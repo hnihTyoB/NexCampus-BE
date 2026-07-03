@@ -307,3 +307,15 @@ model RefreshToken {
   @@index([userId])
   @@map("refresh_tokens")
 }
+
+// 14. NotificationTemplate
+model NotificationTemplate {
+  id              String   @id @default(uuid()) @db.Uuid
+  type            String   @unique
+  titleTemplate   String   @map("title_template")
+  contentTemplate String   @map("content_template")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("notification_templates")
+}

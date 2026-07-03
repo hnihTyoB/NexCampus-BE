@@ -68,9 +68,11 @@ export class TaskAssignmentService {
     // Notify the intern of the new task assignment
     await NotificationDispatcher.dispatch(
       intern.userId,
-      'Bạn đã được giao công việc mới',
-      `Công việc: "${task.title}". Hạn nộp: ${new Date(task.deadline).toLocaleDateString()}`,
-      'TASK_ASSIGNMENT'
+      'TASK_ASSIGNMENT',
+      {
+        taskTitle: task.title,
+        deadline: new Date(task.deadline).toLocaleDateString(),
+      }
     );
 
     return result;
@@ -100,9 +102,11 @@ export class TaskAssignmentService {
       if (newIntern) {
         await NotificationDispatcher.dispatch(
           newIntern.userId,
-          'Bạn đã được giao công việc mới (Chuyển giao)',
-          `Công việc: "${assignment.task.title}". Hạn nộp: ${new Date(assignment.task.deadline).toLocaleDateString()}`,
-          'TASK_ASSIGNMENT'
+          'TASK_ASSIGNMENT',
+          {
+            taskTitle: assignment.task.title,
+            deadline: new Date(assignment.task.deadline).toLocaleDateString(),
+          }
         );
       }
     }

@@ -49,9 +49,10 @@ export class DailyReportService {
     if (intern.leaderId) {
       await NotificationDispatcher.dispatch(
         intern.leaderId,
-        'Báo cáo hàng ngày mới',
-        `Thực tập sinh ${intern.user.fullName} đã gửi báo cáo hàng ngày.`,
-        'DAILY_REPORT'
+        'DAILY_REPORT',
+        {
+          internName: intern.user.fullName,
+        }
       );
     }
 

@@ -61,18 +61,24 @@ export class TaskSubmissionService {
     // Notify the assigner (leader/admin)
     await NotificationDispatcher.dispatch(
       assignment.assignedBy,
-      'Bản nộp bài mới cần duyệt',
-      `Thực tập sinh ${assignment.intern.user.fullName} đã nộp bài cho công việc "${assignment.task.title}" (Lần ${attempt}).`,
-      'TASK_SUBMISSION'
+      'TASK_SUBMISSION',
+      {
+        internName: assignment.intern.user.fullName,
+        taskTitle: assignment.task.title,
+        attempt,
+      }
     );
 
     // If intern has a direct leader different from the assigner, notify them too
     if (assignment.intern.leaderId && assignment.intern.leaderId !== assignment.assignedBy) {
       await NotificationDispatcher.dispatch(
         assignment.intern.leaderId,
-        'Bản nộp bài mới cần duyệt',
-        `Thực tập sinh ${assignment.intern.user.fullName} đã nộp bài cho công việc "${assignment.task.title}" (Lần ${attempt}).`,
-        'TASK_SUBMISSION'
+        'TASK_SUBMISSION',
+        {
+          internName: assignment.intern.user.fullName,
+          taskTitle: assignment.task.title,
+          attempt,
+        }
       );
     }
 
@@ -115,9 +121,12 @@ export class TaskSubmissionService {
       // Notify the intern of the review status update
       await NotificationDispatcher.dispatch(
         submission.assignment.intern.userId,
-        'Kết quả duyệt bài nộp',
-        `Bài nộp cho công việc "${submission.assignment.task.title}" (Lần ${submission.attempt}) đã được duyệt: ${reviewData.reviewStatus}.`,
-        'SUBMISSION_REVIEW'
+        'SUBMISSION_REVIEW',
+        {
+          taskTitle: submission.assignment.task.title,
+          attempt: submission.attempt,
+          reviewStatus: reviewData.reviewStatus,
+        }
       );
 
       return result;

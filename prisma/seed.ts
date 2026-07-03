@@ -77,6 +77,46 @@ async function main() {
     },
   });
 
+  const templates = [
+    {
+      type: 'TASK_ASSIGNMENT',
+      titleTemplate: 'Bạn đã được giao công việc mới',
+      contentTemplate: 'Công việc: "{{taskTitle}}". Hạn nộp: {{deadline}}',
+    },
+    {
+      type: 'TASK_SUBMISSION',
+      titleTemplate: 'Bản nộp bài mới cần duyệt',
+      contentTemplate: 'Thực tập sinh {{internName}} đã nộp bài cho công việc "{{taskTitle}}" (Lần {{attempt}}).',
+    },
+    {
+      type: 'SUBMISSION_REVIEW',
+      titleTemplate: 'Kết quả duyệt bài nộp',
+      contentTemplate: 'Bài nộp cho công việc "{{taskTitle}}" (Lần {{attempt}}) đã được duyệt: {{reviewStatus}}.',
+    },
+    {
+      type: 'DAILY_REPORT',
+      titleTemplate: 'Báo cáo hàng ngày mới',
+      contentTemplate: 'Thực tập sinh {{internName}} đã gửi báo cáo hàng ngày.',
+    },
+    {
+      type: 'WEEKLY_EVALUATION',
+      titleTemplate: 'Đánh giá hàng tuần mới',
+      contentTemplate: 'Bạn nhận được đánh giá tuần {{week}} với tổng điểm là {{totalScore}}/10.',
+    },
+  ];
+
+  for (const t of templates) {
+    await prisma.notificationTemplate.upsert({
+      where: { type: t.type },
+      update: {
+        titleTemplate: t.titleTemplate,
+        contentTemplate: t.contentTemplate,
+      },
+      create: t,
+    });
+    console.log(`NotificationTemplate ${t.type} upserted`);
+  }
+
   console.log('Seed completed successfully');
 }
 

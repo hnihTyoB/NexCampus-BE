@@ -58,9 +58,11 @@ export class WeeklyEvaluationService {
     // Notify the intern of the weekly evaluation
     await NotificationDispatcher.dispatch(
       intern.userId,
-      'Đánh giá hàng tuần mới',
-      `Bạn nhận được đánh giá tuần ${data.week} với tổng điểm là ${totalScore.toFixed(1)}/10.`,
-      'WEEKLY_EVALUATION'
+      'WEEKLY_EVALUATION',
+      {
+        week: data.week,
+        totalScore: totalScore.toFixed(1),
+      }
     );
 
     return result;
@@ -91,9 +93,11 @@ export class WeeklyEvaluationService {
     const finalScore = totalScore !== undefined ? totalScore : evaluation.totalScore;
     await NotificationDispatcher.dispatch(
       evaluation.intern.userId,
-      'Cập nhật đánh giá hàng tuần',
-      `Đánh giá tuần ${evaluation.week} của bạn đã được cập nhật với tổng điểm là ${finalScore.toFixed(1)}/10.`,
-      'WEEKLY_EVALUATION'
+      'WEEKLY_EVALUATION',
+      {
+        week: evaluation.week,
+        totalScore: finalScore.toFixed(1),
+      }
     );
 
     return result;

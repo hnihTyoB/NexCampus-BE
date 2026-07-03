@@ -11,6 +11,7 @@ import weeklyEvaluationRoute from '../modules/weekly-evaluations/weekly-evaluati
 import notificationLogRoute from '../modules/notification-logs/notification-log.route';
 import notificationRoute from '../modules/notifications/notification.route';
 import notificationSettingRoute from '../modules/notification-settings/notification-setting.route';
+import notificationTemplateRoute from '../modules/notification-templates/notification-template.route';
 
 const router = Router();
 
@@ -30,5 +31,6 @@ router.use('/weekly-evaluations', weeklyEvaluationRoute);
 router.use('/notification-logs', notificationLogRoute);
 router.use('/notifications', notificationRoute);
 router.use('/notification-settings', notificationSettingRoute);
+router.use('/notification-templates', notificationTemplateRoute);
 
 export default router;

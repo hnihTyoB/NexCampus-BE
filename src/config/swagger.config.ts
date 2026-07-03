@@ -489,6 +489,24 @@ export const swaggerSpec = {
           discordEnabled: { type: 'boolean' },
         },
       },
+      NotificationTemplate: {
+        type: 'object',
+        properties: {
+          id:              { type: 'string', format: 'uuid' },
+          type:            { type: 'string' },
+          titleTemplate:   { type: 'string' },
+          contentTemplate: { type: 'string' },
+          createdAt:      { type: 'string', format: 'date-time' },
+          updatedAt:      { type: 'string', format: 'date-time' },
+        },
+      },
+      UpdateNotificationTemplateBody: {
+        type: 'object',
+        properties: {
+          titleTemplate:   { type: 'string' },
+          contentTemplate: { type: 'string' },
+        },
+      },
     },
     parameters: {
       PageParam:  { in: 'query', name: 'page',  schema: { type: 'integer', default: 1 } },
@@ -516,6 +534,7 @@ export const swaggerSpec = {
     { name: 'NotificationLogs',  description: 'Nhật ký gửi thông báo (Notification Logs)' },
     { name: 'Notifications',     description: 'Thông báo của người dùng (Notifications)' },
     { name: 'NotificationSettings', description: 'Cấu hình nhận thông báo (Notification Settings)' },
+    { name: 'NotificationTemplates', description: 'Quản lý mẫu thông báo (Notification Templates)' },
     { name: 'System',           description: 'Health check' },
   ],
   paths: {
@@ -1415,6 +1434,47 @@ export const swaggerSpec = {
         responses: {
           200: { description: 'Cập nhật thành công', content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/SuccessResponse' }, { type: 'object', properties: { data: { $ref: '#/components/schemas/NotificationSetting' } } }] } } } },
           401: { $ref: '#/components/responses/Unauthorized' },
+        },
+      },
+    },
+
+    // ─── NotificationTemplates ───────────────────────────────────────────────
+    '/notification-templates': {
+      get: {
+        tags: ['NotificationTemplates'],
+        summary: 'Danh sách mẫu thông báo (Admin / Leader)',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: { description: 'Danh sách mẫu', content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/SuccessResponse' }, { type: 'object', properties: { data: { type: 'array', items: { $ref: '#/components/schemas/NotificationTemplate' } } } }] } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+        },
+      },
+    },
+    '/notification-templates/{id}': {
+      get: {
+        tags: ['NotificationTemplates'],
+        summary: 'Chi tiết mẫu thông báo theo ID (Admin / Leader)',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: {
+          200: { description: 'Thông tin mẫu thông báo', content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/SuccessResponse' }, { type: 'object', properties: { data: { $ref: '#/components/schemas/NotificationTemplate' } } }] } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+      put: {
+        tags: ['NotificationTemplates'],
+        summary: 'Cập nhật mẫu thông báo (Admin / Leader)',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string', format: 'uuid' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/UpdateNotificationTemplateBody' } } } },
+        responses: {
+          200: { description: 'Cập nhật thành công', content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/SuccessResponse' }, { type: 'object', properties: { data: { $ref: '#/components/schemas/NotificationTemplate' } } }] } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { $ref: '#/components/responses/NotFound' },
         },
       },
     },
