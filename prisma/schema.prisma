@@ -1,0 +1,309 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// 1. Role
+model Role {
+  id    String @id @default(uuid()) @db.Uuid
+  name  String @unique // ADMIN, LEADER, INTERN
+  users User[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("roles")
+}
+
+// 2. User
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @unique
+  password  String
+  fullName  String?  @map("full_name")
+  roleId    String   @map("role_id") @db.Uuid
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  role Role @relation(fields: [roleId], references: [id])
+
+  // Relations
+  approvedApplications Application[]        @relation("ApprovedApplications")
+  intern               Intern?              @relation("InternUser")
+  leadedInterns        Intern[]             @relation("LeaderInterns")
+  notificationSetting  NotificationSetting?
+  createdTasks         Task[]               @relation("CreatedTasks")
+  assignedTasks        TaskAssignment[]     @relation("AssignedTasks")
+  reviewedSubmissions  TaskSubmission[]     @relation("ReviewedSubmissions")
+  leaderEvaluations    WeeklyEvaluation[]   @relation("LeaderEvaluations")
+  notifications        Notification[]
+  refreshTokens        RefreshToken[]
+
+  @@index([roleId])
+  @@map("users")
+}
+
+// 3. Application
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Application {
+  id         String            @id @default(uuid()) @db.Uuid
+  fullName   String            @map("full_name")
+  email      String
+  phone      String
+  department String
+  position   String
+  startDate  DateTime          @map("start_date")
+  duration   Int
+  status     ApplicationStatus @default(PENDING)
+  approvedBy String?           @map("approved_by") @db.Uuid
+  approvedAt DateTime?         @map("approved_at")
+  deletedAt  DateTime?         @map("deleted_at")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+
+  approver User? @relation("ApprovedApplications", fields: [approvedBy], references: [id], onDelete: SetNull)
+
+  @@index([approvedBy])
+  @@map("applications")
+}
+
+// 4. Intern
+enum InternStatus {
+  ACTIVE
+  COMPLETED
+  DROPPED
+}
+
+model Intern {
+  id                 String       @id @default(uuid()) @db.Uuid
+  userId             String       @unique @map("user_id") @db.Uuid
+  leaderId           String?      @map("leader_id") @db.Uuid
+  fullName           String       @map("full_name")
+  phone              String
+  department         String
+  position           String
+  startDate          DateTime     @map("start_date")
+  duration           Int
+  discordUsername    String?      @map("discord_username")
+  discordRoleGranted Boolean      @default(false) @map("discord_role_granted")
+  status             InternStatus @default(ACTIVE)
+  deletedAt          DateTime?    @map("deleted_at")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+
+  user   User  @relation("InternUser", fields: [userId], references: [id], onDelete: Cascade)
+  leader User? @relation("LeaderInterns", fields: [leaderId], references: [id], onDelete: SetNull)
+
+  // Relations
+  assignments       TaskAssignment[]
+  dailyReports      DailyReport[]
+  weeklyEvaluations WeeklyEvaluation[]
+
+  @@index([leaderId])
+  @@map("interns")
+}
+
+// 5. NotificationSetting
+model NotificationSetting {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @unique @map("user_id") @db.Uuid
+  webEnabled     Boolean  @default(true) @map("web_enabled")
+  emailEnabled   Boolean  @default(true) @map("email_enabled")
+  discordEnabled Boolean  @default(false) @map("discord_enabled")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_settings")
+}
+
+// 6. Task
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Task {
+  id          String       @id @default(uuid()) @db.Uuid
+  title       String
+  description String?
+  deadline    DateTime
+  priority    TaskPriority @default(MEDIUM)
+  createdBy   String       @map("created_by") @db.Uuid
+  deletedAt   DateTime?    @map("deleted_at")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  creator    User            @relation("CreatedTasks", fields: [createdBy], references: [id], onDelete: Cascade)
+  assignment TaskAssignment?
+
+  @@index([createdBy])
+  @@map("tasks")
+}
+
+// 7. TaskAssignment
+enum AssignmentStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  DONE
+}
+
+model TaskAssignment {
+  id         String           @id @default(uuid()) @db.Uuid
+  taskId     String           @unique @map("task_id") @db.Uuid
+  internId   String           @map("intern_id") @db.Uuid
+  assignedBy String           @map("assigned_by") @db.Uuid
+  status     AssignmentStatus @default(TODO)
+  assignedAt DateTime         @default(now()) @map("assigned_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+
+  task        Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  intern      Intern           @relation(fields: [internId], references: [id], onDelete: Cascade)
+  assigner    User             @relation("AssignedTasks", fields: [assignedBy], references: [id], onDelete: Cascade)
+  submissions TaskSubmission[]
+
+  @@index([internId])
+  @@index([assignedBy])
+  @@map("task_assignments")
+}
+
+// 8. TaskSubmission
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model TaskSubmission {
+  id            String       @id @default(uuid()) @db.Uuid
+  assignmentId  String       @map("assignment_id") @db.Uuid
+  attempt       Int
+  prLink        String?      @map("pr_link")
+  videoDemo     String?      @map("video_demo")
+  note          String?
+  reviewStatus  ReviewStatus @default(PENDING) @map("review_status")
+  reviewComment String?      @map("review_comment")
+  reviewedBy    String?      @map("reviewed_by") @db.Uuid
+  reviewedAt    DateTime?    @map("reviewed_at")
+  submittedAt   DateTime     @default(now()) @map("submitted_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  assignment TaskAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  reviewer   User?          @relation("ReviewedSubmissions", fields: [reviewedBy], references: [id], onDelete: SetNull)
+
+  @@index([assignmentId])
+  @@index([reviewedBy])
+  @@map("task_submissions")
+}
+
+// 9. DailyReport
+model DailyReport {
+  id        String   @id @default(uuid()) @db.Uuid
+  internId  String   @map("intern_id") @db.Uuid
+  content   String
+  prLink    String?  @map("pr_link")
+  videoDemo String?  @map("video_demo")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  intern Intern @relation(fields: [internId], references: [id], onDelete: Cascade)
+
+  @@index([internId])
+  @@map("daily_reports")
+}
+
+// 10. WeeklyEvaluation
+model WeeklyEvaluation {
+  id            String   @id @default(uuid()) @db.Uuid
+  internId      String   @map("intern_id") @db.Uuid
+  leaderId      String   @map("leader_id") @db.Uuid
+  week          Int
+  communication Float
+  attitude      Float
+  learning      Float
+  coding        Float
+  totalScore    Float    @map("total_score")
+  comment       String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  intern Intern @relation(fields: [internId], references: [id], onDelete: Cascade)
+  leader User   @relation("LeaderEvaluations", fields: [leaderId], references: [id], onDelete: Cascade)
+
+  @@unique([internId, week])
+  @@index([leaderId])
+  @@map("weekly_evaluations")
+}
+
+// 11. Notification
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  title     String
+  content   String
+  type      String
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs NotificationLog[]
+
+  @@index([userId])
+  @@map("notifications")
+}
+
+// 12. NotificationLog
+enum NotificationChannel {
+  WEB
+  EMAIL
+  DISCORD
+}
+
+enum NotificationLogStatus {
+  SUCCESS
+  FAILED
+}
+
+model NotificationLog {
+  id             String                @id @default(uuid()) @db.Uuid
+  notificationId String                @map("notification_id") @db.Uuid
+  channel        NotificationChannel
+  status         NotificationLogStatus
+  sentAt         DateTime              @default(now()) @map("sent_at")
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([notificationId])
+  @@map("notification_logs")
+}
+
+// 13. RefreshToken
+model RefreshToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  token     String   @unique
+  userId    String   @map("user_id") @db.Uuid
+  userAgent String?  @map("user_agent")
+  ipAddress String?  @map("ip_address")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}

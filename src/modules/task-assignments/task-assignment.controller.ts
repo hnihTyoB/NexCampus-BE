@@ -1,0 +1,61 @@
+import { Request, Response, NextFunction } from 'express';
+import { TaskAssignmentService } from './task-assignment.service';
+import { TaskAssignmentQueryDto, CreateTaskAssignmentDto, UpdateTaskAssignmentDto } from './task-assignment.dto';
+
+export class TaskAssignmentController {
+  private readonly service = new TaskAssignmentService();
+
+  findAll = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const query = req.query as unknown as TaskAssignmentQueryDto;
+      const result = await this.service.findAll(query, req.user);
+
+      res.json({ success: true, ...result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  findById = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.service.findById(req.params.id);
+
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  create = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const assignedBy = req.user.id;
+      const body = req.body as CreateTaskAssignmentDto;
+      const result = await this.service.create(body, assignedBy);
+
+      res.status(201).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  update = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = req.body as UpdateTaskAssignmentDto;
+      const result = await this.service.update(req.params.id, body);
+
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  delete = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await this.service.delete(req.params.id);
+
+      res.json({ success: true, message: 'Task assignment deleted successfully' });
+    } catch (error) {
+      next(error);
+    }
+  };
+}

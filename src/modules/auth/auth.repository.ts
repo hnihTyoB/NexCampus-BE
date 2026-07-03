@@ -1,0 +1,41 @@
+import { prisma } from '../../database/prisma.client';
+
+export class AuthRepository {
+  findByEmail(email: string) {
+    return prisma.user.findUnique({
+      where: { email },
+      include: { role: true },
+    });
+  }
+
+  findById(id: string) {
+    return prisma.user.findUnique({
+      where: { id },
+      include: { role: true },
+    });
+  }
+
+  async saveRefreshToken(userId: string, token: string, expiresAt: Date, userAgent?: string, ipAddress?: string) {
+    return prisma.refreshToken.create({
+      data: {
+        userId,
+        token,
+        expiresAt,
+        userAgent,
+        ipAddress,
+      },
+    });
+  }
+
+  async findRefreshToken(token: string) {
+    return prisma.refreshToken.findUnique({
+      where: { token },
+    });
+  }
+
+  async deleteRefreshToken(token: string) {
+    return prisma.refreshToken.deleteMany({
+      where: { token },
+    });
+  }
+}

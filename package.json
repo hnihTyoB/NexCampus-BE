@@ -1,0 +1,53 @@
+{
+  "name": "data-crawler-be",
+  "version": "1.0.0",
+  "description": "Backend API for data crawling service",
+  "main": "dist/server.js",
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "prisma:generate": "node scripts/prisma-run.js generate",
+    "prisma:studio": "node scripts/prisma-run.js studio",
+    "db:migrate": "node scripts/prisma-run.js migrate dev",
+    "db:migrate:init": "node scripts/prisma-run.js migrate dev --name init",
+    "db:migrate:deploy": "node scripts/prisma-run.js migrate deploy",
+    "db:migrate:reset": "node scripts/prisma-run.js migrate reset",
+    "db:migrate:status": "node scripts/prisma-run.js migrate status",
+    "db:seed": "node scripts/prisma-run.js db seed -- --tsx prisma/seed.ts",
+    "lint": "eslint .",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "swagger-ui-express": "^5.0.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/morgan": "^1.9.9",
+    "@types/node": "^22.10.2",
+    "@types/swagger-ui-express": "^4.1.8",
+    "eslint": "^9.17.0",
+    "prettier": "^3.4.2",
+    "prisma": "^5.22.0",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
+}
