@@ -6,6 +6,7 @@ import { ERROR_CODE } from '../../common/errors/error-code';
 import { TaskSubmissionQueryDto, CreateTaskSubmissionDto, UpdateTaskSubmissionDto } from './task-submission.dto';
 import { ROLES } from '../../common/constants/role.constant';
 import { REVIEW_STATUS } from '../../common/constants/status.constant';
+import { NotificationDispatcher } from '../notifications/notification.dispatcher';
 
 interface UserPayload {
   id: string;
@@ -55,7 +56,27 @@ export class TaskSubmissionService {
     const count = await this.repository.countAttempts(data.assignmentId);
     const attempt = count + 1;
 
-    return this.repository.create(data, attempt);
+    const result = await this.repository.create(data, attempt);
+
+    // Notify the assigner (leader/admin)
+    await NotificationDispatcher.dispatch(
+      assignment.assignedBy,
+      'Bản nộp bài mới cần duyệt',
+      `Thực tập sinh ${assignment.intern.user.fullName} đã nộp bài cho công việc "${assignment.task.title}" (Lần ${attempt}).`,
+      'TASK_SUBMISSION'
+    );
+
+    // If intern has a direct leader different from the assigner, notify them too
+    if (assignment.intern.leaderId && assignment.intern.leaderId !== assignment.assignedBy) {
+      await NotificationDispatcher.dispatch(
+        assignment.intern.leaderId,
+        'Bản nộp bài mới cần duyệt',
+        `Thực tập sinh ${assignment.intern.user.fullName} đã nộp bài cho công việc "${assignment.task.title}" (Lần ${attempt}).`,
+        'TASK_SUBMISSION'
+      );
+    }
+
+    return result;
   }
 
   async update(id: string, data: UpdateTaskSubmissionDto, user: UserPayload) {
@@ -89,7 +110,17 @@ export class TaskSubmissionService {
       };
 
       // Set the reviewedBy property using repository's method
-      return this.repository.update(id, reviewData, user.id);
+      const result = await this.repository.update(id, reviewData, user.id);
+
+      // Notify the intern of the review status update
+      await NotificationDispatcher.dispatch(
+        submission.assignment.intern.userId,
+        'Kết quả duyệt bài nộp',
+        `Bài nộp cho công việc "${submission.assignment.task.title}" (Lần ${submission.attempt}) đã được duyệt: ${reviewData.reviewStatus}.`,
+        'SUBMISSION_REVIEW'
+      );
+
+      return result;
     }
   }
 

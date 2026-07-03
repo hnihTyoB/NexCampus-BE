@@ -4,6 +4,7 @@ import { AppError } from '../../common/errors/app-error';
 import { ERROR_CODE } from '../../common/errors/error-code';
 import { WeeklyEvaluationQueryDto, CreateWeeklyEvaluationDto, UpdateWeeklyEvaluationDto } from './weekly-evaluation.dto';
 import { ROLES } from '../../common/constants/role.constant';
+import { NotificationDispatcher } from '../notifications/notification.dispatcher';
 
 interface UserPayload {
   id: string;
@@ -52,7 +53,17 @@ export class WeeklyEvaluationService {
     // 3. Compute totalScore
     const totalScore = (data.communication + data.attitude + data.learning + data.coding) / 4;
 
-    return this.repository.create(data, totalScore, leaderId);
+    const result = await this.repository.create(data, totalScore, leaderId);
+
+    // Notify the intern of the weekly evaluation
+    await NotificationDispatcher.dispatch(
+      intern.userId,
+      'Đánh giá hàng tuần mới',
+      `Bạn nhận được đánh giá tuần ${data.week} với tổng điểm là ${totalScore.toFixed(1)}/10.`,
+      'WEEKLY_EVALUATION'
+    );
+
+    return result;
   }
 
   async update(id: string, data: UpdateWeeklyEvaluationDto) {
@@ -74,7 +85,18 @@ export class WeeklyEvaluationService {
       totalScore = (comm + att + learn + code) / 4;
     }
 
-    return this.repository.update(id, data, totalScore);
+    const result = await this.repository.update(id, data, totalScore);
+
+    // Notify the intern of the evaluation update
+    const finalScore = totalScore !== undefined ? totalScore : evaluation.totalScore;
+    await NotificationDispatcher.dispatch(
+      evaluation.intern.userId,
+      'Cập nhật đánh giá hàng tuần',
+      `Đánh giá tuần ${evaluation.week} của bạn đã được cập nhật với tổng điểm là ${finalScore.toFixed(1)}/10.`,
+      'WEEKLY_EVALUATION'
+    );
+
+    return result;
   }
 
   async delete(id: string) {

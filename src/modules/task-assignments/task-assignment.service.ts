@@ -5,6 +5,7 @@ import { AppError } from '../../common/errors/app-error';
 import { ERROR_CODE } from '../../common/errors/error-code';
 import { TaskAssignmentQueryDto, CreateTaskAssignmentDto, UpdateTaskAssignmentDto } from './task-assignment.dto';
 import { ROLES } from '../../common/constants/role.constant';
+import { NotificationDispatcher } from '../notifications/notification.dispatcher';
 
 interface UserPayload {
   id: string;
@@ -62,7 +63,17 @@ export class TaskAssignmentService {
       throw new AppError('Task has already been assigned', 409, ERROR_CODE.DUPLICATE_ENTRY);
     }
 
-    return this.repository.create(data, assignedBy);
+    const result = await this.repository.create(data, assignedBy);
+
+    // Notify the intern of the new task assignment
+    await NotificationDispatcher.dispatch(
+      intern.userId,
+      'Bạn đã được giao công việc mới',
+      `Công việc: "${task.title}". Hạn nộp: ${new Date(task.deadline).toLocaleDateString()}`,
+      'TASK_ASSIGNMENT'
+    );
+
+    return result;
   }
 
   async update(id: string, data: UpdateTaskAssignmentDto) {
@@ -81,7 +92,22 @@ export class TaskAssignmentService {
       }
     }
 
-    return this.repository.update(id, data);
+    const result = await this.repository.update(id, data);
+
+    // If reassigned to a different intern, notify the new intern
+    if (data.internId !== undefined && data.internId !== assignment.internId) {
+      const newIntern = await this.internRepository.findById(data.internId);
+      if (newIntern) {
+        await NotificationDispatcher.dispatch(
+          newIntern.userId,
+          'Bạn đã được giao công việc mới (Chuyển giao)',
+          `Công việc: "${assignment.task.title}". Hạn nộp: ${new Date(assignment.task.deadline).toLocaleDateString()}`,
+          'TASK_ASSIGNMENT'
+        );
+      }
+    }
+
+    return result;
   }
 
   async delete(id: string) {

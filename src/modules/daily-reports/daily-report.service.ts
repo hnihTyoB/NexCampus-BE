@@ -4,6 +4,7 @@ import { AppError } from '../../common/errors/app-error';
 import { ERROR_CODE } from '../../common/errors/error-code';
 import { DailyReportQueryDto, CreateDailyReportDto, UpdateDailyReportDto } from './daily-report.dto';
 import { ROLES } from '../../common/constants/role.constant';
+import { NotificationDispatcher } from '../notifications/notification.dispatcher';
 
 interface UserPayload {
   id: string;
@@ -42,7 +43,19 @@ export class DailyReportService {
       throw new AppError('Intern profile not found', 404, ERROR_CODE.NOT_FOUND);
     }
 
-    return this.repository.create(data, intern.id);
+    const result = await this.repository.create(data, intern.id);
+
+    // Notify the leader of the new daily report
+    if (intern.leaderId) {
+      await NotificationDispatcher.dispatch(
+        intern.leaderId,
+        'Báo cáo hàng ngày mới',
+        `Thực tập sinh ${intern.user.fullName} đã gửi báo cáo hàng ngày.`,
+        'DAILY_REPORT'
+      );
+    }
+
+    return result;
   }
 
   async update(id: string, data: UpdateDailyReportDto, user: UserPayload) {
