@@ -9,6 +9,8 @@ import taskSubmissionRoute from '../modules/task-submissions/task-submission.rou
 import dailyReportRoute from '../modules/daily-reports/daily-report.route';
 import weeklyEvaluationRoute from '../modules/weekly-evaluations/weekly-evaluation.route';
 import notificationLogRoute from '../modules/notification-logs/notification-log.route';
+import notificationRoute from '../modules/notifications/notification.route';
+import notificationSettingRoute from '../modules/notification-settings/notification-setting.route';
 
 const router = Router();
 
@@ -26,5 +28,7 @@ router.use('/task-submissions', taskSubmissionRoute);
 router.use('/daily-reports', dailyReportRoute);
 router.use('/weekly-evaluations', weeklyEvaluationRoute);
 router.use('/notification-logs', notificationLogRoute);
+router.use('/notifications', notificationRoute);
+router.use('/notification-settings', notificationSettingRoute);
 
 export default router;

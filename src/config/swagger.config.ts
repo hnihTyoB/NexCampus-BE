@@ -446,6 +446,49 @@ export const swaggerSpec = {
           status:         { type: 'string', enum: ['SUCCESS', 'FAILED'] },
         },
       },
+      Notification: {
+        type: 'object',
+        properties: {
+          id:        { type: 'string', format: 'uuid' },
+          userId:    { type: 'string', format: 'uuid' },
+          title:     { type: 'string' },
+          content:   { type: 'string' },
+          type:      { type: 'string' },
+          isRead:    { type: 'boolean' },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      CreateNotificationBody: {
+        type: 'object',
+        required: ['userId', 'title', 'content', 'type'],
+        properties: {
+          userId:    { type: 'string', format: 'uuid' },
+          title:     { type: 'string' },
+          content:   { type: 'string' },
+          type:      { type: 'string' },
+        },
+      },
+      NotificationSetting: {
+        type: 'object',
+        properties: {
+          id:             { type: 'string', format: 'uuid' },
+          userId:         { type: 'string', format: 'uuid' },
+          webEnabled:     { type: 'boolean' },
+          emailEnabled:   { type: 'boolean' },
+          discordEnabled: { type: 'boolean' },
+          createdAt:      { type: 'string', format: 'date-time' },
+          updatedAt:      { type: 'string', format: 'date-time' },
+        },
+      },
+      UpdateNotificationSettingBody: {
+        type: 'object',
+        properties: {
+          webEnabled:     { type: 'boolean' },
+          emailEnabled:   { type: 'boolean' },
+          discordEnabled: { type: 'boolean' },
+        },
+      },
     },
     parameters: {
       PageParam:  { in: 'query', name: 'page',  schema: { type: 'integer', default: 1 } },
@@ -471,6 +514,8 @@ export const swaggerSpec = {
     { name: 'DailyReports',     description: 'Báo cáo hàng ngày của thực tập sinh (Daily Reports)' },
     { name: 'WeeklyEvaluations', description: 'Đánh giá hàng tuần của Leader (Weekly Evaluations)' },
     { name: 'NotificationLogs',  description: 'Nhật ký gửi thông báo (Notification Logs)' },
+    { name: 'Notifications',     description: 'Thông báo của người dùng (Notifications)' },
+    { name: 'NotificationSettings', description: 'Cấu hình nhận thông báo (Notification Settings)' },
     { name: 'System',           description: 'Health check' },
   ],
   paths: {
@@ -1266,6 +1311,110 @@ export const swaggerSpec = {
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
           404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+
+    // ─── Notifications ───────────────────────────────────────────────────────
+    '/notifications': {
+      get: {
+        tags: ['Notifications'],
+        summary: 'Danh sách thông báo của người dùng',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { in: 'query', name: 'userId', schema: { type: 'string', format: 'uuid' } },
+          { in: 'query', name: 'isRead', schema: { type: 'boolean' } },
+          { in: 'query', name: 'type', schema: { type: 'string' } },
+          { $ref: '#/components/parameters/PageParam' },
+          { $ref: '#/components/parameters/LimitParam' },
+          { in: 'query', name: 'sortBy', schema: { type: 'string', enum: ['createdAt'], default: 'createdAt' } },
+          { $ref: '#/components/parameters/OrderParam' },
+        ],
+        responses: {
+          200: {
+            description: 'Danh sách thông báo',
+            content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/SuccessResponse' }, { type: 'object', properties: { data: { type: 'array', items: { $ref: '#/components/schemas/Notification' } }, meta: { $ref: '#/components/schemas/PaginationMeta' } } }] } } },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+        },
+      },
+      post: {
+        tags: ['Notifications'],
+        summary: 'Tạo thông báo mới (Admin / Leader)',
+        security: [{ BearerAuth: [] }],
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/CreateNotificationBody' } } } },
+        responses: {
+          201: {
+            description: 'Đã tạo thông báo thành công',
+            content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/SuccessResponse' }, { type: 'object', properties: { data: { $ref: '#/components/schemas/Notification' } } }] } } },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+    '/notifications/{id}': {
+      get: {
+        tags: ['Notifications'],
+        summary: 'Chi tiết thông báo theo ID',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: {
+          200: { description: 'Thông tin thông báo', content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/SuccessResponse' }, { type: 'object', properties: { data: { $ref: '#/components/schemas/Notification' } } }] } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+      delete: {
+        tags: ['Notifications'],
+        summary: 'Xoá thông báo',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: {
+          200: { description: 'Đã xoá thành công', content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/SuccessResponse' }, { type: 'object', properties: { message: { type: 'string' } } }] } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+    '/notifications/{id}/read': {
+      patch: {
+        tags: ['Notifications'],
+        summary: 'Đánh dấu thông báo đã đọc',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: {
+          200: { description: 'Cập nhật thành công', content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/SuccessResponse' }, { type: 'object', properties: { data: { $ref: '#/components/schemas/Notification' } } }] } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+
+    // ─── NotificationSettings ────────────────────────────────────────────────
+    '/notification-settings/me': {
+      get: {
+        tags: ['NotificationSettings'],
+        summary: 'Lấy cấu hình nhận thông báo của tôi (Auto-initialization)',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: { description: 'Thông tin cấu hình', content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/SuccessResponse' }, { type: 'object', properties: { data: { $ref: '#/components/schemas/NotificationSetting' } } }] } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+        },
+      },
+      put: {
+        tags: ['NotificationSettings'],
+        summary: 'Cập nhật cấu hình nhận thông báo của tôi',
+        security: [{ BearerAuth: [] }],
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/UpdateNotificationSettingBody' } } } },
+        responses: {
+          200: { description: 'Cập nhật thành công', content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/SuccessResponse' }, { type: 'object', properties: { data: { $ref: '#/components/schemas/NotificationSetting' } } }] } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
         },
       },
     },
