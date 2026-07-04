@@ -73,6 +73,7 @@ export const swaggerSpec = {
           roleId:    { type: 'string', format: 'uuid' },
           role:      { $ref: '#/components/schemas/Role' },
           isActive:  { type: 'boolean' },
+          avatarUrl: { type: 'string', format: 'uri', nullable: true, example: 'https://[project].supabase.co/storage/v1/object/public/avatars/...' },
           createdAt: { type: 'string', format: 'date-time' },
           updatedAt: { type: 'string', format: 'date-time' },
         },
@@ -349,6 +350,11 @@ export const swaggerSpec = {
           reviewedAt:    { type: 'string', format: 'date-time', nullable: true },
           submittedAt:   { type: 'string', format: 'date-time' },
           updatedAt:     { type: 'string', format: 'date-time' },
+          attachments: {
+            type: 'array',
+            description: 'Danh sách file đính kèm của bài nộp',
+            items: { $ref: '#/components/schemas/SubmissionAttachment' },
+          },
         },
       },
       CreateTaskSubmissionBody: {
@@ -371,6 +377,21 @@ export const swaggerSpec = {
           reviewComment: { type: 'string', nullable: true },
         },
       },
+      // ─── SubmissionAttachment ──────────────────────────────────────────────────
+      SubmissionAttachment: {
+        type: 'object',
+        properties: {
+          id:           { type: 'string', format: 'uuid' },
+          submissionId: { type: 'string', format: 'uuid' },
+          fileName:     { type: 'string', example: 'test-report.pdf' },
+          fileUrl:      { type: 'string', format: 'uri', example: 'https://[project].supabase.co/storage/v1/object/public/submission-attachments/...' },
+          filePath:     { type: 'string', example: 'uuid-submission-id/uuid_test-report.pdf' },
+          mimeType:     { type: 'string', example: 'application/pdf' },
+          fileSize:     { type: 'integer', description: 'Kích thước file tính bằng bytes', example: 1048576 },
+          uploadedBy:   { type: 'string', format: 'uuid' },
+          createdAt:    { type: 'string', format: 'date-time' },
+        },
+      },
       DailyReport: {
         type: 'object',
         properties: {
@@ -381,6 +402,11 @@ export const swaggerSpec = {
           videoDemo: { type: 'string', format: 'uri', nullable: true },
           createdAt: { type: 'string', format: 'date-time' },
           updatedAt: { type: 'string', format: 'date-time' },
+          attachments: {
+            type: 'array',
+            description: 'Danh sách file đính kèm của báo cáo',
+            items: { $ref: '#/components/schemas/ReportAttachment' },
+          },
         },
       },
       CreateDailyReportBody: {
@@ -398,6 +424,21 @@ export const swaggerSpec = {
           content:   { type: 'string' },
           prLink:    { type: 'string', format: 'uri', nullable: true },
           videoDemo: { type: 'string', format: 'uri', nullable: true },
+        },
+      },
+      // ─── ReportAttachment ──────────────────────────────────────────────────────
+      ReportAttachment: {
+        type: 'object',
+        properties: {
+          id:         { type: 'string', format: 'uuid' },
+          reportId:   { type: 'string', format: 'uuid' },
+          fileName:   { type: 'string', example: 'screenshot.png' },
+          fileUrl:    { type: 'string', format: 'uri', example: 'https://[project].supabase.co/storage/v1/object/public/report-attachments/...' },
+          filePath:   { type: 'string', example: 'uuid-report-id/uuid_screenshot.png' },
+          mimeType:   { type: 'string', example: 'image/png' },
+          fileSize:   { type: 'integer', description: 'Kích thước file tính bằng bytes', example: 51200 },
+          uploadedBy: { type: 'string', format: 'uuid' },
+          createdAt:  { type: 'string', format: 'date-time' },
         },
       },
       WeeklyEvaluation: {
@@ -550,7 +591,9 @@ export const swaggerSpec = {
     { name: 'TaskAttachments',         description: 'File đính kèm của Task — tài liệu hướng dẫn, thiết kế, zip mã nguồn' },
     { name: 'TaskAssignments',         description: 'Giao việc cho thực tập sinh (Assignments)' },
     { name: 'TaskSubmissions',         description: 'Nộp bài và duyệt bài của thực tập sinh (Submissions)' },
+    { name: 'SubmissionAttachments',   description: 'File đính kèm của bài nộp thực tập sinh (Submissions)' },
     { name: 'DailyReports',            description: 'Báo cáo hàng ngày của thực tập sinh (Daily Reports)' },
+    { name: 'ReportAttachments',       description: 'File đính kèm của báo cáo hàng ngày (Daily Reports)' },
     { name: 'WeeklyEvaluations',       description: 'Đánh giá hàng tuần của Leader (Weekly Evaluations)' },
     { name: 'NotificationLogs',        description: 'Nhật ký gửi thông báo (Notification Logs)' },
     { name: 'Notifications',           description: 'Thông báo của người dùng (Notifications)' },
@@ -699,6 +742,41 @@ export const swaggerSpec = {
         },
       },
     },
+    '/users/avatar': {
+      post: {
+        tags: ['Users'],
+        summary: 'Tải lên hoặc cập nhật ảnh đại diện (Avatar) của chính mình',
+        description: 'Tải lên ảnh đại diện của tài khoản đang đăng nhập. Hỗ trợ các định dạng hình ảnh (JPEG, PNG, WEBP, GIF). Dung lượng tối đa cấu hình qua `SUPABASE_STORAGE_MAX_FILE_SIZE_MB`. Sau khi tải lên thành công, hệ thống tự động xóa ảnh đại diện cũ trên Storage (nếu có) và cập nhật trường `avatarUrl` của User.',
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'multipart/form-data': {
+              schema: {
+                type: 'object',
+                required: ['avatar'],
+                properties: {
+                  avatar: {
+                    type: 'string',
+                    format: 'binary',
+                    description: 'File hình ảnh làm ảnh đại diện',
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Đã tải lên ảnh đại diện thành công',
+            content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/SuccessResponse' }, { type: 'object', properties: { data: { $ref: '#/components/schemas/User' } } }] } } },
+          },
+          400: { description: 'File không hợp lệ (không phải ảnh hoặc quá dung lượng)', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+        },
+      },
+    },
+
 
     // ─── Applications ────────────────────────────────────────────────────────
     '/applications': {
@@ -1211,6 +1289,132 @@ export const swaggerSpec = {
         },
       },
     },
+    '/task-submissions/{id}/video': {
+      post: {
+        tags: ['TaskSubmissions'],
+        summary: 'Upload trực tiếp file video demo cho bài nộp (Intern only)',
+        description: 'Tải lên video demo dạng `.mp4` hoặc `.webm`. Hạn mức dung lượng tối đa cấu hình qua `SUPABASE_STORAGE_MAX_FILE_SIZE_MB`. Sau khi tải lên thành công, hệ thống tự động cập nhật trường `videoDemo` của TaskSubmission.',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string', format: 'uuid' }, description: 'ID của TaskSubmission' }],
+        requestBody: {
+          required: true,
+          content: {
+            'multipart/form-data': {
+              schema: {
+                type: 'object',
+                required: ['video'],
+                properties: {
+                  video: {
+                    type: 'string',
+                    format: 'binary',
+                    description: 'File video demo (.mp4, .webm)',
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Đã upload video demo và cập nhật bài nộp thành công',
+            content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/SuccessResponse' }, { type: 'object', properties: { data: { $ref: '#/components/schemas/TaskSubmission' } } }] } } },
+          },
+          400: { description: 'File video không hợp lệ hoặc bài nộp đã được APPROVED', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+    '/task-submissions/{submissionId}/attachments': {
+      get: {
+        tags: ['SubmissionAttachments'],
+        summary: 'Lấy danh sách file đính kèm của một bài nộp (Admin / Leader / Intern)',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: 'path', name: 'submissionId', required: true, schema: { type: 'string', format: 'uuid' }, description: 'ID của TaskSubmission' }],
+        responses: {
+          200: {
+            description: 'Danh sách file đính kèm bài nộp',
+            content: {
+              'application/json': {
+                schema: {
+                  allOf: [
+                    { $ref: '#/components/schemas/SuccessResponse' },
+                    { type: 'object', properties: { data: { type: 'array', items: { $ref: '#/components/schemas/SubmissionAttachment' } } } },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+      post: {
+        tags: ['SubmissionAttachments'],
+        summary: 'Upload file đính kèm cho bài nộp (Admin / Leader / Intern)',
+        description: 'Tải lên tài liệu đính kèm dạng hình ảnh, PDF, DOCX, hoặc ZIP/RAR. Thực tập sinh chỉ được tải lên cho bài nộp của chính mình và khi bài nộp chưa được APPROVED.',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: 'path', name: 'submissionId', required: true, schema: { type: 'string', format: 'uuid' }, description: 'ID của TaskSubmission' }],
+        requestBody: {
+          required: true,
+          content: {
+            'multipart/form-data': {
+              schema: {
+                type: 'object',
+                required: ['file'],
+                properties: {
+                  file: {
+                    type: 'string',
+                    format: 'binary',
+                    description: 'File cần upload (ảnh, PDF, DOCX, ZIP, RAR, 7z)',
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'File đã upload và đính kèm vào bài nộp',
+            content: {
+              'application/json': {
+                schema: {
+                  allOf: [
+                    { $ref: '#/components/schemas/SuccessResponse' },
+                    { type: 'object', properties: { data: { $ref: '#/components/schemas/SubmissionAttachment' } } },
+                  ],
+                },
+              },
+            },
+          },
+          400: { description: 'File không hợp lệ hoặc bài nộp đã được duyệt APPROVED', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+    '/task-submissions/{submissionId}/attachments/{attachmentId}': {
+      delete: {
+        tags: ['SubmissionAttachments'],
+        summary: 'Xoá file đính kèm của bài nộp (Admin / Leader / Intern)',
+        description: 'Xoá file trên Supabase Storage và xoá record trong database.',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { in: 'path', name: 'submissionId', required: true, schema: { type: 'string', format: 'uuid' }, description: 'ID của TaskSubmission' },
+          { in: 'path', name: 'attachmentId', required: true, schema: { type: 'string', format: 'uuid' }, description: 'ID của Attachment' },
+        ],
+        responses: {
+          200: { description: 'Xoá thành công', content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/SuccessResponse' }, { type: 'object', properties: { message: { type: 'string', example: 'Submission attachment deleted successfully' } } }] } } } },
+          400: { description: 'Không thể chỉnh sửa hoặc xoá bài nộp đã APPROVED', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
 
     // ─── DailyReports ────────────────────────────────────────────────────────
     '/daily-reports': {
@@ -1284,6 +1488,131 @@ export const swaggerSpec = {
         parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string', format: 'uuid' } }],
         responses: {
           200: { description: 'Đã xoá báo cáo thành công', content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/SuccessResponse' }, { type: 'object', properties: { message: { type: 'string' } } }] } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+    '/daily-reports/{id}/video': {
+      post: {
+        tags: ['DailyReports'],
+        summary: 'Upload trực tiếp file video demo cho báo cáo hàng ngày (Intern only)',
+        description: 'Tải lên video demo dạng `.mp4` hoặc `.webm` cho báo cáo ngày. Dung lượng tối đa cấu hình qua `SUPABASE_STORAGE_MAX_FILE_SIZE_MB`. Sau khi tải lên thành công, hệ thống tự động cập nhật trường `videoDemo` của DailyReport.',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string', format: 'uuid' }, description: 'ID của DailyReport' }],
+        requestBody: {
+          required: true,
+          content: {
+            'multipart/form-data': {
+              schema: {
+                type: 'object',
+                required: ['video'],
+                properties: {
+                  video: {
+                    type: 'string',
+                    format: 'binary',
+                    description: 'File video demo (.mp4, .webm)',
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Đã upload video demo và cập nhật báo cáo thành công',
+            content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/SuccessResponse' }, { type: 'object', properties: { data: { $ref: '#/components/schemas/DailyReport' } } }] } } },
+          },
+          400: { description: 'File video không hợp lệ hoặc không có quyền sở hữu báo cáo', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+    '/daily-reports/{reportId}/attachments': {
+      get: {
+        tags: ['ReportAttachments'],
+        summary: 'Lấy danh sách file đính kèm của báo cáo ngày (Admin / Leader / Intern)',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: 'path', name: 'reportId', required: true, schema: { type: 'string', format: 'uuid' }, description: 'ID của DailyReport' }],
+        responses: {
+          200: {
+            description: 'Danh sách file đính kèm báo cáo ngày',
+            content: {
+              'application/json': {
+                schema: {
+                  allOf: [
+                    { $ref: '#/components/schemas/SuccessResponse' },
+                    { type: 'object', properties: { data: { type: 'array', items: { $ref: '#/components/schemas/ReportAttachment' } } } },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+      post: {
+        tags: ['ReportAttachments'],
+        summary: 'Upload file đính kèm cho báo cáo ngày (Admin / Leader / Intern)',
+        description: 'Tải lên hình ảnh chụp màn hình, PDF báo cáo hoặc tài liệu nén. Thực tập sinh chỉ được đính kèm vào báo cáo của chính mình.',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: 'path', name: 'reportId', required: true, schema: { type: 'string', format: 'uuid' }, description: 'ID của DailyReport' }],
+        requestBody: {
+          required: true,
+          content: {
+            'multipart/form-data': {
+              schema: {
+                type: 'object',
+                required: ['file'],
+                properties: {
+                  file: {
+                    type: 'string',
+                    format: 'binary',
+                    description: 'File cần upload (ảnh, PDF, ZIP/RAR, v.v.)',
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'File đã upload và đính kèm thành công',
+            content: {
+              'application/json': {
+                schema: {
+                  allOf: [
+                    { $ref: '#/components/schemas/SuccessResponse' },
+                    { type: 'object', properties: { data: { $ref: '#/components/schemas/ReportAttachment' } } },
+                  ],
+                },
+              },
+            },
+          },
+          400: { description: 'File không hợp lệ hoặc dữ liệu sai', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+    '/daily-reports/{reportId}/attachments/{attachmentId}': {
+      delete: {
+        tags: ['ReportAttachments'],
+        summary: 'Xoá file đính kèm của báo cáo ngày (Admin / Leader / Intern)',
+        description: 'Xoá file trên Supabase Storage và xoá record tương ứng dưới DB.',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { in: 'path', name: 'reportId',     required: true, schema: { type: 'string', format: 'uuid' }, description: 'ID của DailyReport' },
+          { in: 'path', name: 'attachmentId', required: true, schema: { type: 'string', format: 'uuid' }, description: 'ID của Attachment' },
+        ],
+        responses: {
+          200: { description: 'Xoá thành công', content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/SuccessResponse' }, { type: 'object', properties: { message: { type: 'string', example: 'Report attachment deleted successfully' } } }] } } } },
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
           404: { $ref: '#/components/responses/NotFound' },

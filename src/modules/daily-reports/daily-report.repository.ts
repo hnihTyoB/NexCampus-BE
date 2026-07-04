@@ -14,6 +14,11 @@ const defaultInclude = {
       },
     },
   },
+  attachments: {
+    orderBy: {
+      createdAt: 'desc' as const,
+    },
+  },
 };
 
 export class DailyReportRepository {

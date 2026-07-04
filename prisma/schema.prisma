@@ -30,6 +30,7 @@ model User {
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+  avatarUrl String?  @map("avatar_url")
 
   role Role @relation(fields: [roleId], references: [id])
 
@@ -45,6 +46,8 @@ model User {
   notifications        Notification[]
   refreshTokens        RefreshToken[]
   taskAttachments      TaskAttachment[]     @relation("TaskAttachmentUploader")
+  submissionAttachments SubmissionAttachment[] @relation("SubmissionAttachmentUploader")
+  reportAttachments    ReportAttachment[]     @relation("ReportAttachmentUploader")
 
   @@index([roleId])
   @@map("users")
@@ -223,12 +226,32 @@ model TaskSubmission {
   submittedAt   DateTime     @default(now()) @map("submitted_at")
   updatedAt     DateTime     @updatedAt @map("updated_at")
 
-  assignment TaskAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  reviewer   User?          @relation("ReviewedSubmissions", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  assignment  TaskAssignment         @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  reviewer    User?                  @relation("ReviewedSubmissions", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  attachments SubmissionAttachment[]
 
   @@index([assignmentId])
   @@index([reviewedBy])
   @@map("task_submissions")
+}
+
+// 8b. SubmissionAttachment
+model SubmissionAttachment {
+  id           String   @id @default(uuid()) @db.Uuid
+  submissionId String   @map("submission_id") @db.Uuid
+  fileName     String   @map("file_name")
+  fileUrl      String   @map("file_url")
+  filePath     String   @map("file_path")
+  mimeType     String   @map("mime_type")
+  fileSize     Int      @map("file_size")
+  uploadedBy   String   @map("uploaded_by") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  submission TaskSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  uploader   User           @relation("SubmissionAttachmentUploader", fields: [uploadedBy], references: [id], onDelete: Cascade)
+
+  @@index([submissionId])
+  @@map("submission_attachments")
 }
 
 // 9. DailyReport
@@ -241,10 +264,30 @@ model DailyReport {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  intern Intern @relation(fields: [internId], references: [id], onDelete: Cascade)
+  intern      Intern             @relation(fields: [internId], references: [id], onDelete: Cascade)
+  attachments ReportAttachment[]
 
   @@index([internId])
   @@map("daily_reports")
+}
+
+// 9b. ReportAttachment
+model ReportAttachment {
+  id         String   @id @default(uuid()) @db.Uuid
+  reportId   String   @map("report_id") @db.Uuid
+  fileName   String   @map("file_name")
+  fileUrl    String   @map("file_url")
+  filePath   String   @map("file_path")
+  mimeType   String   @map("mime_type")
+  fileSize   Int      @map("file_size")
+  uploadedBy String   @map("uploaded_by") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  report   DailyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  uploader User        @relation("ReportAttachmentUploader", fields: [uploadedBy], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@map("report_attachments")
 }
 
 // 10. WeeklyEvaluation

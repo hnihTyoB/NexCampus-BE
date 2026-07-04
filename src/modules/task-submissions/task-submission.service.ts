@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { TaskSubmissionRepository } from './task-submission.repository';
 import { TaskAssignmentRepository } from '../task-assignments/task-assignment.repository';
 import { InternRepository } from '../interns/intern.repository';
@@ -7,6 +8,8 @@ import { TaskSubmissionQueryDto, CreateTaskSubmissionDto, UpdateTaskSubmissionDt
 import { ROLES } from '../../common/constants/role.constant';
 import { REVIEW_STATUS } from '../../common/constants/status.constant';
 import { NotificationDispatcher } from '../notifications/notification.dispatcher';
+import { StorageService } from '../../common/services/storage.service';
+import { envConfig } from '../../config/env.config';
 
 interface UserPayload {
   id: string;
@@ -133,6 +136,49 @@ export class TaskSubmissionService {
     }
   }
 
+  async uploadVideoDemo(id: string, file: Express.Multer.File, user: UserPayload) {
+    const submission = await this.findById(id);
+
+    // 1. Authorization check: Intern can only upload for their own submission
+    if (user.role === ROLES.INTERN && submission.assignment.intern.userId !== user.id) {
+      throw new AppError('You are not authorized to upload for this submission', 403, ERROR_CODE.FORBIDDEN);
+    }
+
+    // 2. Check status: cannot upload if APPROVED
+    if (submission.reviewStatus === REVIEW_STATUS.APPROVED) {
+      throw new AppError('Cannot upload video demo for an approved submission', 400, ERROR_CODE.VALIDATION_ERROR);
+    }
+
+    // 3. Delete old video file from storage if it exists and was uploaded to our bucket
+    const bucket = envConfig.supabase.storageSubmissionBucket;
+    const storageService = new StorageService();
+
+    if (submission.videoDemo) {
+      const prefix = `${envConfig.supabase.url}/storage/v1/object/public/${bucket}/`;
+      if (submission.videoDemo.startsWith(prefix)) {
+        const videoPath = submission.videoDemo.replace(prefix, '');
+        try {
+          await storageService.deleteFile(bucket, videoPath);
+        } catch (err) {
+          console.error(`Failed to delete old video demo from storage:`, err);
+        }
+      }
+    }
+
+    // 4. Upload new video file
+    const safeFileName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = `${id}/video_${randomUUID()}_${safeFileName}`;
+    const videoUrl = await storageService.uploadFile(
+      bucket,
+      filePath,
+      file.buffer,
+      file.mimetype,
+    );
+
+    // 5. Update submission in DB
+    return this.repository.update(id, { videoDemo: videoUrl });
+  }
+
   async delete(id: string, user: UserPayload) {
     const submission = await this.findById(id);
 
@@ -145,6 +191,34 @@ export class TaskSubmissionService {
       // Intern cannot delete an approved submission
       if (submission.reviewStatus === REVIEW_STATUS.APPROVED) {
         throw new AppError('Cannot delete an approved submission', 400, ERROR_CODE.VALIDATION_ERROR);
+      }
+    }
+
+    // Delete associated files from Supabase Storage
+    const bucket = envConfig.supabase.storageSubmissionBucket;
+    const storageService = new StorageService();
+
+    // 1. Delete submission attachments
+    if (submission.attachments && submission.attachments.length > 0) {
+      for (const attachment of submission.attachments) {
+        try {
+          await storageService.deleteFile(bucket, attachment.filePath);
+        } catch (err) {
+          console.error(`Failed to delete storage file ${attachment.filePath}:`, err);
+        }
+      }
+    }
+
+    // 2. Delete video demo if it is uploaded to our bucket
+    if (submission.videoDemo) {
+      const prefix = `${envConfig.supabase.url}/storage/v1/object/public/${bucket}/`;
+      if (submission.videoDemo.startsWith(prefix)) {
+        const videoPath = submission.videoDemo.replace(prefix, '');
+        try {
+          await storageService.deleteFile(bucket, videoPath);
+        } catch (err) {
+          console.error(`Failed to delete video demo from storage:`, err);
+        }
       }
     }
 

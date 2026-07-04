@@ -70,7 +70,7 @@ export class UserRepository {
     });
   }
 
-  update(id: string, data: { isActive?: boolean; roleId?: string }) {
+  update(id: string, data: { isActive?: boolean; roleId?: string; avatarUrl?: string | null }) {
     return prisma.user.update({
       where: { id },
       data,

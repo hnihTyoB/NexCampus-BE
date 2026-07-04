@@ -75,6 +75,9 @@ export const envConfig = {
     url: process.env.SUPABASE_URL || '',
     secretKey: process.env.SUPABASE_SECRET_KEY || '',
     storageBucket: process.env.SUPABASE_STORAGE_TASK_BUCKET || 'task-attachments',
+    storageSubmissionBucket: process.env.SUPABASE_STORAGE_SUBMISSION_BUCKET || 'submission-attachments',
+    storageReportBucket: process.env.SUPABASE_STORAGE_REPORT_BUCKET || 'report-attachments',
+    storageAvatarBucket: process.env.SUPABASE_STORAGE_AVATAR_BUCKET || 'avatars',
     maxFileSizeMb: parseFileSizeMb(process.env.SUPABASE_STORAGE_MAX_FILE_SIZE_MB),
   },
   storageCleanup: {
