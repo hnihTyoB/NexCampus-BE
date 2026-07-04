@@ -1,7 +1,7 @@
 {
-  "name": "data-crawler-be",
+  "name": "nex-campus",
   "version": "1.0.0",
-  "description": "Backend API for data crawling service",
+  "description": "NexCampus Platform",
   "main": "dist/server.js",
   "packageManager": "pnpm@9.15.0",
   "scripts": {

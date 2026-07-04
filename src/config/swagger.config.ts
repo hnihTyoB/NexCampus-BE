@@ -535,6 +535,7 @@ export const swaggerSpec = {
     { name: 'Notifications',     description: 'Thông báo của người dùng (Notifications)' },
     { name: 'NotificationSettings', description: 'Cấu hình nhận thông báo (Notification Settings)' },
     { name: 'NotificationTemplates', description: 'Quản lý mẫu thông báo (Notification Templates)' },
+    { name: 'Stats',             description: 'Thống kê dashboard (Dashboard Statistics)' },
     { name: 'System',           description: 'Health check' },
   ],
   paths: {
@@ -1475,6 +1476,87 @@ export const swaggerSpec = {
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
           404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+
+    // ─── Stats ───────────────────────────────────────────────────────────────
+    '/stats': {
+      get: {
+        tags: ['Stats'],
+        summary: 'Thống kê toàn hệ thống (Admin only)',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Dữ liệu thống kê dashboard',
+            content: {
+              'application/json': {
+                schema: {
+                  allOf: [
+                    { $ref: '#/components/schemas/SuccessResponse' },
+                    {
+                      type: 'object',
+                      properties: {
+                        data: {
+                          type: 'object',
+                          properties: {
+                            interns:           { type: 'object', properties: { total: { type: 'integer' }, active: { type: 'integer' }, completed: { type: 'integer' }, dropped: { type: 'integer' } } },
+                            applications:      { type: 'object', properties: { total: { type: 'integer' }, pending: { type: 'integer' }, approved: { type: 'integer' }, rejected: { type: 'integer' } } },
+                            tasks:             { type: 'object', properties: { total: { type: 'integer' }, overdue: { type: 'integer' }, byPriority: { type: 'object', properties: { low: { type: 'integer' }, medium: { type: 'integer' }, high: { type: 'integer' } } } } },
+                            assignments:       { type: 'object', properties: { total: { type: 'integer' }, byStatus: { type: 'object', properties: { todo: { type: 'integer' }, inProgress: { type: 'integer' }, review: { type: 'integer' }, done: { type: 'integer' } } } } },
+                            submissions:       { type: 'object', properties: { total: { type: 'integer' }, pending: { type: 'integer' }, approved: { type: 'integer' }, rejected: { type: 'integer' } } },
+                            dailyReports:      { type: 'object', properties: { last30Days: { type: 'integer' }, avgPerDay: { type: 'number' } } },
+                            weeklyEvaluations: { type: 'object', properties: { total: { type: 'integer' }, avgScore: { type: 'number' } } },
+                            notifications:     { type: 'object', properties: { total: { type: 'integer' }, unread: { type: 'integer' } } },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+        },
+      },
+    },
+    '/stats/my': {
+      get: {
+        tags: ['Stats'],
+        summary: 'Thống kê nhóm quản lý của Leader (Admin / Leader)',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Dữ liệu thống kê trong phạm vi nhóm',
+            content: {
+              'application/json': {
+                schema: {
+                  allOf: [
+                    { $ref: '#/components/schemas/SuccessResponse' },
+                    {
+                      type: 'object',
+                      properties: {
+                        data: {
+                          type: 'object',
+                          properties: {
+                            interns:           { type: 'object', properties: { total: { type: 'integer' }, active: { type: 'integer' }, completed: { type: 'integer' }, dropped: { type: 'integer' } } },
+                            assignments:       { type: 'object', properties: { byStatus: { type: 'object' } } },
+                            submissions:       { type: 'object', properties: { pending: { type: 'integer' }, approved: { type: 'integer' }, rejected: { type: 'integer' } } },
+                            dailyReports:      { type: 'object', properties: { last30Days: { type: 'integer' }, avgPerDay: { type: 'number' } } },
+                            weeklyEvaluations: { type: 'object', properties: { total: { type: 'integer' }, avgScore: { type: 'number' } } },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
         },
       },
     },
