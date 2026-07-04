@@ -1,5 +1,6 @@
 import { prisma } from '../../database/prisma.client';
 import { NOTIFICATION_CHANNEL, NOTIFICATION_LOG_STATUS } from '../../common/constants/status.constant';
+import { notificationQueue } from '../../queues/notification.queue';
 
 const fallbacks: Record<string, { title: string; content: string }> = {
   TASK_ASSIGNMENT: {
@@ -24,55 +25,40 @@ const fallbacks: Record<string, { title: string; content: string }> = {
   },
 };
 
+const interpolate = (template: string, variables: Record<string, any>) => {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+    return variables[key] !== undefined ? String(variables[key]) : `{{${key}}}`;
+  });
+};
+
 export class NotificationDispatcher {
   static async dispatch(userId: string, type: string, params: Record<string, any>) {
     try {
       // 1. Get user's notification settings (auto-initialize if not exist)
-      let settings = await prisma.notificationSetting.findUnique({
-        where: { userId },
-      });
+      let settings = await prisma.notificationSetting.findUnique({ where: { userId } });
 
       if (!settings) {
         settings = await prisma.notificationSetting.create({
-          data: {
-            userId,
-            webEnabled: true,
-            emailEnabled: true,
-            discordEnabled: false,
-          },
+          data: { userId, webEnabled: true, emailEnabled: true, discordEnabled: false },
         });
       }
 
       // 2. Fetch template from database
-      const dbTemplate = await prisma.notificationTemplate.findUnique({
-        where: { type },
-      });
+      const dbTemplate = await prisma.notificationTemplate.findUnique({ where: { type } });
 
-      const titleTemplate = dbTemplate?.titleTemplate || fallbacks[type]?.title || 'Thông báo mới';
+      const titleTemplate  = dbTemplate?.titleTemplate  || fallbacks[type]?.title   || 'Thông báo mới';
       const contentTemplate = dbTemplate?.contentTemplate || fallbacks[type]?.content || '';
 
       // 3. Interpolate parameters
-      const interpolate = (template: string, variables: Record<string, any>) => {
-        return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
-          return variables[key] !== undefined ? String(variables[key]) : `{{${key}}}`;
-        });
-      };
-
-      const title = interpolate(titleTemplate, params);
+      const title   = interpolate(titleTemplate, params);
       const content = interpolate(contentTemplate, params);
 
-      // 4. Create Notification
+      // 4. Create Notification record
       const notification = await prisma.notification.create({
-        data: {
-          userId,
-          title,
-          content,
-          type,
-          isRead: false,
-        },
+        data: { userId, title, content, type, isRead: false },
       });
 
-      // 5. Dispatch to enabled channels and create logs
+      // 5. WEB channel — synchronous, instant
       if (settings.webEnabled) {
         await prisma.notificationLog.create({
           data: {
@@ -83,24 +69,20 @@ export class NotificationDispatcher {
         });
       }
 
-      if (settings.emailEnabled) {
-        await prisma.notificationLog.create({
-          data: {
+      // 6. EMAIL and DISCORD — asynchronous via BullMQ queue
+      const needsAsync = settings.emailEnabled || settings.discordEnabled;
+      if (needsAsync) {
+        await notificationQueue.add(
+          `notify-${notification.id}`,
+          {
             notificationId: notification.id,
-            channel: NOTIFICATION_CHANNEL.EMAIL,
-            status: NOTIFICATION_LOG_STATUS.SUCCESS,
+            userId,
+            title,
+            content,
+            emailEnabled: settings.emailEnabled,
+            discordEnabled: settings.discordEnabled,
           },
-        });
-      }
-
-      if (settings.discordEnabled) {
-        await prisma.notificationLog.create({
-          data: {
-            notificationId: notification.id,
-            channel: NOTIFICATION_CHANNEL.DISCORD,
-            status: NOTIFICATION_LOG_STATUS.SUCCESS,
-          },
-        });
+        );
       }
 
       return notification;

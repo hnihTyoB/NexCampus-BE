@@ -22,12 +22,14 @@
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "bcryptjs": "^2.4.3",
+    "bullmq": "^5.79.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
+    "nodemailer": "^9.0.3",
     "swagger-ui-express": "^5.0.1",
     "zod": "^3.24.1"
   },
@@ -38,6 +40,7 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/morgan": "^1.9.9",
     "@types/node": "^22.10.2",
+    "@types/nodemailer": "^8.0.1",
     "@types/swagger-ui-express": "^4.1.8",
     "eslint": "^9.17.0",
     "prettier": "^3.4.2",

@@ -3,11 +3,11 @@ version: '3.8'
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: crawl_data_postgres
+    container_name: nexcampus_postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: crawl_data_db
+      POSTGRES_DB: nexcampus_db
     ports:
       - "5432:5432"
     volumes:
@@ -15,9 +15,12 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: crawl_data_redis
+    container_name: nexcampus_redis
     ports:
       - "6379:6379"
+    volumes:
+      - redis_data:/data
 
 volumes:
   postgres_data:
+  redis_data:
