@@ -11,6 +11,9 @@ const creatorSelect = {
 const defaultInclude = {
   creator: { select: creatorSelect },
   assignment: true,
+  attachments: {
+    orderBy: { createdAt: 'desc' as const },
+  },
 };
 
 export class TaskRepository {

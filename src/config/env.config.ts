@@ -1,3 +1,43 @@
+const MIN_FILE_SIZE_MB = 1;
+const MAX_FILE_SIZE_MB = 500;
+
+function parseFileSizeMb(raw: string | undefined): number {
+  const value = parseInt(raw ?? '50', 10);
+
+  if (isNaN(value)) {
+    throw new Error(
+      `[env] SUPABASE_STORAGE_MAX_FILE_SIZE_MB must be a number, got "${raw}".`,
+    );
+  }
+  if (value < MIN_FILE_SIZE_MB || value > MAX_FILE_SIZE_MB) {
+    throw new Error(
+      `[env] SUPABASE_STORAGE_MAX_FILE_SIZE_MB must be between ${MIN_FILE_SIZE_MB} and ${MAX_FILE_SIZE_MB} MB, got ${value}.`,
+    );
+  }
+
+  return value;
+}
+
+const MIN_RETENTION_DAYS = 1;
+const MAX_RETENTION_DAYS = 365;
+
+function parseRetentionDays(raw: string | undefined): number {
+  const value = parseInt(raw ?? '30', 10);
+
+  if (isNaN(value)) {
+    throw new Error(
+      `[env] STORAGE_CLEANUP_RETENTION_DAYS must be a number, got "${raw}".`,
+    );
+  }
+  if (value < MIN_RETENTION_DAYS || value > MAX_RETENTION_DAYS) {
+    throw new Error(
+      `[env] STORAGE_CLEANUP_RETENTION_DAYS must be between ${MIN_RETENTION_DAYS} and ${MAX_RETENTION_DAYS} days, got ${value}.`,
+    );
+  }
+
+  return value;
+}
+
 export const envConfig = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '8888', 10),
@@ -30,5 +70,16 @@ export const envConfig = {
   },
   discord: {
     webhookUrl: process.env.DISCORD_WEBHOOK_URL || '',
+  },
+  supabase: {
+    url: process.env.SUPABASE_URL || '',
+    secretKey: process.env.SUPABASE_SECRET_KEY || '',
+    storageBucket: process.env.SUPABASE_STORAGE_TASK_BUCKET || 'task-attachments',
+    maxFileSizeMb: parseFileSizeMb(process.env.SUPABASE_STORAGE_MAX_FILE_SIZE_MB),
+  },
+  storageCleanup: {
+    retentionDays: parseRetentionDays(process.env.STORAGE_CLEANUP_RETENTION_DAYS),
+    // Lich chay cron (mac dinh: 2:00 sang moi ngay)
+    cronExpression: process.env.STORAGE_CLEANUP_CRON || '0 2 * * *',
   },
 };

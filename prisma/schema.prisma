@@ -44,6 +44,7 @@ model User {
   leaderEvaluations    WeeklyEvaluation[]   @relation("LeaderEvaluations")
   notifications        Notification[]
   refreshTokens        RefreshToken[]
+  taskAttachments      TaskAttachment[]     @relation("TaskAttachmentUploader")
 
   @@index([roleId])
   @@map("users")
@@ -147,11 +148,31 @@ model Task {
   createdAt   DateTime     @default(now()) @map("created_at")
   updatedAt   DateTime     @updatedAt @map("updated_at")
 
-  creator    User            @relation("CreatedTasks", fields: [createdBy], references: [id], onDelete: Cascade)
-  assignment TaskAssignment?
+  creator     User             @relation("CreatedTasks", fields: [createdBy], references: [id], onDelete: Cascade)
+  assignment  TaskAssignment?
+  attachments TaskAttachment[]
 
   @@index([createdBy])
   @@map("tasks")
+}
+
+// 6b. TaskAttachment
+model TaskAttachment {
+  id         String   @id @default(uuid()) @db.Uuid
+  taskId     String   @map("task_id") @db.Uuid
+  fileName   String   @map("file_name")
+  fileUrl    String   @map("file_url")
+  filePath   String   @map("file_path")
+  mimeType   String   @map("mime_type")
+  fileSize   Int      @map("file_size")
+  uploadedBy String   @map("uploaded_by") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  task     Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploader User @relation("TaskAttachmentUploader", fields: [uploadedBy], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("task_attachments")
 }
 
 // 7. TaskAssignment

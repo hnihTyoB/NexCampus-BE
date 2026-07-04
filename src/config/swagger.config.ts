@@ -266,6 +266,11 @@ export const swaggerSpec = {
               fullName: { type: 'string', nullable: true },
             },
           },
+          attachments: {
+            type: 'array',
+            description: 'Danh sách file đính kèm của task',
+            items: { $ref: '#/components/schemas/TaskAttachment' },
+          },
         },
       },
       CreateTaskBody: {
@@ -285,6 +290,21 @@ export const swaggerSpec = {
           description: { type: 'string', nullable: true },
           deadline:    { type: 'string', format: 'date-time' },
           priority:    { type: 'string', enum: ['LOW', 'MEDIUM', 'HIGH'] },
+        },
+      },
+      // ─── TaskAttachment ───────────────────────────────────────────────────────
+      TaskAttachment: {
+        type: 'object',
+        properties: {
+          id:         { type: 'string', format: 'uuid' },
+          taskId:     { type: 'string', format: 'uuid' },
+          fileName:   { type: 'string', example: 'design-mockup.zip' },
+          fileUrl:    { type: 'string', format: 'uri', example: 'https://[project].supabase.co/storage/v1/object/public/task-attachments/...' },
+          filePath:   { type: 'string', example: 'uuid-task-id/uuid_design-mockup.zip' },
+          mimeType:   { type: 'string', example: 'application/zip' },
+          fileSize:   { type: 'integer', description: 'Kích thước file tính bằng bytes', example: 204800 },
+          uploadedBy: { type: 'string', format: 'uuid' },
+          createdAt:  { type: 'string', format: 'date-time' },
         },
       },
       TaskAssignment: {
@@ -522,21 +542,22 @@ export const swaggerSpec = {
     },
   },
   tags: [
-    { name: 'Auth',             description: 'Đăng nhập, làm mới token, đăng xuất' },
-    { name: 'Users',            description: 'Quản lý tài khoản người dùng (Admin only)' },
-    { name: 'Applications',     description: 'Đơn xin thực tập (Onboarding)' },
-    { name: 'Interns',          description: 'Hồ sơ thực tập sinh (Interns)' },
-    { name: 'Tasks',            description: 'Quản lý công việc (Tasks)' },
-    { name: 'TaskAssignments',  description: 'Giao việc cho thực tập sinh (Assignments)' },
-    { name: 'TaskSubmissions',  description: 'Nộp bài và duyệt bài của thực tập sinh (Submissions)' },
-    { name: 'DailyReports',     description: 'Báo cáo hàng ngày của thực tập sinh (Daily Reports)' },
-    { name: 'WeeklyEvaluations', description: 'Đánh giá hàng tuần của Leader (Weekly Evaluations)' },
-    { name: 'NotificationLogs',  description: 'Nhật ký gửi thông báo (Notification Logs)' },
-    { name: 'Notifications',     description: 'Thông báo của người dùng (Notifications)' },
-    { name: 'NotificationSettings', description: 'Cấu hình nhận thông báo (Notification Settings)' },
-    { name: 'NotificationTemplates', description: 'Quản lý mẫu thông báo (Notification Templates)' },
-    { name: 'Stats',             description: 'Thống kê dashboard (Dashboard Statistics)' },
-    { name: 'System',           description: 'Health check' },
+    { name: 'Auth',                   description: 'Đăng nhập, làm mới token, đăng xuất' },
+    { name: 'Users',                   description: 'Quản lý tài khoản người dùng (Admin only)' },
+    { name: 'Applications',            description: 'Đơn xin thực tập (Onboarding)' },
+    { name: 'Interns',                 description: 'Hồ sơ thực tập sinh (Interns)' },
+    { name: 'Tasks',                   description: 'Quản lý công việc (Tasks)' },
+    { name: 'TaskAttachments',         description: 'File đính kèm của Task — tài liệu hướng dẫn, thiết kế, zip mã nguồn' },
+    { name: 'TaskAssignments',         description: 'Giao việc cho thực tập sinh (Assignments)' },
+    { name: 'TaskSubmissions',         description: 'Nộp bài và duyệt bài của thực tập sinh (Submissions)' },
+    { name: 'DailyReports',            description: 'Báo cáo hàng ngày của thực tập sinh (Daily Reports)' },
+    { name: 'WeeklyEvaluations',       description: 'Đánh giá hàng tuần của Leader (Weekly Evaluations)' },
+    { name: 'NotificationLogs',        description: 'Nhật ký gửi thông báo (Notification Logs)' },
+    { name: 'Notifications',           description: 'Thông báo của người dùng (Notifications)' },
+    { name: 'NotificationSettings',    description: 'Cấu hình nhận thông báo (Notification Settings)' },
+    { name: 'NotificationTemplates',   description: 'Quản lý mẫu thông báo (Notification Templates)' },
+    { name: 'Stats',                   description: 'Thống kê dashboard (Dashboard Statistics)' },
+    { name: 'System',                  description: 'Health check' },
   ],
   paths: {
     // ─── System ─────────────────────────────────────────────────────────────
@@ -932,6 +953,101 @@ export const swaggerSpec = {
         },
       },
     },
+
+    // ─── TaskAttachments ──────────────────────────────────────────────────────
+    '/tasks/{taskId}/attachments': {
+      get: {
+        tags: ['TaskAttachments'],
+        summary: 'Lấy danh sách file đính kèm của một task (Admin / Leader / Intern)',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { in: 'path', name: 'taskId', required: true, schema: { type: 'string', format: 'uuid' }, description: 'ID của Task' },
+        ],
+        responses: {
+          200: {
+            description: 'Danh sách file đính kèm',
+            content: {
+              'application/json': {
+                schema: {
+                  allOf: [
+                    { $ref: '#/components/schemas/SuccessResponse' },
+                    { type: 'object', properties: { data: { type: 'array', items: { $ref: '#/components/schemas/TaskAttachment' } } } },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+      post: {
+        tags: ['TaskAttachments'],
+        summary: 'Upload file đính kèm cho task (Admin / Leader)',
+        description: 'Gửi file qua `multipart/form-data` với field tên là `file`. Hỗ trợ: ảnh (JPEG, PNG, WEBP, GIF), PDF, DOCX, ZIP, RAR, 7z, MP4, WEBM. Dung lượng tối đa cấu hình qua `SUPABASE_STORAGE_MAX_FILE_SIZE_MB`.',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { in: 'path', name: 'taskId', required: true, schema: { type: 'string', format: 'uuid' }, description: 'ID của Task' },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'multipart/form-data': {
+              schema: {
+                type: 'object',
+                required: ['file'],
+                properties: {
+                  file: {
+                    type: 'string',
+                    format: 'binary',
+                    description: 'File cần upload (ảnh, PDF, DOCX, ZIP, RAR, 7z, MP4, WEBM)',
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'File đã được upload thành công',
+            content: {
+              'application/json': {
+                schema: {
+                  allOf: [
+                    { $ref: '#/components/schemas/SuccessResponse' },
+                    { type: 'object', properties: { data: { $ref: '#/components/schemas/TaskAttachment' } } },
+                  ],
+                },
+              },
+            },
+          },
+          400: { description: 'Không có file hoặc file không hợp lệ (sai định dạng / vượt dung lượng)', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+    '/tasks/{taskId}/attachments/{attachmentId}': {
+      delete: {
+        tags: ['TaskAttachments'],
+        summary: 'Xoá file đính kèm (Admin / Leader)',
+        description: 'Xoá file cả trên Supabase Storage lẫn record trong database.',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { in: 'path', name: 'taskId',       required: true, schema: { type: 'string', format: 'uuid' }, description: 'ID của Task' },
+          { in: 'path', name: 'attachmentId', required: true, schema: { type: 'string', format: 'uuid' }, description: 'ID của Attachment' },
+        ],
+        responses: {
+          200: { description: 'Đã xoá file đính kèm', content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/SuccessResponse' }, { type: 'object', properties: { message: { type: 'string', example: 'Attachment deleted successfully' } } }] } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+
     // ─── TaskAssignments ──────────────────────────────────────────────────────
     '/task-assignments': {
       get: {
