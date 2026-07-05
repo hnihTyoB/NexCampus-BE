@@ -3,6 +3,7 @@
 Backend API service for managing interns, supervisors (leaders), tasks, submissions, evaluations, and notifications.
 
 ## Tech Stack
+
 - **Node.js** & **Express** with **TypeScript**
 - **Prisma ORM** with **PostgreSQL** (Supabase)
 - **JWT Authentication** & **Role-Based Access Control**
@@ -13,6 +14,7 @@ Backend API service for managing interns, supervisors (leaders), tasks, submissi
 ## Database Design & Models
 
 The system is structured around 12 core models:
+
 1. **Role**: Represents user authorizations (`ADMIN`, `LEADER`, `INTERN`).
 2. **User**: Credentials, active status, and role reference.
 3. **Application**: Registry/application form details. Spawns a User account upon approval.
@@ -31,10 +33,12 @@ The system is structured around 12 core models:
 ## Getting Started
 
 ### Prerequisites
+
 - Node.js (v18+)
 - pnpm (recommended) or npm
 
 ### Installation
+
 1. Clone the repository
 2. Install dependencies:
    ```bash
@@ -51,7 +55,9 @@ The system is structured around 12 core models:
      ```
 
 ### Database Initialization
+
 Apply migrations and run the seeding script to populate initial roles and create the default admin account:
+
 ```bash
 # Validate schema
 npx prisma validate
@@ -62,27 +68,24 @@ npx prisma migrate dev --name init_intern_mgmt
 # Seed initial data (Roles & Default Admin)
 npm run db:seed
 ```
-*Default Admin credentials:*
+
+_Default Admin credentials:_
+
 - **Email**: `admin@nexcampus.local`
 - **Password**: `Admin@123456`
 
 ### Running the App
+
 Start the development server:
+
 ```bash
 npm run dev
 ```
 
-The server runs on http://localhost:3000 by default.
+The server runs on http://localhost:8888 by default.
 
 ---
 
-## API Endpoints
+## API Documentation
 
-- **Auth Routing (`/api/v1/auth`)**:
-  - `POST /login`: User authentication.
-  - `GET /me`: Get current authenticated user details.
-- **Users Routing (`/api/v1/users`)** (Admin only):
-  - `GET /`: Get all users.
-  - `GET /:id`: Get user details by ID.
-  - `POST /`: Create a new user account.
-  - `PUT /:id`: Update user details.
+See **Swagger UI** at `http://localhost:8888/api/docs` for detailed API documentation.

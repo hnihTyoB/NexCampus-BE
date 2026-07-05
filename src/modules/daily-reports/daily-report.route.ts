@@ -22,7 +22,6 @@ router.put('/:id', authMiddleware, requireRole(ROLES.INTERN), validate(updateDai
 router.post('/:id/video', authMiddleware, requireRole(ROLES.INTERN), uploadSingle('video'), controller.uploadVideo);
 router.delete('/:id', authMiddleware, requireRole(ROLES.ADMIN, ROLES.LEADER, ROLES.INTERN), controller.delete);
 
-// Daily Report Attachments sub-router
 router.use('/:reportId/attachments', reportAttachmentRoute);
 
 export default router;

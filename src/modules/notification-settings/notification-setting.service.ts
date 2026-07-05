@@ -14,7 +14,6 @@ export class NotificationSettingService {
   }
 
   async updateMe(userId: string, data: any) {
-    // Ensure settings record exists first
     await this.getMe(userId);
 
     return this.repository.update(userId, data);

@@ -14,14 +14,12 @@ import taskAttachmentRoute from '../task-attachments/task-attachment.route';
 const router = Router();
 const controller = new TaskController();
 
-// Task CRUD
 router.get('/', authMiddleware, requireRole(ROLES.ADMIN, ROLES.LEADER, ROLES.INTERN), validate(findAllTaskSchema, 'query'), controller.findAll);
 router.get('/:id', authMiddleware, requireRole(ROLES.ADMIN, ROLES.LEADER, ROLES.INTERN), controller.findById);
 router.post('/', authMiddleware, requireRole(ROLES.ADMIN, ROLES.LEADER), validate(createTaskSchema), controller.create);
 router.put('/:id', authMiddleware, requireRole(ROLES.ADMIN, ROLES.LEADER), validate(updateTaskSchema), controller.update);
 router.delete('/:id', authMiddleware, requireRole(ROLES.ADMIN, ROLES.LEADER), controller.delete);
 
-// Task Attachments – sub-router (mergeParams: true nhan taskId tu route cha)
 router.use('/:taskId/attachments', taskAttachmentRoute);
 
 export default router;

@@ -34,10 +34,6 @@ const storage = multer.memoryStorage();
 
 const getMaxFileSize = () => envConfig.supabase.maxFileSizeMb * 1024 * 1024;
 
-/**
- * Upload mot file don (single field)
- * @param fieldName Ten field trong form-data
- */
 export const uploadSingle = (fieldName: string) =>
   multer({
     storage,
@@ -45,11 +41,6 @@ export const uploadSingle = (fieldName: string) =>
     limits: { fileSize: getMaxFileSize() },
   }).single(fieldName);
 
-/**
- * Upload nhieu file cung mot field
- * @param fieldName Ten field trong form-data
- * @param maxCount  So luong file toi da
- */
 export const uploadMultiple = (fieldName: string, maxCount = 5) =>
   multer({
     storage,

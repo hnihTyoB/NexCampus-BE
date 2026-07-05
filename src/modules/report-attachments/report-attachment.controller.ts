@@ -6,10 +6,6 @@ import { ERROR_CODE } from '../../common/errors/error-code';
 export class ReportAttachmentController {
   private readonly service = new ReportAttachmentService();
 
-  /**
-   * POST /daily-reports/:reportId/attachments
-   * Upload file dinh kem cho daily report
-   */
   upload = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.file) {
@@ -33,10 +29,6 @@ export class ReportAttachmentController {
     }
   };
 
-  /**
-   * GET /daily-reports/:reportId/attachments
-   * Lay danh sach file dinh kem cua daily report
-   */
   findByReport = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { reportId } = req.params;
@@ -48,10 +40,6 @@ export class ReportAttachmentController {
     }
   };
 
-  /**
-   * DELETE /daily-reports/:reportId/attachments/:attachmentId
-   * Xoa file dinh kem
-   */
   delete = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { attachmentId } = req.params;

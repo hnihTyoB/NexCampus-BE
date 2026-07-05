@@ -14,9 +14,6 @@ export class StorageService {
     this.supabase = createClient(url, secretKey);
   }
 
-  /**
-   * Upload file len bucket, tra ve public URL
-   */
   async uploadFile(bucket: string, path: string, buffer: Buffer, mimeType: string): Promise<string> {
     const { error } = await this.supabase.storage
       .from(bucket)
@@ -33,9 +30,6 @@ export class StorageService {
     return data.publicUrl;
   }
 
-  /**
-   * Xoa file khoi bucket (dung khi xoa mot attachment cu the)
-   */
   async deleteFile(bucket: string, path: string): Promise<void> {
     const { error } = await this.supabase.storage.from(bucket).remove([path]);
 

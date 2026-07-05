@@ -46,7 +46,6 @@ export class NotificationService {
   }
 
   async markAsRead(id: string, user: UserPayload) {
-    // This will perform the authorization and existence check
     const notification = await this.findById(id, user);
 
     if (notification.isRead) {
@@ -57,7 +56,6 @@ export class NotificationService {
   }
 
   async delete(id: string, user: UserPayload) {
-    // This will perform the authorization and existence check
     await this.findById(id, user);
 
     return this.repository.delete(id);

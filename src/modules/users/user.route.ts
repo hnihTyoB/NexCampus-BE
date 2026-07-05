@@ -11,9 +11,9 @@ const router = Router();
 const controller = new UserController();
 
 router.get('/', authMiddleware, requireRole(ROLES.ADMIN), validate(findAllUserSchema, 'query'), controller.findAll);
-router.post('/avatar', authMiddleware, uploadSingle('avatar'), controller.uploadAvatar);
 router.get('/:id', authMiddleware, requireRole(ROLES.ADMIN), controller.findById);
 router.post('/', authMiddleware, requireRole(ROLES.ADMIN), validate(createUserSchema), controller.create);
+router.post('/avatar', authMiddleware, uploadSingle('avatar'), controller.uploadAvatar);
 router.put('/:id', authMiddleware, requireRole(ROLES.ADMIN), validate(updateUserSchema), controller.update);
 
 export default router;

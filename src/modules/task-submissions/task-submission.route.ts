@@ -22,7 +22,6 @@ router.put('/:id', authMiddleware, requireRole(ROLES.ADMIN, ROLES.LEADER, ROLES.
 router.post('/:id/video', authMiddleware, requireRole(ROLES.INTERN), uploadSingle('video'), controller.uploadVideo);
 router.delete('/:id', authMiddleware, requireRole(ROLES.ADMIN, ROLES.LEADER, ROLES.INTERN), controller.delete);
 
-// Submission Attachments sub-router
 router.use('/:submissionId/attachments', submissionAttachmentRoute);
 
 export default router;

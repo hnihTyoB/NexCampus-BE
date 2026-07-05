@@ -7,10 +7,7 @@ import { ROLES } from '../../common/constants/role.constant';
 const router = Router();
 const controller = new StatsController();
 
-// Admin: full system stats
 router.get('/', authMiddleware, requireRole(ROLES.ADMIN), controller.getAdminStats);
-
-// Leader: stats scoped to their own interns
 router.get('/my', authMiddleware, requireRole(ROLES.ADMIN, ROLES.LEADER), controller.getLeaderStats);
 
 export default router;

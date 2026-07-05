@@ -15,9 +15,6 @@ export class TaskAttachmentService {
     return envConfig.supabase.storageBucket;
   }
 
-  /**
-   * Upload file dinh kem vao mot task
-   */
   async uploadAttachment(
     taskId: string,
     uploadedBy: string,
@@ -53,9 +50,6 @@ export class TaskAttachmentService {
     });
   }
 
-  /**
-   * Xoa file dinh kem (xoa ca tren Storage va DB)
-   */
   async deleteAttachment(attachmentId: string) {
     const attachment = await this.attachmentRepo.findById(attachmentId);
 
@@ -70,9 +64,6 @@ export class TaskAttachmentService {
     await this.attachmentRepo.delete(attachmentId);
   }
 
-  /**
-   * Lay danh sach attachment theo taskId
-   */
   async findByTaskId(taskId: string) {
     return this.attachmentRepo.findByTaskId(taskId);
   }

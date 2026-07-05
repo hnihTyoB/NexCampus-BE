@@ -54,9 +54,6 @@ export class TaskAttachmentRepository {
     });
   }
 
-  /**
-   * Xoa nhieu attachment theo danh sach id (sau khi da xoa file tren Storage).
-   */
   deleteManyByIds(ids: string[]) {
     return prisma.taskAttachment.deleteMany({
       where: { id: { in: ids } },

@@ -6,10 +6,6 @@ import { ERROR_CODE } from '../../common/errors/error-code';
 export class SubmissionAttachmentController {
   private readonly service = new SubmissionAttachmentService();
 
-  /**
-   * POST /task-submissions/:submissionId/attachments
-   * Upload file dinh kem cho submission
-   */
   upload = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.file) {
@@ -33,10 +29,6 @@ export class SubmissionAttachmentController {
     }
   };
 
-  /**
-   * GET /task-submissions/:submissionId/attachments
-   * Lay danh sach file dinh kem cua submission
-   */
   findBySubmission = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { submissionId } = req.params;
@@ -48,10 +40,6 @@ export class SubmissionAttachmentController {
     }
   };
 
-  /**
-   * DELETE /task-submissions/:submissionId/attachments/:attachmentId
-   * Xoa file dinh kem
-   */
   delete = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { attachmentId } = req.params;

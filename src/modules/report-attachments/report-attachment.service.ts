@@ -18,9 +18,6 @@ export class ReportAttachmentService {
     return envConfig.supabase.storageReportBucket;
   }
 
-  /**
-   * Upload file dinh kem cho mot bao cao ngay (DailyReport)
-   */
   async uploadAttachment(
     reportId: string,
     uploadedBy: string,
@@ -65,9 +62,6 @@ export class ReportAttachmentService {
     });
   }
 
-  /**
-   * Xoa file dinh kem cua bao cao ngay
-   */
   async deleteAttachment(attachmentId: string, userId: string, userRole: string) {
     const attachment = await this.attachmentRepo.findById(attachmentId);
     if (!attachment) {
@@ -95,9 +89,6 @@ export class ReportAttachmentService {
     await this.attachmentRepo.delete(attachmentId);
   }
 
-  /**
-   * Lay danh sach attachment theo reportId
-   */
   async findByReportId(reportId: string) {
     return this.attachmentRepo.findByReportId(reportId);
   }

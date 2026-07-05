@@ -6,10 +6,6 @@ import { ERROR_CODE } from '../../common/errors/error-code';
 export class TaskAttachmentController {
   private readonly service = new TaskAttachmentService();
 
-  /**
-   * POST /tasks/:taskId/attachments
-   * Upload mot file dinh kem cho task
-   */
   upload = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.file) {
@@ -27,10 +23,6 @@ export class TaskAttachmentController {
     }
   };
 
-  /**
-   * GET /tasks/:taskId/attachments
-   * Lay danh sach file dinh kem cua mot task
-   */
   findByTask = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { taskId } = req.params;
@@ -42,10 +34,6 @@ export class TaskAttachmentController {
     }
   };
 
-  /**
-   * DELETE /tasks/:taskId/attachments/:attachmentId
-   * Xoa mot file dinh kem
-   */
   delete = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { attachmentId } = req.params;

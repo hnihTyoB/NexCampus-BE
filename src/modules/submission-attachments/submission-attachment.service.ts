@@ -17,9 +17,6 @@ export class SubmissionAttachmentService {
     return envConfig.supabase.storageSubmissionBucket;
   }
 
-  /**
-   * Upload file dinh kem cho mot bai nop (TaskSubmission)
-   */
   async uploadAttachment(
     submissionId: string,
     uploadedBy: string,
@@ -66,9 +63,6 @@ export class SubmissionAttachmentService {
     });
   }
 
-  /**
-   * Xoa file dinh kem cua bai nop
-   */
   async deleteAttachment(attachmentId: string, userId: string, userRole: string) {
     const attachment = await this.attachmentRepo.findById(attachmentId);
     if (!attachment) {
@@ -81,8 +75,7 @@ export class SubmissionAttachmentService {
       throw new AppError('Task submission not found', 404, ERROR_CODE.NOT_FOUND);
     }
 
-    // Quyen kiem soat:
-    // - Intern chi duoc xoa attachment cua minh
+    // Intern chi duoc xoa attachment cua minh
     if (userRole === ROLES.INTERN) {
       if (submission.assignment.intern.userId !== userId) {
         throw new AppError('You are not authorized to delete this attachment', 403, ERROR_CODE.FORBIDDEN);
@@ -100,9 +93,6 @@ export class SubmissionAttachmentService {
     await this.attachmentRepo.delete(attachmentId);
   }
 
-  /**
-   * Lay danh sach attachment theo submissionId
-   */
   async findBySubmissionId(submissionId: string) {
     return this.attachmentRepo.findBySubmissionId(submissionId);
   }

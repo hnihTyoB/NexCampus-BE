@@ -82,7 +82,6 @@ export const envConfig = {
   },
   storageCleanup: {
     retentionDays: parseRetentionDays(process.env.STORAGE_CLEANUP_RETENTION_DAYS),
-    // Lich chay cron (mac dinh: 2:00 sang moi ngay)
     cronExpression: process.env.STORAGE_CLEANUP_CRON || '0 2 * * *',
   },
 };
