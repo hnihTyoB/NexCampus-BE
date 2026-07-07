@@ -444,31 +444,43 @@ export const swaggerSpec = {
       WeeklyEvaluation: {
         type: 'object',
         properties: {
-          id:            { type: 'string', format: 'uuid' },
-          internId:      { type: 'string', format: 'uuid' },
-          leaderId:      { type: 'string', format: 'uuid' },
-          week:          { type: 'integer' },
-          communication: { type: 'number' },
-          attitude:      { type: 'number' },
-          learning:      { type: 'number' },
-          coding:        { type: 'number' },
-          totalScore:    { type: 'number' },
-          comment:       { type: 'string', nullable: true },
-          createdAt:     { type: 'string', format: 'date-time' },
-          updatedAt:     { type: 'string', format: 'date-time' },
+          id:              { type: 'string', format: 'uuid' },
+          internId:        { type: 'string', format: 'uuid' },
+          leaderId:        { type: 'string', format: 'uuid' },
+          week:            { type: 'integer' },
+          communication:   { type: 'number' },
+          attitude:        { type: 'number' },
+          learning:        { type: 'number' },
+          coding:          { type: 'number' },
+          totalScore:      { type: 'number' },
+          comment:         { type: 'string', nullable: true },
+          aiCommunication: { type: 'number', nullable: true, description: 'Điểm giao tiếp gốc của AI' },
+          aiAttitude:      { type: 'number', nullable: true, description: 'Điểm thái độ gốc của AI' },
+          aiLearning:      { type: 'number', nullable: true, description: 'Điểm tự học gốc của AI' },
+          aiCoding:        { type: 'number', nullable: true, description: 'Điểm viết code gốc của AI' },
+          aiComment:       { type: 'string', nullable: true, description: 'Nhận xét gốc của AI' },
+          aiGeneratedAt:   { type: 'string', format: 'date-time', nullable: true, description: 'Thời điểm AI sinh gợi ý' },
+          leaderEdited:    { type: 'boolean', description: 'Đánh dấu Leader có chỉnh sửa điểm so với AI hay không' },
+          createdAt:       { type: 'string', format: 'date-time' },
+          updatedAt:       { type: 'string', format: 'date-time' },
         },
       },
       CreateWeeklyEvaluationBody: {
         type: 'object',
         required: ['internId', 'week', 'communication', 'attitude', 'learning', 'coding'],
         properties: {
-          internId:      { type: 'string', format: 'uuid' },
-          week:          { type: 'integer' },
-          communication: { type: 'number', minimum: 0, maximum: 10 },
-          attitude:      { type: 'number', minimum: 0, maximum: 10 },
-          learning:      { type: 'number', minimum: 0, maximum: 10 },
-          coding:        { type: 'number', minimum: 0, maximum: 10 },
-          comment:       { type: 'string' },
+          internId:        { type: 'string', format: 'uuid' },
+          week:            { type: 'integer' },
+          communication:   { type: 'number', minimum: 0, maximum: 10 },
+          attitude:        { type: 'number', minimum: 0, maximum: 10 },
+          learning:        { type: 'number', minimum: 0, maximum: 10 },
+          coding:          { type: 'number', minimum: 0, maximum: 10 },
+          comment:         { type: 'string' },
+          aiCommunication: { type: 'number', minimum: 0, maximum: 10 },
+          aiAttitude:      { type: 'number', minimum: 0, maximum: 10 },
+          aiLearning:      { type: 'number', minimum: 0, maximum: 10 },
+          aiCoding:        { type: 'number', minimum: 0, maximum: 10 },
+          aiComment:       { type: 'string' },
         },
       },
       UpdateWeeklyEvaluationBody: {
@@ -479,6 +491,41 @@ export const swaggerSpec = {
           learning:      { type: 'number', minimum: 0, maximum: 10 },
           coding:        { type: 'number', minimum: 0, maximum: 10 },
           comment:       { type: 'string', nullable: true },
+        },
+      },
+      AiSuggestionRequestBody: {
+        type: 'object',
+        required: ['internId', 'week'],
+        properties: {
+          internId: { type: 'string', format: 'uuid', example: 'd82c2533-7004-4835-a379-5f4a534a1994' },
+          week:     { type: 'integer', minimum: 1, example: 1 },
+        },
+      },
+      AiSuggestionResponse: {
+        type: 'object',
+        properties: {
+          communication: { type: 'number', example: 8.5 },
+          attitude:      { type: 'number', example: 9.0 },
+          learning:      { type: 'number', example: 8.0 },
+          coding:        { type: 'number', example: 7.5 },
+          comment:       { type: 'string', example: 'Thực tập sinh thể hiện tinh thần tốt...' },
+          strengths:     { type: 'array', items: { type: 'string' }, example: ['Báo cáo daily đầy đủ', 'Nhanh tiếp thu'] },
+          weaknesses:    { type: 'array', items: { type: 'string' }, example: ['Lần submit đầu thiếu test case expired'] },
+          suggestions:   { type: 'array', items: { type: 'string' }, example: ['Nên test kỹ hơn', 'Phát huy tinh thần tự học'] },
+          dataUsed: {
+            type: 'object',
+            properties: {
+              dailyReportsCount:    { type: 'integer', example: 5 },
+              taskSubmissionsCount: { type: 'integer', example: 3 },
+              weekRange: {
+                type: 'object',
+                properties: {
+                  from: { type: 'string', format: 'date-time' },
+                  to:   { type: 'string', format: 'date-time' },
+                },
+              },
+            },
+          },
         },
       },
       NotificationLog: {
@@ -1621,6 +1668,23 @@ export const swaggerSpec = {
     },
 
     // ─── WeeklyEvaluations ────────────────────────────────────────────────────
+    '/weekly-evaluations/ai-suggestion': {
+      post: {
+        tags: ['WeeklyEvaluations'],
+        summary: 'Lấy gợi ý đánh giá tuần từ AI (Admin / Leader)',
+        security: [{ BearerAuth: [] }],
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/AiSuggestionRequestBody' } } } },
+        responses: {
+          200: {
+            description: 'AI gợi ý thành công',
+            content: { 'application/json': { schema: { allOf: [{ $ref: '#/components/schemas/SuccessResponse' }, { type: 'object', properties: { data: { $ref: '#/components/schemas/AiSuggestionResponse' } } }] } } },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
     '/weekly-evaluations': {
       get: {
         tags: ['WeeklyEvaluations'],
