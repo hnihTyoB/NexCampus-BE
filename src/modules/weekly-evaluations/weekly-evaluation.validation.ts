@@ -18,6 +18,13 @@ export const createWeeklyEvaluationSchema = z.object({
   learning: z.number().min(0).max(10),
   coding: z.number().min(0).max(10),
   comment: z.string().max(2000).optional(),
+
+  // AI fields tuỳ chọn — gửi kèm khi Leader lưu sau khi xem AI gợi ý
+  aiCommunication: z.number().min(0).max(10).optional(),
+  aiAttitude: z.number().min(0).max(10).optional(),
+  aiLearning: z.number().min(0).max(10).optional(),
+  aiCoding: z.number().min(0).max(10).optional(),
+  aiComment: z.string().max(5000).optional(),
 });
 
 export const updateWeeklyEvaluationSchema = z.object({
@@ -26,4 +33,11 @@ export const updateWeeklyEvaluationSchema = z.object({
   learning: z.number().min(0).max(10).optional(),
   coding: z.number().min(0).max(10).optional(),
   comment: z.string().max(2000).nullable().optional(),
+});
+
+// ─── AI Suggestion ──────────────────────────────────────────────────────────
+
+export const aiSuggestionSchema = z.object({
+  internId: z.string().uuid({ message: 'internId phải là UUID hợp lệ' }),
+  week: z.number().int().positive({ message: 'week phải là số nguyên dương' }),
 });

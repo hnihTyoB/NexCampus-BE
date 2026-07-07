@@ -7,11 +7,15 @@ import {
   findAllWeeklyEvaluationSchema,
   createWeeklyEvaluationSchema,
   updateWeeklyEvaluationSchema,
+  aiSuggestionSchema,
 } from './weekly-evaluation.validation';
 import { ROLES } from '../../common/constants/role.constant';
 
 const router = Router();
 const controller = new WeeklyEvaluationController();
+
+// AI suggestion route PHẢI đặt trước /:id để tránh conflict
+router.post('/ai-suggestion', authMiddleware, requireRole(ROLES.ADMIN, ROLES.LEADER), validate(aiSuggestionSchema), controller.getAiSuggestion);
 
 router.get('/', authMiddleware, requireRole(ROLES.ADMIN, ROLES.LEADER, ROLES.INTERN), validate(findAllWeeklyEvaluationSchema, 'query'), controller.findAll);
 router.get('/:id', authMiddleware, requireRole(ROLES.ADMIN, ROLES.LEADER, ROLES.INTERN), controller.findById);

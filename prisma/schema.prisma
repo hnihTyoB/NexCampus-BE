@@ -302,6 +302,16 @@ model WeeklyEvaluation {
   coding        Float
   totalScore    Float    @map("total_score")
   comment       String?
+
+  // AI suggestion fields (lưu gợi ý gốc của AI, không thay đổi sau khi Leader lưu)
+  aiCommunication Float?    @map("ai_communication")
+  aiAttitude      Float?    @map("ai_attitude")
+  aiLearning      Float?    @map("ai_learning")
+  aiCoding        Float?    @map("ai_coding")
+  aiComment       String?   @map("ai_comment")
+  aiGeneratedAt   DateTime? @map("ai_generated_at")
+  leaderEdited    Boolean   @default(false) @map("leader_edited")
+
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 

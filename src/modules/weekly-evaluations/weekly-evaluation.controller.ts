@@ -1,6 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { WeeklyEvaluationService } from './weekly-evaluation.service';
-import { WeeklyEvaluationQueryDto, CreateWeeklyEvaluationDto, UpdateWeeklyEvaluationDto } from './weekly-evaluation.dto';
+import {
+  WeeklyEvaluationQueryDto,
+  CreateWeeklyEvaluationDto,
+  UpdateWeeklyEvaluationDto,
+  AiSuggestionRequestDto,
+} from './weekly-evaluation.dto';
 
 export class WeeklyEvaluationController {
   private readonly service = new WeeklyEvaluationService();
@@ -54,6 +59,22 @@ export class WeeklyEvaluationController {
       await this.service.delete(req.params.id);
 
       res.json({ success: true, message: 'Weekly evaluation deleted successfully' });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * POST /weekly-evaluations/ai-suggestion
+   * Leader gọi endpoint này để nhận gợi ý đánh giá từ AI.
+   * Không lưu vào DB — chỉ trả về gợi ý để Leader xem xét.
+   */
+  getAiSuggestion = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = req.body as AiSuggestionRequestDto;
+      const result = await this.service.getAiSuggestion(body, req.user);
+
+      res.json({ success: true, data: result });
     } catch (error) {
       next(error);
     }

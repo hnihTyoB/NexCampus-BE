@@ -84,4 +84,11 @@ export const envConfig = {
     retentionDays: parseRetentionDays(process.env.STORAGE_CLEANUP_RETENTION_DAYS),
     cronExpression: process.env.STORAGE_CLEANUP_CRON || '0 2 * * *',
   },
+  gemini: {
+    apiKeys: (process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '')
+      .split(',')
+      .map(k => k.trim())
+      .filter(Boolean),
+  },
+  aiProvider: process.env.AI_PROVIDER || 'gemini',
 };

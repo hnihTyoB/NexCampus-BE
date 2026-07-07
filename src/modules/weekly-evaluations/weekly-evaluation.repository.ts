@@ -82,7 +82,7 @@ export class WeeklyEvaluationRepository {
     });
   }
 
-  create(data: CreateWeeklyEvaluationDto, totalScore: number, leaderId: string) {
+  create(data: CreateWeeklyEvaluationDto, totalScore: number, leaderId: string, leaderEdited: boolean) {
     return prisma.weeklyEvaluation.create({
       data: {
         internId: data.internId,
@@ -94,6 +94,15 @@ export class WeeklyEvaluationRepository {
         coding: data.coding,
         totalScore,
         comment: data.comment || null,
+
+        // AI suggestion fields (lưu gợi ý gốc)
+        aiCommunication: data.aiCommunication ?? null,
+        aiAttitude: data.aiAttitude ?? null,
+        aiLearning: data.aiLearning ?? null,
+        aiCoding: data.aiCoding ?? null,
+        aiComment: data.aiComment ?? null,
+        aiGeneratedAt: data.aiCommunication != null ? new Date() : null,
+        leaderEdited,
       },
       include: defaultInclude,
     });
