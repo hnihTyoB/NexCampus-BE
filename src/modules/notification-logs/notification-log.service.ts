@@ -1,9 +1,13 @@
-import { NotificationLogRepository } from './notification-log.repository';
-import { prisma } from '../../database/prisma.client';
-import { AppError } from '../../common/errors/app-error';
-import { ERROR_CODE } from '../../common/errors/error-code';
-import { NotificationLogQueryDto, CreateNotificationLogDto, UpdateNotificationLogDto } from './notification-log.dto';
-import { ROLES } from '../../common/constants/role.constant';
+import { NotificationLogRepository } from "./notification-log.repository";
+import { prisma } from "../../database/prisma.client";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODE } from "../../common/errors/error-code";
+import {
+  NotificationLogQueryDto,
+  CreateNotificationLogDto,
+  UpdateNotificationLogDto,
+} from "./notification-log.dto";
+import { ROLES } from "../../common/constants/role.constant";
 
 interface UserPayload {
   id: string;
@@ -23,7 +27,11 @@ export class NotificationLogService {
     const log = await this.repository.findById(id);
 
     if (!log) {
-      throw new AppError('Notification log not found', 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError(
+        "Notification log not found",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
     }
 
     return log;
@@ -36,7 +44,7 @@ export class NotificationLogService {
     });
 
     if (!notification) {
-      throw new AppError('Notification not found', 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError("Notification not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
     return this.repository.create(data);

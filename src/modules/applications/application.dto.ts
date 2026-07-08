@@ -1,4 +1,4 @@
-import { ApplicationStatus } from '@prisma/client';
+import { ApplicationStatus } from "@prisma/client";
 
 export interface ApplicationQueryDto {
   status?: ApplicationStatus;
@@ -7,8 +7,8 @@ export interface ApplicationQueryDto {
   email?: string;
   startDateFrom?: string;
   startDateTo?: string;
-  sortBy?: 'createdAt' | 'startDate' | 'fullName' | 'status';
-  order?: 'asc' | 'desc';
+  sortBy?: "createdAt" | "startDate" | "fullName" | "status";
+  order?: "asc" | "desc";
   page?: number;
   limit?: number;
 }
@@ -24,7 +24,7 @@ export interface CreateApplicationDto {
 }
 
 export interface ReviewApplicationDto {
-  status: 'APPROVED' | 'REJECTED';
+  status: "APPROVED" | "REJECTED";
 }
 
 export interface ApplicationResponseDto {

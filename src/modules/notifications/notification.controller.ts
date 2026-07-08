@@ -1,6 +1,9 @@
-import { Request, Response, NextFunction } from 'express';
-import { NotificationService } from './notification.service';
-import { NotificationQueryDto, CreateNotificationDto } from './notification.dto';
+import { Request, Response, NextFunction } from "express";
+import { NotificationService } from "./notification.service";
+import {
+  NotificationQueryDto,
+  CreateNotificationDto,
+} from "./notification.dto";
 
 export class NotificationController {
   private readonly service = new NotificationService();
@@ -51,7 +54,7 @@ export class NotificationController {
     try {
       await this.service.delete(req.params.id, req.user);
 
-      res.json({ success: true, message: 'Notification deleted successfully' });
+      res.json({ success: true, message: "Notification deleted successfully" });
     } catch (error) {
       next(error);
     }

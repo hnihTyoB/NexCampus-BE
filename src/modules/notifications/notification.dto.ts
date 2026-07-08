@@ -2,8 +2,8 @@ export interface NotificationQueryDto {
   userId?: string;
   isRead?: boolean;
   type?: string;
-  sortBy?: 'createdAt';
-  order?: 'asc' | 'desc';
+  sortBy?: "createdAt";
+  order?: "asc" | "desc";
   page?: number;
   limit?: number;
 }

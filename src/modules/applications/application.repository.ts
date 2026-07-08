@@ -1,6 +1,6 @@
-import { ApplicationStatus, Prisma } from '@prisma/client';
-import { prisma } from '../../database/prisma.client';
-import { ApplicationQueryDto } from './application.dto';
+import { ApplicationStatus, Prisma } from "@prisma/client";
+import { prisma } from "../../database/prisma.client";
+import { ApplicationQueryDto } from "./application.dto";
 
 const approverSelect = {
   id: true,
@@ -17,8 +17,8 @@ export class ApplicationRepository {
       email,
       startDateFrom,
       startDateTo,
-      sortBy = 'createdAt',
-      order = 'desc',
+      sortBy = "createdAt",
+      order = "desc",
       page = 1,
       limit = 20,
     } = query;
@@ -26,9 +26,13 @@ export class ApplicationRepository {
     const where: Prisma.ApplicationWhereInput = {
       deletedAt: null,
       ...(status ? { status } : {}),
-      ...(department ? { department: { contains: department, mode: 'insensitive' } } : {}),
-      ...(position ? { position: { contains: position, mode: 'insensitive' } } : {}),
-      ...(email ? { email: { contains: email, mode: 'insensitive' } } : {}),
+      ...(department
+        ? { department: { contains: department, mode: "insensitive" } }
+        : {}),
+      ...(position
+        ? { position: { contains: position, mode: "insensitive" } }
+        : {}),
+      ...(email ? { email: { contains: email, mode: "insensitive" } } : {}),
       ...(startDateFrom || startDateTo
         ? {
             startDate: {
@@ -84,11 +88,7 @@ export class ApplicationRepository {
     });
   }
 
-  review(
-    id: string,
-    status: 'APPROVED' | 'REJECTED',
-    approverId: string,
-  ) {
+  review(id: string, status: "APPROVED" | "REJECTED", approverId: string) {
     return prisma.application.update({
       where: { id },
       data: {

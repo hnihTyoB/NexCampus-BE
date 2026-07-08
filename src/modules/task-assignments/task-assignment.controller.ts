@@ -1,6 +1,10 @@
-import { Request, Response, NextFunction } from 'express';
-import { TaskAssignmentService } from './task-assignment.service';
-import { TaskAssignmentQueryDto, CreateTaskAssignmentDto, UpdateTaskAssignmentDto } from './task-assignment.dto';
+import { Request, Response, NextFunction } from "express";
+import { TaskAssignmentService } from "./task-assignment.service";
+import {
+  TaskAssignmentQueryDto,
+  CreateTaskAssignmentDto,
+  UpdateTaskAssignmentDto,
+} from "./task-assignment.dto";
 
 export class TaskAssignmentController {
   private readonly service = new TaskAssignmentService();
@@ -53,7 +57,10 @@ export class TaskAssignmentController {
     try {
       await this.service.delete(req.params.id);
 
-      res.json({ success: true, message: 'Task assignment deleted successfully' });
+      res.json({
+        success: true,
+        message: "Task assignment deleted successfully",
+      });
     } catch (error) {
       next(error);
     }

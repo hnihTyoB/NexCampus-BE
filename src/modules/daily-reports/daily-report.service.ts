@@ -1,13 +1,17 @@
-import { randomUUID } from 'crypto';
-import { DailyReportRepository } from './daily-report.repository';
-import { InternRepository } from '../interns/intern.repository';
-import { AppError } from '../../common/errors/app-error';
-import { ERROR_CODE } from '../../common/errors/error-code';
-import { StorageService } from '../../common/services/storage.service';
-import { envConfig } from '../../config/env.config';
-import { DailyReportQueryDto, CreateDailyReportDto, UpdateDailyReportDto } from './daily-report.dto';
-import { ROLES } from '../../common/constants/role.constant';
-import { NotificationDispatcher } from '../notifications/notification.dispatcher';
+import { randomUUID } from "crypto";
+import { DailyReportRepository } from "./daily-report.repository";
+import { InternRepository } from "../interns/intern.repository";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODE } from "../../common/errors/error-code";
+import { StorageService } from "../../common/services/storage.service";
+import { envConfig } from "../../config/env.config";
+import {
+  DailyReportQueryDto,
+  CreateDailyReportDto,
+  UpdateDailyReportDto,
+} from "./daily-report.dto";
+import { ROLES } from "../../common/constants/role.constant";
+import { NotificationDispatcher } from "../notifications/notification.dispatcher";
 
 interface UserPayload {
   id: string;
@@ -23,7 +27,11 @@ export class DailyReportService {
     if (user.role === ROLES.INTERN) {
       const intern = await this.internRepository.findByUserId(user.id);
       if (!intern) {
-        throw new AppError('Intern profile not found', 404, ERROR_CODE.NOT_FOUND);
+        throw new AppError(
+          "Intern profile not found",
+          404,
+          ERROR_CODE.NOT_FOUND,
+        );
       }
       query.internId = intern.id;
     }
@@ -34,7 +42,7 @@ export class DailyReportService {
     const report = await this.repository.findById(id);
 
     if (!report) {
-      throw new AppError('Daily report not found', 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError("Daily report not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
     return report;
@@ -43,20 +51,16 @@ export class DailyReportService {
   async create(data: CreateDailyReportDto, user: UserPayload) {
     const intern = await this.internRepository.findByUserId(user.id);
     if (!intern) {
-      throw new AppError('Intern profile not found', 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError("Intern profile not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
     const result = await this.repository.create(data, intern.id);
 
     // Notify the leader of the new daily report
     if (intern.leaderId) {
-      await NotificationDispatcher.dispatch(
-        intern.leaderId,
-        'DAILY_REPORT',
-        {
-          internName: intern.user.fullName,
-        }
-      );
+      await NotificationDispatcher.dispatch(intern.leaderId, "DAILY_REPORT", {
+        internName: intern.user.fullName,
+      });
     }
 
     return result;
@@ -68,21 +72,33 @@ export class DailyReportService {
     if (user.role === ROLES.INTERN) {
       const intern = await this.internRepository.findByUserId(user.id);
       if (!intern || report.internId !== intern.id) {
-        throw new AppError('You are not authorized to update this report', 403, ERROR_CODE.FORBIDDEN);
+        throw new AppError(
+          "You are not authorized to update this report",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
       }
     }
 
     return this.repository.update(id, data);
   }
 
-  async uploadVideoDemo(id: string, file: Express.Multer.File, user: UserPayload) {
+  async uploadVideoDemo(
+    id: string,
+    file: Express.Multer.File,
+    user: UserPayload,
+  ) {
     const report = await this.findById(id);
 
     // 1. Authorization check: Intern can only upload for their own report
     if (user.role === ROLES.INTERN) {
       const intern = await this.internRepository.findByUserId(user.id);
       if (!intern || report.internId !== intern.id) {
-        throw new AppError('You are not authorized to upload for this report', 403, ERROR_CODE.FORBIDDEN);
+        throw new AppError(
+          "You are not authorized to upload for this report",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
       }
     }
 
@@ -93,7 +109,7 @@ export class DailyReportService {
     if (report.videoDemo) {
       const prefix = `${envConfig.supabase.url}/storage/v1/object/public/${bucket}/`;
       if (report.videoDemo.startsWith(prefix)) {
-        const videoPath = report.videoDemo.replace(prefix, '');
+        const videoPath = report.videoDemo.replace(prefix, "");
         try {
           await storageService.deleteFile(bucket, videoPath);
         } catch (err) {
@@ -103,7 +119,7 @@ export class DailyReportService {
     }
 
     // 3. Upload new video file
-    const safeFileName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const safeFileName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
     const filePath = `${id}/video_${randomUUID()}_${safeFileName}`;
     const videoUrl = await storageService.uploadFile(
       bucket,
@@ -122,7 +138,11 @@ export class DailyReportService {
     if (user.role === ROLES.INTERN) {
       const intern = await this.internRepository.findByUserId(user.id);
       if (!intern || report.internId !== intern.id) {
-        throw new AppError('You are not authorized to delete this report', 403, ERROR_CODE.FORBIDDEN);
+        throw new AppError(
+          "You are not authorized to delete this report",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
       }
     }
 
@@ -136,7 +156,10 @@ export class DailyReportService {
         try {
           await storageService.deleteFile(bucket, attachment.filePath);
         } catch (err) {
-          console.error(`Failed to delete storage file ${attachment.filePath}:`, err);
+          console.error(
+            `Failed to delete storage file ${attachment.filePath}:`,
+            err,
+          );
         }
       }
     }
@@ -145,7 +168,7 @@ export class DailyReportService {
     if (report.videoDemo) {
       const prefix = `${envConfig.supabase.url}/storage/v1/object/public/${bucket}/`;
       if (report.videoDemo.startsWith(prefix)) {
-        const videoPath = report.videoDemo.replace(prefix, '');
+        const videoPath = report.videoDemo.replace(prefix, "");
         try {
           await storageService.deleteFile(bucket, videoPath);
         } catch (err) {

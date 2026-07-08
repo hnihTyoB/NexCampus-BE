@@ -1,6 +1,6 @@
-import { Request, Response, NextFunction } from 'express';
-import { InternService } from './intern.service';
-import { InternQueryDto, CreateInternDto, UpdateInternDto } from './intern.dto';
+import { Request, Response, NextFunction } from "express";
+import { InternService } from "./intern.service";
+import { InternQueryDto, CreateInternDto, UpdateInternDto } from "./intern.dto";
 
 export class InternController {
   private readonly service = new InternService();
@@ -52,7 +52,7 @@ export class InternController {
     try {
       await this.service.delete(req.params.id);
 
-      res.json({ success: true, message: 'Intern deleted successfully' });
+      res.json({ success: true, message: "Intern deleted successfully" });
     } catch (error) {
       next(error);
     }

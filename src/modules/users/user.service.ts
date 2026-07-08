@@ -1,10 +1,10 @@
-import bcrypt from 'bcryptjs';
-import { UserRepository } from './user.repository';
-import { AppError } from '../../common/errors/app-error';
-import { ERROR_CODE } from '../../common/errors/error-code';
-import { UserQueryDto, CreateUserDto, UpdateUserDto } from './user.dto';
-import { StorageService } from '../../common/services/storage.service';
-import { envConfig } from '../../config/env.config';
+import bcrypt from "bcryptjs";
+import { UserRepository } from "./user.repository";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODE } from "../../common/errors/error-code";
+import { UserQueryDto, CreateUserDto, UpdateUserDto } from "./user.dto";
+import { StorageService } from "../../common/services/storage.service";
+import { envConfig } from "../../config/env.config";
 
 export class UserService {
   private readonly repository = new UserRepository();
@@ -17,7 +17,7 @@ export class UserService {
     const user = await this.repository.findById(id);
 
     if (!user) {
-      throw new AppError('User not found', 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError("User not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
     return user;
@@ -27,7 +27,11 @@ export class UserService {
     const existing = await this.repository.findByEmail(data.email);
 
     if (existing) {
-      throw new AppError('Email already exists', 409, ERROR_CODE.DUPLICATE_ENTRY);
+      throw new AppError(
+        "Email already exists",
+        409,
+        ERROR_CODE.DUPLICATE_ENTRY,
+      );
     }
 
     const passwordHash = await bcrypt.hash(data.password, 10);
@@ -58,7 +62,7 @@ export class UserService {
     if (user.avatarUrl) {
       const prefix = `${envConfig.supabase.url}/storage/v1/object/public/${bucket}/`;
       if (user.avatarUrl.startsWith(prefix)) {
-        const avatarPath = user.avatarUrl.replace(prefix, '');
+        const avatarPath = user.avatarUrl.replace(prefix, "");
         try {
           await storageService.deleteFile(bucket, avatarPath);
         } catch (err) {
@@ -68,7 +72,7 @@ export class UserService {
     }
 
     // 2. Upload new avatar
-    const safeFileName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const safeFileName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
     const filePath = `${id}/${safeFileName}`;
     const avatarUrl = await storageService.uploadFile(
       bucket,
@@ -79,5 +83,10 @@ export class UserService {
 
     // 3. Update database
     return this.repository.update(id, { avatarUrl });
+  }
+
+  async delete(id: string) {
+    await this.findById(id);
+    return this.repository.delete(id);
   }
 }

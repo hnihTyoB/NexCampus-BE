@@ -1,5 +1,5 @@
-import nodemailer from 'nodemailer';
-import { envConfig } from '../../config/env.config';
+import nodemailer from "nodemailer";
+import { envConfig } from "../../config/env.config";
 
 export class EmailService {
   private static transporter = nodemailer.createTransport({
@@ -12,9 +12,20 @@ export class EmailService {
     },
   });
 
-  static async sendMail(to: string, subject: string, content: string): Promise<boolean> {
-    if (!envConfig.email.host || !envConfig.email.user || !envConfig.email.pass) {
-      console.warn('[EmailService] SMTP not configured — skipping email to:', to);
+  static async sendMail(
+    to: string,
+    subject: string,
+    content: string,
+  ): Promise<boolean> {
+    if (
+      !envConfig.email.host ||
+      !envConfig.email.user ||
+      !envConfig.email.pass
+    ) {
+      console.warn(
+        "[EmailService] SMTP not configured — skipping email to:",
+        to,
+      );
       return false;
     }
 
@@ -32,7 +43,7 @@ export class EmailService {
       });
       return true;
     } catch (error) {
-      console.error('[EmailService] Failed to send email to:', to, error);
+      console.error("[EmailService] Failed to send email to:", to, error);
       return false;
     }
   }

@@ -1,9 +1,12 @@
-import { NotificationRepository } from './notification.repository';
-import { prisma } from '../../database/prisma.client';
-import { AppError } from '../../common/errors/app-error';
-import { ERROR_CODE } from '../../common/errors/error-code';
-import { NotificationQueryDto, CreateNotificationDto } from './notification.dto';
-import { ROLES } from '../../common/constants/role.constant';
+import { NotificationRepository } from "./notification.repository";
+import { prisma } from "../../database/prisma.client";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODE } from "../../common/errors/error-code";
+import {
+  NotificationQueryDto,
+  CreateNotificationDto,
+} from "./notification.dto";
+import { ROLES } from "../../common/constants/role.constant";
 
 interface UserPayload {
   id: string;
@@ -23,11 +26,15 @@ export class NotificationService {
     const notification = await this.repository.findById(id);
 
     if (!notification) {
-      throw new AppError('Notification not found', 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError("Notification not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
     if (user.role === ROLES.INTERN && notification.userId !== user.id) {
-      throw new AppError('You are not authorized to view this notification', 403, ERROR_CODE.FORBIDDEN);
+      throw new AppError(
+        "You are not authorized to view this notification",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
     }
 
     return notification;
@@ -39,7 +46,7 @@ export class NotificationService {
     });
 
     if (!recipient) {
-      throw new AppError('Recipient user not found', 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError("Recipient user not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
     return this.repository.create(data);

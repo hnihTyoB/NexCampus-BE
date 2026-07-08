@@ -1,6 +1,6 @@
-import { Request, Response, NextFunction } from 'express';
-import { NotificationSettingService } from './notification-setting.service';
-import { UpdateNotificationSettingDto } from './notification-setting.dto';
+import { Request, Response, NextFunction } from "express";
+import { NotificationSettingService } from "./notification-setting.service";
+import { UpdateNotificationSettingDto } from "./notification-setting.dto";
 
 export class NotificationSettingController {
   private readonly service = new NotificationSettingService();

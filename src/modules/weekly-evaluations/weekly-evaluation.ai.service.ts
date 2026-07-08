@@ -1,14 +1,14 @@
-import { prisma } from '../../database/prisma.client';
-import { InternRepository } from '../interns/intern.repository';
-import { AppError } from '../../common/errors/app-error';
-import { ERROR_CODE } from '../../common/errors/error-code';
-import { aiService } from '../../common/services/ai.service';
-import { ROLES } from '../../common/constants/role.constant';
+import { prisma } from "../../database/prisma.client";
+import { InternRepository } from "../interns/intern.repository";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODE } from "../../common/errors/error-code";
+import { aiService } from "../../common/services/ai.service";
+import { ROLES } from "../../common/constants/role.constant";
 import {
   AiSuggestionRequestDto,
   AiSuggestionResponseDto,
   GeminiEvaluationJson,
-} from './weekly-evaluation.dto';
+} from "./weekly-evaluation.dto";
 
 interface UserPayload {
   id: string;
@@ -26,7 +26,10 @@ export class WeeklyEvaluationAiService {
    * Tuần 2: startDate + 7 → startDate + 13 ngày
    * ...
    */
-  private getWeekDateRange(startDate: Date, week: number): { from: Date; to: Date } {
+  private getWeekDateRange(
+    startDate: Date,
+    week: number,
+  ): { from: Date; to: Date } {
     const dayOffset = (week - 1) * 7;
     const from = new Date(startDate);
     from.setDate(from.getDate() + dayOffset);
@@ -44,10 +47,18 @@ export class WeeklyEvaluationAiService {
    * Ví dụ: "Thứ Hai, 01/07/2026"
    */
   private formatDateVi(date: Date): string {
-    const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+    const days = [
+      "Chủ Nhật",
+      "Thứ Hai",
+      "Thứ Ba",
+      "Thứ Tư",
+      "Thứ Năm",
+      "Thứ Sáu",
+      "Thứ Bảy",
+    ];
     const dayName = days[date.getDay()];
-    const dd = String(date.getDate()).padStart(2, '0');
-    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, "0");
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
     const yyyy = date.getFullYear();
     return `${dayName}, ${dd}/${mm}/${yyyy}`;
   }
@@ -62,14 +73,18 @@ export class WeeklyEvaluationAiService {
         createdAt: { gte: from, lte: to },
         intern: { deletedAt: null },
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: "asc" },
     });
   }
 
   /**
    * Lấy dữ liệu TaskSubmission của intern trong khoảng tuần cụ thể.
    */
-  private async getTaskSubmissionsInRange(internId: string, from: Date, to: Date) {
+  private async getTaskSubmissionsInRange(
+    internId: string,
+    from: Date,
+    to: Date,
+  ) {
     return prisma.taskSubmission.findMany({
       where: {
         submittedAt: { gte: from, lte: to },
@@ -92,7 +107,7 @@ export class WeeklyEvaluationAiService {
           },
         },
       },
-      orderBy: { submittedAt: 'asc' },
+      orderBy: { submittedAt: "asc" },
     });
   }
 
@@ -125,7 +140,8 @@ export class WeeklyEvaluationAiService {
       };
     }>;
   }): string {
-    const { internName, week, weekRange, dailyReports, taskSubmissions } = params;
+    const { internName, week, weekRange, dailyReports, taskSubmissions } =
+      params;
 
     const fromStr = this.formatDateVi(weekRange.from);
     const toStr = this.formatDateVi(weekRange.to);
@@ -133,52 +149,82 @@ export class WeeklyEvaluationAiService {
     // Phần Daily Reports
     let dailyReportSection: string;
     if (dailyReports.length === 0) {
-      dailyReportSection = '(Không có báo cáo hàng ngày nào trong tuần này)';
+      dailyReportSection = "(Không có báo cáo hàng ngày nào trong tuần này)";
     } else {
       dailyReportSection = dailyReports
-        .map((r: { createdAt: Date; content: string; prLink: string | null; videoDemo: string | null }, idx: number) => {
-          const dateStr = this.formatDateVi(r.createdAt);
-          const lines = [
-            `[${idx + 1}] Ngày: ${dateStr}`,
-            `    Nội dung: ${r.content}`,
-          ];
-          if (r.prLink) lines.push(`    PR Link: ${r.prLink}`);
-          if (r.videoDemo) lines.push(`    Video Demo: ${r.videoDemo}`);
-          return lines.join('\n');
-        })
-        .join('\n---\n');
+        .map(
+          (
+            r: {
+              createdAt: Date;
+              content: string;
+              prLink: string | null;
+              videoDemo: string | null;
+            },
+            idx: number,
+          ) => {
+            const dateStr = this.formatDateVi(r.createdAt);
+            const lines = [
+              `[${idx + 1}] Ngày: ${dateStr}`,
+              `    Nội dung: ${r.content}`,
+            ];
+            if (r.prLink) lines.push(`    PR Link: ${r.prLink}`);
+            if (r.videoDemo) lines.push(`    Video Demo: ${r.videoDemo}`);
+            return lines.join("\n");
+          },
+        )
+        .join("\n---\n");
     }
 
     // Phần Task Submissions
     let taskSection: string;
     if (taskSubmissions.length === 0) {
-      taskSection = '(Không có bài nộp task nào trong tuần này)';
+      taskSection = "(Không có bài nộp task nào trong tuần này)";
     } else {
       taskSection = taskSubmissions
-        .map((s: { attempt: number; reviewStatus: string; prLink: string | null; videoDemo: string | null; note: string | null; reviewComment: string | null; assignment: { task: { title: string; description: string | null; deadline: Date } } }, idx: number) => {
-          const task = s.assignment.task;
-          const deadlineStr = task.deadline
-            ? this.formatDateVi(new Date(task.deadline))
-            : 'Không có deadline';
-          const lines = [
-            `[${idx + 1}] Task: ${task.title}`,
-            `    Deadline: ${deadlineStr}`,
-            `    Lần nộp: #${s.attempt}`,
-            `    Trạng thái: ${s.reviewStatus}`,
-          ];
-          if (s.prLink) lines.push(`    PR Link: ${s.prLink}`);
-          if (s.videoDemo) lines.push(`    Video Demo: ${s.videoDemo}`);
-          if (s.note) lines.push(`    Ghi chú của intern: ${s.note}`);
-          if (s.reviewComment) lines.push(`    Nhận xét của Leader: ${s.reviewComment}`);
-          return lines.join('\n');
-        })
-        .join('\n---\n');
+        .map(
+          (
+            s: {
+              attempt: number;
+              reviewStatus: string;
+              prLink: string | null;
+              videoDemo: string | null;
+              note: string | null;
+              reviewComment: string | null;
+              assignment: {
+                task: {
+                  title: string;
+                  description: string | null;
+                  deadline: Date;
+                };
+              };
+            },
+            idx: number,
+          ) => {
+            const task = s.assignment.task;
+            const deadlineStr = task.deadline
+              ? this.formatDateVi(new Date(task.deadline))
+              : "Không có deadline";
+            const lines = [
+              `[${idx + 1}] Task: ${task.title}`,
+              `    Deadline: ${deadlineStr}`,
+              `    Lần nộp: #${s.attempt}`,
+              `    Trạng thái: ${s.reviewStatus}`,
+            ];
+            if (s.prLink) lines.push(`    PR Link: ${s.prLink}`);
+            if (s.videoDemo) lines.push(`    Video Demo: ${s.videoDemo}`);
+            if (s.note) lines.push(`    Ghi chú của intern: ${s.note}`);
+            if (s.reviewComment)
+              lines.push(`    Nhận xét của Leader: ${s.reviewComment}`);
+            return lines.join("\n");
+          },
+        )
+        .join("\n---\n");
     }
 
     const noDataNote =
       dailyReports.length === 0 && taskSubmissions.length === 0
-        ? '\nLưu ý: Không có dữ liệu nào trong tuần này. Hãy đặt điểm mặc định là 5 và ghi rõ trong comment là không đủ dữ liệu để đánh giá.\n'
-        : '';
+        ? "\nLưu ý: Không có dữ liệu nào trong tuần này. Hãy đặt điểm mặc định là 5 và ghi rõ trong comment là không đủ dữ liệu để đánh giá.\n"
+        : "";
 
     return `Bạn là Leader của công ty phần mềm, đang đánh giá thực tập sinh cuối tuần.
 
@@ -225,16 +271,24 @@ suggestions: 2-4 đề xuất hành động cụ thể giúp intern tiến bộ`
    * Validate và normalize output từ Gemini.
    */
   private validateGeminiOutput(raw: unknown): GeminiEvaluationJson {
-    if (!raw || typeof raw !== 'object') {
-      throw new AppError('AI trả về kết quả không đúng định dạng.', 502, ERROR_CODE.INTERNAL_SERVER_ERROR);
+    if (!raw || typeof raw !== "object") {
+      throw new AppError(
+        "AI trả về kết quả không đúng định dạng.",
+        502,
+        ERROR_CODE.INTERNAL_SERVER_ERROR,
+      );
     }
 
     const obj = raw as Record<string, unknown>;
 
     const clampScore = (val: unknown, field: string): number => {
-      const num = typeof val === 'number' ? val : parseFloat(String(val));
+      const num = typeof val === "number" ? val : parseFloat(String(val));
       if (isNaN(num)) {
-        throw new AppError(`AI trả về điểm '${field}' không hợp lệ: ${val}`, 502, ERROR_CODE.INTERNAL_SERVER_ERROR);
+        throw new AppError(
+          `AI trả về điểm '${field}' không hợp lệ: ${val}`,
+          502,
+          ERROR_CODE.INTERNAL_SERVER_ERROR,
+        );
       }
       // Làm tròn đến bước 0.5, clamp vào [1, 10]
       return Math.min(10, Math.max(1, Math.round(num * 2) / 2));
@@ -246,11 +300,14 @@ suggestions: 2-4 đề xuất hành động cụ thể giúp intern tiến bộ`
     };
 
     return {
-      communication: clampScore(obj.communication, 'communication'),
-      attitude: clampScore(obj.attitude, 'attitude'),
-      learning: clampScore(obj.learning, 'learning'),
-      coding: clampScore(obj.coding, 'coding'),
-      comment: typeof obj.comment === 'string' ? obj.comment : 'AI không cung cấp nhận xét.',
+      communication: clampScore(obj.communication, "communication"),
+      attitude: clampScore(obj.attitude, "attitude"),
+      learning: clampScore(obj.learning, "learning"),
+      coding: clampScore(obj.coding, "coding"),
+      comment:
+        typeof obj.comment === "string"
+          ? obj.comment
+          : "AI không cung cấp nhận xét.",
       strengths: toStringArray(obj.strengths),
       weaknesses: toStringArray(obj.weaknesses),
       suggestions: toStringArray(obj.suggestions),
@@ -260,30 +317,54 @@ suggestions: 2-4 đề xuất hành động cụ thể giúp intern tiến bộ`
   /**
    * Entry point chính: Được gọi khi Leader nhấn "AI gợi ý".
    */
-  async getSuggestion(data: AiSuggestionRequestDto, user: UserPayload): Promise<AiSuggestionResponseDto> {
+  async getSuggestion(
+    data: AiSuggestionRequestDto,
+    user: UserPayload,
+  ): Promise<AiSuggestionResponseDto> {
     // 1. Kiểm tra intern tồn tại
     const intern = await this.internRepository.findById(data.internId);
     if (!intern) {
-      throw new AppError('Không tìm thấy thực tập sinh.', 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError(
+        "Không tìm thấy thực tập sinh.",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
     }
 
     // 2. Kiểm tra quyền: Leader chỉ xem intern của mình
     if (user.role === ROLES.LEADER && intern.leaderId !== user.id) {
-      throw new AppError('Bạn không có quyền đánh giá thực tập sinh này.', 403, ERROR_CODE.FORBIDDEN);
+      throw new AppError(
+        "Bạn không có quyền đánh giá thực tập sinh này.",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
     }
 
     // 3. Tính khoảng ngày của tuần
-    const weekRange = this.getWeekDateRange(new Date(intern.startDate), data.week);
+    const weekRange = this.getWeekDateRange(
+      new Date(intern.startDate),
+      data.week,
+    );
 
     // 4. Lấy dữ liệu trong tuần
     const [dailyReports, taskSubmissions] = await Promise.all([
       this.getDailyReportsInRange(data.internId, weekRange.from, weekRange.to),
-      this.getTaskSubmissionsInRange(data.internId, weekRange.from, weekRange.to),
+      this.getTaskSubmissionsInRange(
+        data.internId,
+        weekRange.from,
+        weekRange.to,
+      ),
     ]);
 
     // 5. Build prompt
     const internName = intern.user?.fullName || intern.fullName;
-    const prompt = this.buildPrompt({ internName, week: data.week, weekRange, dailyReports, taskSubmissions });
+    const prompt = this.buildPrompt({
+      internName,
+      week: data.week,
+      weekRange,
+      dailyReports,
+      taskSubmissions,
+    });
 
     // 6. Gọi AI Service (Gemini/OpenAI/DeepSeek...) thông qua Interface chung
     const rawResult = await aiService.generateJSON<unknown>(prompt);

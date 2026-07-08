@@ -1,5 +1,5 @@
-import { envConfig } from '../../config/env.config';
-import { geminiService } from './gemini.service';
+import { envConfig } from "../../config/env.config";
+import { geminiService } from "./gemini.service";
 
 export interface IAiProvider {
   generateJSON<T = Record<string, unknown>>(prompt: string): Promise<T>;
@@ -13,7 +13,7 @@ export class AiService {
     const providerType = envConfig.aiProvider.toLowerCase();
 
     switch (providerType) {
-      case 'gemini':
+      case "gemini":
         this.provider = geminiService;
         break;
 
@@ -36,7 +36,9 @@ export class AiService {
       */
 
       default:
-        console.warn(`[AiService] Provider "${providerType}" không được hỗ trợ. Tự động chuyển sang Gemini.`);
+        console.warn(
+          `[AiService] Provider "${providerType}" không được hỗ trợ. Tự động chuyển sang Gemini.`,
+        );
         this.provider = geminiService;
     }
   }

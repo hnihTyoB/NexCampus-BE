@@ -1,24 +1,28 @@
-import multer, { FileFilterCallback } from 'multer';
-import { Request } from 'express';
-import { envConfig } from '../config/env.config';
+import multer, { FileFilterCallback } from "multer";
+import { Request } from "express";
+import { envConfig } from "../config/env.config";
 
 const ALLOWED_MIME_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/zip',
-  'application/x-zip-compressed',
-  'application/x-rar-compressed',
-  'application/x-7z-compressed',
-  'video/mp4',
-  'video/webm',
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/x-rar-compressed",
+  "application/x-7z-compressed",
+  "video/mp4",
+  "video/webm",
 ];
 
-const fileFilter = (_req: Request, file: Express.Multer.File, callback: FileFilterCallback) => {
+const fileFilter = (
+  _req: Request,
+  file: Express.Multer.File,
+  callback: FileFilterCallback,
+) => {
   if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
     callback(null, true);
   } else {

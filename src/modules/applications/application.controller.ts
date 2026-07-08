@@ -1,6 +1,10 @@
-import { Request, Response, NextFunction } from 'express';
-import { ApplicationService } from './application.service';
-import { ApplicationQueryDto, CreateApplicationDto, ReviewApplicationDto } from './application.dto';
+import { Request, Response, NextFunction } from "express";
+import { ApplicationService } from "./application.service";
+import {
+  ApplicationQueryDto,
+  CreateApplicationDto,
+  ReviewApplicationDto,
+} from "./application.dto";
 
 export class ApplicationController {
   private readonly service = new ApplicationService();
@@ -53,7 +57,7 @@ export class ApplicationController {
     try {
       await this.service.delete(req.params.id);
 
-      res.json({ success: true, message: 'Application deleted successfully' });
+      res.json({ success: true, message: "Application deleted successfully" });
     } catch (error) {
       next(error);
     }

@@ -1,4 +1,4 @@
-import { TaskPriority } from '@prisma/client';
+import { TaskPriority } from "@prisma/client";
 
 export interface TaskQueryDto {
   title?: string;
@@ -6,8 +6,8 @@ export interface TaskQueryDto {
   createdBy?: string;
   deadlineFrom?: string;
   deadlineTo?: string;
-  sortBy?: 'createdAt' | 'title' | 'deadline' | 'priority';
-  order?: 'asc' | 'desc';
+  sortBy?: "createdAt" | "title" | "deadline" | "priority";
+  order?: "asc" | "desc";
   page?: number;
   limit?: number;
 }

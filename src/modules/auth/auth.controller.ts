@@ -1,6 +1,6 @@
-import { Request, Response, NextFunction } from 'express';
-import { AuthService } from './auth.service';
-import { LoginDto } from './auth.dto';
+import { Request, Response, NextFunction } from "express";
+import { AuthService } from "./auth.service";
+import { LoginDto } from "./auth.dto";
 
 export class AuthController {
   private readonly service = new AuthService();
@@ -8,7 +8,7 @@ export class AuthController {
   login = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = req.body as LoginDto;
-      const userAgent = req.headers['user-agent'];
+      const userAgent = req.headers["user-agent"];
       const ipAddress = req.ip;
       const result = await this.service.login(body, { userAgent, ipAddress });
 
@@ -34,12 +34,33 @@ export class AuthController {
     }
   };
 
+  updateMe = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { fullName, password, avatarUrl } = req.body;
+      const result = await this.service.updateMe(req.user.id, {
+        fullName,
+        password,
+        avatarUrl,
+      });
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   refresh = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { refreshToken } = req.body;
-      const userAgent = req.headers['user-agent'];
+      const userAgent = req.headers["user-agent"];
       const ipAddress = req.ip;
-      const result = await this.service.refresh(refreshToken, { userAgent, ipAddress });
+      const result = await this.service.refresh(refreshToken, {
+        userAgent,
+        ipAddress,
+      });
 
       res.json({
         success: true,
@@ -57,7 +78,7 @@ export class AuthController {
 
       res.json({
         success: true,
-        message: 'Logged out successfully',
+        message: "Logged out successfully",
       });
     } catch (error) {
       next(error);

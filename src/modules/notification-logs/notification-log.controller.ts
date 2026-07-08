@@ -1,6 +1,10 @@
-import { Request, Response, NextFunction } from 'express';
-import { NotificationLogService } from './notification-log.service';
-import { NotificationLogQueryDto, CreateNotificationLogDto, UpdateNotificationLogDto } from './notification-log.dto';
+import { Request, Response, NextFunction } from "express";
+import { NotificationLogService } from "./notification-log.service";
+import {
+  NotificationLogQueryDto,
+  CreateNotificationLogDto,
+  UpdateNotificationLogDto,
+} from "./notification-log.dto";
 
 export class NotificationLogController {
   private readonly service = new NotificationLogService();
@@ -52,7 +56,10 @@ export class NotificationLogController {
     try {
       await this.service.delete(req.params.id);
 
-      res.json({ success: true, message: 'Notification log deleted successfully' });
+      res.json({
+        success: true,
+        message: "Notification log deleted successfully",
+      });
     } catch (error) {
       next(error);
     }

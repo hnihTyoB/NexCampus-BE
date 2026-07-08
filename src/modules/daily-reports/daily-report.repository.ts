@@ -1,6 +1,10 @@
-import { Prisma } from '@prisma/client';
-import { prisma } from '../../database/prisma.client';
-import { DailyReportQueryDto, CreateDailyReportDto, UpdateDailyReportDto } from './daily-report.dto';
+import { Prisma } from "@prisma/client";
+import { prisma } from "../../database/prisma.client";
+import {
+  DailyReportQueryDto,
+  CreateDailyReportDto,
+  UpdateDailyReportDto,
+} from "./daily-report.dto";
 
 const defaultInclude = {
   intern: {
@@ -16,7 +20,7 @@ const defaultInclude = {
   },
   attachments: {
     orderBy: {
-      createdAt: 'desc' as const,
+      createdAt: "desc" as const,
     },
   },
 };
@@ -27,8 +31,8 @@ export class DailyReportRepository {
       internId,
       createdAtFrom,
       createdAtTo,
-      sortBy = 'createdAt',
-      order = 'desc',
+      sortBy = "createdAt",
+      order = "desc",
       page = 1,
       limit = 20,
     } = query;

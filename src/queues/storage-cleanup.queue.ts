@@ -1,24 +1,27 @@
-import { Queue } from 'bullmq';
-import { envConfig } from '../config/env.config';
+import { Queue } from "bullmq";
+import { envConfig } from "../config/env.config";
 
 // Job data rong - day la scheduled job, khong can truyen data
 export type StorageCleanupJobData = Record<string, never>;
 
-export const storageCleanupQueue = new Queue<StorageCleanupJobData>('storage-cleanup-queue', {
-  connection: {
-    host: envConfig.redis.host,
-    port: envConfig.redis.port,
-  },
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: {
-      type: 'exponential',
-      delay: 10000, // 10s -> 20s -> 40s
+export const storageCleanupQueue = new Queue<StorageCleanupJobData>(
+  "storage-cleanup-queue",
+  {
+    connection: {
+      host: envConfig.redis.host,
+      port: envConfig.redis.port,
     },
-    removeOnComplete: { count: 10 },
-    removeOnFail: { count: 20 },
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: {
+        type: "exponential",
+        delay: 10000, // 10s -> 20s -> 40s
+      },
+      removeOnComplete: { count: 10 },
+      removeOnFail: { count: 20 },
+    },
   },
-});
+);
 
 /**
  * Dang ky repeatable job (chay theo lich cron tu env).
@@ -34,7 +37,7 @@ export async function scheduleStorageCleanupJob() {
   }
 
   await storageCleanupQueue.add(
-    'cleanup',
+    "cleanup",
     {},
     {
       repeat: { pattern: cronExpression },
@@ -42,6 +45,6 @@ export async function scheduleStorageCleanupJob() {
   );
 
   console.log(
-    `[StorageCleanupQueue] Scheduled cleanup job — cron: "${cronExpression}", retention: ${retentionDays} days`,
+    `[StorageCleanupQueue] Scheduled cleanup job ï¿½ cron: "${cronExpression}", retention: ${retentionDays} days`,
   );
 }

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export const updateNotificationSettingSchema = z.object({
   webEnabled: z.boolean().optional(),

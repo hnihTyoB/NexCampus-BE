@@ -1,4 +1,4 @@
-import { prisma } from '../../database/prisma.client';
+import { prisma } from "../../database/prisma.client";
 
 export class AuthRepository {
   findByEmail(email: string) {
@@ -15,7 +15,13 @@ export class AuthRepository {
     });
   }
 
-  async saveRefreshToken(userId: string, token: string, expiresAt: Date, userAgent?: string, ipAddress?: string) {
+  async saveRefreshToken(
+    userId: string,
+    token: string,
+    expiresAt: Date,
+    userAgent?: string,
+    ipAddress?: string,
+  ) {
     return prisma.refreshToken.create({
       data: {
         userId,
@@ -36,6 +42,17 @@ export class AuthRepository {
   async deleteRefreshToken(token: string) {
     return prisma.refreshToken.deleteMany({
       where: { token },
+    });
+  }
+
+  async updateMe(
+    id: string,
+    data: { fullName?: string; password?: string; avatarUrl?: string },
+  ) {
+    return prisma.user.update({
+      where: { id },
+      data,
+      include: { role: true },
     });
   }
 }

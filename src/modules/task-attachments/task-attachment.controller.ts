@@ -1,7 +1,7 @@
-import { Request, Response, NextFunction } from 'express';
-import { TaskAttachmentService } from './task-attachment.service';
-import { AppError } from '../../common/errors/app-error';
-import { ERROR_CODE } from '../../common/errors/error-code';
+import { Request, Response, NextFunction } from "express";
+import { TaskAttachmentService } from "./task-attachment.service";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODE } from "../../common/errors/error-code";
 
 export class TaskAttachmentController {
   private readonly service = new TaskAttachmentService();
@@ -9,13 +9,21 @@ export class TaskAttachmentController {
   upload = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.file) {
-        throw new AppError('No file uploaded', 400, ERROR_CODE.VALIDATION_ERROR);
+        throw new AppError(
+          "No file uploaded",
+          400,
+          ERROR_CODE.VALIDATION_ERROR,
+        );
       }
 
       const { taskId } = req.params;
       const uploadedBy = req.user.id;
 
-      const attachment = await this.service.uploadAttachment(taskId, uploadedBy, req.file);
+      const attachment = await this.service.uploadAttachment(
+        taskId,
+        uploadedBy,
+        req.file,
+      );
 
       res.status(201).json({ success: true, data: attachment });
     } catch (error) {
@@ -40,7 +48,7 @@ export class TaskAttachmentController {
 
       await this.service.deleteAttachment(attachmentId);
 
-      res.json({ success: true, message: 'Attachment deleted successfully' });
+      res.json({ success: true, message: "Attachment deleted successfully" });
     } catch (error) {
       next(error);
     }

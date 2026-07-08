@@ -1,10 +1,10 @@
-import { prisma } from '../../database/prisma.client';
+import { prisma } from "../../database/prisma.client";
 
 export class ReportAttachmentRepository {
   findByReportId(reportId: string) {
     return prisma.reportAttachment.findMany({
       where: { reportId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 

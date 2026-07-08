@@ -1,6 +1,10 @@
-import { Prisma } from '@prisma/client';
-import { prisma } from '../../database/prisma.client';
-import { NotificationLogQueryDto, CreateNotificationLogDto, UpdateNotificationLogDto } from './notification-log.dto';
+import { Prisma } from "@prisma/client";
+import { prisma } from "../../database/prisma.client";
+import {
+  NotificationLogQueryDto,
+  CreateNotificationLogDto,
+  UpdateNotificationLogDto,
+} from "./notification-log.dto";
 
 const defaultInclude = {
   notification: {
@@ -22,8 +26,8 @@ export class NotificationLogRepository {
       notificationId,
       channel,
       status,
-      sortBy = 'sentAt',
-      order = 'desc',
+      sortBy = "sentAt",
+      order = "desc",
       page = 1,
       limit = 20,
     } = query;

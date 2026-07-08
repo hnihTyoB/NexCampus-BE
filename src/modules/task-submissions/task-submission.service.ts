@@ -1,15 +1,19 @@
-import { randomUUID } from 'crypto';
-import { TaskSubmissionRepository } from './task-submission.repository';
-import { TaskAssignmentRepository } from '../task-assignments/task-assignment.repository';
-import { InternRepository } from '../interns/intern.repository';
-import { AppError } from '../../common/errors/app-error';
-import { ERROR_CODE } from '../../common/errors/error-code';
-import { TaskSubmissionQueryDto, CreateTaskSubmissionDto, UpdateTaskSubmissionDto } from './task-submission.dto';
-import { ROLES } from '../../common/constants/role.constant';
-import { REVIEW_STATUS } from '../../common/constants/status.constant';
-import { NotificationDispatcher } from '../notifications/notification.dispatcher';
-import { StorageService } from '../../common/services/storage.service';
-import { envConfig } from '../../config/env.config';
+import { randomUUID } from "crypto";
+import { TaskSubmissionRepository } from "./task-submission.repository";
+import { TaskAssignmentRepository } from "../task-assignments/task-assignment.repository";
+import { InternRepository } from "../interns/intern.repository";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODE } from "../../common/errors/error-code";
+import {
+  TaskSubmissionQueryDto,
+  CreateTaskSubmissionDto,
+  UpdateTaskSubmissionDto,
+} from "./task-submission.dto";
+import { ROLES } from "../../common/constants/role.constant";
+import { REVIEW_STATUS } from "../../common/constants/status.constant";
+import { NotificationDispatcher } from "../notifications/notification.dispatcher";
+import { StorageService } from "../../common/services/storage.service";
+import { envConfig } from "../../config/env.config";
 
 interface UserPayload {
   id: string;
@@ -26,7 +30,11 @@ export class TaskSubmissionService {
     if (user.role === ROLES.INTERN) {
       const intern = await this.internRepository.findByUserId(user.id);
       if (!intern) {
-        throw new AppError('Intern profile not found', 404, ERROR_CODE.NOT_FOUND);
+        throw new AppError(
+          "Intern profile not found",
+          404,
+          ERROR_CODE.NOT_FOUND,
+        );
       }
       query.internId = intern.id;
     }
@@ -37,7 +45,11 @@ export class TaskSubmissionService {
     const submission = await this.repository.findById(id);
 
     if (!submission) {
-      throw new AppError('Task submission not found', 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError(
+        "Task submission not found",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
     }
 
     return submission;
@@ -45,14 +57,24 @@ export class TaskSubmissionService {
 
   async create(data: CreateTaskSubmissionDto, user: UserPayload) {
     // 1. Find assignment
-    const assignment = await this.assignmentRepository.findById(data.assignmentId);
+    const assignment = await this.assignmentRepository.findById(
+      data.assignmentId,
+    );
     if (!assignment) {
-      throw new AppError('Task assignment not found', 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError(
+        "Task assignment not found",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
     }
 
     // 2. Authorization check: Intern can only submit their own assignment
     if (user.role === ROLES.INTERN && assignment.intern.userId !== user.id) {
-      throw new AppError('You are not authorized to submit for this assignment', 403, ERROR_CODE.FORBIDDEN);
+      throw new AppError(
+        "You are not authorized to submit for this assignment",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
     }
 
     // 3. Count attempts
@@ -64,24 +86,27 @@ export class TaskSubmissionService {
     // Notify the assigner (leader/admin)
     await NotificationDispatcher.dispatch(
       assignment.assignedBy,
-      'TASK_SUBMISSION',
+      "TASK_SUBMISSION",
       {
         internName: assignment.intern.user.fullName,
         taskTitle: assignment.task.title,
         attempt,
-      }
+      },
     );
 
     // If intern has a direct leader different from the assigner, notify them too
-    if (assignment.intern.leaderId && assignment.intern.leaderId !== assignment.assignedBy) {
+    if (
+      assignment.intern.leaderId &&
+      assignment.intern.leaderId !== assignment.assignedBy
+    ) {
       await NotificationDispatcher.dispatch(
         assignment.intern.leaderId,
-        'TASK_SUBMISSION',
+        "TASK_SUBMISSION",
         {
           internName: assignment.intern.user.fullName,
           taskTitle: assignment.task.title,
           attempt,
-        }
+        },
       );
     }
 
@@ -94,18 +119,27 @@ export class TaskSubmissionService {
     if (user.role === ROLES.INTERN) {
       // 1. Intern can only update their own submission
       if (submission.assignment.intern.userId !== user.id) {
-        throw new AppError('You are not authorized to update this submission', 403, ERROR_CODE.FORBIDDEN);
+        throw new AppError(
+          "You are not authorized to update this submission",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
       }
 
       // 2. Intern cannot edit an already approved submission
       if (submission.reviewStatus === REVIEW_STATUS.APPROVED) {
-        throw new AppError('Cannot update an approved submission', 400, ERROR_CODE.VALIDATION_ERROR);
+        throw new AppError(
+          "Cannot update an approved submission",
+          400,
+          ERROR_CODE.VALIDATION_ERROR,
+        );
       }
 
       // 3. Keep intern's modifications, reset status to PENDING for re-review
       const internData: UpdateTaskSubmissionDto = {
         prLink: data.prLink !== undefined ? data.prLink : submission.prLink,
-        videoDemo: data.videoDemo !== undefined ? data.videoDemo : submission.videoDemo,
+        videoDemo:
+          data.videoDemo !== undefined ? data.videoDemo : submission.videoDemo,
         note: data.note !== undefined ? data.note : submission.note,
         reviewStatus: REVIEW_STATUS.PENDING,
       };
@@ -114,8 +148,14 @@ export class TaskSubmissionService {
     } else {
       // Leader/Admin can review submission
       const reviewData: UpdateTaskSubmissionDto = {
-        reviewStatus: data.reviewStatus !== undefined ? data.reviewStatus : submission.reviewStatus,
-        reviewComment: data.reviewComment !== undefined ? data.reviewComment : submission.reviewComment,
+        reviewStatus:
+          data.reviewStatus !== undefined
+            ? data.reviewStatus
+            : submission.reviewStatus,
+        reviewComment:
+          data.reviewComment !== undefined
+            ? data.reviewComment
+            : submission.reviewComment,
       };
 
       // Set the reviewedBy property using repository's method
@@ -124,29 +164,44 @@ export class TaskSubmissionService {
       // Notify the intern of the review status update
       await NotificationDispatcher.dispatch(
         submission.assignment.intern.userId,
-        'SUBMISSION_REVIEW',
+        "SUBMISSION_REVIEW",
         {
           taskTitle: submission.assignment.task.title,
           attempt: submission.attempt,
           reviewStatus: reviewData.reviewStatus,
-        }
+        },
       );
 
       return result;
     }
   }
 
-  async uploadVideoDemo(id: string, file: Express.Multer.File, user: UserPayload) {
+  async uploadVideoDemo(
+    id: string,
+    file: Express.Multer.File,
+    user: UserPayload,
+  ) {
     const submission = await this.findById(id);
 
     // 1. Authorization check: Intern can only upload for their own submission
-    if (user.role === ROLES.INTERN && submission.assignment.intern.userId !== user.id) {
-      throw new AppError('You are not authorized to upload for this submission', 403, ERROR_CODE.FORBIDDEN);
+    if (
+      user.role === ROLES.INTERN &&
+      submission.assignment.intern.userId !== user.id
+    ) {
+      throw new AppError(
+        "You are not authorized to upload for this submission",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
     }
 
     // 2. Check status: cannot upload if APPROVED
     if (submission.reviewStatus === REVIEW_STATUS.APPROVED) {
-      throw new AppError('Cannot upload video demo for an approved submission', 400, ERROR_CODE.VALIDATION_ERROR);
+      throw new AppError(
+        "Cannot upload video demo for an approved submission",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
     }
 
     // 3. Delete old video file from storage if it exists and was uploaded to our bucket
@@ -156,7 +211,7 @@ export class TaskSubmissionService {
     if (submission.videoDemo) {
       const prefix = `${envConfig.supabase.url}/storage/v1/object/public/${bucket}/`;
       if (submission.videoDemo.startsWith(prefix)) {
-        const videoPath = submission.videoDemo.replace(prefix, '');
+        const videoPath = submission.videoDemo.replace(prefix, "");
         try {
           await storageService.deleteFile(bucket, videoPath);
         } catch (err) {
@@ -166,7 +221,7 @@ export class TaskSubmissionService {
     }
 
     // 4. Upload new video file
-    const safeFileName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const safeFileName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
     const filePath = `${id}/video_${randomUUID()}_${safeFileName}`;
     const videoUrl = await storageService.uploadFile(
       bucket,
@@ -185,12 +240,20 @@ export class TaskSubmissionService {
     if (user.role === ROLES.INTERN) {
       // Intern can only delete their own submission
       if (submission.assignment.intern.userId !== user.id) {
-        throw new AppError('You are not authorized to delete this submission', 403, ERROR_CODE.FORBIDDEN);
+        throw new AppError(
+          "You are not authorized to delete this submission",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
       }
 
       // Intern cannot delete an approved submission
       if (submission.reviewStatus === REVIEW_STATUS.APPROVED) {
-        throw new AppError('Cannot delete an approved submission', 400, ERROR_CODE.VALIDATION_ERROR);
+        throw new AppError(
+          "Cannot delete an approved submission",
+          400,
+          ERROR_CODE.VALIDATION_ERROR,
+        );
       }
     }
 
@@ -204,7 +267,10 @@ export class TaskSubmissionService {
         try {
           await storageService.deleteFile(bucket, attachment.filePath);
         } catch (err) {
-          console.error(`Failed to delete storage file ${attachment.filePath}:`, err);
+          console.error(
+            `Failed to delete storage file ${attachment.filePath}:`,
+            err,
+          );
         }
       }
     }
@@ -213,7 +279,7 @@ export class TaskSubmissionService {
     if (submission.videoDemo) {
       const prefix = `${envConfig.supabase.url}/storage/v1/object/public/${bucket}/`;
       if (submission.videoDemo.startsWith(prefix)) {
-        const videoPath = submission.videoDemo.replace(prefix, '');
+        const videoPath = submission.videoDemo.replace(prefix, "");
         try {
           await storageService.deleteFile(bucket, videoPath);
         } catch (err) {

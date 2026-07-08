@@ -1,6 +1,6 @@
-import { Request, Response, NextFunction } from 'express';
-import { NotificationTemplateService } from './notification-template.service';
-import { UpdateNotificationTemplateDto } from './notification-template.dto';
+import { Request, Response, NextFunction } from "express";
+import { NotificationTemplateService } from "./notification-template.service";
+import { UpdateNotificationTemplateDto } from "./notification-template.dto";
 
 export class NotificationTemplateController {
   private readonly service = new NotificationTemplateService();

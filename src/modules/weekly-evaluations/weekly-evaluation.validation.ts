@@ -1,11 +1,11 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export const findAllWeeklyEvaluationSchema = z.object({
   internId: z.string().uuid().optional(),
   leaderId: z.string().uuid().optional(),
   week: z.coerce.number().int().positive().optional(),
-  sortBy: z.enum(['week', 'totalScore', 'createdAt']).optional(),
-  order: z.enum(['asc', 'desc']).optional(),
+  sortBy: z.enum(["week", "totalScore", "createdAt"]).optional(),
+  order: z.enum(["asc", "desc"]).optional(),
   page: z.coerce.number().int().positive().optional().default(1),
   limit: z.coerce.number().int().min(1).max(100).optional().default(20),
 });
@@ -38,6 +38,6 @@ export const updateWeeklyEvaluationSchema = z.object({
 // ─── AI Suggestion ──────────────────────────────────────────────────────────
 
 export const aiSuggestionSchema = z.object({
-  internId: z.string().uuid({ message: 'internId phải là UUID hợp lệ' }),
-  week: z.number().int().positive({ message: 'week phải là số nguyên dương' }),
+  internId: z.string().uuid({ message: "internId phải là UUID hợp lệ" }),
+  week: z.number().int().positive({ message: "week phải là số nguyên dương" }),
 });

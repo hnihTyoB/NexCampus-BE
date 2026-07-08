@@ -1,8 +1,12 @@
-import { ApplicationRepository } from './application.repository';
-import { AppError } from '../../common/errors/app-error';
-import { ERROR_CODE } from '../../common/errors/error-code';
-import { ApplicationQueryDto, CreateApplicationDto, ReviewApplicationDto } from './application.dto';
-import { APPLICATION_STATUS } from '../../common/constants/status.constant';
+import { ApplicationRepository } from "./application.repository";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODE } from "../../common/errors/error-code";
+import {
+  ApplicationQueryDto,
+  CreateApplicationDto,
+  ReviewApplicationDto,
+} from "./application.dto";
+import { APPLICATION_STATUS } from "../../common/constants/status.constant";
 
 export class ApplicationService {
   private readonly repository = new ApplicationRepository();
@@ -15,7 +19,7 @@ export class ApplicationService {
     const application = await this.repository.findById(id);
 
     if (!application) {
-      throw new AppError('Application not found', 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError("Application not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
     return application;
@@ -52,7 +56,7 @@ export class ApplicationService {
 
     if (application.status === APPLICATION_STATUS.APPROVED) {
       throw new AppError(
-        'Cannot delete an approved application',
+        "Cannot delete an approved application",
         409,
         ERROR_CODE.DUPLICATE_ENTRY,
       );

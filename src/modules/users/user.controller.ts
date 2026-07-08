@@ -1,8 +1,8 @@
-import { Request, Response, NextFunction } from 'express';
-import { UserService } from './user.service';
-import { UserQueryDto, CreateUserDto, UpdateUserDto } from './user.dto';
-import { AppError } from '../../common/errors/app-error';
-import { ERROR_CODE } from '../../common/errors/error-code';
+import { Request, Response, NextFunction } from "express";
+import { UserService } from "./user.service";
+import { UserQueryDto, CreateUserDto, UpdateUserDto } from "./user.dto";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODE } from "../../common/errors/error-code";
 
 export class UserController {
   private readonly service = new UserService();
@@ -62,11 +62,28 @@ export class UserController {
   uploadAvatar = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.file) {
-        throw new AppError('No file uploaded', 400, ERROR_CODE.VALIDATION_ERROR);
+        throw new AppError(
+          "No file uploaded",
+          400,
+          ERROR_CODE.VALIDATION_ERROR,
+        );
       }
 
       const userId = req.user.id;
       const result = await this.service.uploadAvatar(userId, req.file);
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  delete = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.service.delete(req.params.id);
 
       res.json({
         success: true,

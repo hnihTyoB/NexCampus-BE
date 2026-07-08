@@ -1,13 +1,19 @@
-import { Request, Response, NextFunction } from 'express';
-import { AppError } from '../common/errors/app-error';
-import { ERROR_CODE } from '../common/errors/error-code';
+import { Request, Response, NextFunction } from "express";
+import { AppError } from "../common/errors/app-error";
+import { ERROR_CODE } from "../common/errors/error-code";
 
 export function notFoundMiddleware(
   req: Request,
   res: Response,
   next: NextFunction,
 ): void {
-  next(new AppError(`Route ${req.method} ${req.originalUrl} not found`, 404, ERROR_CODE.NOT_FOUND));
+  next(
+    new AppError(
+      `Route ${req.method} ${req.originalUrl} not found`,
+      404,
+      ERROR_CODE.NOT_FOUND,
+    ),
+  );
 }
 
 export function errorMiddleware(
@@ -25,11 +31,11 @@ export function errorMiddleware(
     return;
   }
 
-  console.error('[Unhandled Error]', error);
+  console.error("[Unhandled Error]", error);
 
   res.status(500).json({
     success: false,
-    message: 'Internal server error',
-    code: 'INTERNAL_SERVER_ERROR',
+    message: "Internal server error",
+    code: "INTERNAL_SERVER_ERROR",
   });
 }

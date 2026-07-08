@@ -1,6 +1,6 @@
-import { Request, Response, NextFunction } from 'express';
-import { TaskService } from './task.service';
-import { TaskQueryDto, CreateTaskDto, UpdateTaskDto } from './task.dto';
+import { Request, Response, NextFunction } from "express";
+import { TaskService } from "./task.service";
+import { TaskQueryDto, CreateTaskDto, UpdateTaskDto } from "./task.dto";
 
 export class TaskController {
   private readonly service = new TaskService();
@@ -53,7 +53,7 @@ export class TaskController {
     try {
       await this.service.delete(req.params.id);
 
-      res.json({ success: true, message: 'Task deleted successfully' });
+      res.json({ success: true, message: "Task deleted successfully" });
     } catch (error) {
       next(error);
     }

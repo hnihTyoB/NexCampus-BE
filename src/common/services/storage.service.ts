@@ -1,5 +1,5 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { envConfig } from '../../config/env.config';
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { envConfig } from "../../config/env.config";
 
 export class StorageService {
   private supabase: SupabaseClient;
@@ -8,13 +8,20 @@ export class StorageService {
     const { url, secretKey } = envConfig.supabase;
 
     if (!url || !secretKey) {
-      throw new Error('Supabase URL or Secret Key is missing in environment variables');
+      throw new Error(
+        "Supabase URL or Secret Key is missing in environment variables",
+      );
     }
 
     this.supabase = createClient(url, secretKey);
   }
 
-  async uploadFile(bucket: string, path: string, buffer: Buffer, mimeType: string): Promise<string> {
+  async uploadFile(
+    bucket: string,
+    path: string,
+    buffer: Buffer,
+    mimeType: string,
+  ): Promise<string> {
     const { error } = await this.supabase.storage
       .from(bucket)
       .upload(path, buffer, {
@@ -34,7 +41,9 @@ export class StorageService {
     const { error } = await this.supabase.storage.from(bucket).remove([path]);
 
     if (error) {
-      throw new Error(`Failed to delete file from Supabase Storage: ${error.message}`);
+      throw new Error(
+        `Failed to delete file from Supabase Storage: ${error.message}`,
+      );
     }
   }
 }

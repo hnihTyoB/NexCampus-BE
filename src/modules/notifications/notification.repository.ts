@@ -1,6 +1,9 @@
-import { Prisma } from '@prisma/client';
-import { prisma } from '../../database/prisma.client';
-import { NotificationQueryDto, CreateNotificationDto } from './notification.dto';
+import { Prisma } from "@prisma/client";
+import { prisma } from "../../database/prisma.client";
+import {
+  NotificationQueryDto,
+  CreateNotificationDto,
+} from "./notification.dto";
 
 const defaultInclude = {
   user: {
@@ -18,8 +21,8 @@ export class NotificationRepository {
       userId,
       isRead,
       type,
-      sortBy = 'createdAt',
-      order = 'desc',
+      sortBy = "createdAt",
+      order = "desc",
       page = 1,
       limit = 20,
     } = query;

@@ -1,6 +1,10 @@
-import { Prisma } from '@prisma/client';
-import { prisma } from '../../database/prisma.client';
-import { WeeklyEvaluationQueryDto, CreateWeeklyEvaluationDto, UpdateWeeklyEvaluationDto } from './weekly-evaluation.dto';
+import { Prisma } from "@prisma/client";
+import { prisma } from "../../database/prisma.client";
+import {
+  WeeklyEvaluationQueryDto,
+  CreateWeeklyEvaluationDto,
+  UpdateWeeklyEvaluationDto,
+} from "./weekly-evaluation.dto";
 
 const defaultInclude = {
   intern: {
@@ -29,8 +33,8 @@ export class WeeklyEvaluationRepository {
       internId,
       leaderId,
       week,
-      sortBy = 'createdAt',
-      order = 'desc',
+      sortBy = "createdAt",
+      order = "desc",
       page = 1,
       limit = 20,
     } = query;
@@ -82,7 +86,12 @@ export class WeeklyEvaluationRepository {
     });
   }
 
-  create(data: CreateWeeklyEvaluationDto, totalScore: number, leaderId: string, leaderEdited: boolean) {
+  create(
+    data: CreateWeeklyEvaluationDto,
+    totalScore: number,
+    leaderId: string,
+    leaderEdited: boolean,
+  ) {
     return prisma.weeklyEvaluation.create({
       data: {
         internId: data.internId,
@@ -112,7 +121,9 @@ export class WeeklyEvaluationRepository {
     return prisma.weeklyEvaluation.update({
       where: { id },
       data: {
-        ...(data.communication !== undefined ? { communication: data.communication } : {}),
+        ...(data.communication !== undefined
+          ? { communication: data.communication }
+          : {}),
         ...(data.attitude !== undefined ? { attitude: data.attitude } : {}),
         ...(data.learning !== undefined ? { learning: data.learning } : {}),
         ...(data.coding !== undefined ? { coding: data.coding } : {}),

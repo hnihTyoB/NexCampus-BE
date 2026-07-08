@@ -1,12 +1,12 @@
-import { AssignmentStatus } from '@prisma/client';
+import { AssignmentStatus } from "@prisma/client";
 
 export interface TaskAssignmentQueryDto {
   taskId?: string;
   internId?: string;
   assignedBy?: string;
   status?: AssignmentStatus;
-  sortBy?: 'assignedAt' | 'status';
-  order?: 'asc' | 'desc';
+  sortBy?: "assignedAt" | "status";
+  order?: "asc" | "desc";
   page?: number;
   limit?: number;
 }

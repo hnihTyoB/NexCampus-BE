@@ -1,11 +1,7 @@
-import { InternRepository } from './intern.repository';
-import { AppError } from '../../common/errors/app-error';
-import { ERROR_CODE } from '../../common/errors/error-code';
-import {
-  InternQueryDto,
-  CreateInternDto,
-  UpdateInternDto,
-} from './intern.dto';
+import { InternRepository } from "./intern.repository";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODE } from "../../common/errors/error-code";
+import { InternQueryDto, CreateInternDto, UpdateInternDto } from "./intern.dto";
 
 export class InternService {
   private readonly repository = new InternRepository();
@@ -18,7 +14,7 @@ export class InternService {
     const profile = await this.repository.findById(id);
 
     if (!profile) {
-      throw new AppError('Intern not found', 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError("Intern not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
     return profile;
@@ -29,7 +25,7 @@ export class InternService {
 
     if (existing) {
       throw new AppError(
-        'This user already has an intern profile',
+        "This user already has an intern profile",
         409,
         ERROR_CODE.DUPLICATE_ENTRY,
       );

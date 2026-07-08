@@ -1,4 +1,4 @@
-import { ErrorCode } from './error-code';
+import { ErrorCode } from "./error-code";
 
 export class AppError extends Error {
   public readonly statusCode: number;
@@ -17,4 +17,3 @@ export class AppError extends Error {
     }
   }
 }
-

@@ -1,6 +1,6 @@
-import { Prisma } from '@prisma/client';
-import { prisma } from '../../database/prisma.client';
-import { TaskQueryDto, CreateTaskDto, UpdateTaskDto } from './task.dto';
+import { Prisma } from "@prisma/client";
+import { prisma } from "../../database/prisma.client";
+import { TaskQueryDto, CreateTaskDto, UpdateTaskDto } from "./task.dto";
 
 const creatorSelect = {
   id: true,
@@ -12,7 +12,7 @@ const defaultInclude = {
   creator: { select: creatorSelect },
   assignment: true,
   attachments: {
-    orderBy: { createdAt: 'desc' as const },
+    orderBy: { createdAt: "desc" as const },
   },
 };
 
@@ -24,15 +24,15 @@ export class TaskRepository {
       createdBy,
       deadlineFrom,
       deadlineTo,
-      sortBy = 'createdAt',
-      order = 'desc',
+      sortBy = "createdAt",
+      order = "desc",
       page = 1,
       limit = 20,
     } = query;
 
     const where: Prisma.TaskWhereInput = {
       deletedAt: null,
-      ...(title ? { title: { contains: title, mode: 'insensitive' } } : {}),
+      ...(title ? { title: { contains: title, mode: "insensitive" } } : {}),
       ...(priority ? { priority } : {}),
       ...(createdBy ? { createdBy } : {}),
       ...(deadlineFrom || deadlineTo
@@ -89,8 +89,12 @@ export class TaskRepository {
       where: { id },
       data: {
         ...(data.title !== undefined ? { title: data.title } : {}),
-        ...(data.description !== undefined ? { description: data.description } : {}),
-        ...(data.deadline !== undefined ? { deadline: new Date(data.deadline) } : {}),
+        ...(data.description !== undefined
+          ? { description: data.description }
+          : {}),
+        ...(data.deadline !== undefined
+          ? { deadline: new Date(data.deadline) }
+          : {}),
         ...(data.priority !== undefined ? { priority: data.priority } : {}),
       },
       include: defaultInclude,

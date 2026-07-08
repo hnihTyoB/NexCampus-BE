@@ -1,11 +1,11 @@
-import { prisma } from '../../database/prisma.client';
+import { prisma } from "../../database/prisma.client";
 import {
   APPLICATION_STATUS,
   INTERN_STATUS,
   TASK_PRIORITY,
   ASSIGNMENT_STATUS,
   REVIEW_STATUS,
-} from '../../common/constants/status.constant';
+} from "../../common/constants/status.constant";
 
 export class StatsRepository {
   async getAdminStats() {
@@ -54,33 +54,57 @@ export class StatsRepository {
     ] = await Promise.all([
       // ─── Interns ─────────────────────────────────────────────────────────────
       prisma.intern.count({ where: { deletedAt: null } }),
-      prisma.intern.count({ where: { deletedAt: null, status: INTERN_STATUS.ACTIVE } }),
-      prisma.intern.count({ where: { deletedAt: null, status: INTERN_STATUS.COMPLETED } }),
-      prisma.intern.count({ where: { deletedAt: null, status: INTERN_STATUS.DROPPED } }),
+      prisma.intern.count({
+        where: { deletedAt: null, status: INTERN_STATUS.ACTIVE },
+      }),
+      prisma.intern.count({
+        where: { deletedAt: null, status: INTERN_STATUS.COMPLETED },
+      }),
+      prisma.intern.count({
+        where: { deletedAt: null, status: INTERN_STATUS.DROPPED },
+      }),
 
       // ─── Applications ─────────────────────────────────────────────────────────
       prisma.application.count({ where: { deletedAt: null } }),
-      prisma.application.count({ where: { deletedAt: null, status: APPLICATION_STATUS.PENDING } }),
-      prisma.application.count({ where: { deletedAt: null, status: APPLICATION_STATUS.APPROVED } }),
-      prisma.application.count({ where: { deletedAt: null, status: APPLICATION_STATUS.REJECTED } }),
+      prisma.application.count({
+        where: { deletedAt: null, status: APPLICATION_STATUS.PENDING },
+      }),
+      prisma.application.count({
+        where: { deletedAt: null, status: APPLICATION_STATUS.APPROVED },
+      }),
+      prisma.application.count({
+        where: { deletedAt: null, status: APPLICATION_STATUS.REJECTED },
+      }),
 
       // ─── Tasks ────────────────────────────────────────────────────────────────
       prisma.task.count({ where: { deletedAt: null } }),
       prisma.task.count({ where: { deletedAt: null, deadline: { lt: now } } }),
-      prisma.task.groupBy({ by: ['priority'], where: { deletedAt: null }, _count: true }),
+      prisma.task.groupBy({
+        by: ["priority"],
+        where: { deletedAt: null },
+        _count: true,
+      }),
 
       // ─── Assignments ─────────────────────────────────────────────────────────
       prisma.taskAssignment.count(),
-      prisma.taskAssignment.groupBy({ by: ['status'], _count: true }),
+      prisma.taskAssignment.groupBy({ by: ["status"], _count: true }),
 
       // ─── Submissions ─────────────────────────────────────────────────────────
       prisma.taskSubmission.count(),
-      prisma.taskSubmission.count({ where: { reviewStatus: REVIEW_STATUS.PENDING } }),
-      prisma.taskSubmission.count({ where: { reviewStatus: REVIEW_STATUS.APPROVED } }),
-      prisma.taskSubmission.count({ where: { reviewStatus: REVIEW_STATUS.REJECTED } }),
+      prisma.taskSubmission.count({
+        where: { reviewStatus: REVIEW_STATUS.PENDING },
+      }),
+      prisma.taskSubmission.count({
+        where: { reviewStatus: REVIEW_STATUS.APPROVED },
+      }),
+      prisma.taskSubmission.count({
+        where: { reviewStatus: REVIEW_STATUS.REJECTED },
+      }),
 
       // ─── Daily Reports ───────────────────────────────────────────────────────
-      prisma.dailyReport.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
+      prisma.dailyReport.count({
+        where: { createdAt: { gte: thirtyDaysAgo } },
+      }),
 
       // ─── Weekly Evaluations ──────────────────────────────────────────────────
       prisma.weeklyEvaluation.count(),
@@ -93,10 +117,14 @@ export class StatsRepository {
 
     // Reshape groupBy results
     const taskPriorityMap: Record<string, number> = {};
-    tasksByPriority.forEach((r) => { taskPriorityMap[r.priority] = r._count; });
+    tasksByPriority.forEach((r) => {
+      taskPriorityMap[r.priority] = r._count;
+    });
 
     const assignmentStatusMap: Record<string, number> = {};
-    assignmentsByStatus.forEach((r) => { assignmentStatusMap[r.status] = r._count; });
+    assignmentsByStatus.forEach((r) => {
+      assignmentStatusMap[r.status] = r._count;
+    });
 
     return {
       interns: {
@@ -115,18 +143,18 @@ export class StatsRepository {
         total: totalTasks,
         overdue: overdueTasksCount,
         byPriority: {
-          low:    taskPriorityMap[TASK_PRIORITY.LOW]    ?? 0,
+          low: taskPriorityMap[TASK_PRIORITY.LOW] ?? 0,
           medium: taskPriorityMap[TASK_PRIORITY.MEDIUM] ?? 0,
-          high:   taskPriorityMap[TASK_PRIORITY.HIGH]   ?? 0,
+          high: taskPriorityMap[TASK_PRIORITY.HIGH] ?? 0,
         },
       },
       assignments: {
         total: totalAssignments,
         byStatus: {
-          todo:       assignmentStatusMap[ASSIGNMENT_STATUS.TODO]        ?? 0,
+          todo: assignmentStatusMap[ASSIGNMENT_STATUS.TODO] ?? 0,
           inProgress: assignmentStatusMap[ASSIGNMENT_STATUS.IN_PROGRESS] ?? 0,
-          review:     assignmentStatusMap[ASSIGNMENT_STATUS.REVIEW]      ?? 0,
-          done:       assignmentStatusMap[ASSIGNMENT_STATUS.DONE]        ?? 0,
+          review: assignmentStatusMap[ASSIGNMENT_STATUS.REVIEW] ?? 0,
+          done: assignmentStatusMap[ASSIGNMENT_STATUS.DONE] ?? 0,
         },
       },
       submissions: {
@@ -169,20 +197,52 @@ export class StatsRepository {
       avgScore,
     ] = await Promise.all([
       prisma.intern.count({ where: { deletedAt: null, leaderId } }),
-      prisma.intern.count({ where: { deletedAt: null, leaderId, status: INTERN_STATUS.ACTIVE } }),
-      prisma.intern.count({ where: { deletedAt: null, leaderId, status: INTERN_STATUS.COMPLETED } }),
-      prisma.intern.count({ where: { deletedAt: null, leaderId, status: INTERN_STATUS.DROPPED } }),
-      prisma.taskAssignment.groupBy({ by: ['status'], where: { assignedBy: leaderId }, _count: true }),
-      prisma.taskSubmission.count({ where: { reviewStatus: REVIEW_STATUS.PENDING,  assignment: { assignedBy: leaderId } } }),
-      prisma.taskSubmission.count({ where: { reviewStatus: REVIEW_STATUS.APPROVED, assignment: { assignedBy: leaderId } } }),
-      prisma.taskSubmission.count({ where: { reviewStatus: REVIEW_STATUS.REJECTED, assignment: { assignedBy: leaderId } } }),
-      prisma.dailyReport.count({ where: { createdAt: { gte: thirtyDaysAgo }, intern: { leaderId } } }),
+      prisma.intern.count({
+        where: { deletedAt: null, leaderId, status: INTERN_STATUS.ACTIVE },
+      }),
+      prisma.intern.count({
+        where: { deletedAt: null, leaderId, status: INTERN_STATUS.COMPLETED },
+      }),
+      prisma.intern.count({
+        where: { deletedAt: null, leaderId, status: INTERN_STATUS.DROPPED },
+      }),
+      prisma.taskAssignment.groupBy({
+        by: ["status"],
+        where: { assignedBy: leaderId },
+        _count: true,
+      }),
+      prisma.taskSubmission.count({
+        where: {
+          reviewStatus: REVIEW_STATUS.PENDING,
+          assignment: { assignedBy: leaderId },
+        },
+      }),
+      prisma.taskSubmission.count({
+        where: {
+          reviewStatus: REVIEW_STATUS.APPROVED,
+          assignment: { assignedBy: leaderId },
+        },
+      }),
+      prisma.taskSubmission.count({
+        where: {
+          reviewStatus: REVIEW_STATUS.REJECTED,
+          assignment: { assignedBy: leaderId },
+        },
+      }),
+      prisma.dailyReport.count({
+        where: { createdAt: { gte: thirtyDaysAgo }, intern: { leaderId } },
+      }),
       prisma.weeklyEvaluation.count({ where: { leaderId } }),
-      prisma.weeklyEvaluation.aggregate({ _avg: { totalScore: true }, where: { leaderId } }),
+      prisma.weeklyEvaluation.aggregate({
+        _avg: { totalScore: true },
+        where: { leaderId },
+      }),
     ]);
 
     const assignmentStatusMap: Record<string, number> = {};
-    assignmentsByStatus.forEach((r) => { assignmentStatusMap[r.status] = r._count; });
+    assignmentsByStatus.forEach((r) => {
+      assignmentStatusMap[r.status] = r._count;
+    });
 
     return {
       interns: {
@@ -193,10 +253,10 @@ export class StatsRepository {
       },
       assignments: {
         byStatus: {
-          todo:       assignmentStatusMap[ASSIGNMENT_STATUS.TODO]        ?? 0,
+          todo: assignmentStatusMap[ASSIGNMENT_STATUS.TODO] ?? 0,
           inProgress: assignmentStatusMap[ASSIGNMENT_STATUS.IN_PROGRESS] ?? 0,
-          review:     assignmentStatusMap[ASSIGNMENT_STATUS.REVIEW]      ?? 0,
-          done:       assignmentStatusMap[ASSIGNMENT_STATUS.DONE]        ?? 0,
+          review: assignmentStatusMap[ASSIGNMENT_STATUS.REVIEW] ?? 0,
+          done: assignmentStatusMap[ASSIGNMENT_STATUS.DONE] ?? 0,
         },
       },
       submissions: {

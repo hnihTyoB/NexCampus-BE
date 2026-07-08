@@ -1,8 +1,12 @@
-import { Request, Response, NextFunction } from 'express';
-import { TaskSubmissionService } from './task-submission.service';
-import { TaskSubmissionQueryDto, CreateTaskSubmissionDto, UpdateTaskSubmissionDto } from './task-submission.dto';
-import { AppError } from '../../common/errors/app-error';
-import { ERROR_CODE } from '../../common/errors/error-code';
+import { Request, Response, NextFunction } from "express";
+import { TaskSubmissionService } from "./task-submission.service";
+import {
+  TaskSubmissionQueryDto,
+  CreateTaskSubmissionDto,
+  UpdateTaskSubmissionDto,
+} from "./task-submission.dto";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODE } from "../../common/errors/error-code";
 
 export class TaskSubmissionController {
   private readonly service = new TaskSubmissionService();
@@ -55,7 +59,11 @@ export class TaskSubmissionController {
   uploadVideo = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.file) {
-        throw new AppError('No file uploaded', 400, ERROR_CODE.VALIDATION_ERROR);
+        throw new AppError(
+          "No file uploaded",
+          400,
+          ERROR_CODE.VALIDATION_ERROR,
+        );
       }
 
       const user = req.user;
@@ -74,7 +82,10 @@ export class TaskSubmissionController {
       const user = req.user;
       await this.service.delete(req.params.id, user);
 
-      res.json({ success: true, message: 'Task submission deleted successfully' });
+      res.json({
+        success: true,
+        message: "Task submission deleted successfully",
+      });
     } catch (error) {
       next(error);
     }

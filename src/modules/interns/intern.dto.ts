@@ -1,4 +1,4 @@
-import { InternStatus } from '@prisma/client';
+import { InternStatus } from "@prisma/client";
 
 export interface InternQueryDto {
   fullName?: string;
@@ -10,8 +10,8 @@ export interface InternQueryDto {
   startDateFrom?: string;
   startDateTo?: string;
 
-  sortBy?: 'createdAt' | 'fullName' | 'startDate' | 'status';
-  order?: 'asc' | 'desc';
+  sortBy?: "createdAt" | "fullName" | "startDate" | "status";
+  order?: "asc" | "desc";
 
   page?: number;
   limit?: number;

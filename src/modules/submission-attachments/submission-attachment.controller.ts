@@ -1,7 +1,7 @@
-import { Request, Response, NextFunction } from 'express';
-import { SubmissionAttachmentService } from './submission-attachment.service';
-import { AppError } from '../../common/errors/app-error';
-import { ERROR_CODE } from '../../common/errors/error-code';
+import { Request, Response, NextFunction } from "express";
+import { SubmissionAttachmentService } from "./submission-attachment.service";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODE } from "../../common/errors/error-code";
 
 export class SubmissionAttachmentController {
   private readonly service = new SubmissionAttachmentService();
@@ -9,7 +9,11 @@ export class SubmissionAttachmentController {
   upload = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.file) {
-        throw new AppError('No file uploaded', 400, ERROR_CODE.VALIDATION_ERROR);
+        throw new AppError(
+          "No file uploaded",
+          400,
+          ERROR_CODE.VALIDATION_ERROR,
+        );
       }
 
       const { submissionId } = req.params;
@@ -29,7 +33,11 @@ export class SubmissionAttachmentController {
     }
   };
 
-  findBySubmission = async (req: Request, res: Response, next: NextFunction) => {
+  findBySubmission = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
     try {
       const { submissionId } = req.params;
       const attachments = await this.service.findBySubmissionId(submissionId);
@@ -48,7 +56,10 @@ export class SubmissionAttachmentController {
 
       await this.service.deleteAttachment(attachmentId, userId, userRole);
 
-      res.json({ success: true, message: 'Submission attachment deleted successfully' });
+      res.json({
+        success: true,
+        message: "Submission attachment deleted successfully",
+      });
     } catch (error) {
       next(error);
     }

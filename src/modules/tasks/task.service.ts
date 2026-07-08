@@ -1,7 +1,7 @@
-import { TaskRepository } from './task.repository';
-import { AppError } from '../../common/errors/app-error';
-import { ERROR_CODE } from '../../common/errors/error-code';
-import { TaskQueryDto, CreateTaskDto, UpdateTaskDto } from './task.dto';
+import { TaskRepository } from "./task.repository";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODE } from "../../common/errors/error-code";
+import { TaskQueryDto, CreateTaskDto, UpdateTaskDto } from "./task.dto";
 
 export class TaskService {
   private readonly repository = new TaskRepository();
@@ -14,7 +14,7 @@ export class TaskService {
     const task = await this.repository.findById(id);
 
     if (!task) {
-      throw new AppError('Task not found', 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError("Task not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
     return task;

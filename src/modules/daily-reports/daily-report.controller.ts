@@ -1,8 +1,12 @@
-import { Request, Response, NextFunction } from 'express';
-import { DailyReportService } from './daily-report.service';
-import { DailyReportQueryDto, CreateDailyReportDto, UpdateDailyReportDto } from './daily-report.dto';
-import { AppError } from '../../common/errors/app-error';
-import { ERROR_CODE } from '../../common/errors/error-code';
+import { Request, Response, NextFunction } from "express";
+import { DailyReportService } from "./daily-report.service";
+import {
+  DailyReportQueryDto,
+  CreateDailyReportDto,
+  UpdateDailyReportDto,
+} from "./daily-report.dto";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODE } from "../../common/errors/error-code";
 
 export class DailyReportController {
   private readonly service = new DailyReportService();
@@ -55,7 +59,11 @@ export class DailyReportController {
   uploadVideo = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.file) {
-        throw new AppError('No file uploaded', 400, ERROR_CODE.VALIDATION_ERROR);
+        throw new AppError(
+          "No file uploaded",
+          400,
+          ERROR_CODE.VALIDATION_ERROR,
+        );
       }
 
       const user = req.user;
@@ -74,7 +82,7 @@ export class DailyReportController {
       const user = req.user;
       await this.service.delete(req.params.id, user);
 
-      res.json({ success: true, message: 'Daily report deleted successfully' });
+      res.json({ success: true, message: "Daily report deleted successfully" });
     } catch (error) {
       next(error);
     }

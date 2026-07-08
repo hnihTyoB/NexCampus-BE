@@ -1,10 +1,10 @@
-import { prisma } from '../../database/prisma.client';
+import { prisma } from "../../database/prisma.client";
 
 export class SubmissionAttachmentRepository {
   findBySubmissionId(submissionId: string) {
     return prisma.submissionAttachment.findMany({
       where: { submissionId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 

@@ -2,8 +2,8 @@ export interface DailyReportQueryDto {
   internId?: string;
   createdAtFrom?: string;
   createdAtTo?: string;
-  sortBy?: 'createdAt' | 'internId';
-  order?: 'asc' | 'desc';
+  sortBy?: "createdAt" | "internId";
+  order?: "asc" | "desc";
   page?: number;
   limit?: number;
 }

@@ -1,8 +1,8 @@
-import { Worker, Job } from 'bullmq';
-import { envConfig } from '../config/env.config';
-import { TaskAttachmentRepository } from '../modules/task-attachments/task-attachment.repository';
-import { StorageService } from '../common/services/storage.service';
-import type { StorageCleanupJobData } from './storage-cleanup.queue';
+import { Worker, Job } from "bullmq";
+import { envConfig } from "../config/env.config";
+import { TaskAttachmentRepository } from "../modules/task-attachments/task-attachment.repository";
+import { StorageService } from "../common/services/storage.service";
+import type { StorageCleanupJobData } from "./storage-cleanup.queue";
 
 async function processCleanupJob(_job: Job<StorageCleanupJobData>) {
   const { retentionDays } = envConfig.storageCleanup;
@@ -12,17 +12,21 @@ async function processCleanupJob(_job: Job<StorageCleanupJobData>) {
   const storageService = new StorageService();
 
   console.log(
-    `[StorageCleanupWorker] Starting cleanup — scanning attachments of tasks soft-deleted more than ${retentionDays} day(s) ago...`,
+    `[StorageCleanupWorker] Starting cleanup ï¿½ scanning attachments of tasks soft-deleted more than ${retentionDays} day(s) ago...`,
   );
 
   const orphaned = await attachmentRepo.findOrphanedAttachments(retentionDays);
 
   if (orphaned.length === 0) {
-    console.log('[StorageCleanupWorker] No orphaned attachments found. Nothing to clean up.');
+    console.log(
+      "[StorageCleanupWorker] No orphaned attachments found. Nothing to clean up.",
+    );
     return;
   }
 
-  console.log(`[StorageCleanupWorker] Found ${orphaned.length} orphaned attachment(s) to delete.`);
+  console.log(
+    `[StorageCleanupWorker] Found ${orphaned.length} orphaned attachment(s) to delete.`,
+  );
 
   const successIds: string[] = [];
   const failedPaths: string[] = [];
@@ -32,16 +36,25 @@ async function processCleanupJob(_job: Job<StorageCleanupJobData>) {
     try {
       await storageService.deleteFile(storageBucket, attachment.filePath);
       successIds.push(attachment.id);
-      console.log(`[StorageCleanupWorker] Deleted storage file: ${attachment.filePath}`);
+      console.log(
+        `[StorageCleanupWorker] Deleted storage file: ${attachment.filePath}`,
+      );
     } catch (err) {
       // Neu file da bi xoa truoc do (not found), van tinh la thanh cong de xoa DB record
       const errMessage = err instanceof Error ? err.message : String(err);
-      if (errMessage.toLowerCase().includes('not found') || errMessage.toLowerCase().includes('does not exist')) {
+      if (
+        errMessage.toLowerCase().includes("not found") ||
+        errMessage.toLowerCase().includes("does not exist")
+      ) {
         successIds.push(attachment.id);
-        console.warn(`[StorageCleanupWorker] File not found on storage (already deleted?): ${attachment.filePath}`);
+        console.warn(
+          `[StorageCleanupWorker] File not found on storage (already deleted?): ${attachment.filePath}`,
+        );
       } else {
         failedPaths.push(attachment.filePath);
-        console.error(`[StorageCleanupWorker] Failed to delete storage file: ${attachment.filePath} — ${errMessage}`);
+        console.error(
+          `[StorageCleanupWorker] Failed to delete storage file: ${attachment.filePath} ï¿½ ${errMessage}`,
+        );
       }
     }
   }
@@ -49,7 +62,9 @@ async function processCleanupJob(_job: Job<StorageCleanupJobData>) {
   // Xoa cac DB record da xoa Storage thanh cong
   if (successIds.length > 0) {
     await attachmentRepo.deleteManyByIds(successIds);
-    console.log(`[StorageCleanupWorker] Deleted ${successIds.length} DB record(s).`);
+    console.log(
+      `[StorageCleanupWorker] Deleted ${successIds.length} DB record(s).`,
+    );
   }
 
   if (failedPaths.length > 0) {
@@ -59,12 +74,12 @@ async function processCleanupJob(_job: Job<StorageCleanupJobData>) {
     );
   }
 
-  console.log('[StorageCleanupWorker] Cleanup job completed.');
+  console.log("[StorageCleanupWorker] Cleanup job completed.");
 }
 
 export function startStorageCleanupWorker() {
   const worker = new Worker<StorageCleanupJobData>(
-    'storage-cleanup-queue',
+    "storage-cleanup-queue",
     processCleanupJob,
     {
       connection: {
@@ -75,18 +90,20 @@ export function startStorageCleanupWorker() {
     },
   );
 
-  worker.on('completed', (job) => {
+  worker.on("completed", (job) => {
     console.log(`[StorageCleanupWorker] Job ${job.id} completed successfully.`);
   });
 
-  worker.on('failed', (job, err) => {
+  worker.on("failed", (job, err) => {
     console.error(`[StorageCleanupWorker] Job ${job?.id} failed:`, err.message);
   });
 
-  worker.on('error', (err) => {
-    console.error('[StorageCleanupWorker] Worker error:', err.message);
+  worker.on("error", (err) => {
+    console.error("[StorageCleanupWorker] Worker error:", err.message);
   });
 
-  console.log('[StorageCleanupWorker] Worker started — waiting for cleanup jobs...');
+  console.log(
+    "[StorageCleanupWorker] Worker started ï¿½ waiting for cleanup jobs...",
+  );
   return worker;
 }

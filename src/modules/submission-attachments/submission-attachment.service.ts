@@ -1,12 +1,12 @@
-import { randomUUID } from 'crypto';
-import { SubmissionAttachmentRepository } from './submission-attachment.repository';
-import { TaskSubmissionRepository } from '../task-submissions/task-submission.repository';
-import { StorageService } from '../../common/services/storage.service';
-import { AppError } from '../../common/errors/app-error';
-import { ERROR_CODE } from '../../common/errors/error-code';
-import { envConfig } from '../../config/env.config';
-import { ROLES } from '../../common/constants/role.constant';
-import { REVIEW_STATUS } from '../../common/constants/status.constant';
+import { randomUUID } from "crypto";
+import { SubmissionAttachmentRepository } from "./submission-attachment.repository";
+import { TaskSubmissionRepository } from "../task-submissions/task-submission.repository";
+import { StorageService } from "../../common/services/storage.service";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODE } from "../../common/errors/error-code";
+import { envConfig } from "../../config/env.config";
+import { ROLES } from "../../common/constants/role.constant";
+import { REVIEW_STATUS } from "../../common/constants/status.constant";
 
 export class SubmissionAttachmentService {
   private readonly attachmentRepo = new SubmissionAttachmentRepository();
@@ -26,21 +26,36 @@ export class SubmissionAttachmentService {
     // 1. Kiem tra submission ton tai
     const submission = await this.submissionRepo.findById(submissionId);
     if (!submission) {
-      throw new AppError('Task submission not found', 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError(
+        "Task submission not found",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
     }
 
     // 2. Kiem tra quyen so huu (neu la intern, chi duoc upload cho submission cua minh)
-    if (userRole === ROLES.INTERN && submission.assignment.intern.userId !== uploadedBy) {
-      throw new AppError('You are not authorized to upload for this submission', 403, ERROR_CODE.FORBIDDEN);
+    if (
+      userRole === ROLES.INTERN &&
+      submission.assignment.intern.userId !== uploadedBy
+    ) {
+      throw new AppError(
+        "You are not authorized to upload for this submission",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
     }
 
     // 3. Kiem tra trang thai (khong cho phep upload khi da duoc APPROVED)
     if (submission.reviewStatus === REVIEW_STATUS.APPROVED) {
-      throw new AppError('Cannot upload attachments for an approved submission', 400, ERROR_CODE.VALIDATION_ERROR);
+      throw new AppError(
+        "Cannot upload attachments for an approved submission",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
     }
 
     // 4. Tao duong dan duy nhat trong bucket: {submissionId}/{uuid}_{originalname}
-    const safeFileName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const safeFileName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
     const filePath = `${submissionId}/${randomUUID()}_${safeFileName}`;
 
     // 5. Upload len Supabase Storage
@@ -63,26 +78,44 @@ export class SubmissionAttachmentService {
     });
   }
 
-  async deleteAttachment(attachmentId: string, userId: string, userRole: string) {
+  async deleteAttachment(
+    attachmentId: string,
+    userId: string,
+    userRole: string,
+  ) {
     const attachment = await this.attachmentRepo.findById(attachmentId);
     if (!attachment) {
-      throw new AppError('Attachment not found', 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError("Attachment not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
     // Lay submission de check quyen va trang thai
-    const submission = await this.submissionRepo.findById(attachment.submissionId);
+    const submission = await this.submissionRepo.findById(
+      attachment.submissionId,
+    );
     if (!submission) {
-      throw new AppError('Task submission not found', 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError(
+        "Task submission not found",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
     }
 
     // Intern chi duoc xoa attachment cua minh
     if (userRole === ROLES.INTERN) {
       if (submission.assignment.intern.userId !== userId) {
-        throw new AppError('You are not authorized to delete this attachment', 403, ERROR_CODE.FORBIDDEN);
+        throw new AppError(
+          "You are not authorized to delete this attachment",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
       }
       // Intern khong duoc xoa neu submission da APPROVED
       if (submission.reviewStatus === REVIEW_STATUS.APPROVED) {
-        throw new AppError('Cannot delete attachments for an approved submission', 400, ERROR_CODE.VALIDATION_ERROR);
+        throw new AppError(
+          "Cannot delete attachments for an approved submission",
+          400,
+          ERROR_CODE.VALIDATION_ERROR,
+        );
       }
     }
 

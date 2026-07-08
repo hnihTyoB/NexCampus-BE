@@ -1,5 +1,5 @@
-import { AppError } from '../errors/app-error';
-import { ERROR_CODE } from '../errors/error-code';
+import { AppError } from "../errors/app-error";
+import { ERROR_CODE } from "../errors/error-code";
 
 const PRIVATE_IP_PATTERNS = [
   /^localhost$/i,
@@ -17,11 +17,15 @@ export function validateUrl(url: string): URL {
   try {
     parsed = new URL(url);
   } catch {
-    throw new AppError('Invalid URL format', 400, ERROR_CODE.INVALID_URL);
+    throw new AppError("Invalid URL format", 400, ERROR_CODE.INVALID_URL);
   }
 
-  if (!['http:', 'https:'].includes(parsed.protocol)) {
-    throw new AppError('Only HTTP and HTTPS URLs are allowed', 400, ERROR_CODE.INVALID_URL);
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new AppError(
+      "Only HTTP and HTTPS URLs are allowed",
+      400,
+      ERROR_CODE.INVALID_URL,
+    );
   }
 
   const hostname = parsed.hostname;
@@ -29,7 +33,7 @@ export function validateUrl(url: string): URL {
   for (const pattern of PRIVATE_IP_PATTERNS) {
     if (pattern.test(hostname)) {
       throw new AppError(
-        'Private or local IP addresses are not allowed',
+        "Private or local IP addresses are not allowed",
         403,
         ERROR_CODE.PRIVATE_IP_BLOCKED,
       );
@@ -44,6 +48,6 @@ export function extractDomain(url: string): string {
     const parsed = new URL(url);
     return parsed.hostname;
   } catch {
-    return '';
+    return "";
   }
 }

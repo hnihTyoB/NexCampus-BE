@@ -1,4 +1,4 @@
-import { ReviewStatus } from '@prisma/client';
+import { ReviewStatus } from "@prisma/client";
 
 export interface TaskSubmissionQueryDto {
   assignmentId?: string;
@@ -6,8 +6,8 @@ export interface TaskSubmissionQueryDto {
   reviewedBy?: string;
   internId?: string;
   taskId?: string;
-  sortBy?: 'submittedAt' | 'reviewStatus' | 'attempt';
-  order?: 'asc' | 'desc';
+  sortBy?: "submittedAt" | "reviewStatus" | "attempt";
+  order?: "asc" | "desc";
   page?: number;
   limit?: number;
 }

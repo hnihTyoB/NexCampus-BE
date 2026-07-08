@@ -1,6 +1,6 @@
-import { Prisma } from '@prisma/client';
-import { prisma } from '../../database/prisma.client';
-import { UserQueryDto } from './user.dto';
+import { Prisma } from "@prisma/client";
+import { prisma } from "../../database/prisma.client";
+import { UserQueryDto } from "./user.dto";
 
 export class UserRepository {
   async findAll(query: UserQueryDto) {
@@ -9,15 +9,17 @@ export class UserRepository {
       fullName,
       roleName,
       isActive,
-      sortBy = 'createdAt',
-      order = 'desc',
+      sortBy = "createdAt",
+      order = "desc",
       page = 1,
       limit = 20,
     } = query;
 
     const where: Prisma.UserWhereInput = {
-      ...(email ? { email: { contains: email, mode: 'insensitive' } } : {}),
-      ...(fullName ? { fullName: { contains: fullName, mode: 'insensitive' } } : {}),
+      ...(email ? { email: { contains: email, mode: "insensitive" } } : {}),
+      ...(fullName
+        ? { fullName: { contains: fullName, mode: "insensitive" } }
+        : {}),
       ...(isActive !== undefined ? { isActive } : {}),
       ...(roleName ? { role: { name: roleName } } : {}),
     };
@@ -55,11 +57,7 @@ export class UserRepository {
     });
   }
 
-  create(data: {
-    email: string;
-    passwordHash: string;
-    roleId: string;
-  }) {
+  create(data: { email: string; passwordHash: string; roleId: string }) {
     return prisma.user.create({
       data: {
         email: data.email,
@@ -70,11 +68,28 @@ export class UserRepository {
     });
   }
 
-  update(id: string, data: { isActive?: boolean; roleId?: string; avatarUrl?: string | null }) {
+  update(
+    id: string,
+    data: { isActive?: boolean; roleId?: string; avatarUrl?: string | null },
+  ) {
     return prisma.user.update({
       where: { id },
       data,
       include: { role: true },
     });
+  }
+
+  async delete(id: string) {
+    const [user] = await prisma.$transaction([
+      prisma.user.update({
+        where: { id },
+        data: { isActive: false },
+        include: { role: true },
+      }),
+      prisma.refreshToken.deleteMany({
+        where: { userId: id },
+      }),
+    ]);
+    return user;
   }
 }

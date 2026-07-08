@@ -1,4 +1,4 @@
-import { NotificationSettingRepository } from './notification-setting.repository';
+import { NotificationSettingRepository } from "./notification-setting.repository";
 
 export class NotificationSettingService {
   private readonly repository = new NotificationSettingRepository();

@@ -1,7 +1,7 @@
-import { Request, Response, NextFunction } from 'express';
-import { ReportAttachmentService } from './report-attachment.service';
-import { AppError } from '../../common/errors/app-error';
-import { ERROR_CODE } from '../../common/errors/error-code';
+import { Request, Response, NextFunction } from "express";
+import { ReportAttachmentService } from "./report-attachment.service";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODE } from "../../common/errors/error-code";
 
 export class ReportAttachmentController {
   private readonly service = new ReportAttachmentService();
@@ -9,7 +9,11 @@ export class ReportAttachmentController {
   upload = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.file) {
-        throw new AppError('No file uploaded', 400, ERROR_CODE.VALIDATION_ERROR);
+        throw new AppError(
+          "No file uploaded",
+          400,
+          ERROR_CODE.VALIDATION_ERROR,
+        );
       }
 
       const { reportId } = req.params;
@@ -48,7 +52,10 @@ export class ReportAttachmentController {
 
       await this.service.deleteAttachment(attachmentId, userId, userRole);
 
-      res.json({ success: true, message: 'Report attachment deleted successfully' });
+      res.json({
+        success: true,
+        message: "Report attachment deleted successfully",
+      });
     } catch (error) {
       next(error);
     }

@@ -2,8 +2,8 @@ export interface WeeklyEvaluationQueryDto {
   internId?: string;
   leaderId?: string;
   week?: number;
-  sortBy?: 'week' | 'totalScore' | 'createdAt';
-  order?: 'asc' | 'desc';
+  sortBy?: "week" | "totalScore" | "createdAt";
+  order?: "asc" | "desc";
   page?: number;
   limit?: number;
 }
@@ -72,7 +72,7 @@ export interface AiSuggestionResponseDto {
     taskSubmissionsCount: number;
     weekRange: {
       from: string; // ISO date string
-      to: string;   // ISO date string
+      to: string; // ISO date string
     };
   };
 }

@@ -1,6 +1,10 @@
-import { Prisma } from '@prisma/client';
-import { prisma } from '../../database/prisma.client';
-import { TaskAssignmentQueryDto, CreateTaskAssignmentDto, UpdateTaskAssignmentDto } from './task-assignment.dto';
+import { Prisma } from "@prisma/client";
+import { prisma } from "../../database/prisma.client";
+import {
+  TaskAssignmentQueryDto,
+  CreateTaskAssignmentDto,
+  UpdateTaskAssignmentDto,
+} from "./task-assignment.dto";
 
 const defaultInclude = {
   task: true,
@@ -31,8 +35,8 @@ export class TaskAssignmentRepository {
       internId,
       assignedBy,
       status,
-      sortBy = 'assignedAt',
-      order = 'desc',
+      sortBy = "assignedAt",
+      order = "desc",
       page = 1,
       limit = 20,
     } = query;

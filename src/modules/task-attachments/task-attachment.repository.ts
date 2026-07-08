@@ -1,10 +1,10 @@
-import { prisma } from '../../database/prisma.client';
+import { prisma } from "../../database/prisma.client";
 
 export class TaskAttachmentRepository {
   findByTaskId(taskId: string) {
     return prisma.taskAttachment.findMany({
       where: { taskId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 

@@ -1,6 +1,10 @@
-import { Prisma } from '@prisma/client';
-import { prisma } from '../../database/prisma.client';
-import { TaskSubmissionQueryDto, CreateTaskSubmissionDto, UpdateTaskSubmissionDto } from './task-submission.dto';
+import { Prisma } from "@prisma/client";
+import { prisma } from "../../database/prisma.client";
+import {
+  TaskSubmissionQueryDto,
+  CreateTaskSubmissionDto,
+  UpdateTaskSubmissionDto,
+} from "./task-submission.dto";
 
 const defaultInclude = {
   assignment: {
@@ -28,7 +32,7 @@ const defaultInclude = {
   },
   attachments: {
     orderBy: {
-      createdAt: 'desc' as const,
+      createdAt: "desc" as const,
     },
   },
 };
@@ -41,8 +45,8 @@ export class TaskSubmissionRepository {
       reviewedBy,
       internId,
       taskId,
-      sortBy = 'submittedAt',
-      order = 'desc',
+      sortBy = "submittedAt",
+      order = "desc",
       page = 1,
       limit = 20,
     } = query;
@@ -117,8 +121,12 @@ export class TaskSubmissionRepository {
         ...(data.prLink !== undefined ? { prLink: data.prLink } : {}),
         ...(data.videoDemo !== undefined ? { videoDemo: data.videoDemo } : {}),
         ...(data.note !== undefined ? { note: data.note } : {}),
-        ...(data.reviewStatus !== undefined ? { reviewStatus: data.reviewStatus } : {}),
-        ...(data.reviewComment !== undefined ? { reviewComment: data.reviewComment } : {}),
+        ...(data.reviewStatus !== undefined
+          ? { reviewStatus: data.reviewStatus }
+          : {}),
+        ...(data.reviewComment !== undefined
+          ? { reviewComment: data.reviewComment }
+          : {}),
         ...(reviewedBy !== undefined ? { reviewedBy } : {}),
         ...(reviewedBy !== undefined ? { reviewedAt: new Date() } : {}),
       },

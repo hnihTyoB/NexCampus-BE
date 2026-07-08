@@ -1,16 +1,16 @@
-import { WeeklyEvaluationRepository } from './weekly-evaluation.repository';
-import { WeeklyEvaluationAiService } from './weekly-evaluation.ai.service';
-import { InternRepository } from '../interns/intern.repository';
-import { AppError } from '../../common/errors/app-error';
-import { ERROR_CODE } from '../../common/errors/error-code';
+import { WeeklyEvaluationRepository } from "./weekly-evaluation.repository";
+import { WeeklyEvaluationAiService } from "./weekly-evaluation.ai.service";
+import { InternRepository } from "../interns/intern.repository";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODE } from "../../common/errors/error-code";
 import {
   WeeklyEvaluationQueryDto,
   CreateWeeklyEvaluationDto,
   UpdateWeeklyEvaluationDto,
   AiSuggestionRequestDto,
-} from './weekly-evaluation.dto';
-import { ROLES } from '../../common/constants/role.constant';
-import { NotificationDispatcher } from '../notifications/notification.dispatcher';
+} from "./weekly-evaluation.dto";
+import { ROLES } from "../../common/constants/role.constant";
+import { NotificationDispatcher } from "../notifications/notification.dispatcher";
 
 interface UserPayload {
   id: string;
@@ -27,7 +27,11 @@ export class WeeklyEvaluationService {
     if (user.role === ROLES.INTERN) {
       const intern = await this.internRepository.findByUserId(user.id);
       if (!intern) {
-        throw new AppError('Intern profile not found', 404, ERROR_CODE.NOT_FOUND);
+        throw new AppError(
+          "Intern profile not found",
+          404,
+          ERROR_CODE.NOT_FOUND,
+        );
       }
       query.internId = intern.id;
     }
@@ -38,7 +42,11 @@ export class WeeklyEvaluationService {
     const evaluation = await this.repository.findById(id);
 
     if (!evaluation) {
-      throw new AppError('Weekly evaluation not found', 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError(
+        "Weekly evaluation not found",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
     }
 
     return evaluation;
@@ -48,32 +56,41 @@ export class WeeklyEvaluationService {
     // 1. Ensure intern exists and is not soft-deleted
     const intern = await this.internRepository.findById(data.internId);
     if (!intern) {
-      throw new AppError('Intern profile not found', 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError("Intern profile not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
     // 2. Ensure unique evaluation per week for that intern
-    const existing = await this.repository.findByInternAndWeek(data.internId, data.week);
+    const existing = await this.repository.findByInternAndWeek(
+      data.internId,
+      data.week,
+    );
     if (existing) {
-      throw new AppError('An evaluation for this intern and week already exists', 409, ERROR_CODE.DUPLICATE_ENTRY);
+      throw new AppError(
+        "An evaluation for this intern and week already exists",
+        409,
+        ERROR_CODE.DUPLICATE_ENTRY,
+      );
     }
 
     // 3. Compute totalScore
-    const totalScore = (data.communication + data.attitude + data.learning + data.coding) / 4;
+    const totalScore =
+      (data.communication + data.attitude + data.learning + data.coding) / 4;
 
     // 4. Detect leaderEdited: nếu Leader gửi kèm AI fields và đã thay đổi ít nhất 1 điểm
     const leaderEdited = this.detectLeaderEdited(data);
 
-    const result = await this.repository.create(data, totalScore, leaderId, leaderEdited);
+    const result = await this.repository.create(
+      data,
+      totalScore,
+      leaderId,
+      leaderEdited,
+    );
 
     // Notify the intern of the weekly evaluation
-    await NotificationDispatcher.dispatch(
-      intern.userId,
-      'WEEKLY_EVALUATION',
-      {
-        week: data.week,
-        totalScore: totalScore.toFixed(1),
-      }
-    );
+    await NotificationDispatcher.dispatch(intern.userId, "WEEKLY_EVALUATION", {
+      week: data.week,
+      totalScore: totalScore.toFixed(1),
+    });
 
     return result;
   }
@@ -90,9 +107,14 @@ export class WeeklyEvaluationService {
       data.learning !== undefined ||
       data.coding !== undefined
     ) {
-      const comm = data.communication !== undefined ? data.communication : evaluation.communication;
-      const att = data.attitude !== undefined ? data.attitude : evaluation.attitude;
-      const learn = data.learning !== undefined ? data.learning : evaluation.learning;
+      const comm =
+        data.communication !== undefined
+          ? data.communication
+          : evaluation.communication;
+      const att =
+        data.attitude !== undefined ? data.attitude : evaluation.attitude;
+      const learn =
+        data.learning !== undefined ? data.learning : evaluation.learning;
       const code = data.coding !== undefined ? data.coding : evaluation.coding;
       totalScore = (comm + att + learn + code) / 4;
     }
@@ -100,14 +122,15 @@ export class WeeklyEvaluationService {
     const result = await this.repository.update(id, data, totalScore);
 
     // Notify the intern of the evaluation update
-    const finalScore = totalScore !== undefined ? totalScore : evaluation.totalScore;
+    const finalScore =
+      totalScore !== undefined ? totalScore : evaluation.totalScore;
     await NotificationDispatcher.dispatch(
       evaluation.intern.userId,
-      'WEEKLY_EVALUATION',
+      "WEEKLY_EVALUATION",
       {
         week: evaluation.week,
         totalScore: finalScore.toFixed(1),
-      }
+      },
     );
 
     return result;
@@ -143,7 +166,8 @@ export class WeeklyEvaluationService {
     if (!hasAiFields) return false;
 
     const changed =
-      (data.aiCommunication != null && data.aiCommunication !== data.communication) ||
+      (data.aiCommunication != null &&
+        data.aiCommunication !== data.communication) ||
       (data.aiAttitude != null && data.aiAttitude !== data.attitude) ||
       (data.aiLearning != null && data.aiLearning !== data.learning) ||
       (data.aiCoding != null && data.aiCoding !== data.coding);

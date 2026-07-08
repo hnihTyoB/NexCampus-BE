@@ -1,11 +1,11 @@
-import { Request, Response, NextFunction } from 'express';
-import { WeeklyEvaluationService } from './weekly-evaluation.service';
+import { Request, Response, NextFunction } from "express";
+import { WeeklyEvaluationService } from "./weekly-evaluation.service";
 import {
   WeeklyEvaluationQueryDto,
   CreateWeeklyEvaluationDto,
   UpdateWeeklyEvaluationDto,
   AiSuggestionRequestDto,
-} from './weekly-evaluation.dto';
+} from "./weekly-evaluation.dto";
 
 export class WeeklyEvaluationController {
   private readonly service = new WeeklyEvaluationService();
@@ -58,7 +58,10 @@ export class WeeklyEvaluationController {
     try {
       await this.service.delete(req.params.id);
 
-      res.json({ success: true, message: 'Weekly evaluation deleted successfully' });
+      res.json({
+        success: true,
+        message: "Weekly evaluation deleted successfully",
+      });
     } catch (error) {
       next(error);
     }

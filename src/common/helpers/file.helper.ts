@@ -1,5 +1,5 @@
-import path from 'path';
-import fs from 'fs';
+import path from "path";
+import fs from "fs";
 
 export function ensureDirExists(dirPath: string): void {
   if (!fs.existsSync(dirPath)) {
@@ -7,7 +7,10 @@ export function ensureDirExists(dirPath: string): void {
   }
 }
 
-export function buildExportFilePath(exportDir: string, fileName: string): string {
+export function buildExportFilePath(
+  exportDir: string,
+  fileName: string,
+): string {
   return path.join(exportDir, fileName);
 }
 
