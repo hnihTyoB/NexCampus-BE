@@ -4,6 +4,7 @@ import { jwtConfig } from "../config/jwt.config";
 import { AppError } from "../common/errors/app-error";
 import { ERROR_CODE } from "../common/errors/error-code";
 import { prisma } from "../database/prisma.client";
+import { Role } from "../common/constants/role.constant";
 
 export async function authMiddleware(
   req: Request,
@@ -44,7 +45,7 @@ export async function authMiddleware(
     req.user = {
       id: payload.id,
       email: payload.email,
-      role: payload.role as any,
+      role: payload.role as Role,
     };
 
     next();

@@ -12,6 +12,19 @@ import { ROLES } from "../../common/constants/role.constant";
 const router = Router();
 const controller = new NotificationController();
 
+router.post(
+  "/remind/tasks",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER),
+  controller.triggerTaskReminders,
+);
+router.post(
+  "/remind/evaluations",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER),
+  controller.triggerEvaluationReminders,
+);
+
 router.get(
   "/",
   authMiddleware,

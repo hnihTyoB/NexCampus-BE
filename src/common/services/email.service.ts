@@ -3,6 +3,8 @@ import { envConfig } from "../../config/env.config";
 
 export class EmailService {
   private static transporter = nodemailer.createTransport({
+    pool: true,
+    maxConnections: 5,
     host: envConfig.email.host,
     port: envConfig.email.port,
     secure: envConfig.email.port === 465,

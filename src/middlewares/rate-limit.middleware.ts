@@ -5,6 +5,17 @@ const requestCounts = new Map<string, { count: number; resetAt: number }>();
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_REQUESTS = 100;
 
+// Clean up expired records every 15 minutes to prevent memory leaks
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, record] of requestCounts.entries()) {
+    if (now > record.resetAt) {
+      requestCounts.delete(ip);
+    }
+  }
+}, WINDOW_MS);
+
+
 export function rateLimitMiddleware(
   req: Request,
   res: Response,

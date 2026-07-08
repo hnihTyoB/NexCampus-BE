@@ -1,4 +1,15 @@
 import { z } from "zod";
+import { validateUrl } from "../../common/helpers/url.helper";
+
+const isPublicUrl = (val: string | null | undefined) => {
+  if (!val) return true;
+  try {
+    validateUrl(val);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 export const findAllDailyReportSchema = z.object({
   internId: z.string().uuid().optional(),
@@ -18,12 +29,13 @@ export const findAllDailyReportSchema = z.object({
 
 export const createDailyReportSchema = z.object({
   content: z.string().min(1).max(5000),
-  prLink: z.string().url().optional().or(z.literal("")),
-  videoDemo: z.string().url().optional().or(z.literal("")),
+  prLink: z.string().url().refine(isPublicUrl, { message: "URL cannot be a private or local address" }).optional().or(z.literal("")),
+  videoDemo: z.string().url().refine(isPublicUrl, { message: "URL cannot be a private or local address" }).optional().or(z.literal("")),
 });
 
 export const updateDailyReportSchema = z.object({
   content: z.string().min(1).max(5000).optional(),
-  prLink: z.string().url().nullable().optional().or(z.literal("")),
-  videoDemo: z.string().url().nullable().optional().or(z.literal("")),
+  prLink: z.string().url().nullable().refine(isPublicUrl, { message: "URL cannot be a private or local address" }).optional().or(z.literal("")),
+  videoDemo: z.string().url().nullable().refine(isPublicUrl, { message: "URL cannot be a private or local address" }).optional().or(z.literal("")),
 });
+

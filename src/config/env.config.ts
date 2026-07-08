@@ -100,4 +100,8 @@ export const envConfig = {
       .filter(Boolean),
   },
   aiProvider: process.env.AI_PROVIDER || "gemini",
+  reminders: {
+    cronExpression: process.env.REMINDER_CRON || "0 8 * * *",
+    thresholdHours: parseInt(process.env.REMINDER_TASK_THRESHOLD_HOURS || "24", 10),
+  },
 };

@@ -2,32 +2,43 @@ import { prisma } from "../../database/prisma.client";
 import {
   NOTIFICATION_CHANNEL,
   NOTIFICATION_LOG_STATUS,
+  NOTIFICATION_TYPE,
 } from "../../common/constants/status.constant";
 import { notificationQueue } from "../../queues/notification.queue";
 
 const fallbacks: Record<string, { title: string; content: string }> = {
-  TASK_ASSIGNMENT: {
+  [NOTIFICATION_TYPE.TASK_ASSIGNMENT]: {
     title: "Bạn đã được giao công việc mới",
     content: 'Công việc: "{{taskTitle}}". Hạn nộp: {{deadline}}',
   },
-  TASK_SUBMISSION: {
+  [NOTIFICATION_TYPE.TASK_SUBMISSION]: {
     title: "Bản nộp bài mới cần duyệt",
     content:
       'Thực tập sinh {{internName}} đã nộp bài cho công việc "{{taskTitle}}" (Lần {{attempt}}).',
   },
-  SUBMISSION_REVIEW: {
+  [NOTIFICATION_TYPE.SUBMISSION_REVIEW]: {
     title: "Kết quả duyệt bài nộp",
     content:
       'Bài nộp cho công việc "{{taskTitle}}" (Lần {{attempt}}) đã được duyệt: {{reviewStatus}}.',
   },
-  DAILY_REPORT: {
+  [NOTIFICATION_TYPE.DAILY_REPORT]: {
     title: "Báo cáo hàng ngày mới",
     content: "Thực tập sinh {{internName}} đã gửi báo cáo hàng ngày.",
   },
-  WEEKLY_EVALUATION: {
+  [NOTIFICATION_TYPE.WEEKLY_EVALUATION]: {
     title: "Đánh giá hàng tuần mới",
     content:
       "Bạn nhận được đánh giá tuần {{week}} với tổng điểm là {{totalScore}}/10.",
+  },
+  [NOTIFICATION_TYPE.TASK_REMINDER]: {
+    title: "Nhắc nhở hoàn thành công việc",
+    content:
+      'Công việc "{{taskTitle}}" của bạn có hạn nộp vào lúc {{deadline}}. Vui lòng hoàn thành đúng hạn.',
+  },
+  [NOTIFICATION_TYPE.EVALUATION_REMINDER]: {
+    title: "Nhắc nhở đánh giá thực tập sinh",
+    content:
+      'Thực tập sinh {{internName}} chưa có đánh giá cho tuần {{week}}. Vui lòng thực hiện đánh giá.',
   },
 };
 

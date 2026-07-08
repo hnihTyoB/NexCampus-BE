@@ -9,6 +9,7 @@ import {
 } from "./middlewares/error.middleware";
 import routes from "./routes";
 import { swaggerSpec, swaggerOptions } from "./config/swagger.config";
+import { rateLimitMiddleware } from "./middlewares/rate-limit.middleware";
 
 const app = express();
 
@@ -30,7 +31,7 @@ app.use(
   swaggerUi.setup(swaggerSpec, swaggerOptions),
 );
 
-app.use("/api/v1", routes);
+app.use("/api/v1", rateLimitMiddleware, routes);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);

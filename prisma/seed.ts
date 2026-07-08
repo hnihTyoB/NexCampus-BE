@@ -106,6 +106,18 @@ async function main() {
       contentTemplate:
         "Bạn nhận được đánh giá tuần {{week}} với tổng điểm là {{totalScore}}/10.",
     },
+    {
+      type: "TASK_REMINDER",
+      titleTemplate: "Nhắc nhở hoàn thành công việc",
+      contentTemplate:
+        'Công việc "{{taskTitle}}" của bạn có hạn nộp vào lúc {{deadline}}. Vui lòng hoàn thành đúng hạn.',
+    },
+    {
+      type: "EVALUATION_REMINDER",
+      titleTemplate: "Nhắc nhở đánh giá thực tập sinh",
+      contentTemplate:
+        'Thực tập sinh {{internName}} chưa có đánh giá cho tuần {{week}}. Vui lòng thực hiện đánh giá.',
+    },
   ];
 
   for (const t of templates) {

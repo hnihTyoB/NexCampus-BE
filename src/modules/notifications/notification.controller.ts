@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { NotificationService } from "./notification.service";
+import { ReminderService } from "./reminder.service";
 import {
   NotificationQueryDto,
   CreateNotificationDto,
@@ -55,6 +56,40 @@ export class NotificationController {
       await this.service.delete(req.params.id, req.user);
 
       res.json({ success: true, message: "Notification deleted successfully" });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  triggerTaskReminders = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    try {
+      const result = await ReminderService.remindTasks();
+      res.json({
+        success: true,
+        message: "Task reminders triggered successfully",
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  triggerEvaluationReminders = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    try {
+      const result = await ReminderService.remindEvaluations();
+      res.json({
+        success: true,
+        message: "Evaluation reminders triggered successfully",
+        data: result,
+      });
     } catch (error) {
       next(error);
     }
