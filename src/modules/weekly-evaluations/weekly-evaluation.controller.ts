@@ -45,8 +45,9 @@ export class WeeklyEvaluationController {
 
   update = async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const actorId = req.user.id;
       const body = req.body as UpdateWeeklyEvaluationDto;
-      const result = await this.service.update(req.params.id, body);
+      const result = await this.service.update(req.params.id, body, actorId);
 
       res.json({ success: true, data: result });
     } catch (error) {
@@ -56,7 +57,8 @@ export class WeeklyEvaluationController {
 
   delete = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await this.service.delete(req.params.id);
+      const actorId = req.user.id;
+      await this.service.delete(req.params.id, actorId);
 
       res.json({
         success: true,

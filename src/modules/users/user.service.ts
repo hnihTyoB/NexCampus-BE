@@ -5,9 +5,12 @@ import { ERROR_CODE } from "../../common/errors/error-code";
 import { UserQueryDto, CreateUserDto, UpdateUserDto } from "./user.dto";
 import { StorageService } from "../../common/services/storage.service";
 import { envConfig } from "../../config/env.config";
+import { ActivityLogService } from "../activity-logs/activity-log.service";
+import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
 
 export class UserService {
   private readonly repository = new UserRepository();
+  private readonly activityLogService = new ActivityLogService();
 
   async findAll(query: UserQueryDto) {
     return this.repository.findAll(query);
@@ -23,7 +26,7 @@ export class UserService {
     return user;
   }
 
-  async create(data: CreateUserDto) {
+  async create(data: CreateUserDto, actorId: string) {
     const existing = await this.repository.findByEmail(data.email);
 
     if (existing) {
@@ -36,20 +39,50 @@ export class UserService {
 
     const passwordHash = await bcrypt.hash(data.password, 10);
 
-    return this.repository.create({
+    const result = await this.repository.create({
       email: data.email,
       passwordHash,
       roleId: data.roleId,
     });
+
+    await this.activityLogService.log(
+      actorId,
+      ACTIVITY_ACTIONS.CREATE_USER,
+      `Admin đã tạo tài khoản mới: ${result.email}`,
+      result.id,
+      "User",
+    );
+
+    return result;
   }
 
-  async update(id: string, data: UpdateUserDto) {
-    await this.findById(id);
+  async update(id: string, data: UpdateUserDto, actorId: string) {
+    const targetUser = await this.findById(id);
 
-    return this.repository.update(id, {
+    const result = await this.repository.update(id, {
       isActive: data.isActive,
       roleId: data.roleId,
     });
+
+    const changes: string[] = [];
+    if (data.isActive !== undefined && data.isActive !== targetUser.isActive) {
+      changes.push(data.isActive ? "kích hoạt tài khoản" : "khóa tài khoản");
+    }
+    if (data.roleId !== undefined && data.roleId !== targetUser.roleId) {
+      changes.push("thay đổi vai trò");
+    }
+
+    if (changes.length > 0) {
+      await this.activityLogService.log(
+        actorId,
+        ACTIVITY_ACTIONS.UPDATE_USER,
+        `Admin đã cập nhật tài khoản ${result.fullName || result.email}: ${changes.join(", ")}`,
+        result.id,
+        "User",
+      );
+    }
+
+    return result;
   }
 
   async uploadAvatar(id: string, file: Express.Multer.File) {
@@ -85,8 +118,18 @@ export class UserService {
     return this.repository.update(id, { avatarUrl });
   }
 
-  async delete(id: string) {
-    await this.findById(id);
-    return this.repository.delete(id);
+  async delete(id: string, actorId: string) {
+    const targetUser = await this.findById(id);
+    const result = await this.repository.delete(id);
+
+    await this.activityLogService.log(
+      actorId,
+      ACTIVITY_ACTIONS.DELETE_USER,
+      `Admin đã xóa tài khoản ${targetUser.fullName || targetUser.email}`,
+      id,
+      "User",
+    );
+
+    return result;
   }
 }

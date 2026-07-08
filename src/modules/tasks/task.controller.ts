@@ -40,8 +40,9 @@ export class TaskController {
 
   update = async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const actorId = req.user.id;
       const body = req.body as UpdateTaskDto;
-      const result = await this.service.update(req.params.id, body);
+      const result = await this.service.update(req.params.id, body, actorId);
 
       res.json({ success: true, data: result });
     } catch (error) {
@@ -51,7 +52,8 @@ export class TaskController {
 
   delete = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await this.service.delete(req.params.id);
+      const actorId = req.user.id;
+      await this.service.delete(req.params.id, actorId);
 
       res.json({ success: true, message: "Task deleted successfully" });
     } catch (error) {

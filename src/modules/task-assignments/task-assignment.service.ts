@@ -10,6 +10,8 @@ import {
 } from "./task-assignment.dto";
 import { ROLES } from "../../common/constants/role.constant";
 import { NotificationDispatcher } from "../notifications/notification.dispatcher";
+import { ActivityLogService } from "../activity-logs/activity-log.service";
+import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
 
 interface UserPayload {
   id: string;
@@ -21,6 +23,7 @@ export class TaskAssignmentService {
   private readonly repository = new TaskAssignmentRepository();
   private readonly taskRepository = new TaskRepository();
   private readonly internRepository = new InternRepository();
+  private readonly activityLogService = new ActivityLogService();
 
   async findAll(query: TaskAssignmentQueryDto, user: UserPayload) {
     if (user.role === ROLES.INTERN) {
@@ -91,10 +94,22 @@ export class TaskAssignmentService {
       deadline: new Date(task.deadline).toLocaleDateString(),
     });
 
+    await this.activityLogService.log(
+      assignedBy,
+      ACTIVITY_ACTIONS.ASSIGN_TASK,
+      `Leader đã giao công việc "${task.title}" cho Intern "${intern.fullName}"`,
+      result.id,
+      "TaskAssignment",
+    );
+
     return result;
   }
 
-  async update(id: string, data: UpdateTaskAssignmentDto) {
+  async update(
+    id: string,
+    data: UpdateTaskAssignmentDto,
+    actorId: string,
+  ) {
     const assignment = await this.findById(id);
 
     if (data.internId !== undefined) {
@@ -120,6 +135,27 @@ export class TaskAssignmentService {
 
     const result = await this.repository.update(id, data);
 
+    const changes: string[] = [];
+    if (data.internId !== undefined && data.internId !== assignment.internId) {
+      const newIntern = await this.internRepository.findById(data.internId);
+      changes.push(
+        `phân công lại cho Intern "${newIntern?.fullName || data.internId}"`,
+      );
+    }
+    if (data.status !== undefined && data.status !== assignment.status) {
+      changes.push(`cập nhật trạng thái thành ${data.status}`);
+    }
+
+    if (changes.length > 0) {
+      await this.activityLogService.log(
+        actorId,
+        ACTIVITY_ACTIONS.UPDATE_ASSIGNMENT,
+        `Leader đã cập nhật phân công công việc "${assignment.task.title}": ${changes.join(", ")}`,
+        result.id,
+        "TaskAssignment",
+      );
+    }
+
     // If reassigned to a different intern, notify the new intern
     if (data.internId !== undefined && data.internId !== assignment.internId) {
       const newIntern = await this.internRepository.findById(data.internId);
@@ -138,9 +174,18 @@ export class TaskAssignmentService {
     return result;
   }
 
-  async delete(id: string) {
-    await this.findById(id);
+  async delete(id: string, actorId: string) {
+    const assignment = await this.findById(id);
+    const result = await this.repository.delete(id);
 
-    return this.repository.delete(id);
+    await this.activityLogService.log(
+      actorId,
+      ACTIVITY_ACTIONS.DELETE_ASSIGNMENT,
+      `Leader đã hủy phân công công việc "${assignment.task.title}" của Intern "${assignment.intern.fullName}"`,
+      id,
+      "TaskAssignment",
+    );
+
+    return result;
   }
 }

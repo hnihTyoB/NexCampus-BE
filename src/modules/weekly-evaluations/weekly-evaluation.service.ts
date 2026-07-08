@@ -11,6 +11,8 @@ import {
 } from "./weekly-evaluation.dto";
 import { ROLES } from "../../common/constants/role.constant";
 import { NotificationDispatcher } from "../notifications/notification.dispatcher";
+import { ActivityLogService } from "../activity-logs/activity-log.service";
+import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
 
 interface UserPayload {
   id: string;
@@ -22,6 +24,7 @@ export class WeeklyEvaluationService {
   private readonly repository = new WeeklyEvaluationRepository();
   private readonly internRepository = new InternRepository();
   private readonly aiService = new WeeklyEvaluationAiService();
+  private readonly activityLogService = new ActivityLogService();
 
   async findAll(query: WeeklyEvaluationQueryDto, user: UserPayload) {
     if (user.role === ROLES.INTERN) {
@@ -92,10 +95,22 @@ export class WeeklyEvaluationService {
       totalScore: totalScore.toFixed(1),
     });
 
+    await this.activityLogService.log(
+      leaderId,
+      ACTIVITY_ACTIONS.CREATE_EVALUATION,
+      `Leader đã chấm điểm tuần ${data.week} cho Intern "${intern.fullName}": Điểm TB ${totalScore.toFixed(1)}`,
+      result.id,
+      "WeeklyEvaluation",
+    );
+
     return result;
   }
 
-  async update(id: string, data: UpdateWeeklyEvaluationDto) {
+  async update(
+    id: string,
+    data: UpdateWeeklyEvaluationDto,
+    actorId: string,
+  ) {
     const evaluation = await this.findById(id);
 
     let totalScore: number | undefined;
@@ -133,13 +148,30 @@ export class WeeklyEvaluationService {
       },
     );
 
+    await this.activityLogService.log(
+      actorId,
+      ACTIVITY_ACTIONS.UPDATE_EVALUATION,
+      `Leader đã cập nhật đánh giá tuần ${evaluation.week} của Intern "${evaluation.intern.fullName}"`,
+      result.id,
+      "WeeklyEvaluation",
+    );
+
     return result;
   }
 
-  async delete(id: string) {
-    await this.findById(id);
+  async delete(id: string, actorId: string) {
+    const evaluation = await this.findById(id);
+    const result = await this.repository.delete(id);
 
-    return this.repository.delete(id);
+    await this.activityLogService.log(
+      actorId,
+      ACTIVITY_ACTIONS.DELETE_EVALUATION,
+      `Leader đã xóa đánh giá tuần ${evaluation.week} của Intern "${evaluation.intern.fullName}"`,
+      id,
+      "WeeklyEvaluation",
+    );
+
+    return result;
   }
 
   /**

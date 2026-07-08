@@ -48,6 +48,7 @@ model User {
   taskAttachments      TaskAttachment[]     @relation("TaskAttachmentUploader")
   submissionAttachments SubmissionAttachment[] @relation("SubmissionAttachmentUploader")
   reportAttachments    ReportAttachment[]     @relation("ReportAttachmentUploader")
+  activityLogs         ActivityLog[]
 
   @@index([roleId])
   @@map("users")
@@ -392,5 +393,21 @@ model NotificationTemplate {
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@map("notification_templates")
+}
+
+// 15. ActivityLog
+model ActivityLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  action      String   // E.g. "LOGIN", "LOGOUT", "CREATE_TASK", etc.
+  targetId    String?  @map("target_id") @db.Uuid
+  targetType  String?  @map("target_type")
+  description String
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("activity_logs")
 }
 

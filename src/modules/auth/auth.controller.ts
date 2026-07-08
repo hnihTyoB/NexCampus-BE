@@ -74,7 +74,7 @@ export class AuthController {
   logout = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { refreshToken } = req.body;
-      await this.service.logout(refreshToken);
+      await this.service.logout(refreshToken, req.user.id);
 
       res.json({
         success: true,

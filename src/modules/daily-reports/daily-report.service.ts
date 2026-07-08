@@ -12,6 +12,8 @@ import {
 } from "./daily-report.dto";
 import { ROLES } from "../../common/constants/role.constant";
 import { NotificationDispatcher } from "../notifications/notification.dispatcher";
+import { ActivityLogService } from "../activity-logs/activity-log.service";
+import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
 
 interface UserPayload {
   id: string;
@@ -22,6 +24,7 @@ interface UserPayload {
 export class DailyReportService {
   private readonly repository = new DailyReportRepository();
   private readonly internRepository = new InternRepository();
+  private readonly activityLogService = new ActivityLogService();
 
   async findAll(query: DailyReportQueryDto, user: UserPayload) {
     if (user.role === ROLES.INTERN) {
@@ -62,6 +65,14 @@ export class DailyReportService {
         internName: intern.user.fullName,
       });
     }
+
+    await this.activityLogService.log(
+      user.id,
+      ACTIVITY_ACTIONS.CREATE_DAILY_REPORT,
+      `Intern "${intern.fullName || user.email}" đã nộp báo cáo hàng ngày`,
+      result.id,
+      "DailyReport",
+    );
 
     return result;
   }

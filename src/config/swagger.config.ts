@@ -778,6 +778,32 @@ export const swaggerSpec = {
           contentTemplate: { type: "string" },
         },
       },
+      ActivityLog: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          userId: { type: "string", format: "uuid" },
+          action: { type: "string" },
+          targetId: { type: "string", format: "uuid", nullable: true },
+          targetType: { type: "string", nullable: true },
+          description: { type: "string" },
+          createdAt: { type: "string", format: "date-time" },
+          user: {
+            type: "object",
+            properties: {
+              id: { type: "string", format: "uuid" },
+              email: { type: "string", format: "email" },
+              fullName: { type: "string", nullable: true },
+              role: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+      },
     },
     parameters: {
       PageParam: {
@@ -4444,5 +4470,109 @@ export const swaggerSpec = {
         },
       },
     },
+    "/activity-logs": {
+      get: {
+        tags: ["ActivityLogs"],
+        summary: "Danh sách nhật ký hoạt động (Admin / Leader / Intern)",
+        description: "Intern chỉ được xem nhật ký hoạt động của chính mình. Admin và Leader xem được toàn bộ.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "query",
+            name: "userId",
+            schema: { type: "string", format: "uuid" },
+            description: "Lọc theo ID người dùng thực hiện"
+          },
+          {
+            in: "query",
+            name: "action",
+            schema: { type: "string" },
+            description: "Lọc theo loại hành động (LOGIN, LOGOUT, CREATE_TASK,...)"
+          },
+          {
+            in: "query",
+            name: "targetId",
+            schema: { type: "string", format: "uuid" },
+            description: "Lọc theo ID đối tượng bị tác động"
+          },
+          {
+            in: "query",
+            name: "targetType",
+            schema: { type: "string" },
+            description: "Lọc theo loại đối tượng (Task, TaskSubmission,...)"
+          },
+          { $ref: "#/components/parameters/PageParam" },
+          { $ref: "#/components/parameters/LimitParam" },
+          {
+            in: "query",
+            name: "sortBy",
+            schema: { type: "string", enum: ["createdAt"], default: "createdAt" }
+          },
+          { $ref: "#/components/parameters/OrderParam" }
+        ],
+        responses: {
+          200: {
+            description: "Danh sách nhật ký hoạt động",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "array",
+                          items: { $ref: "#/components/schemas/ActivityLog" }
+                        },
+                        meta: { $ref: "#/components/schemas/PaginationMeta" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          401: { $ref: "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/activity-logs/{id}": {
+      get: {
+        tags: ["ActivityLogs"],
+        summary: "Chi tiết nhật ký hoạt động theo ID",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" }
+          }
+        ],
+        responses: {
+          200: {
+            description: "Thông tin chi tiết nhật ký hoạt động",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/ActivityLog" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          404: { $ref: "#/components/responses/NotFound" }
+        }
+      }
+    }
   },
 };

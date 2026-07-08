@@ -13,6 +13,7 @@ import notificationRoute from "../modules/notifications/notification.route";
 import notificationSettingRoute from "../modules/notification-settings/notification-setting.route";
 import notificationTemplateRoute from "../modules/notification-templates/notification-template.route";
 import statsRoute from "../modules/stats/stats.route";
+import activityLogRoute from "../modules/activity-logs/activity-log.route";
 
 const router = Router();
 
@@ -34,5 +35,6 @@ router.use("/notifications", notificationRoute);
 router.use("/notification-settings", notificationSettingRoute);
 router.use("/notification-templates", notificationTemplateRoute);
 router.use("/stats", statsRoute);
+router.use("/activity-logs", activityLogRoute);
 
 export default router;

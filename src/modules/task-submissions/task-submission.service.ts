@@ -14,6 +14,8 @@ import { REVIEW_STATUS } from "../../common/constants/status.constant";
 import { NotificationDispatcher } from "../notifications/notification.dispatcher";
 import { StorageService } from "../../common/services/storage.service";
 import { envConfig } from "../../config/env.config";
+import { ActivityLogService } from "../activity-logs/activity-log.service";
+import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
 
 interface UserPayload {
   id: string;
@@ -25,6 +27,7 @@ export class TaskSubmissionService {
   private readonly repository = new TaskSubmissionRepository();
   private readonly assignmentRepository = new TaskAssignmentRepository();
   private readonly internRepository = new InternRepository();
+  private readonly activityLogService = new ActivityLogService();
 
   async findAll(query: TaskSubmissionQueryDto, user: UserPayload) {
     if (user.role === ROLES.INTERN) {
@@ -110,6 +113,14 @@ export class TaskSubmissionService {
       );
     }
 
+    await this.activityLogService.log(
+      user.id,
+      ACTIVITY_ACTIONS.CREATE_SUBMISSION,
+      `Intern "${assignment.intern.fullName || user.email}" đã nộp bài giải lần ${attempt} cho Task: "${assignment.task.title}"`,
+      result.id,
+      "TaskSubmission",
+    );
+
     return result;
   }
 
@@ -144,7 +155,17 @@ export class TaskSubmissionService {
         reviewStatus: REVIEW_STATUS.PENDING,
       };
 
-      return this.repository.update(id, internData);
+      const result = await this.repository.update(id, internData);
+
+      await this.activityLogService.log(
+        user.id,
+        ACTIVITY_ACTIONS.UPDATE_SUBMISSION,
+        `Intern "${submission.assignment.intern.fullName || user.email}" cập nhật bài giải lần ${submission.attempt} cho Task: "${submission.assignment.task.title}"`,
+        result.id,
+        "TaskSubmission",
+      );
+
+      return result;
     } else {
       // Leader/Admin can review submission
       const reviewData: UpdateTaskSubmissionDto = {
@@ -170,6 +191,18 @@ export class TaskSubmissionService {
           attempt: submission.attempt,
           reviewStatus: reviewData.reviewStatus,
         },
+      );
+
+      const actionText =
+        reviewData.reviewStatus === REVIEW_STATUS.APPROVED
+          ? "duyệt"
+          : "từ chối";
+      await this.activityLogService.log(
+        user.id,
+        ACTIVITY_ACTIONS.REVIEW_SUBMISSION,
+        `Leader đã ${actionText} bài nộp lần ${submission.attempt} của Intern "${submission.assignment.intern.fullName}" cho Task: "${submission.assignment.task.title}"`,
+        result.id,
+        "TaskSubmission",
       );
 
       return result;
@@ -288,6 +321,16 @@ export class TaskSubmissionService {
       }
     }
 
-    return this.repository.delete(id);
+    const result = await this.repository.delete(id);
+
+    await this.activityLogService.log(
+      user.id,
+      ACTIVITY_ACTIONS.DELETE_SUBMISSION,
+      `Người dùng đã xóa bài nộp lần ${submission.attempt} cho Task: "${submission.assignment.task.title}"`,
+      id,
+      "TaskSubmission",
+    );
+
+    return result;
   }
 }

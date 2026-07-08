@@ -5,9 +5,12 @@ import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import { jwtConfig } from "../../config/jwt.config";
 import { LoginDto, LoginResponseDto, AuthTokensDto, MeDto } from "./auth.dto";
+import { ActivityLogService } from "../activity-logs/activity-log.service";
+import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
 
 export class AuthService {
   private readonly repository = new AuthRepository();
+  private readonly activityLogService = new ActivityLogService();
 
   async login(
     data: LoginDto,
@@ -56,6 +59,12 @@ export class AuthService {
       expiresAt,
       metadata?.userAgent,
       metadata?.ipAddress,
+    );
+
+    await this.activityLogService.log(
+      user.id,
+      ACTIVITY_ACTIONS.LOGIN,
+      `Người dùng ${user.fullName || user.email} đã đăng nhập hệ thống${metadata?.ipAddress ? ` từ IP ${metadata.ipAddress}` : ""}`
     );
 
     return {
@@ -140,7 +149,7 @@ export class AuthService {
     };
   }
 
-  async logout(token: string) {
+  async logout(token: string, userId?: string) {
     const result = await this.repository.deleteRefreshToken(token);
 
     if (result.count === 0) {
@@ -149,6 +158,17 @@ export class AuthService {
         400,
         ERROR_CODE.TOKEN_INVALID,
       );
+    }
+
+    if (userId) {
+      const user = await this.repository.findById(userId);
+      if (user) {
+        await this.activityLogService.log(
+          userId,
+          ACTIVITY_ACTIONS.LOGOUT,
+          `Người dùng ${user.fullName || user.email} đã đăng xuất`
+        );
+      }
     }
   }
 
@@ -184,6 +204,17 @@ export class AuthService {
     }
 
     const updatedUser = await this.repository.updateMe(userId, data);
+
+    const changes: string[] = [];
+    if (data.fullName !== undefined) changes.push("họ tên");
+    if (data.password !== undefined) changes.push("mật khẩu");
+    if (data.avatarUrl !== undefined) changes.push("ảnh đại diện");
+
+    await this.activityLogService.log(
+      userId,
+      ACTIVITY_ACTIONS.UPDATE_PROFILE,
+      `Người dùng ${updatedUser.fullName || updatedUser.email} đã cập nhật ${changes.join(", ")}`
+    );
 
     return {
       id: updatedUser.id,

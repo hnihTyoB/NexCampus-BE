@@ -33,8 +33,9 @@ export class UserController {
 
   create = async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const actorId = req.user.id;
       const body = req.body as CreateUserDto;
-      const result = await this.service.create(body);
+      const result = await this.service.create(body, actorId);
 
       res.status(201).json({
         success: true,
@@ -47,8 +48,9 @@ export class UserController {
 
   update = async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const actorId = req.user.id;
       const body = req.body as UpdateUserDto;
-      const result = await this.service.update(req.params.id, body);
+      const result = await this.service.update(req.params.id, body, actorId);
 
       res.json({
         success: true,
@@ -83,7 +85,8 @@ export class UserController {
 
   delete = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const result = await this.service.delete(req.params.id);
+      const actorId = req.user.id;
+      const result = await this.service.delete(req.params.id, actorId);
 
       res.json({
         success: true,
