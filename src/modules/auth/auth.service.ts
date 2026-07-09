@@ -1,12 +1,22 @@
+import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { AuthRepository } from "./auth.repository";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import { jwtConfig } from "../../config/jwt.config";
-import { LoginDto, LoginResponseDto, AuthTokensDto, MeDto } from "./auth.dto";
+import { envConfig } from "../../config/env.config";
+import {
+  LoginDto,
+  LoginResponseDto,
+  AuthTokensDto,
+  MeDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+} from "./auth.dto";
 import { ActivityLogService } from "../activity-logs/activity-log.service";
 import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
+import { EmailService } from "../../common/services/email.service";
 
 export class AuthService {
   private readonly repository = new AuthRepository();
@@ -224,5 +234,75 @@ export class AuthService {
       isActive: updatedUser.isActive,
       createdAt: updatedUser.createdAt,
     };
+  }
+
+  async forgotPassword(data: ForgotPasswordDto): Promise<void> {
+    const { email } = data;
+    const user = await this.repository.findByEmail(email);
+
+    if (!user) {
+      throw new AppError("Email not found", 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    if (!user.isActive) {
+      throw new AppError("Account is inactive", 403, ERROR_CODE.USER_INACTIVE);
+    }
+
+    // Generate secure random token
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 3600000); // 1 hour
+
+    await this.repository.updateResetToken(user.id, token, expiresAt);
+
+    const resetLink = `${envConfig.app.baseUrl}/reset-password?token=${token}`;
+
+    const emailSubject = "[NexCampus] Khôi phục mật khẩu";
+    const emailContent = `
+      Bạn đã yêu cầu khôi phục mật khẩu tài khoản NexCampus.<br/>
+      Vui lòng nhấn vào liên kết dưới đây để đặt lại mật khẩu mới (liên kết có hiệu lực trong 1 giờ):<br/>
+      <p style="margin: 16px 0;">
+        <a href="${resetLink}" style="display:inline-block;background-color:#4f46e5;color:#ffffff;padding:10px 20px;text-decoration:none;border-radius:4px;font-weight:bold;">Đặt lại mật khẩu</a>
+      </p>
+      Hoặc sao chép liên kết này vào trình duyệt:<br/>
+      <a href="${resetLink}">${resetLink}</a>
+    `;
+
+    await EmailService.sendMail(user.email, emailSubject, emailContent);
+
+    await this.activityLogService.log(
+      user.id,
+      ACTIVITY_ACTIONS.FORGOT_PASSWORD,
+      `Người dùng ${user.fullName || user.email} đã yêu cầu đặt lại mật khẩu`
+    );
+  }
+
+  async resetPassword(data: ResetPasswordDto): Promise<void> {
+    const { token, password } = data;
+    const user = await this.repository.findByResetToken(token);
+
+    if (!user) {
+      throw new AppError(
+        "Invalid or expired password reset token",
+        400,
+        ERROR_CODE.TOKEN_INVALID,
+      );
+    }
+
+    if (!user.resetPasswordExpires || user.resetPasswordExpires < new Date()) {
+      throw new AppError(
+        "Password reset token has expired",
+        400,
+        ERROR_CODE.TOKEN_EXPIRED,
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    await this.repository.updatePassword(user.id, passwordHash);
+
+    await this.activityLogService.log(
+      user.id,
+      ACTIVITY_ACTIONS.RESET_PASSWORD,
+      `Người dùng ${user.fullName || user.email} đã đặt lại mật khẩu thành công`
+    );
   }
 }

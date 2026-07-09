@@ -27,3 +27,13 @@ export interface LoginResponseDto {
     role: string;
   };
 }
+
+export interface ForgotPasswordDto {
+  email: string;
+}
+
+export interface ResetPasswordDto {
+  token: string;
+  password: string;
+}
+

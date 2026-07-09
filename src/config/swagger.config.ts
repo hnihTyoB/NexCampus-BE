@@ -140,6 +140,25 @@ export const swaggerSpec = {
           refreshToken: { type: "string" },
         },
       },
+      ForgotPasswordBody: {
+        type: "object",
+        required: ["email"],
+        properties: {
+          email: {
+            type: "string",
+            format: "email",
+            example: "user@nexcampus.local",
+          },
+        },
+      },
+      ResetPasswordBody: {
+        type: "object",
+        required: ["token", "password"],
+        properties: {
+          token: { type: "string", example: "39bdf11f..." },
+          password: { type: "string", example: "NewPassword@123" },
+        },
+      },
       // ─── Application ──────────────────────────────────────────────────────
       Application: {
         type: "object",
@@ -1086,6 +1105,81 @@ export const swaggerSpec = {
         },
       },
     },
+    "/auth/forgot-password": {
+      post: {
+        tags: ["Auth"],
+        summary: "Yêu cầu khôi phục mật khẩu",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ForgotPasswordBody" },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Yêu cầu khôi phục mật khẩu đã được tiếp nhận",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: { message: { type: "string" } },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          404: { $ref: "#/components/responses/NotFound" },
+          422: { $ref: "#/components/responses/Validation" },
+        },
+      },
+    },
+    "/auth/reset-password": {
+      post: {
+        tags: ["Auth"],
+        summary: "Đặt lại mật khẩu mới",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ResetPasswordBody" },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Đặt lại mật khẩu thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: { message: { type: "string" } },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          400: {
+            description: "Token không hợp lệ hoặc đã hết hạn",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          422: { $ref: "#/components/responses/Validation" },
+        },
+      },
+    },
 
     // ─── Users ───────────────────────────────────────────────────────────────
     "/users": {
@@ -1283,6 +1377,42 @@ export const swaggerSpec = {
           403: { $ref: "#/components/responses/Forbidden" },
           404: { $ref: "#/components/responses/NotFound" },
           422: { $ref: "#/components/responses/Validation" },
+        },
+      },
+      delete: {
+        tags: ["Users"],
+        summary: "Xóa tài khoản người dùng (Admin only)",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          200: {
+            description: "Xóa tài khoản thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/User" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
         },
       },
     },

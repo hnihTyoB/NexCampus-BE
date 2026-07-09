@@ -7,6 +7,8 @@ import {
   refreshSchema,
   logoutSchema,
   updateMeSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
 } from "./auth.validation";
 
 const router = Router();
@@ -26,6 +28,17 @@ router.post(
   authMiddleware,
   validate(logoutSchema),
   controller.logout,
+);
+
+router.post(
+  "/forgot-password",
+  validate(forgotPasswordSchema),
+  controller.forgotPassword,
+);
+router.post(
+  "/reset-password",
+  validate(resetPasswordSchema),
+  controller.resetPassword,
 );
 
 export default router;

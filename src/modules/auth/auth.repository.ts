@@ -55,4 +55,37 @@ export class AuthRepository {
       include: { role: true },
     });
   }
+
+  async updateResetToken(
+    id: string,
+    token: string | null,
+    expiresAt: Date | null,
+  ) {
+    return prisma.user.update({
+      where: { id },
+      data: {
+        resetPasswordToken: token,
+        resetPasswordExpires: expiresAt,
+      },
+    });
+  }
+
+  async findByResetToken(token: string) {
+    return prisma.user.findUnique({
+      where: { resetPasswordToken: token },
+      include: { role: true },
+    });
+  }
+
+  async updatePassword(id: string, passwordHash: string) {
+    return prisma.user.update({
+      where: { id },
+      data: {
+        password: passwordHash,
+        resetPasswordToken: null,
+        resetPasswordExpires: null,
+      },
+      include: { role: true },
+    });
+  }
 }
