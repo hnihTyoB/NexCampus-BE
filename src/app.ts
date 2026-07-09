@@ -10,6 +10,7 @@ import {
 import routes from "./routes";
 import { swaggerSpec, swaggerOptions } from "./config/swagger.config";
 import { rateLimitMiddleware } from "./middlewares/rate-limit.middleware";
+import { envConfig } from "./config/env.config";
 
 const app = express();
 
@@ -20,7 +21,12 @@ app.use(
     contentSecurityPolicy: false, // Tắt CSP để Swagger UI tải được stylesheet
   }),
 );
-app.use(cors());
+app.use(
+  cors({
+    origin: [envConfig.app.baseUrl,],
+    credentials: true,
+  }),
+);
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

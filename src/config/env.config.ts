@@ -41,6 +41,9 @@ function parseRetentionDays(raw: string | undefined): number {
 export const envConfig = {
   nodeEnv: process.env.NODE_ENV || "development",
   port: parseInt(process.env.PORT || "8888", 10),
+  app: {
+    baseUrl: process.env.BASE_URL || "http://localhost:8888",
+  },
   database: {
     host: process.env.DB_HOST || "localhost",
     port: parseInt(process.env.DB_PORT || "5432", 10),
