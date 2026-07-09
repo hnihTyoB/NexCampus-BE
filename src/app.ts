@@ -23,7 +23,7 @@ app.use(
 );
 app.use(
   cors({
-    origin: [envConfig.app.baseUrl,],
+    origin: envConfig.app.baseUrl,
     credentials: true,
   }),
 );
