@@ -106,4 +106,35 @@ export class ApplicationRepository {
       data: { deletedAt: new Date() },
     });
   }
+
+  async upsertInvite(email: string, token: string, expiresAt: Date) {
+    return prisma.applicationInvite.upsert({
+      where: { email },
+      update: {
+        token,
+        expiresAt,
+        used: false,
+        createdAt: new Date(),
+      },
+      create: {
+        email,
+        token,
+        expiresAt,
+        used: false,
+      },
+    });
+  }
+
+  async findInviteByToken(token: string) {
+    return prisma.applicationInvite.findUnique({
+      where: { token },
+    });
+  }
+
+  async markInviteAsUsed(token: string) {
+    return prisma.applicationInvite.update({
+      where: { token },
+      data: { used: true },
+    });
+  }
 }

@@ -4,6 +4,7 @@ import {
   ApplicationQueryDto,
   CreateApplicationDto,
   ReviewApplicationDto,
+  CreateInviteDto,
 } from "./application.dto";
 
 export class ApplicationController {
@@ -57,7 +58,39 @@ export class ApplicationController {
     try {
       await this.service.delete(req.params.id);
 
-      res.json({ success: true, message: "Application deleted successfully" });
+      res.json({
+        success: true,
+        message: "Application deleted successfully",
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  createInvite = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const actorId = req.user.id;
+      const body = req.body as CreateInviteDto;
+      const result = await this.service.createInvite(actorId, body);
+
+      res.status(201).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  verifyInvite = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const token = req.query.token as string;
+      const result = await this.service.verifyInvite(token);
+
+      res.json({
+        success: true,
+        data: result,
+      });
     } catch (error) {
       next(error);
     }

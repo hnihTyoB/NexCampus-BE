@@ -7,11 +7,21 @@ import {
   createApplicationSchema,
   findAllApplicationSchema,
   reviewApplicationSchema,
+  createInviteSchema,
 } from "./application.validation";
 import { ROLES } from "../../common/constants/role.constant";
 
 const router = Router();
 const controller = new ApplicationController();
+
+router.post(
+  "/invites",
+  authMiddleware,
+  requireRole(ROLES.ADMIN),
+  validate(createInviteSchema),
+  controller.createInvite,
+);
+router.get("/invites/verify", controller.verifyInvite);
 
 router.post("/", validate(createApplicationSchema), controller.create);
 router.get(

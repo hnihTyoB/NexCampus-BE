@@ -34,6 +34,10 @@ export const ACTIVITY_ACTIONS = {
 
   // Daily Report
   CREATE_DAILY_REPORT: "CREATE_DAILY_REPORT",
+
+  // Application Invite & Submit
+  CREATE_APPLICATION_INVITE: "CREATE_APPLICATION_INVITE",
+  SUBMIT_APPLICATION: "SUBMIT_APPLICATION",
 } as const;
 
 export type ActivityAction = keyof typeof ACTIVITY_ACTIONS;

@@ -36,6 +36,7 @@ export const createApplicationSchema = z.object({
     .number({ invalid_type_error: "Duration must be a number" })
     .int()
     .positive("Duration must be a positive integer"),
+  token: z.string().min(1, "Invitation token is required"),
 });
 
 export const reviewApplicationSchema = z.object({
@@ -43,3 +44,8 @@ export const reviewApplicationSchema = z.object({
     errorMap: () => ({ message: "status must be APPROVED or REJECTED" }),
   }),
 });
+
+export const createInviteSchema = z.object({
+  email: z.string().min(1, "Email is required").email("Invalid email format"),
+});
+

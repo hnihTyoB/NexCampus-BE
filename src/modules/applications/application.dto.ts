@@ -21,6 +21,7 @@ export interface CreateApplicationDto {
   position: string;
   startDate: string;
   duration: number;
+  token: string;
 }
 
 export interface ReviewApplicationDto {
@@ -47,3 +48,17 @@ export interface ApplicationResponseDto {
     fullName: string | null;
   } | null;
 }
+
+export interface CreateInviteDto {
+  email: string;
+}
+
+export interface ApplicationInviteResponseDto {
+  id: string;
+  email: string;
+  token: string;
+  used: boolean;
+  expiresAt: Date;
+  createdAt: Date;
+}
+

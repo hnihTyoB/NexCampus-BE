@@ -206,6 +206,7 @@ export const swaggerSpec = {
           "position",
           "startDate",
           "duration",
+          "token",
         ],
         properties: {
           fullName: { type: "string", example: "Nguyễn Văn A" },
@@ -219,6 +220,7 @@ export const swaggerSpec = {
             example: 3,
             description: "Số tháng thực tập",
           },
+          token: { type: "string", example: "39bdf11f..." },
         },
       },
       ReviewApplicationBody: {
@@ -226,6 +228,24 @@ export const swaggerSpec = {
         required: ["status"],
         properties: {
           status: { type: "string", enum: ["APPROVED", "REJECTED"] },
+        },
+      },
+      CreateInviteBody: {
+        type: "object",
+        required: ["email"],
+        properties: {
+          email: { type: "string", format: "email", example: "candidate@gmail.com" },
+        },
+      },
+      ApplicationInvite: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          email: { type: "string", format: "email" },
+          token: { type: "string" },
+          used: { type: "boolean" },
+          expiresAt: { type: "string", format: "date-time" },
+          createdAt: { type: "string", format: "date-time" },
         },
       },
       // ─── Intern ────────────────────────────────────────────────────
@@ -1474,7 +1494,99 @@ export const swaggerSpec = {
       },
     },
 
-    // ─── Applications ────────────────────────────────────────────────────────
+    "/applications/invites": {
+      post: {
+        tags: ["Applications"],
+        summary: "Tạo liên kết mời nộp đơn (Admin only)",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreateInviteBody" },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Đã tạo lời mời thành công và gửi email",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "object",
+                          properties: {
+                            invite: { $ref: "#/components/schemas/ApplicationInvite" },
+                            link: { type: "string" },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          422: { $ref: "#/components/responses/Validation" },
+        },
+      },
+    },
+    "/applications/invites/verify": {
+      get: {
+        tags: ["Applications"],
+        summary: "Xác thực link mời nộp đơn",
+        parameters: [
+          {
+            in: "query",
+            name: "token",
+            required: true,
+            schema: { type: "string" },
+            description: "Mã token của lời mời",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Token hợp lệ",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "object",
+                          properties: {
+                            valid: { type: "boolean", example: true },
+                            email: { type: "string", format: "email" },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          400: {
+            description: "Token không hợp lệ hoặc đã hết hạn",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
     "/applications": {
       post: {
         tags: ["Applications"],
