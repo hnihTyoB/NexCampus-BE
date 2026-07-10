@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { UserRepository } from "./user.repository";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
@@ -8,6 +9,33 @@ import { envConfig } from "../../config/env.config";
 import { ActivityLogService } from "../activity-logs/activity-log.service";
 import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
 import { EmailService } from "../../common/services/email.service";
+
+function generateSecurePassword(): string {
+  const lowercase = "abcdefghijklmnopqrstuvwxyz";
+  const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const numbers = "0123456789";
+  const special = "!@#$%^&*()_+~`|}{[]:;?><,./-=";
+
+  const chars = [
+    lowercase[crypto.randomInt(lowercase.length)],
+    uppercase[crypto.randomInt(uppercase.length)],
+    numbers[crypto.randomInt(numbers.length)],
+    special[crypto.randomInt(special.length)],
+  ];
+
+  const allChars = lowercase + uppercase + numbers + special;
+  for (let i = 0; i < 8; i++) {
+    chars.push(allChars[crypto.randomInt(allChars.length)]);
+  }
+
+  // Shuffle array using Durstenfeld shuffle (Fisher-Yates) algorithm
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+
+  return chars.join("");
+}
 
 export class UserService {
   private readonly repository = new UserRepository();
@@ -38,12 +66,30 @@ export class UserService {
       );
     }
 
-    const passwordHash = await bcrypt.hash(data.password, 10);
+    let roleId = data.roleId;
+    if (!roleId && data.roleName) {
+      const role = await this.repository.findRoleByName(data.roleName);
+      if (!role) {
+        throw new AppError("Role not found", 404, ERROR_CODE.NOT_FOUND);
+      }
+      roleId = role.id;
+    }
+
+    if (!roleId) {
+      throw new AppError(
+        "Role is required",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    const password = data.password || generateSecurePassword();
+    const passwordHash = await bcrypt.hash(password, 10);
 
     const result = await this.repository.create({
       email: data.email,
       passwordHash,
-      roleId: data.roleId,
+      roleId,
     });
 
     await this.activityLogService.log(
@@ -62,7 +108,7 @@ export class UserService {
         Tài khoản của bạn đã được quản trị viên khởi tạo thành công trên hệ thống. Dưới đây là thông tin đăng nhập của bạn:<br/>
         <ul>
           <li><strong>Email đăng nhập:</strong> ${data.email}</li>
-          <li><strong>Mật khẩu:</strong> ${data.password}</li>
+          <li><strong>Mật khẩu:</strong> ${password}</li>
         </ul>
         Vui lòng truy cập <a href="${envConfig.app.baseUrl}" style="color:#4f46e5;font-weight:bold;">NexCampus</a> để đăng nhập và đổi mật khẩu của bạn để bảo mật tài khoản.<br/><br/>
         Trân trọng,<br/>

@@ -43,6 +43,12 @@ export class UserRepository {
     };
   }
 
+  findRoleByName(name: string) {
+    return prisma.role.findUnique({
+      where: { name },
+    });
+  }
+
   findById(id: string) {
     return prisma.user.findUnique({
       where: { id },

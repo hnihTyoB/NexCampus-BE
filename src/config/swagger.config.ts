@@ -84,18 +84,30 @@ export const swaggerSpec = {
       },
       CreateUserBody: {
         type: "object",
-        required: ["email", "password", "roleId"],
+        required: ["email"],
         properties: {
           email: {
             type: "string",
             format: "email",
             example: "intern@nexcampus.local",
           },
-          password: { type: "string", minLength: 8, example: "Intern@123456" },
+          password: {
+            type: "string",
+            minLength: 8,
+            example: "Intern@123456",
+            description: "Mật khẩu cho tài khoản. Nếu không truyền, hệ thống sẽ tự động tạo ngẫu nhiên.",
+          },
           roleId: {
             type: "string",
             format: "uuid",
             example: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+            description: "ID của Role. Yêu cầu truyền ít nhất một trong hai: roleId hoặc roleName.",
+          },
+          roleName: {
+            type: "string",
+            enum: ["ADMIN", "LEADER", "INTERN"],
+            example: "INTERN",
+            description: "Tên của Role. Yêu cầu truyền ít nhất một trong hai: roleId hoặc roleName.",
           },
         },
       },
