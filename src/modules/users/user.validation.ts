@@ -18,6 +18,7 @@ export const findAllUserSchema = z.object({
 
 export const createUserSchema = z.object({
   email: z.string().min(1, "Email is required").email("Invalid email format"),
+  
   password: z
     .string()
     .min(8, "Password must be at least 8 characters")
@@ -27,11 +28,17 @@ export const createUserSchema = z.object({
     .regex(
       /[^a-zA-Z0-9]/,
       "Password must contain at least one special character",
-    ),
-  roleId: z.string().uuid("Invalid roleId format"),
+    )
+    .optional(), 
+    
+  role: z.enum(["LEADER", "INTERN"], {
+    errorMap: () => ({ message: "Role phải là LEADER hoặc INTERN" }),
+  }),
 });
 
+// 2. CẬP NHẬT: Schema cập nhật thông tin User
 export const updateUserSchema = z.object({
   isActive: z.boolean().optional(),
-  roleId: z.string().uuid("Invalid roleId format").optional(),
+  // Đồng bộ đổi sang kiểm tra chữ thay vì UUID
+  role: z.enum(["LEADER", "INTERN"]).optional(),
 });

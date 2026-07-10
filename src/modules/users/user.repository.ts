@@ -3,6 +3,15 @@ import { prisma } from "../../database/prisma.client";
 import { UserQueryDto } from "./user.dto";
 
 export class UserRepository {
+  
+  async findRoleByName(roleName: string) {
+    return prisma.role.findFirst({
+      where: {
+        name: roleName, 
+      },
+    });
+  }
+
   async findAll(query: UserQueryDto) {
     const {
       email,

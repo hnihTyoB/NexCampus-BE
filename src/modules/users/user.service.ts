@@ -28,53 +28,68 @@ export class UserService {
   }
 
   async create(data: CreateUserDto, actorId: string) {
-    const existing = await this.repository.findByEmail(data.email);
+      const existing = await this.repository.findByEmail(data.email);
 
-    if (existing) {
-      throw new AppError(
-        "Email already exists",
-        409,
-        ERROR_CODE.DUPLICATE_ENTRY,
+      if (existing) {
+        throw new AppError(
+          "Email already exists",
+          409,
+          ERROR_CODE.DUPLICATE_ENTRY,
+        );
+      }
+
+      // 1. XỬ LÝ ROLE: Dịch từ dạng chữ ("LEADER" / "INTERN") sang UUID thực tế trong DB
+      const roleRecord = await this.repository.findRoleByName(data.role); 
+      if (!roleRecord) {
+        throw new AppError("Role không tồn tại trên hệ thống", 404, ERROR_CODE.NOT_FOUND);
+      }
+
+      // 2. XỬ LÝ PASSWORD: Nếu Front-end gửi trống, Back-end tự sinh mật khẩu ngẫu nhiên
+      let plainPassword = data.password;
+      if (!plainPassword) {
+        // Sinh chuỗi ngẫu nhiên đảm bảo tính bảo mật
+        const randomString = Math.random().toString(36).slice(-8);
+        plainPassword = `Nex@${randomString}`; 
+      }
+
+      // 3. HASH PASSWORD VÀ INSERT VÀO DATABASE
+      const passwordHash = await bcrypt.hash(plainPassword, 10);
+
+      const result = await this.repository.create({
+        email: data.email,
+        passwordHash: passwordHash, 
+        roleId: roleRecord.id,       // Dùng UUID vừa tìm được từ DB
+      });
+
+      await this.activityLogService.log(
+        actorId,
+        ACTIVITY_ACTIONS.CREATE_USER,
+        `Admin đã tạo tài khoản mới: ${result.email}`,
+        result.id,
+        "User",
       );
+
+      // 4. GỬI EMAIL CHÀO MỪNG KÈM TEXT PASSWORD
+      try {
+        const emailSubject = "[NexCampus] Tài khoản của bạn đã được tạo";
+        const emailContent = `
+          Chào mừng bạn đến với NexCampus!<br/><br/>
+          Tài khoản của bạn đã được quản trị viên khởi tạo thành công trên hệ thống. Dưới đây là thông tin đăng nhập của bạn:<br/>
+          <ul>
+            <li><strong>Email đăng nhập:</strong> ${data.email}</li>
+            <li><strong>Mật khẩu:</strong> ${plainPassword}</li>
+          </ul>
+          Vui lòng truy cập <a href="${envConfig.app.baseUrl}" style="color:#4f46e5;font-weight:bold;">NexCampus</a> để đăng nhập và đổi mật khẩu của bạn để bảo mật tài khoản.<br/><br/>
+          Trân trọng,<br/>
+          Đội ngũ NexCampus.
+        `;
+        await EmailService.sendMail(data.email, emailSubject, emailContent);
+      } catch (emailError) {
+        console.error(`[UserService] Failed to send registration email to ${data.email}:`, emailError);
+      }
+
+      return result;
     }
-
-    const passwordHash = await bcrypt.hash(data.password, 10);
-
-    const result = await this.repository.create({
-      email: data.email,
-      passwordHash,
-      roleId: data.roleId,
-    });
-
-    await this.activityLogService.log(
-      actorId,
-      ACTIVITY_ACTIONS.CREATE_USER,
-      `Admin đã tạo tài khoản mới: ${result.email}`,
-      result.id,
-      "User",
-    );
-
-    // Send confirmation email to the created user
-    try {
-      const emailSubject = "[NexCampus] Tài khoản của bạn đã được tạo";
-      const emailContent = `
-        Chào mừng bạn đến với NexCampus!<br/><br/>
-        Tài khoản của bạn đã được quản trị viên khởi tạo thành công trên hệ thống. Dưới đây là thông tin đăng nhập của bạn:<br/>
-        <ul>
-          <li><strong>Email đăng nhập:</strong> ${data.email}</li>
-          <li><strong>Mật khẩu:</strong> ${data.password}</li>
-        </ul>
-        Vui lòng truy cập <a href="${envConfig.app.baseUrl}" style="color:#4f46e5;font-weight:bold;">NexCampus</a> để đăng nhập và đổi mật khẩu của bạn để bảo mật tài khoản.<br/><br/>
-        Trân trọng,<br/>
-        Đội ngũ NexCampus.
-      `;
-      await EmailService.sendMail(data.email, emailSubject, emailContent);
-    } catch (emailError) {
-      console.error(`[UserService] Failed to send registration email to ${data.email}:`, emailError);
-    }
-
-    return result;
-  }
 
   async update(id: string, data: UpdateUserDto, actorId: string) {
     const targetUser = await this.findById(id);

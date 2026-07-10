@@ -11,13 +11,13 @@ export interface UserQueryDto {
 
 export interface CreateUserDto {
   email: string;
-  password: string;
-  roleId: string;
+  password?: string;
+  role: "LEADER" | "INTERN";
 }
 
 export interface UpdateUserDto {
   isActive?: boolean;
-  roleId?: string;
+  roleId?: "LEADER" | "INTERN";
 }
 
 export interface UserResponseDto {
