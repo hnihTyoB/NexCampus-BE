@@ -1434,7 +1434,7 @@ export const swaggerSpec = {
                     {
                       type: "object",
                       properties: {
-                        data: { $ref: "#/components/schemas/User" },
+                        message: { type: "string" },
                       },
                     },
                   ],
@@ -1627,6 +1627,14 @@ export const swaggerSpec = {
                     },
                   ],
                 },
+              },
+            },
+          },
+          409: {
+            description: "Email đã tồn tại trong hệ thống hoặc đã có đơn đăng ký khác đang xử lý/phê duyệt",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
               },
             },
           },
@@ -1841,7 +1849,7 @@ export const swaggerSpec = {
           403: { $ref: "#/components/responses/Forbidden" },
           404: { $ref: "#/components/responses/NotFound" },
           409: {
-            description: "Đơn không còn ở trạng thái PENDING",
+            description: "Đơn không còn ở trạng thái PENDING hoặc email của ứng viên đã được đăng ký tài khoản trước đó",
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/ErrorResponse" },

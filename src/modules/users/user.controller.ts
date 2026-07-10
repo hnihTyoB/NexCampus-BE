@@ -90,7 +90,7 @@ export class UserController {
 
       res.json({
         success: true,
-        data: result,
+        message: "User deleted successfully",
       });
     } catch (error) {
       next(error);

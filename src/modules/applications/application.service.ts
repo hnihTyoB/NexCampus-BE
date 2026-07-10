@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import bcrypt from "bcryptjs";
 import { ApplicationRepository } from "./application.repository";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
@@ -13,6 +14,8 @@ import { envConfig } from "../../config/env.config";
 import { EmailService } from "../../common/services/email.service";
 import { ActivityLogService } from "../activity-logs/activity-log.service";
 import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
+import { prisma } from "../../database/prisma.client";
+import { generateSecurePassword } from "../../common/helpers/password.helper";
 
 export class ApplicationService {
   private readonly repository = new ApplicationRepository();
@@ -130,11 +133,40 @@ export class ApplicationService {
     }
 
     // 2. Security check: Make sure email matches the invite email
-    if (data.email.toLowerCase().trim() !== invite.email.toLowerCase().trim()) {
+    const normalizedEmail = data.email.toLowerCase().trim();
+    if (normalizedEmail !== invite.email.toLowerCase().trim()) {
       throw new AppError(
         "Email does not match the invitation email",
         400,
         ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    // Check if user already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+    if (existingUser) {
+      throw new AppError(
+        "A user with this email already exists in the system.",
+        409,
+        ERROR_CODE.DUPLICATE_ENTRY,
+      );
+    }
+
+    // Check if application already exists (not REJECTED and not deleted)
+    const existingApp = await prisma.application.findFirst({
+      where: {
+        email: { equals: normalizedEmail, mode: "insensitive" },
+        status: { in: [APPLICATION_STATUS.PENDING, APPLICATION_STATUS.APPROVED] },
+        deletedAt: null,
+      },
+    });
+    if (existingApp) {
+      throw new AppError(
+        "An application with this email already exists and is pending or approved.",
+        409,
+        ERROR_CODE.DUPLICATE_ENTRY,
       );
     }
 
@@ -164,6 +196,100 @@ export class ApplicationService {
         409,
         ERROR_CODE.DUPLICATE_ENTRY,
       );
+    }
+
+    if (dto.status === APPLICATION_STATUS.APPROVED) {
+      const normalizedEmail = application.email.toLowerCase().trim();
+
+      // Double check: if user already exists
+      const existingUser = await prisma.user.findUnique({
+        where: { email: normalizedEmail },
+      });
+      if (existingUser) {
+        throw new AppError(
+          "A user with this email already exists.",
+          409,
+          ERROR_CODE.DUPLICATE_ENTRY,
+        );
+      }
+
+      // Get INTERN role
+      const role = await prisma.role.findUnique({
+        where: { name: "INTERN" },
+      });
+      if (!role) {
+        throw new AppError("Role 'INTERN' not found", 404, ERROR_CODE.NOT_FOUND);
+      }
+
+      const password = generateSecurePassword();
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      // Perform all DB updates in a transaction
+      await prisma.$transaction(async (tx) => {
+        // 1. Approve application
+        await tx.application.update({
+          where: { id },
+          data: {
+            status: APPLICATION_STATUS.APPROVED,
+            approvedBy: approverId,
+            approvedAt: new Date(),
+          },
+        });
+
+        // 2. Create User account
+        const user = await tx.user.create({
+          data: {
+            email: normalizedEmail,
+            password: passwordHash,
+            fullName: application.fullName,
+            roleId: role.id,
+          },
+        });
+
+        // 3. Create Intern profile
+        await tx.intern.create({
+          data: {
+            userId: user.id,
+            fullName: application.fullName,
+            phone: application.phone,
+            department: application.department,
+            position: application.position,
+            startDate: application.startDate,
+            duration: application.duration,
+          },
+        });
+      });
+
+      // Send verification/confirmation email to the applicant
+      try {
+        const emailSubject = "[NexCampus] Tài khoản thực tập sinh của bạn đã được tạo";
+        const emailContent = `
+          Chào mừng bạn đến với NexCampus!<br/><br/>
+          Đơn đăng ký thực tập của bạn tại NexCampus đã được phê duyệt.<br/>
+          Tài khoản của bạn đã được khởi tạo thành công trên hệ thống. Dưới đây là thông tin đăng nhập của bạn:<br/>
+          <ul>
+            <li><strong>Email đăng nhập:</strong> ${normalizedEmail}</li>
+            <li><strong>Mật khẩu:</strong> ${password}</li>
+          </ul>
+          Vui lòng truy cập <a href="${envConfig.app.baseUrl}" style="color:#4f46e5;font-weight:bold;">NexCampus</a> để đăng nhập và đổi mật khẩu của bạn để bảo mật tài khoản.<br/><br/>
+          Trân trọng,<br/>
+          Đội ngũ NexCampus.
+        `;
+        await EmailService.sendMail(normalizedEmail, emailSubject, emailContent);
+      } catch (emailError) {
+        console.error(`[ApplicationService] Failed to send registration email to ${normalizedEmail}:`, emailError);
+      }
+
+      // Log activity
+      await this.activityLogService.log(
+        approverId,
+        ACTIVITY_ACTIONS.CREATE_USER,
+        `Quản trị viên đã phê duyệt đơn đăng ký của ${application.fullName} (${normalizedEmail}) và tạo tài khoản thực tập sinh.`,
+        application.id,
+        "Application",
+      );
+
+      return this.findById(id);
     }
 
     return this.repository.review(id, dto.status, approverId);
