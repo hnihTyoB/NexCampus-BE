@@ -106,6 +106,14 @@ export const swaggerSpec = {
           roleId: { type: "string", format: "uuid" },
         },
       },
+      ChangePasswordBody: {
+        type: "object",
+        required: ["currentPassword", "newPassword"],
+        properties: {
+          currentPassword: { type: "string", example: "OldPass@123" },
+          newPassword: { type: "string", minLength: 8, example: "NewPass@456" },
+        },
+      },
       // ─── Auth ─────────────────────────────────────────────────────────────
       LoginBody: {
         type: "object",
@@ -1470,6 +1478,50 @@ export const swaggerSpec = {
             },
           },
           401: { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/users/change-password": {
+      patch: {
+        tags: ["Users"],
+        summary: "Đổi mật khẩu cho tài khoản đang đăng nhập",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ChangePasswordBody" },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Đổi mật khẩu thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: { message: { type: "string" } },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          400: {
+            description: "Mật khẩu hiện tại không đúng",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          404: { $ref: "#/components/responses/NotFound" },
+          422: { $ref: "#/components/responses/Validation" },
         },
       },
     },

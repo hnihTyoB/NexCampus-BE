@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import { UserRepository } from "./user.repository";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
-import { UserQueryDto, CreateUserDto, UpdateUserDto } from "./user.dto";
+import { UserQueryDto, CreateUserDto, UpdateUserDto, ChangePasswordDto } from "./user.dto";
 import { StorageService } from "../../common/services/storage.service";
 import { envConfig } from "../../config/env.config";
 import { ActivityLogService } from "../activity-logs/activity-log.service";
@@ -163,6 +163,30 @@ export class UserService {
       `Admin đã xóa tài khoản ${targetUser.fullName || targetUser.email}`,
       id,
       "User",
+    );
+
+    return result;
+  }
+
+  async changePassword(userId: string, data: ChangePasswordDto) {
+    const user = await this.findById(userId);
+
+    const isMatch = await bcrypt.compare(data.currentPassword, user.password);
+    if (!isMatch) {
+      throw new AppError(
+        "Current password is incorrect",
+        400,
+        ERROR_CODE.PASSWORD_MISMATCH,
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(data.newPassword, 10);
+    const result = await this.repository.updatePassword(userId, passwordHash);
+
+    await this.activityLogService.log(
+      userId,
+      ACTIVITY_ACTIONS.CHANGE_PASSWORD,
+      `User ${user.email} changed their password`,
     );
 
     return result;

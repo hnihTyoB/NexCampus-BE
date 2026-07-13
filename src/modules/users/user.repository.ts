@@ -88,6 +88,18 @@ export class UserRepository {
     });
   }
 
+  async updatePassword(id: string, passwordHash: string) {
+    return prisma.user.update({
+      where: { id },
+      data: {
+        password: passwordHash,
+        resetPasswordToken: null,
+        resetPasswordExpires: null,
+      },
+      include: { role: true },
+    });
+  }
+
   async delete(id: string) {
     const [user] = await prisma.$transaction([
       prisma.user.update({

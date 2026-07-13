@@ -7,6 +7,7 @@ import {
   createUserSchema,
   findAllUserSchema,
   updateUserSchema,
+  changePasswordSchema,
 } from "./user.validation";
 import { ROLES } from "../../common/constants/role.constant";
 import { uploadSingle } from "../../middlewares/upload.middleware";
@@ -52,6 +53,12 @@ router.delete(
   authMiddleware,
   requireRole(ROLES.ADMIN),
   controller.delete,
+);
+router.patch(
+  "/change-password",
+  authMiddleware,
+  validate(changePasswordSchema),
+  controller.changePassword,
 );
 
 export default router;

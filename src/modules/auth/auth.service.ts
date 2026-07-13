@@ -195,7 +195,9 @@ export class AuthService {
       fullName: user.fullName,
       role: user.role.name,
       isActive: user.isActive,
+      avatarUrl: user.avatarUrl,
       createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
     };
   }
 
@@ -232,48 +234,63 @@ export class AuthService {
       fullName: updatedUser.fullName,
       role: updatedUser.role.name,
       isActive: updatedUser.isActive,
+      avatarUrl: updatedUser.avatarUrl,
       createdAt: updatedUser.createdAt,
+      updatedAt: updatedUser.updatedAt,
     };
   }
 
   async forgotPassword(data: ForgotPasswordDto): Promise<void> {
     const { email } = data;
-    const user = await this.repository.findByEmail(email);
 
-    if (!user) {
-      throw new AppError("Email not found", 404, ERROR_CODE.NOT_FOUND);
+    try {
+      const user = await this.repository.findByEmail(email);
+
+      if (!user) {
+        return;
+      }
+
+      if (!user.isActive) {
+        return;
+      }
+
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 3600000);
+
+      await this.repository.updateResetToken(user.id, token, expiresAt);
+
+      const resetLink = `${envConfig.app.baseUrl}/reset-password?token=${token}`;
+
+      const emailSubject = "[NexCampus] Khôi phục mật khẩu";
+      const emailContent = `
+        Bạn đã yêu cầu khôi phục mật khẩu tài khoản NexCampus.<br/>
+        Vui lòng nhấn vào liên kết dưới đây để đặt lại mật khẩu mới (liên kết có hiệu lực trong 1 giờ):<br/>
+        <p style="margin: 16px 0;">
+          <a href="${resetLink}" style="display:inline-block;background-color:#4f46e5;color:#ffffff;padding:10px 20px;text-decoration:none;border-radius:4px;font-weight:bold;">Đặt lại mật khẩu</a>
+        </p>
+        Hoặc sao chép liên kết này vào trình duyệt:<br/>
+        <a href="${resetLink}">${resetLink}</a>
+      `;
+
+      try {
+        await EmailService.sendMail(user.email, emailSubject, emailContent);
+      } catch (emailError) {
+        console.error(`[AuthService] Failed to send forgot-password email to ${email}:`, emailError);
+      }
+
+      try {
+        await this.activityLogService.log(
+          user.id,
+          ACTIVITY_ACTIONS.FORGOT_PASSWORD,
+          `Người dùng ${user.fullName || user.email} đã yêu cầu đặt lại mật khẩu`
+        );
+      } catch (logError) {
+        console.error("[AuthService] Failed to write forgot-password activity log:", logError);
+      }
+    } catch (error) {
+      console.error("[AuthService] forgotPassword unexpected error:", error);
+      throw new AppError("Internal server error", 500, ERROR_CODE.INTERNAL_SERVER_ERROR);
     }
-
-    if (!user.isActive) {
-      throw new AppError("Account is inactive", 403, ERROR_CODE.USER_INACTIVE);
-    }
-
-    // Generate secure random token
-    const token = crypto.randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + 3600000); // 1 hour
-
-    await this.repository.updateResetToken(user.id, token, expiresAt);
-
-    const resetLink = `${envConfig.app.baseUrl}/reset-password?token=${token}`;
-
-    const emailSubject = "[NexCampus] Khôi phục mật khẩu";
-    const emailContent = `
-      Bạn đã yêu cầu khôi phục mật khẩu tài khoản NexCampus.<br/>
-      Vui lòng nhấn vào liên kết dưới đây để đặt lại mật khẩu mới (liên kết có hiệu lực trong 1 giờ):<br/>
-      <p style="margin: 16px 0;">
-        <a href="${resetLink}" style="display:inline-block;background-color:#4f46e5;color:#ffffff;padding:10px 20px;text-decoration:none;border-radius:4px;font-weight:bold;">Đặt lại mật khẩu</a>
-      </p>
-      Hoặc sao chép liên kết này vào trình duyệt:<br/>
-      <a href="${resetLink}">${resetLink}</a>
-    `;
-
-    await EmailService.sendMail(user.email, emailSubject, emailContent);
-
-    await this.activityLogService.log(
-      user.id,
-      ACTIVITY_ACTIONS.FORGOT_PASSWORD,
-      `Người dùng ${user.fullName || user.email} đã yêu cầu đặt lại mật khẩu`
-    );
   }
 
   async resetPassword(data: ResetPasswordDto): Promise<void> {

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { UserService } from "./user.service";
-import { UserQueryDto, CreateUserDto, UpdateUserDto } from "./user.dto";
+import { UserQueryDto, CreateUserDto, UpdateUserDto, ChangePasswordDto } from "./user.dto";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 
@@ -91,6 +91,21 @@ export class UserController {
       res.json({
         success: true,
         data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  changePassword = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.user.id;
+      const body = req.body as ChangePasswordDto;
+      await this.service.changePassword(userId, body);
+
+      res.json({
+        success: true,
+        message: "Password changed successfully",
       });
     } catch (error) {
       next(error);

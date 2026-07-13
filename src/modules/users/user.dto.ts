@@ -20,6 +20,11 @@ export interface UpdateUserDto {
   roleId?: "LEADER" | "INTERN";
 }
 
+export interface ChangePasswordDto {
+  currentPassword: string;
+  newPassword: string;
+}
+
 export interface UserResponseDto {
   id: string;
   email: string;

@@ -14,7 +14,9 @@ export interface MeDto {
   fullName: string | null;
   role: string;
   isActive: boolean;
+  avatarUrl: string | null;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface LoginResponseDto {
