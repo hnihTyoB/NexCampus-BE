@@ -323,6 +323,36 @@ export const swaggerSpec = {
           createdAt: { type: "string", format: "date-time" },
         },
       },
+      // ─── Regulation ────────────────────────────────────────────────────────
+      Regulation: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          title: { type: "string", example: "Quy định thực tập tại NexCampus" },
+          content: { type: "string", example: "<h3>QUY ĐỊNH CHUNG</h3>..." },
+          version: { type: "integer", example: 1 },
+          isActive: { type: "boolean", example: true },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        },
+      },
+      CreateRegulationBody: {
+        type: "object",
+        required: ["title", "content"],
+        properties: {
+          title: { type: "string", example: "Quy định thực tập tại NexCampus" },
+          content: { type: "string", example: "<h3>QUY ĐỊNH CHUNG</h3>..." },
+          isActive: { type: "boolean", example: false },
+        },
+      },
+      UpdateRegulationBody: {
+        type: "object",
+        properties: {
+          title: { type: "string", example: "Quy định thực tập tại NexCampus" },
+          content: { type: "string", example: "<h3>QUY ĐỊNH CHUNG</h3>..." },
+          isActive: { type: "boolean", example: false },
+        },
+      },
       // ─── Intern ────────────────────────────────────────────────────
       Intern: {
         type: "object",
@@ -4975,6 +5005,258 @@ export const swaggerSpec = {
             }
           },
           401: { $ref: "#/components/responses/Unauthorized" },
+          404: { $ref: "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/regulations/active": {
+      get: {
+        tags: ["Regulations"],
+        summary: "Lấy quy định thực tập đang hoạt động (Public)",
+        description: "Trả về nội dung quy định thực tập có trạng thái active mới nhất để ứng viên đọc và xác nhận khi điền thông tin đăng ký.",
+        responses: {
+          200: {
+            description: "Thông tin quy định đang hoạt động",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/Regulation" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          404: { $ref: "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/regulations": {
+      get: {
+        tags: ["Regulations"],
+        summary: "Danh sách tất cả các quy định (Admin / Leader)",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { $ref: "#/components/parameters/PageParam" },
+          { $ref: "#/components/parameters/LimitParam" }
+        ],
+        responses: {
+          200: {
+            description: "Danh sách quy định",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        items: {
+                          type: "array",
+                          items: { $ref: "#/components/schemas/Regulation" }
+                        },
+                        total: { type: "integer" },
+                        page: { type: "integer" },
+                        limit: { type: "integer" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" }
+        }
+      },
+      post: {
+        tags: ["Regulations"],
+        summary: "Tạo quy định mới (Admin)",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreateRegulationBody" }
+            }
+          }
+        },
+        responses: {
+          201: {
+            description: "Tạo quy định thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/Regulation" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          400: { $ref: "#/components/responses/BadRequest" },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/regulations/{id}": {
+      get: {
+        tags: ["Regulations"],
+        summary: "Chi tiết quy định theo ID (Admin / Leader)",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" }
+          }
+        ],
+        responses: {
+          200: {
+            description: "Chi tiết quy định",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/Regulation" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" }
+        }
+      },
+      put: {
+        tags: ["Regulations"],
+        summary: "Cập nhật quy định theo ID (Admin)",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" }
+          }
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UpdateRegulationBody" }
+            }
+          }
+        },
+        responses: {
+          200: {
+            description: "Cập nhật quy định thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/Regulation" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          400: { $ref: "#/components/responses/BadRequest" },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" }
+        }
+      },
+      delete: {
+        tags: ["Regulations"],
+        summary: "Xóa quy định theo ID (Admin)",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" }
+          }
+        ],
+        responses: {
+          200: {
+            description: "Xóa quy định thành công",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/SuccessResponse" }
+              }
+            }
+          },
+          400: { $ref: "#/components/responses/BadRequest" },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/regulations/{id}/activate": {
+      patch: {
+        tags: ["Regulations"],
+        summary: "Kích hoạt quy định theo ID (Admin)",
+        description: "Khi quy định này được kích hoạt, tất cả các quy định khác sẽ tự động được chuyển về trạng thái không hoạt động.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" }
+          }
+        ],
+        responses: {
+          200: {
+            description: "Kích hoạt quy định thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/Regulation" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
           404: { $ref: "#/components/responses/NotFound" }
         }
       }
