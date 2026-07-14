@@ -171,6 +171,61 @@ export const swaggerSpec = {
           password: { type: "string", example: "NewPassword@123" },
         },
       },
+      UpdateMeBody: {
+        type: "object",
+        properties: {
+          fullName: { type: "string", example: "Nguyễn Văn A" },
+          password: { type: "string", example: "NewPassword@123" },
+          avatarUrl: { type: "string", format: "uri" },
+        },
+      },
+      ChangePasswordBody: {
+        type: "object",
+        required: ["oldPassword", "newPassword", "confirmPassword"],
+        properties: {
+          oldPassword: { type: "string", example: "OldPassword@123" },
+          newPassword: { type: "string", example: "NewPassword@123" },
+          confirmPassword: { type: "string", example: "NewPassword@123" },
+        },
+      },
+      Me: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          email: { type: "string", format: "email" },
+          fullName: { type: "string", nullable: true },
+          avatarUrl: { type: "string", format: "uri", nullable: true },
+          role: { type: "string", example: "INTERN" },
+          isActive: { type: "boolean" },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+          intern: {
+            nullable: true,
+            type: "object",
+            properties: {
+              id: { type: "string", format: "uuid" },
+              phone: { type: "string", example: "0912345678" },
+              department: { type: "string", example: "Engineering" },
+              position: { type: "string", example: "Frontend Developer" },
+              startDate: { type: "string", format: "date-time" },
+              duration: { type: "integer", example: 3 },
+              discordUsername: { type: "string", nullable: true },
+              discordRoleGranted: { type: "boolean" },
+              status: { type: "string", enum: ["ACTIVE", "COMPLETED", "DROPPED"] },
+            },
+          },
+          notificationSetting: {
+            nullable: true,
+            type: "object",
+            properties: {
+              id: { type: "string", format: "uuid" },
+              webEnabled: { type: "boolean" },
+              emailEnabled: { type: "boolean" },
+              discordEnabled: { type: "boolean" },
+            },
+          },
+        },
+      },
       // ─── Application ──────────────────────────────────────────────────────
       Application: {
         type: "object",
@@ -1048,7 +1103,7 @@ export const swaggerSpec = {
                     {
                       type: "object",
                       properties: {
-                        data: { $ref: "#/components/schemas/User" },
+                        data: { $ref: "#/components/schemas/Me" },
                       },
                     },
                   ],
@@ -1057,6 +1112,41 @@ export const swaggerSpec = {
             },
           },
           401: { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+      put: {
+        tags: ["Auth"],
+        summary: "Cập nhật thông tin cá nhân",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UpdateMeBody" },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Cập nhật thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/Me" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          422: { $ref: "#/components/responses/Validation" },
         },
       },
     },
@@ -1208,6 +1298,51 @@ export const swaggerSpec = {
               },
             },
           },
+          422: { $ref: "#/components/responses/Validation" },
+        },
+      },
+    },
+    "/auth/change-password": {
+      post: {
+        tags: ["Auth"],
+        summary: "Đổi mật khẩu cho người dùng đã đăng nhập",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ChangePasswordBody" },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Thay đổi mật khẩu thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        message: { type: "string", example: "Thay đổi mật khẩu thành công." },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          400: {
+            description: "Mật khẩu cũ không đúng hoặc mật khẩu mới trùng mật khẩu cũ",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
           422: { $ref: "#/components/responses/Validation" },
         },
       },
