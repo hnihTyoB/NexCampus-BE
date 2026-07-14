@@ -4,6 +4,9 @@ export const findAllTaskSchema = z.object({
   title: z.string().optional(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH"]).optional(),
   createdBy: z.string().uuid().optional(),
+  phase: z.string().optional(),
+  module: z.string().optional(),
+  taskGroupId: z.string().uuid().optional(),
   deadlineFrom: z
     .string()
     .refine((v) => !isNaN(Date.parse(v)), { message: "Invalid deadlineFrom" })
@@ -25,6 +28,18 @@ export const createTaskSchema = z.object({
     message: "Invalid deadline",
   }),
   priority: z.enum(["LOW", "MEDIUM", "HIGH"]).optional(),
+  // Extended fields
+  code: z.string().max(50).optional(),
+  startDate: z
+    .string()
+    .refine((v) => !isNaN(Date.parse(v)), { message: "Invalid startDate" })
+    .optional(),
+  estDays: z.number().positive().optional(),
+  phase: z.string().max(100).optional(),
+  module: z.string().max(100).optional(),
+  acceptanceCriteria: z.string().optional(),
+  taskNotes: z.string().optional(),
+  taskGroupId: z.string().uuid().optional(),
 });
 
 export const updateTaskSchema = z.object({
@@ -35,4 +50,17 @@ export const updateTaskSchema = z.object({
     .refine((v) => !isNaN(Date.parse(v)), { message: "Invalid deadline" })
     .optional(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH"]).optional(),
+  // Extended fields
+  code: z.string().max(50).nullable().optional(),
+  startDate: z
+    .string()
+    .refine((v) => !isNaN(Date.parse(v)), { message: "Invalid startDate" })
+    .nullable()
+    .optional(),
+  estDays: z.number().positive().nullable().optional(),
+  phase: z.string().max(100).nullable().optional(),
+  module: z.string().max(100).nullable().optional(),
+  acceptanceCriteria: z.string().nullable().optional(),
+  taskNotes: z.string().nullable().optional(),
+  taskGroupId: z.string().uuid().nullable().optional(),
 });

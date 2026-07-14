@@ -10,13 +10,24 @@ const creatorSelect = {
 
 const defaultSelect = {
   id: true,
+  code: true,
   title: true,
   description: true,
   deadline: true,
+  startDate: true,
+  estDays: true,
+  phase: true,
+  module: true,
+  acceptanceCriteria: true,
+  taskNotes: true,
   priority: true,
+  taskGroupId: true,
   createdBy: true,
   createdAt: true,
   updatedAt: true,
+  taskGroup: {
+    select: { id: true, name: true },
+  },
   creator: { select: creatorSelect },
   assignment: {
     select: {
@@ -45,6 +56,14 @@ const defaultSelect = {
       createdAt: "desc" as const,
     },
   },
+  // Dependencies: các task mà task này phụ thuộc vào
+  dependsOn: {
+    select: { id: true, code: true, title: true },
+  },
+  // Tasks phụ thuộc vào task này
+  dependencies: {
+    select: { id: true, code: true, title: true },
+  },
 };
 
 export class TaskRepository {
@@ -53,8 +72,11 @@ export class TaskRepository {
       title,
       priority,
       createdBy,
+      phase,
+      module,
       deadlineFrom,
       deadlineTo,
+      taskGroupId,
       sortBy = "createdAt",
       order = "desc",
       page = 1,
@@ -66,6 +88,9 @@ export class TaskRepository {
       ...(title ? { title: { contains: title, mode: "insensitive" } } : {}),
       ...(priority ? { priority } : {}),
       ...(createdBy ? { createdBy } : {}),
+      ...(phase ? { phase: { contains: phase, mode: "insensitive" } } : {}),
+      ...(module ? { module: { contains: module, mode: "insensitive" } } : {}),
+      ...(taskGroupId ? { taskGroupId } : {}),
       ...(deadlineFrom || deadlineTo
         ? {
             deadline: {
@@ -102,6 +127,13 @@ export class TaskRepository {
     });
   }
 
+  findByCode(code: string, taskGroupId: string | null = null) {
+    return prisma.task.findFirst({
+      where: { code, taskGroupId, deletedAt: null },
+      select: defaultSelect,
+    });
+  }
+
   create(data: CreateTaskDto, createdBy: string) {
     return prisma.task.create({
       data: {
@@ -109,6 +141,14 @@ export class TaskRepository {
         description: data.description,
         deadline: new Date(data.deadline),
         priority: data.priority,
+        code: data.code,
+        startDate: data.startDate ? new Date(data.startDate) : undefined,
+        estDays: data.estDays,
+        phase: data.phase,
+        module: data.module,
+        acceptanceCriteria: data.acceptanceCriteria,
+        taskNotes: data.taskNotes,
+        taskGroupId: data.taskGroupId,
         createdBy,
       },
       select: defaultSelect,
@@ -120,13 +160,21 @@ export class TaskRepository {
       where: { id },
       data: {
         ...(data.title !== undefined ? { title: data.title } : {}),
-        ...(data.description !== undefined
-          ? { description: data.description }
-          : {}),
-        ...(data.deadline !== undefined
-          ? { deadline: new Date(data.deadline) }
-          : {}),
+        ...(data.description !== undefined ? { description: data.description } : {}),
+        ...(data.deadline !== undefined ? { deadline: new Date(data.deadline) } : {}),
         ...(data.priority !== undefined ? { priority: data.priority } : {}),
+        ...(data.code !== undefined ? { code: data.code } : {}),
+        ...(data.startDate !== undefined
+          ? { startDate: data.startDate ? new Date(data.startDate) : null }
+          : {}),
+        ...(data.estDays !== undefined ? { estDays: data.estDays } : {}),
+        ...(data.phase !== undefined ? { phase: data.phase } : {}),
+        ...(data.module !== undefined ? { module: data.module } : {}),
+        ...(data.acceptanceCriteria !== undefined
+          ? { acceptanceCriteria: data.acceptanceCriteria }
+          : {}),
+        ...(data.taskNotes !== undefined ? { taskNotes: data.taskNotes } : {}),
+        ...(data.taskGroupId !== undefined ? { taskGroupId: data.taskGroupId } : {}),
       },
       select: defaultSelect,
     });

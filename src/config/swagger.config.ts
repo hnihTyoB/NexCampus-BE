@@ -439,10 +439,22 @@ export const swaggerSpec = {
           status: { type: "string", enum: ["ACTIVE", "COMPLETED", "DROPPED"] },
         },
       },
+      TaskGroup: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          name: { type: "string", example: "Backend Crawl Project" },
+          description: { type: "string", nullable: true, example: "Dự án cào dữ liệu Backend" },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        },
+      },
       Task: {
         type: "object",
         properties: {
           id: { type: "string", format: "uuid" },
+          taskGroupId: { type: "string", format: "uuid", nullable: true },
+          code: { type: "string", nullable: true, example: "BE1-01" },
           title: { type: "string", example: "Lập trình tính năng đăng nhập" },
           description: {
             type: "string",
@@ -450,11 +462,25 @@ export const swaggerSpec = {
             example: "Sử dụng JWT và bcrypt để bảo mật mật khẩu",
           },
           deadline: { type: "string", format: "date-time" },
+          startDate: { type: "string", format: "date-time", nullable: true, example: "2025-08-01T08:00:00.000Z" },
+          estDays: { type: "number", format: "float", nullable: true, example: 2.5 },
+          phase: { type: "string", nullable: true, example: "Phase 1 - Foundation" },
+          module: { type: "string", nullable: true, example: "Auth" },
+          acceptanceCriteria: { type: "string", nullable: true, example: "Source chạy được pnpm dev/build" },
+          taskNotes: { type: "string", nullable: true, example: "Ghi chú thêm" },
           priority: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"] },
           createdBy: { type: "string", format: "uuid" },
           deletedAt: { type: "string", format: "date-time", nullable: true },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
+          taskGroup: {
+            type: "object",
+            nullable: true,
+            properties: {
+              id: { type: "string", format: "uuid" },
+              name: { type: "string", example: "Backend Crawl Project" },
+            },
+          },
           creator: {
             type: "object",
             properties: {
@@ -467,6 +493,30 @@ export const swaggerSpec = {
             type: "array",
             description: "Danh sách file đính kèm của task",
             items: { $ref: "#/components/schemas/TaskAttachment" },
+          },
+          dependsOn: {
+            type: "array",
+            description: "Các task mà task này phụ thuộc vào",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                code: { type: "string", example: "BE1-01" },
+                title: { type: "string" },
+              },
+            },
+          },
+          dependencies: {
+            type: "array",
+            description: "Các task phụ thuộc vào task này",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                code: { type: "string", example: "BE1-02" },
+                title: { type: "string" },
+              },
+            },
           },
         },
       },
@@ -486,6 +536,14 @@ export const swaggerSpec = {
             enum: ["LOW", "MEDIUM", "HIGH"],
             default: "MEDIUM",
           },
+          code: { type: "string", example: "BE1-01" },
+          startDate: { type: "string", format: "date-time", example: "2025-08-01T08:00:00.000Z" },
+          estDays: { type: "number", format: "float", example: 2.5 },
+          phase: { type: "string", example: "Phase 1 - Foundation" },
+          module: { type: "string", example: "Auth" },
+          acceptanceCriteria: { type: "string", example: "Source chạy được pnpm dev/build" },
+          taskNotes: { type: "string", example: "Ghi chú thêm" },
+          taskGroupId: { type: "string", format: "uuid" },
         },
       },
       UpdateTaskBody: {
@@ -495,6 +553,14 @@ export const swaggerSpec = {
           description: { type: "string", nullable: true },
           deadline: { type: "string", format: "date-time" },
           priority: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"] },
+          code: { type: "string", nullable: true },
+          startDate: { type: "string", format: "date-time", nullable: true },
+          estDays: { type: "number", format: "float", nullable: true },
+          phase: { type: "string", nullable: true },
+          module: { type: "string", nullable: true },
+          acceptanceCriteria: { type: "string", nullable: true },
+          taskNotes: { type: "string", nullable: true },
+          taskGroupId: { type: "string", format: "uuid", nullable: true },
         },
       },
       // ─── TaskAttachment ───────────────────────────────────────────────────────
@@ -533,7 +599,7 @@ export const swaggerSpec = {
           assignedBy: { type: "string", format: "uuid" },
           status: {
             type: "string",
-            enum: ["TODO", "IN_PROGRESS", "REVIEW", "DONE"],
+            enum: ["TODO", "IN_PROGRESS", "REVIEW", "DONE", "BLOCKED"],
           },
           assignedAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
@@ -552,7 +618,7 @@ export const swaggerSpec = {
         properties: {
           status: {
             type: "string",
-            enum: ["TODO", "IN_PROGRESS", "REVIEW", "DONE"],
+            enum: ["TODO", "IN_PROGRESS", "REVIEW", "DONE", "BLOCKED"],
           },
           internId: { type: "string", format: "uuid" },
         },
@@ -2292,6 +2358,289 @@ export const swaggerSpec = {
         },
       },
     },
+    "/tasks/analytics": {
+      get: {
+        tags: ["Tasks"],
+        summary: "Thống kê công việc và hiệu suất (Admin / Leader)",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "query",
+            name: "taskGroupId",
+            schema: { type: "string", format: "uuid" },
+            description: "ID của nhóm công việc muốn lọc số liệu thống kê"
+          }
+        ],
+        responses: {
+          200: {
+            description: "Thống kê chi tiết thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "object",
+                          properties: {
+                            overview: {
+                              type: "object",
+                              properties: {
+                                totalTasks: { type: "integer", example: 45 },
+                                byStatus: {
+                                  type: "array",
+                                  items: {
+                                    type: "object",
+                                    properties: {
+                                      status: { type: "string", example: "TODO" },
+                                      count: { type: "integer", example: 12 }
+                                    }
+                                  }
+                                },
+                                byPriority: {
+                                  type: "array",
+                                  items: {
+                                    type: "object",
+                                    properties: {
+                                      priority: { type: "string", example: "HIGH" },
+                                      count: { type: "integer", example: 33 }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            workloadByIntern: {
+                              type: "array",
+                              items: {
+                                type: "object",
+                                properties: {
+                                  internId: { type: "string", format: "uuid" },
+                                  internFullName: { type: "string", example: "Nguyễn Văn An" },
+                                  totalTasks: { type: "integer", example: 5 },
+                                  totalEstDays: { type: "number", format: "float", example: 12.5 },
+                                  byStatus: {
+                                    type: "array",
+                                    items: {
+                                      type: "object",
+                                      properties: {
+                                        status: { type: "string", example: "IN_PROGRESS" },
+                                        count: { type: "integer", example: 2 }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            progressByPhase: {
+                              type: "array",
+                              items: {
+                                type: "object",
+                                properties: {
+                                  phase: { type: "string", example: "Phase 1 - Foundation" },
+                                  totalTasks: { type: "integer", example: 12 },
+                                  doneTasks: { type: "integer", example: 4 },
+                                  completionRate: { type: "number", format: "float", example: 0.3333 }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/tasks/import/preview": {
+      post: {
+        tags: ["Tasks"],
+        summary: "Xem trước dữ liệu import từ file Excel (Admin / Leader)",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "multipart/form-data": {
+              schema: {
+                type: "object",
+                required: ["file"],
+                properties: {
+                  file: {
+                    type: "string",
+                    format: "binary",
+                    description: "File Excel (.xlsx hoặc .xls) chứa danh sách task"
+                  },
+                  taskGroupId: {
+                    type: "string",
+                    format: "uuid",
+                    description: "ID nhóm công việc hiện có"
+                  },
+                  taskGroupName: {
+                    type: "string",
+                    description: "Tên nhóm công việc muốn tạo tự động"
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          200: {
+            description: "Dữ liệu xem trước từ file Excel",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "object",
+                          properties: {
+                            totalRows: { type: "integer", example: 45 },
+                            validRows: {
+                              type: "array",
+                              items: {
+                                type: "object",
+                                properties: {
+                                  excelCode: { type: "string", example: "BE1-01" },
+                                  title: { type: "string", example: "Setup Express" },
+                                  description: { type: "string", example: "Cấu hình dự án" },
+                                  deadline: { type: "string", format: "date-time" },
+                                  startDate: { type: "string", format: "date-time" },
+                                  priority: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"] },
+                                  ownerName: { type: "string", example: "BE 1" },
+                                  phase: { type: "string", example: "Phase 1 - Foundation" },
+                                  module: { type: "string", example: "Setup" },
+                                  estDays: { type: "number", example: 1 },
+                                  dependencyCodes: { type: "array", items: { type: "string" } }
+                                }
+                              }
+                            },
+                            errorRows: {
+                              type: "array",
+                              items: {
+                                type: "object",
+                                properties: {
+                                  rowIndex: { type: "integer", example: 5 },
+                                  excelCode: { type: "string", example: "BE1-05" },
+                                  errors: { type: "array", items: { type: "string", example: "Thiếu tên Task" } }
+                                }
+                              }
+                            },
+                            internMappings: {
+                              type: "array",
+                              items: {
+                                type: "object",
+                                properties: {
+                                  ownerName: { type: "string", example: "Thịnh" },
+                                  internId: { type: "string", format: "uuid", nullable: true },
+                                  internFullName: { type: "string", nullable: true }
+                                }
+                              }
+                            },
+                            taskGroupId: { type: "string", format: "uuid", nullable: true },
+                            taskGroupName: { type: "string", nullable: true }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          400: { $ref: "#/components/responses/Validation" },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/tasks/import": {
+      post: {
+        tags: ["Tasks"],
+        summary: "Nhập hàng loạt công việc từ file Excel (Admin / Leader)",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "multipart/form-data": {
+              schema: {
+                type: "object",
+                required: ["file"],
+                properties: {
+                  file: {
+                    type: "string",
+                    format: "binary",
+                    description: "File Excel (.xlsx hoặc .xls) chứa danh sách task"
+                  },
+                  taskGroupId: {
+                    type: "string",
+                    format: "uuid",
+                    description: "ID nhóm công việc hiện có"
+                  },
+                  taskGroupName: {
+                    type: "string",
+                    description: "Tên nhóm công việc muốn tạo tự động"
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          201: {
+            description: "Import thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "object",
+                          properties: {
+                            importedTasks: { type: "integer", example: 40 },
+                            importedAssignments: { type: "integer", example: 40 },
+                            importedDependencies: { type: "integer", example: 35 },
+                            skippedCodes: { type: "array", items: { type: "string", example: "BE1-01" } },
+                            errorRows: {
+                              type: "array",
+                              items: {
+                                type: "object",
+                                properties: {
+                                  excelCode: { type: "string", example: "BE1-05" },
+                                  error: { type: "string", example: "Không tìm thấy Intern" }
+                                }
+                              }
+                            },
+                            taskGroupId: { type: "string", format: "uuid", nullable: true },
+                            taskGroupName: { type: "string", nullable: true }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          400: { $ref: "#/components/responses/Validation" },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" }
+        }
+      }
+    },
     "/tasks": {
       get: {
         tags: ["Tasks"],
@@ -2308,6 +2657,12 @@ export const swaggerSpec = {
             in: "query",
             name: "createdBy",
             schema: { type: "string", format: "uuid" },
+          },
+          {
+            in: "query",
+            name: "taskGroupId",
+            schema: { type: "string", format: "uuid" },
+            description: "Lọc công việc theo nhóm"
           },
           {
             in: "query",

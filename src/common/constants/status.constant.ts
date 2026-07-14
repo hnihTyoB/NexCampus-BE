@@ -27,6 +27,7 @@ export const ASSIGNMENT_STATUS = {
   IN_PROGRESS: "IN_PROGRESS",
   REVIEW: "REVIEW",
   DONE: "DONE",
+  BLOCKED: "BLOCKED",
 } as const;
 
 export type AssignmentStatusType = keyof typeof ASSIGNMENT_STATUS;

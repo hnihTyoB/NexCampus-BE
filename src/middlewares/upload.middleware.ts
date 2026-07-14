@@ -16,6 +16,9 @@ const ALLOWED_MIME_TYPES = [
   "application/x-7z-compressed",
   "video/mp4",
   "video/webm",
+  // Excel files
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
+  "application/vnd.ms-excel",                                           // .xls
 ];
 
 const fileFilter = (

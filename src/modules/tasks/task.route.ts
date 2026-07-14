@@ -10,10 +10,46 @@ import {
 } from "./task.validation";
 import { ROLES } from "../../common/constants/role.constant";
 import taskAttachmentRoute from "../task-attachments/task-attachment.route";
+import { uploadSingle } from "../../middlewares/upload.middleware";
 
 const router = Router();
 const controller = new TaskController();
 
+// ── Analytics (phải đặt TRƯỚC /:id để tránh xung đột route) ─────────────────
+router.get(
+  "/analytics",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER),
+  controller.getAnalytics,
+);
+
+// ── Bulk Import ───────────────────────────────────────────────────────────────
+/**
+ * POST /api/tasks/import/preview
+ * Parse file Excel và trả về JSON để UI xem trước trước khi import.
+ * Không lưu vào DB.
+ */
+router.post(
+  "/import/preview",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER),
+  uploadSingle("file"),
+  controller.previewImport,
+);
+
+/**
+ * POST /api/tasks/import
+ * Thực hiện import hàng loạt từ file Excel vào DB (Two-Pass Algorithm).
+ */
+router.post(
+  "/import",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER),
+  uploadSingle("file"),
+  controller.executeImport,
+);
+
+// ── CRUD ──────────────────────────────────────────────────────────────────────
 router.get(
   "/",
   authMiddleware,

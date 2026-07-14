@@ -1,9 +1,17 @@
 import { Request, Response, NextFunction } from "express";
 import { TaskService } from "./task.service";
+import { TaskImportService } from "./task.import.service";
+import { TaskAnalyticsService } from "./task.analytics.service";
 import { TaskQueryDto, CreateTaskDto, UpdateTaskDto } from "./task.dto";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODE } from "../../common/errors/error-code";
 
 export class TaskController {
   private readonly service = new TaskService();
+  private readonly importService = new TaskImportService();
+  private readonly analyticsService = new TaskAnalyticsService();
+
+  // ── CRUD ────────────────────────────────────────────────────────────────────
 
   findAll = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -56,6 +64,75 @@ export class TaskController {
       await this.service.delete(req.params.id, actorId);
 
       res.json({ success: true, message: "Task deleted successfully" });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // ── Bulk Import ──────────────────────────────────────────────────────────────
+
+  /**
+   * POST /api/tasks/import/preview
+   * Parse file Excel và trả về dữ liệu preview để UI xác nhận trước khi import.
+   * Không ghi gì vào DB.
+   */
+  previewImport = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.file) {
+        throw new AppError(
+          "No file uploaded. Please upload an Excel file (.xlsx)",
+          400,
+          ERROR_CODE.VALIDATION_ERROR,
+        );
+      }
+
+      const taskGroupId = (req.body.taskGroupId || req.query.taskGroupId) as string | undefined;
+      const taskGroupName = (req.body.taskGroupName || req.query.taskGroupName) as string | undefined;
+      const result = await this.importService.preview(req.file.buffer, taskGroupId, taskGroupName);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * POST /api/tasks/import
+   * Thực hiện import toàn bộ task từ file Excel vào DB.
+   * Two-Pass: Pass 1 tạo Task+Assignment, Pass 2 tạo Dependency relations.
+   */
+  executeImport = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.file) {
+        throw new AppError(
+          "No file uploaded. Please upload an Excel file (.xlsx)",
+          400,
+          ERROR_CODE.VALIDATION_ERROR,
+        );
+      }
+
+      const createdBy = req.user.id;
+      const taskGroupId = (req.body.taskGroupId || req.query.taskGroupId) as string | undefined;
+      const taskGroupName = (req.body.taskGroupName || req.query.taskGroupName) as string | undefined;
+      const result = await this.importService.execute(req.file.buffer, createdBy, taskGroupId, taskGroupName);
+
+      res.status(201).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // ── Analytics ────────────────────────────────────────────────────────────────
+
+  /**
+   * GET /api/tasks/analytics
+   * Trả về toàn bộ analytics: overview, workload theo intern, tiến độ theo phase.
+   * Dữ liệu này là nền tảng cho tính năng AI Task Allocation sau này.
+   */
+  getAnalytics = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const taskGroupId = (req.query.taskGroupId || req.body.taskGroupId) as string | undefined;
+      const result = await this.analyticsService.getAll(taskGroupId);
+      res.json({ success: true, data: result });
     } catch (error) {
       next(error);
     }
