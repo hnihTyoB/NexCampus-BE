@@ -6,12 +6,56 @@ import {
   UpdateTaskSubmissionDto,
 } from "./task-submission.dto";
 
-const defaultInclude = {
+const defaultSelect = {
+  id: true,
+  assignmentId: true,
+  attempt: true,
+  prLink: true,
+  videoDemo: true,
+  note: true,
+  reviewStatus: true,
+  reviewComment: true,
+  reviewedBy: true,
+  reviewedAt: true,
+  submittedAt: true,
+  updatedAt: true,
   assignment: {
-    include: {
-      task: true,
+    select: {
+      id: true,
+      taskId: true,
+      internId: true,
+      assignedBy: true,
+      status: true,
+      assignedAt: true,
+      updatedAt: true,
+      task: {
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          deadline: true,
+          priority: true,
+          createdBy: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
       intern: {
-        include: {
+        select: {
+          id: true,
+          userId: true,
+          leaderId: true,
+          fullName: true,
+          phone: true,
+          department: true,
+          position: true,
+          startDate: true,
+          duration: true,
+          discordUsername: true,
+          discordRoleGranted: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
           user: {
             select: {
               id: true,
@@ -31,6 +75,17 @@ const defaultInclude = {
     },
   },
   attachments: {
+    select: {
+      id: true,
+      submissionId: true,
+      fileName: true,
+      fileUrl: true,
+      filePath: true,
+      mimeType: true,
+      fileSize: true,
+      uploadedBy: true,
+      createdAt: true,
+    },
     orderBy: {
       createdAt: "desc" as const,
     },
@@ -68,7 +123,7 @@ export class TaskSubmissionRepository {
     const [data, total] = await prisma.$transaction([
       prisma.taskSubmission.findMany({
         where,
-        include: defaultInclude,
+        select: defaultSelect,
         orderBy: { [sortBy]: order },
         skip,
         take: limit,
@@ -91,7 +146,7 @@ export class TaskSubmissionRepository {
           intern: { deletedAt: null },
         },
       },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 
@@ -110,7 +165,7 @@ export class TaskSubmissionRepository {
         videoDemo: data.videoDemo || null,
         note: data.note || null,
       },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 
@@ -130,7 +185,7 @@ export class TaskSubmissionRepository {
         ...(reviewedBy !== undefined ? { reviewedBy } : {}),
         ...(reviewedBy !== undefined ? { reviewedAt: new Date() } : {}),
       },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 

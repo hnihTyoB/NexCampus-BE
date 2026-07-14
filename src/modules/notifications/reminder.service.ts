@@ -30,11 +30,30 @@ export class ReminderService {
           deletedAt: null,
         },
       },
-      include: {
-        task: true,
+      select: {
+        id: true,
+        taskId: true,
+        internId: true,
+        status: true,
+        assignedAt: true,
+        updatedAt: true,
+        task: {
+          select: {
+            id: true,
+            title: true,
+            deadline: true,
+          },
+        },
         intern: {
-          include: {
-            user: true,
+          select: {
+            id: true,
+            fullName: true,
+            user: {
+              select: {
+                id: true,
+                email: true,
+              },
+            },
           },
         },
       },
@@ -94,9 +113,17 @@ export class ReminderService {
         status: "ACTIVE",
         deletedAt: null,
       },
-      include: {
-        user: true,
-        leader: true,
+      select: {
+        id: true,
+        leaderId: true,
+        fullName: true,
+        startDate: true,
+        leader: {
+          select: {
+            id: true,
+            email: true,
+          },
+        },
       },
     });
 

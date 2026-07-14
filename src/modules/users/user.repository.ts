@@ -1,6 +1,22 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../database/prisma.client";
 import { UserQueryDto } from "./user.dto";
+const defaultSelect = {
+  id: true,
+  email: true,
+  fullName: true,
+  roleId: true,
+  isActive: true,
+  createdAt: true,
+  updatedAt: true,
+  avatarUrl: true,
+  role: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+};
 
 export class UserRepository {
   async findAll(query: UserQueryDto) {
@@ -16,6 +32,7 @@ export class UserRepository {
     } = query;
 
     const where: Prisma.UserWhereInput = {
+      deletedAt: null,
       ...(email ? { email: { contains: email, mode: "insensitive" } } : {}),
       ...(fullName
         ? { fullName: { contains: fullName, mode: "insensitive" } }
@@ -29,7 +46,7 @@ export class UserRepository {
     const [data, total] = await prisma.$transaction([
       prisma.user.findMany({
         where,
-        include: { role: true },
+        select: defaultSelect,
         orderBy: { [sortBy]: order },
         skip,
         take: limit,
@@ -50,16 +67,16 @@ export class UserRepository {
   }
 
   findById(id: string) {
-    return prisma.user.findUnique({
-      where: { id },
-      include: { role: true },
+    return prisma.user.findFirst({
+      where: { id, deletedAt: null },
+      select: defaultSelect,
     });
   }
 
   findByEmail(email: string) {
-    return prisma.user.findUnique({
-      where: { email },
-      include: { role: true },
+    return prisma.user.findFirst({
+      where: { email, deletedAt: null },
+      select: defaultSelect,
     });
   }
 
@@ -70,7 +87,7 @@ export class UserRepository {
         password: data.passwordHash,
         roleId: data.roleId,
       },
-      include: { role: true },
+      select: defaultSelect,
     });
   }
 
@@ -81,16 +98,20 @@ export class UserRepository {
     return prisma.user.update({
       where: { id },
       data,
-      include: { role: true },
+      select: defaultSelect,
     });
   }
 
-  async delete(id: string) {
+  async delete(id: string, deletedBy: string) {
     const [user] = await prisma.$transaction([
       prisma.user.update({
         where: { id },
-        data: { isActive: false },
-        include: { role: true },
+        data: {
+          isActive: false,
+          deletedAt: new Date(),
+          deletedBy,
+        },
+        select: defaultSelect,
       }),
       prisma.refreshToken.deleteMany({
         where: { userId: id },

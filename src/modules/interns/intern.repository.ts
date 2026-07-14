@@ -9,7 +9,21 @@ const userSelect = {
   isActive: true,
 };
 
-const defaultInclude = {
+const defaultSelect = {
+  id: true,
+  userId: true,
+  leaderId: true,
+  fullName: true,
+  phone: true,
+  department: true,
+  position: true,
+  startDate: true,
+  duration: true,
+  discordUsername: true,
+  discordRoleGranted: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true,
   user: { select: userSelect },
   leader: { select: userSelect },
 };
@@ -60,7 +74,7 @@ export class InternRepository {
     const [data, total] = await prisma.$transaction([
       prisma.intern.findMany({
         where,
-        include: defaultInclude,
+        select: defaultSelect,
         orderBy: { [sortBy]: order },
         skip,
         take: limit,
@@ -77,14 +91,14 @@ export class InternRepository {
   findById(id: string) {
     return prisma.intern.findFirst({
       where: { id, deletedAt: null },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 
   findByUserId(userId: string) {
     return prisma.intern.findFirst({
       where: { userId, deletedAt: null },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 
@@ -101,7 +115,7 @@ export class InternRepository {
         duration: data.duration,
         discordUsername: data.discordUsername,
       },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 
@@ -128,7 +142,7 @@ export class InternRepository {
           : {}),
         ...(data.status !== undefined ? { status: data.status } : {}),
       },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 
@@ -136,7 +150,7 @@ export class InternRepository {
     return prisma.intern.update({
       where: { id },
       data: { deletedAt: new Date() },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 }

@@ -6,9 +6,42 @@ import {
   UpdateWeeklyEvaluationDto,
 } from "./weekly-evaluation.dto";
 
-const defaultInclude = {
+const defaultSelect = {
+  id: true,
+  internId: true,
+  leaderId: true,
+  week: true,
+  communication: true,
+  attitude: true,
+  learning: true,
+  coding: true,
+  totalScore: true,
+  comment: true,
+  aiCommunication: true,
+  aiAttitude: true,
+  aiLearning: true,
+  aiCoding: true,
+  aiComment: true,
+  aiGeneratedAt: true,
+  leaderEdited: true,
+  createdAt: true,
+  updatedAt: true,
   intern: {
-    include: {
+    select: {
+      id: true,
+      userId: true,
+      leaderId: true,
+      fullName: true,
+      phone: true,
+      department: true,
+      position: true,
+      startDate: true,
+      duration: true,
+      discordUsername: true,
+      discordRoleGranted: true,
+      status: true,
+      createdAt: true,
+      updatedAt: true,
       user: {
         select: {
           id: true,
@@ -51,7 +84,7 @@ export class WeeklyEvaluationRepository {
     const [data, total] = await prisma.$transaction([
       prisma.weeklyEvaluation.findMany({
         where,
-        include: defaultInclude,
+        select: defaultSelect,
         orderBy: { [sortBy]: order },
         skip,
         take: limit,
@@ -71,7 +104,7 @@ export class WeeklyEvaluationRepository {
         id,
         intern: { deletedAt: null },
       },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 
@@ -82,7 +115,7 @@ export class WeeklyEvaluationRepository {
         week,
         intern: { deletedAt: null },
       },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 
@@ -113,7 +146,7 @@ export class WeeklyEvaluationRepository {
         aiGeneratedAt: data.aiCommunication != null ? new Date() : null,
         leaderEdited,
       },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 
@@ -130,7 +163,7 @@ export class WeeklyEvaluationRepository {
         ...(totalScore !== undefined ? { totalScore } : {}),
         ...(data.comment !== undefined ? { comment: data.comment } : {}),
       },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 

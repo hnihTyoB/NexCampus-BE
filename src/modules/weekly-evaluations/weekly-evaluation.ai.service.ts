@@ -94,9 +94,26 @@ export class WeeklyEvaluationAiService {
           task: { deletedAt: null },
         },
       },
-      include: {
+      select: {
+        id: true,
+        assignmentId: true,
+        attempt: true,
+        prLink: true,
+        videoDemo: true,
+        note: true,
+        reviewStatus: true,
+        reviewComment: true,
+        reviewedBy: true,
+        reviewedAt: true,
+        submittedAt: true,
+        updatedAt: true,
         assignment: {
-          include: {
+          select: {
+            id: true,
+            taskId: true,
+            internId: true,
+            assignedBy: true,
+            status: true,
             task: {
               select: {
                 title: true,

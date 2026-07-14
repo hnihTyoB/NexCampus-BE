@@ -5,7 +5,15 @@ import {
   CreateNotificationDto,
 } from "./notification.dto";
 
-const defaultInclude = {
+const defaultSelect = {
+  id: true,
+  userId: true,
+  title: true,
+  content: true,
+  type: true,
+  isRead: true,
+  createdAt: true,
+  updatedAt: true,
   user: {
     select: {
       id: true,
@@ -38,7 +46,7 @@ export class NotificationRepository {
     const [data, total] = await prisma.$transaction([
       prisma.notification.findMany({
         where,
-        include: defaultInclude,
+        select: defaultSelect,
         orderBy: { [sortBy]: order },
         skip,
         take: limit,
@@ -55,7 +63,7 @@ export class NotificationRepository {
   findById(id: string) {
     return prisma.notification.findFirst({
       where: { id },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 
@@ -67,7 +75,7 @@ export class NotificationRepository {
         content: data.content,
         type: data.type,
       },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 
@@ -75,7 +83,7 @@ export class NotificationRepository {
     return prisma.notification.update({
       where: { id },
       data: { isRead: true },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 

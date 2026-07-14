@@ -27,8 +27,8 @@ export async function authMiddleware(
       role: string;
     };
 
-    const user = await prisma.user.findUnique({
-      where: { id: payload.id },
+    const user = await prisma.user.findFirst({
+      where: { id: payload.id, deletedAt: null },
       select: { isActive: true },
     });
 

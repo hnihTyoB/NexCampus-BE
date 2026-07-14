@@ -1,21 +1,76 @@
 import { prisma } from "../../database/prisma.client";
 
+const basicSelect = {
+  id: true,
+  email: true,
+  password: true,
+  fullName: true,
+  roleId: true,
+  isActive: true,
+  avatarUrl: true,
+  resetPasswordExpires: true,
+  createdAt: true,
+  updatedAt: true,
+  role: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+};
+
+const fullSelect = {
+  id: true,
+  email: true,
+  password: true,
+  fullName: true,
+  roleId: true,
+  isActive: true,
+  avatarUrl: true,
+  resetPasswordExpires: true,
+  createdAt: true,
+  updatedAt: true,
+  role: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+  intern: {
+    select: {
+      id: true,
+      phone: true,
+      department: true,
+      position: true,
+      startDate: true,
+      duration: true,
+      discordUsername: true,
+      discordRoleGranted: true,
+      status: true,
+    },
+  },
+  notificationSetting: {
+    select: {
+      id: true,
+      webEnabled: true,
+      emailEnabled: true,
+      discordEnabled: true,
+    },
+  },
+};
+
 export class AuthRepository {
   findByEmail(email: string) {
-    return prisma.user.findUnique({
-      where: { email },
-      include: { role: true },
+    return prisma.user.findFirst({
+      where: { email, deletedAt: null },
+      select: basicSelect,
     });
   }
 
   findById(id: string) {
-    return prisma.user.findUnique({
-      where: { id },
-      include: {
-        role: true,
-        intern: true,
-        notificationSetting: true,
-      },
+    return prisma.user.findFirst({
+      where: { id, deletedAt: null },
+      select: fullSelect,
     });
   }
 
@@ -56,11 +111,7 @@ export class AuthRepository {
     return prisma.user.update({
       where: { id },
       data,
-      include: {
-        role: true,
-        intern: true,
-        notificationSetting: true,
-      },
+      select: fullSelect,
     });
   }
 
@@ -81,7 +132,7 @@ export class AuthRepository {
   async findByResetToken(token: string) {
     return prisma.user.findUnique({
       where: { resetPasswordToken: token },
-      include: { role: true },
+      select: basicSelect,
     });
   }
 
@@ -93,7 +144,7 @@ export class AuthRepository {
         resetPasswordToken: null,
         resetPasswordExpires: null,
       },
-      include: { role: true },
+      select: basicSelect,
     });
   }
 }

@@ -22,8 +22,8 @@ async function processNotificationJob(job: Job<NotificationJobData>) {
   // Resolve recipient email
   let recipientEmail: string | null = null;
   if (emailEnabled) {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+    const user = await prisma.user.findFirst({
+      where: { id: userId, deletedAt: null },
       select: { email: true },
     });
     recipientEmail = user?.email ?? null;

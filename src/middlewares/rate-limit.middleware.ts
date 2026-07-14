@@ -3,7 +3,7 @@ import { Request, Response, NextFunction } from "express";
 const requestCounts = new Map<string, { count: number; resetAt: number }>();
 
 const WINDOW_MS = 15 * 60 * 1000;
-const MAX_REQUESTS = 100;
+const MAX_REQUESTS = 1000;
 
 // Clean up expired records every 15 minutes to prevent memory leaks
 setInterval(() => {

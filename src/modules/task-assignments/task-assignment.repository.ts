@@ -6,10 +6,42 @@ import {
   UpdateTaskAssignmentDto,
 } from "./task-assignment.dto";
 
-const defaultInclude = {
-  task: true,
+const defaultSelect = {
+  id: true,
+  taskId: true,
+  internId: true,
+  assignedBy: true,
+  status: true,
+  assignedAt: true,
+  updatedAt: true,
+  task: {
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      deadline: true,
+      priority: true,
+      createdBy: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
   intern: {
-    include: {
+    select: {
+      id: true,
+      userId: true,
+      leaderId: true,
+      fullName: true,
+      phone: true,
+      department: true,
+      position: true,
+      startDate: true,
+      duration: true,
+      discordUsername: true,
+      discordRoleGranted: true,
+      status: true,
+      createdAt: true,
+      updatedAt: true,
       user: {
         select: {
           id: true,
@@ -55,7 +87,7 @@ export class TaskAssignmentRepository {
     const [data, total] = await prisma.$transaction([
       prisma.taskAssignment.findMany({
         where,
-        include: defaultInclude,
+        select: defaultSelect,
         orderBy: { [sortBy]: order },
         skip,
         take: limit,
@@ -76,7 +108,7 @@ export class TaskAssignmentRepository {
         task: { deletedAt: null },
         intern: { deletedAt: null },
       },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 
@@ -87,7 +119,7 @@ export class TaskAssignmentRepository {
         task: { deletedAt: null },
         intern: { deletedAt: null },
       },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 
@@ -98,7 +130,7 @@ export class TaskAssignmentRepository {
         internId: data.internId,
         assignedBy,
       },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 
@@ -109,7 +141,7 @@ export class TaskAssignmentRepository {
         ...(data.status !== undefined ? { status: data.status } : {}),
         ...(data.internId !== undefined ? { internId: data.internId } : {}),
       },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 

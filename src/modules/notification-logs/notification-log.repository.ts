@@ -6,9 +6,22 @@ import {
   UpdateNotificationLogDto,
 } from "./notification-log.dto";
 
-const defaultInclude = {
+const defaultSelect = {
+  id: true,
+  notificationId: true,
+  channel: true,
+  status: true,
+  sentAt: true,
   notification: {
-    include: {
+    select: {
+      id: true,
+      userId: true,
+      title: true,
+      content: true,
+      type: true,
+      isRead: true,
+      createdAt: true,
+      updatedAt: true,
       user: {
         select: {
           id: true,
@@ -50,7 +63,7 @@ export class NotificationLogRepository {
     const [data, total] = await prisma.$transaction([
       prisma.notificationLog.findMany({
         where,
-        include: defaultInclude,
+        select: defaultSelect,
         orderBy: { [sortBy]: order },
         skip,
         take: limit,
@@ -67,7 +80,7 @@ export class NotificationLogRepository {
   findById(id: string) {
     return prisma.notificationLog.findFirst({
       where: { id },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 
@@ -78,7 +91,7 @@ export class NotificationLogRepository {
         channel: data.channel,
         status: data.status,
       },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 
@@ -89,7 +102,7 @@ export class NotificationLogRepository {
         ...(data.channel !== undefined ? { channel: data.channel } : {}),
         ...(data.status !== undefined ? { status: data.status } : {}),
       },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 

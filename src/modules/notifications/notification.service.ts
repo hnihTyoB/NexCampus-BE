@@ -41,8 +41,8 @@ export class NotificationService {
   }
 
   async create(data: CreateNotificationDto) {
-    const recipient = await prisma.user.findUnique({
-      where: { id: data.userId },
+    const recipient = await prisma.user.findFirst({
+      where: { id: data.userId, deletedAt: null },
     });
 
     if (!recipient) {

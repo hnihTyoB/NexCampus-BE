@@ -2,7 +2,14 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../database/prisma.client";
 import { ActivityLogQueryDto, CreateActivityLogDto } from "./activity-log.dto";
 
-const defaultInclude = {
+const defaultSelect = {
+  id: true,
+  userId: true,
+  action: true,
+  targetId: true,
+  targetType: true,
+  description: true,
+  createdAt: true,
   user: {
     select: {
       id: true,
@@ -42,7 +49,7 @@ export class ActivityLogRepository {
     const [data, total] = await prisma.$transaction([
       prisma.activityLog.findMany({
         where,
-        include: defaultInclude,
+        select: defaultSelect,
         orderBy: { [sortBy]: order },
         skip,
         take: limit,
@@ -59,7 +66,7 @@ export class ActivityLogRepository {
   findById(id: string) {
     return prisma.activityLog.findUnique({
       where: { id },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 
@@ -72,7 +79,7 @@ export class ActivityLogRepository {
         targetType: data.targetType,
         description: data.description,
       },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 }

@@ -160,7 +160,7 @@ export class UserService {
 
   async delete(id: string, actorId: string) {
     const targetUser = await this.findById(id);
-    const result = await this.repository.delete(id);
+    const result = await this.repository.delete(id, actorId);
 
     await this.activityLogService.log(
       actorId,

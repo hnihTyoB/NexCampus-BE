@@ -8,6 +8,25 @@ const approverSelect = {
   fullName: true,
 };
 
+const defaultSelect = {
+  id: true,
+  fullName: true,
+  email: true,
+  phone: true,
+  department: true,
+  position: true,
+  startDate: true,
+  duration: true,
+  status: true,
+  approvedBy: true,
+  approvedAt: true,
+  createdAt: true,
+  updatedAt: true,
+  approver: {
+    select: approverSelect,
+  },
+};
+
 export class ApplicationRepository {
   async findAll(query: ApplicationQueryDto) {
     const {
@@ -48,7 +67,7 @@ export class ApplicationRepository {
     const [data, total] = await prisma.$transaction([
       prisma.application.findMany({
         where,
-        include: { approver: { select: approverSelect } },
+        select: defaultSelect,
         orderBy: { [sortBy]: order },
         skip,
         take: limit,
@@ -70,7 +89,7 @@ export class ApplicationRepository {
   findById(id: string) {
     return prisma.application.findFirst({
       where: { id, deletedAt: null },
-      include: { approver: { select: approverSelect } },
+      select: defaultSelect,
     });
   }
 
@@ -96,7 +115,7 @@ export class ApplicationRepository {
         approvedBy: approverId,
         approvedAt: new Date(),
       },
-      include: { approver: { select: approverSelect } },
+      select: defaultSelect,
     });
   }
 

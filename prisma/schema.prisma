@@ -33,6 +33,8 @@ model User {
   avatarUrl            String?  @map("avatar_url")
   resetPasswordToken   String?  @unique @map("reset_password_token")
   resetPasswordExpires DateTime? @map("reset_password_expires")
+  deletedAt            DateTime? @map("deleted_at")
+  deletedBy            String?   @map("deleted_by") @db.Uuid
 
   role Role @relation(fields: [roleId], references: [id])
 

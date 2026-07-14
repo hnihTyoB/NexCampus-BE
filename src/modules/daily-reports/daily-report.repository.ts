@@ -6,9 +6,30 @@ import {
   UpdateDailyReportDto,
 } from "./daily-report.dto";
 
-const defaultInclude = {
+const defaultSelect = {
+  id: true,
+  internId: true,
+  content: true,
+  prLink: true,
+  videoDemo: true,
+  createdAt: true,
+  updatedAt: true,
   intern: {
-    include: {
+    select: {
+      id: true,
+      userId: true,
+      leaderId: true,
+      fullName: true,
+      phone: true,
+      department: true,
+      position: true,
+      startDate: true,
+      duration: true,
+      discordUsername: true,
+      discordRoleGranted: true,
+      status: true,
+      createdAt: true,
+      updatedAt: true,
       user: {
         select: {
           id: true,
@@ -19,6 +40,17 @@ const defaultInclude = {
     },
   },
   attachments: {
+    select: {
+      id: true,
+      reportId: true,
+      fileName: true,
+      fileUrl: true,
+      filePath: true,
+      mimeType: true,
+      fileSize: true,
+      uploadedBy: true,
+      createdAt: true,
+    },
     orderBy: {
       createdAt: "desc" as const,
     },
@@ -55,7 +87,7 @@ export class DailyReportRepository {
     const [data, total] = await prisma.$transaction([
       prisma.dailyReport.findMany({
         where,
-        include: defaultInclude,
+        select: defaultSelect,
         orderBy: { [sortBy]: order },
         skip,
         take: limit,
@@ -75,7 +107,7 @@ export class DailyReportRepository {
         id,
         intern: { deletedAt: null },
       },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 
@@ -87,7 +119,7 @@ export class DailyReportRepository {
         prLink: data.prLink || null,
         videoDemo: data.videoDemo || null,
       },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 
@@ -99,7 +131,7 @@ export class DailyReportRepository {
         ...(data.prLink !== undefined ? { prLink: data.prLink } : {}),
         ...(data.videoDemo !== undefined ? { videoDemo: data.videoDemo } : {}),
       },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 

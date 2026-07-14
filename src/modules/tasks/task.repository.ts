@@ -8,11 +8,42 @@ const creatorSelect = {
   fullName: true,
 };
 
-const defaultInclude = {
+const defaultSelect = {
+  id: true,
+  title: true,
+  description: true,
+  deadline: true,
+  priority: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
   creator: { select: creatorSelect },
-  assignment: true,
+  assignment: {
+    select: {
+      id: true,
+      taskId: true,
+      internId: true,
+      assignedBy: true,
+      status: true,
+      assignedAt: true,
+      updatedAt: true,
+    },
+  },
   attachments: {
-    orderBy: { createdAt: "desc" as const },
+    select: {
+      id: true,
+      taskId: true,
+      fileName: true,
+      fileUrl: true,
+      filePath: true,
+      mimeType: true,
+      fileSize: true,
+      uploadedBy: true,
+      createdAt: true,
+    },
+    orderBy: {
+      createdAt: "desc" as const,
+    },
   },
 };
 
@@ -50,7 +81,7 @@ export class TaskRepository {
     const [data, total] = await prisma.$transaction([
       prisma.task.findMany({
         where,
-        include: defaultInclude,
+        select: defaultSelect,
         orderBy: { [sortBy]: order },
         skip,
         take: limit,
@@ -67,7 +98,7 @@ export class TaskRepository {
   findById(id: string) {
     return prisma.task.findFirst({
       where: { id, deletedAt: null },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 
@@ -80,7 +111,7 @@ export class TaskRepository {
         priority: data.priority,
         createdBy,
       },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 
@@ -97,7 +128,7 @@ export class TaskRepository {
           : {}),
         ...(data.priority !== undefined ? { priority: data.priority } : {}),
       },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 
@@ -105,7 +136,7 @@ export class TaskRepository {
     return prisma.task.update({
       where: { id },
       data: { deletedAt: new Date() },
-      include: defaultInclude,
+      select: defaultSelect,
     });
   }
 }
