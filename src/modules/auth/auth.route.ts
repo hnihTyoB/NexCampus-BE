@@ -9,6 +9,7 @@ import {
   updateMeSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  changePasswordSchema,
 } from "./auth.validation";
 
 const router = Router();
@@ -39,6 +40,13 @@ router.post(
   "/reset-password",
   validate(resetPasswordSchema),
   controller.resetPassword,
+);
+
+router.post(
+  "/change-password",
+  authMiddleware,
+  validate(changePasswordSchema),
+  controller.changePassword,
 );
 
 export default router;

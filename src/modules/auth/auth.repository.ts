@@ -11,7 +11,11 @@ export class AuthRepository {
   findById(id: string) {
     return prisma.user.findUnique({
       where: { id },
-      include: { role: true },
+      include: {
+        role: true,
+        intern: true,
+        notificationSetting: true,
+      },
     });
   }
 
@@ -52,7 +56,11 @@ export class AuthRepository {
     return prisma.user.update({
       where: { id },
       data,
-      include: { role: true },
+      include: {
+        role: true,
+        intern: true,
+        notificationSetting: true,
+      },
     });
   }
 

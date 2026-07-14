@@ -8,13 +8,36 @@ export interface AuthTokensDto {
   refreshToken: string;
 }
 
+export interface MeInternDto {
+  id: string;
+  phone: string;
+  department: string;
+  position: string;
+  startDate: Date;
+  duration: number;
+  discordUsername: string | null;
+  discordRoleGranted: boolean;
+  status: string;
+}
+
+export interface MeNotificationSettingDto {
+  id: string;
+  webEnabled: boolean;
+  emailEnabled: boolean;
+  discordEnabled: boolean;
+}
+
 export interface MeDto {
   id: string;
   email: string;
   fullName: string | null;
+  avatarUrl: string | null;
   role: string;
   isActive: boolean;
   createdAt: Date;
+  updatedAt: Date;
+  intern: MeInternDto | null;
+  notificationSetting: MeNotificationSettingDto | null;
 }
 
 export interface LoginResponseDto {
@@ -35,5 +58,11 @@ export interface ForgotPasswordDto {
 export interface ResetPasswordDto {
   token: string;
   password: string;
+}
+
+export interface ChangePasswordDto {
+  oldPassword?: string;
+  newPassword?: string;
+  confirmPassword?: string;
 }
 

@@ -1,5 +1,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { envConfig } from "../../config/env.config";
+import { AppError } from "../errors/app-error";
+import { ERROR_CODE } from "../errors/error-code";
 
 export class StorageService {
   private supabase: SupabaseClient;
@@ -8,8 +10,10 @@ export class StorageService {
     const { url, secretKey } = envConfig.supabase;
 
     if (!url || !secretKey) {
-      throw new Error(
+      throw new AppError(
         "Supabase URL or Secret Key is missing in environment variables",
+        500,
+        ERROR_CODE.INTERNAL_SERVER_ERROR,
       );
     }
 
@@ -30,7 +34,11 @@ export class StorageService {
       });
 
     if (error) {
-      throw new Error(`Upload to Supabase Storage failed: ${error.message}`);
+      throw new AppError(
+        `Upload to Supabase Storage failed: ${error.message}`,
+        500,
+        ERROR_CODE.INTERNAL_SERVER_ERROR,
+      );
     }
 
     const { data } = this.supabase.storage.from(bucket).getPublicUrl(path);
@@ -41,8 +49,10 @@ export class StorageService {
     const { error } = await this.supabase.storage.from(bucket).remove([path]);
 
     if (error) {
-      throw new Error(
+      throw new AppError(
         `Failed to delete file from Supabase Storage: ${error.message}`,
+        500,
+        ERROR_CODE.INTERNAL_SERVER_ERROR,
       );
     }
   }

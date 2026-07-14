@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { AuthService } from "./auth.service";
-import { LoginDto, ForgotPasswordDto, ResetPasswordDto } from "./auth.dto";
+import { LoginDto, ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto } from "./auth.dto";
 
 export class AuthController {
   private readonly service = new AuthService();
@@ -107,6 +107,21 @@ export class AuthController {
       res.json({
         success: true,
         message: "Đặt lại mật khẩu thành công.",
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  changePassword = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = req.body as ChangePasswordDto;
+      const userId = req.user.id;
+      await this.service.changePassword(userId, body);
+
+      res.json({
+        success: true,
+        message: "Thay đổi mật khẩu thành công.",
       });
     } catch (error) {
       next(error);

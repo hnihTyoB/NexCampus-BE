@@ -13,6 +13,7 @@ import {
   MeDto,
   ForgotPasswordDto,
   ResetPasswordDto,
+  ChangePasswordDto,
 } from "./auth.dto";
 import { ActivityLogService } from "../activity-logs/activity-log.service";
 import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
@@ -193,9 +194,32 @@ export class AuthService {
       id: user.id,
       email: user.email,
       fullName: user.fullName,
+      avatarUrl: user.avatarUrl,
       role: user.role.name,
       isActive: user.isActive,
       createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      intern: user.intern
+        ? {
+            id: user.intern.id,
+            phone: user.intern.phone,
+            department: user.intern.department,
+            position: user.intern.position,
+            startDate: user.intern.startDate,
+            duration: user.intern.duration,
+            discordUsername: user.intern.discordUsername,
+            discordRoleGranted: user.intern.discordRoleGranted,
+            status: user.intern.status,
+          }
+        : null,
+      notificationSetting: user.notificationSetting
+        ? {
+            id: user.notificationSetting.id,
+            webEnabled: user.notificationSetting.webEnabled,
+            emailEnabled: user.notificationSetting.emailEnabled,
+            discordEnabled: user.notificationSetting.discordEnabled,
+          }
+        : null,
     };
   }
 
@@ -230,9 +254,32 @@ export class AuthService {
       id: updatedUser.id,
       email: updatedUser.email,
       fullName: updatedUser.fullName,
+      avatarUrl: updatedUser.avatarUrl,
       role: updatedUser.role.name,
       isActive: updatedUser.isActive,
       createdAt: updatedUser.createdAt,
+      updatedAt: updatedUser.updatedAt,
+      intern: updatedUser.intern
+        ? {
+            id: updatedUser.intern.id,
+            phone: updatedUser.intern.phone,
+            department: updatedUser.intern.department,
+            position: updatedUser.intern.position,
+            startDate: updatedUser.intern.startDate,
+            duration: updatedUser.intern.duration,
+            discordUsername: updatedUser.intern.discordUsername,
+            discordRoleGranted: updatedUser.intern.discordRoleGranted,
+            status: updatedUser.intern.status,
+          }
+        : null,
+      notificationSetting: updatedUser.notificationSetting
+        ? {
+            id: updatedUser.notificationSetting.id,
+            webEnabled: updatedUser.notificationSetting.webEnabled,
+            emailEnabled: updatedUser.notificationSetting.emailEnabled,
+            discordEnabled: updatedUser.notificationSetting.discordEnabled,
+          }
+        : null,
     };
   }
 
@@ -303,6 +350,50 @@ export class AuthService {
       user.id,
       ACTIVITY_ACTIONS.RESET_PASSWORD,
       `Người dùng ${user.fullName || user.email} đã đặt lại mật khẩu thành công`
+    );
+  }
+
+  async changePassword(userId: string, data: ChangePasswordDto): Promise<void> {
+    const { oldPassword, newPassword } = data;
+
+    if (!oldPassword || !newPassword) {
+      throw new AppError(
+        "Mật khẩu cũ và mật khẩu mới không được để trống",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    const user = await this.repository.findById(userId);
+    if (!user || !user.isActive) {
+      throw new AppError("User not found", 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    const isPasswordValid = await bcrypt.compare(oldPassword, user.password);
+    if (!isPasswordValid) {
+      throw new AppError(
+        "Mật khẩu cũ không chính xác",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      throw new AppError(
+        "Mật khẩu mới không được trùng với mật khẩu cũ",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.repository.updatePassword(user.id, passwordHash);
+
+    await this.activityLogService.log(
+      user.id,
+      ACTIVITY_ACTIONS.CHANGE_PASSWORD,
+      `Người dùng ${user.fullName || user.email} đã đổi mật khẩu thành công`
     );
   }
 }
