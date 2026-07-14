@@ -132,6 +132,29 @@ async function main() {
     console.log(`NotificationTemplate ${t.type} upserted`);
   }
 
+  // Create a default active regulation if none exists
+  const regulationCount = await prisma.regulation.count();
+  if (regulationCount === 0) {
+    await prisma.regulation.create({
+      data: {
+        title: "Quy định thực tập tại NexCampus",
+        content: `
+          <h3>QUY ĐỊNH CHUNG DÀNH CHO THỰC TẬP SINH</h3>
+          <p>Chào mừng bạn đã gia nhập NexCampus. Vui lòng đọc kỹ các điều khoản dưới đây trước khi bắt đầu kỳ thực tập:</p>
+          <ol>
+            <li><strong>Thời gian làm việc:</strong> Thực hiện đầy đủ số giờ thực tập đã cam kết mỗi tuần. Đi làm đúng giờ.</li>
+            <li><strong>Bảo mật thông tin:</strong> Tuyệt đối không tiết lộ mã nguồn, dữ liệu dự án, hoặc thông tin mật của doanh nghiệp cho bất kỳ bên thứ ba nào.</li>
+            <li><strong>Báo cáo công việc:</strong> Gửi báo cáo hàng ngày (Daily Report) đúng giờ và đầy đủ trước 18h00 mỗi ngày làm việc.</li>
+            <li><strong>Thái độ làm việc:</strong> Tôn trọng đồng nghiệp, chủ động học hỏi và tuân thủ sự hướng dẫn của Mentor/Leader.</li>
+          </ol>
+        `,
+        version: 1,
+        isActive: true,
+      },
+    });
+    console.log("Default active regulation created");
+  }
+
   console.log("Seed completed successfully");
 }
 

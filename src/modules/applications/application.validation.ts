@@ -37,6 +37,10 @@ export const createApplicationSchema = z.object({
     .int()
     .positive("Duration must be a positive integer"),
   token: z.string().min(1, "Invitation token is required"),
+  regulationId: z.string().uuid("Invalid regulation ID"),
+  acceptedRegulations: z.boolean().refine((val) => val === true, {
+    message: "You must accept the regulations to submit the application",
+  }),
 });
 
 export const reviewApplicationSchema = z.object({

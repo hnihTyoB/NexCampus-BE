@@ -20,6 +20,8 @@ const defaultSelect = {
   status: true,
   approvedBy: true,
   approvedAt: true,
+  regulationId: true,
+  acceptedAt: true,
   createdAt: true,
   updatedAt: true,
   approver: {
@@ -101,6 +103,8 @@ export class ApplicationRepository {
     position: string;
     startDate: Date;
     duration: number;
+    regulationId: string;
+    acceptedAt: Date;
   }) {
     return prisma.application.create({
       data,

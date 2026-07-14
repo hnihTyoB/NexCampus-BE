@@ -81,9 +81,15 @@ model Application {
   createdAt  DateTime          @default(now()) @map("created_at")
   updatedAt  DateTime          @updatedAt @map("updated_at")
 
-  approver User? @relation("ApprovedApplications", fields: [approvedBy], references: [id], onDelete: SetNull)
+  // Regulations fields
+  regulationId String?         @map("regulation_id") @db.Uuid
+  acceptedAt   DateTime?       @map("accepted_at")
+
+  approver   User?        @relation("ApprovedApplications", fields: [approvedBy], references: [id], onDelete: SetNull)
+  regulation Regulation?  @relation(fields: [regulationId], references: [id], onDelete: SetNull)
 
   @@index([approvedBy])
+  @@index([regulationId])
   @@map("applications")
 }
 
@@ -426,5 +432,21 @@ model ApplicationInvite {
 
   @@map("application_invites")
 }
+
+// 17. Regulation
+model Regulation {
+  id        String   @id @default(uuid()) @db.Uuid
+  title     String
+  content   String   @db.Text
+  version   Int      @default(1)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  applications Application[]
+
+  @@map("regulations")
+}
+
 
 

@@ -22,6 +22,8 @@ export interface CreateApplicationDto {
   startDate: string;
   duration: number;
   token: string;
+  regulationId: string;
+  acceptedRegulations: boolean;
 }
 
 export interface ReviewApplicationDto {

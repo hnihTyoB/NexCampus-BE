@@ -274,6 +274,8 @@ export const swaggerSpec = {
           "startDate",
           "duration",
           "token",
+          "regulationId",
+          "acceptedRegulations",
         ],
         properties: {
           fullName: { type: "string", example: "Nguyễn Văn A" },
@@ -288,6 +290,12 @@ export const swaggerSpec = {
             description: "Số tháng thực tập",
           },
           token: { type: "string", example: "39bdf11f..." },
+          regulationId: {
+            type: "string",
+            format: "uuid",
+            example: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+          },
+          acceptedRegulations: { type: "boolean", example: true },
         },
       },
       ReviewApplicationBody: {

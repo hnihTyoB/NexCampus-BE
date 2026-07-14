@@ -170,6 +170,18 @@ export class ApplicationService {
       );
     }
 
+    // Verify regulation exists and is active
+    const regulation = await prisma.regulation.findFirst({
+      where: { id: data.regulationId, isActive: true },
+    });
+    if (!regulation) {
+      throw new AppError(
+        "Invalid or inactive regulation ID",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
     // 3. Create the application
     const application = await this.repository.create({
       fullName: data.fullName,
@@ -179,6 +191,8 @@ export class ApplicationService {
       position: data.position,
       startDate: new Date(data.startDate),
       duration: data.duration,
+      regulationId: data.regulationId,
+      acceptedAt: new Date(),
     });
 
     // 4. Mark invite as used
