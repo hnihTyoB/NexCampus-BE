@@ -22,16 +22,16 @@ model Role {
 
 // 2. User
 model User {
-  id        String   @id @default(uuid()) @db.Uuid
-  email     String   @unique
-  password  String
-  fullName  String?  @map("full_name")
-  roleId    String   @map("role_id") @db.Uuid
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-  avatarUrl            String?  @map("avatar_url")
-  resetPasswordToken   String?  @unique @map("reset_password_token")
+  id                   String    @id @default(uuid()) @db.Uuid
+  email                String    @unique
+  password             String
+  fullName             String?   @map("full_name")
+  roleId               String    @map("role_id") @db.Uuid
+  isActive             Boolean   @default(true) @map("is_active")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  avatarUrl            String?   @map("avatar_url")
+  resetPasswordToken   String?   @unique @map("reset_password_token")
   resetPasswordExpires DateTime? @map("reset_password_expires")
   deletedAt            DateTime? @map("deleted_at")
   deletedBy            String?   @map("deleted_by") @db.Uuid
@@ -39,17 +39,17 @@ model User {
   role Role @relation(fields: [roleId], references: [id])
 
   // Relations
-  approvedApplications Application[]        @relation("ApprovedApplications")
-  intern               Intern?              @relation("InternUser")
-  leadedInterns        Intern[]             @relation("LeaderInterns")
-  notificationSetting  NotificationSetting?
-  createdTasks         Task[]               @relation("CreatedTasks")
-  assignedTasks        TaskAssignment[]     @relation("AssignedTasks")
-  reviewedSubmissions  TaskSubmission[]     @relation("ReviewedSubmissions")
-  leaderEvaluations    WeeklyEvaluation[]   @relation("LeaderEvaluations")
-  notifications        Notification[]
-  refreshTokens        RefreshToken[]
-  taskAttachments      TaskAttachment[]     @relation("TaskAttachmentUploader")
+  approvedApplications  Application[]          @relation("ApprovedApplications")
+  intern                Intern?                @relation("InternUser")
+  leadedInterns         Intern[]               @relation("LeaderInterns")
+  notificationSetting   NotificationSetting?
+  createdTasks          Task[]                 @relation("CreatedTasks")
+  assignedTasks         TaskAssignment[]       @relation("AssignedTasks")
+  reviewedSubmissions   TaskSubmission[]       @relation("ReviewedSubmissions")
+  leaderEvaluations     WeeklyEvaluation[]     @relation("LeaderEvaluations")
+  notifications         Notification[]
+  refreshTokens         RefreshToken[]
+  taskAttachments       TaskAttachment[]       @relation("TaskAttachmentUploader")
   submissionAttachments SubmissionAttachment[] @relation("SubmissionAttachmentUploader")
   reportAttachments    ReportAttachment[]     @relation("ReportAttachmentUploader")
   activityLogs         ActivityLog[]
@@ -83,11 +83,11 @@ model Application {
   updatedAt  DateTime          @updatedAt @map("updated_at")
 
   // Regulations fields
-  regulationId String?         @map("regulation_id") @db.Uuid
-  acceptedAt   DateTime?       @map("accepted_at")
+  regulationId String?   @map("regulation_id") @db.Uuid
+  acceptedAt   DateTime? @map("accepted_at")
 
-  approver   User?        @relation("ApprovedApplications", fields: [approvedBy], references: [id], onDelete: SetNull)
-  regulation Regulation?  @relation(fields: [regulationId], references: [id], onDelete: SetNull)
+  approver   User?       @relation("ApprovedApplications", fields: [approvedBy], references: [id], onDelete: SetNull)
+  regulation Regulation? @relation(fields: [regulationId], references: [id], onDelete: SetNull)
 
   // Application invites
   applicationInvites ApplicationInvite[]
@@ -126,7 +126,8 @@ model Intern {
   leader User? @relation("LeaderInterns", fields: [leaderId], references: [id], onDelete: SetNull)
 
   // Relations
-  assignments       TaskAssignment[]
+  assignments          TaskAssignment[]   @relation("TaskAssignmentOwner")
+  supportedAssignments TaskAssignment[]   @relation("TaskAssignmentSupport")
   dailyReports      DailyReport[]
   weeklyEvaluations WeeklyEvaluation[]
 
@@ -163,7 +164,7 @@ model TaskGroup {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  tasks       Task[]
+  tasks Task[]
 
   @@map("task_groups")
 }
@@ -171,16 +172,16 @@ model TaskGroup {
 model Task {
   id                 String       @id @default(uuid()) @db.Uuid
   taskGroupId        String?      @map("task_group_id") @db.Uuid
-  code               String?                                   // Mã thân thiện: BE1-01 (dùng cho import & AI allocation)
+  code               String?
   title              String
   description        String?
   deadline           DateTime
-  startDate          DateTime?    @map("start_date")             // Ngày bắt đầu (từ file Excel)
-  estDays            Float?       @map("est_days")               // Số ngày ước lượng (phục vụ Workload Analytics & AI)
-  phase              String?                                     // Giai đoạn: "Phase 1 - Foundation"...
-  module             String?                                     // Module kỹ thuật: "Auth", "Database"...
-  acceptanceCriteria String?      @map("acceptance_criteria") @db.Text // Tiêu chí nghiệm thu
-  taskNotes          String?      @map("task_notes")             // Ghi chú bổ sung
+  startDate          DateTime?    @map("start_date")
+  estDays            Float?       @map("est_days")
+  phase              String?
+  module             String?
+  acceptanceCriteria String?      @map("acceptance_criteria") @db.Text
+  taskNotes          String?      @map("task_notes")
   priority           TaskPriority @default(MEDIUM)
   createdBy          String       @map("created_by") @db.Uuid
   deletedAt          DateTime?    @map("deleted_at")
@@ -192,8 +193,6 @@ model Task {
   assignment  TaskAssignment?
   attachments TaskAttachment[]
 
-  // Self-referencing many-to-many: Task phụ thuộc vào các Task khác
-  // Dùng cho: Import Dependency resolution & AI Allocation (kiểm tra task cha đã DONE chưa)
   dependencies Task[] @relation("TaskDependencies")
   dependsOn    Task[] @relation("TaskDependencies")
 
@@ -236,17 +235,20 @@ model TaskAssignment {
   id         String           @id @default(uuid()) @db.Uuid
   taskId     String           @unique @map("task_id") @db.Uuid
   internId   String           @map("intern_id") @db.Uuid
+  supportId  String?          @map("support_id") @db.Uuid
   assignedBy String           @map("assigned_by") @db.Uuid
   status     AssignmentStatus @default(TODO)
   assignedAt DateTime         @default(now()) @map("assigned_at")
   updatedAt  DateTime         @updatedAt @map("updated_at")
 
   task        Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  intern      Intern           @relation(fields: [internId], references: [id], onDelete: Cascade)
+  intern      Intern           @relation("TaskAssignmentOwner", fields: [internId], references: [id], onDelete: Cascade)
+  support     Intern?          @relation("TaskAssignmentSupport", fields: [supportId], references: [id], onDelete: SetNull)
   assigner    User             @relation("AssignedTasks", fields: [assignedBy], references: [id], onDelete: Cascade)
   submissions TaskSubmission[]
 
   @@index([internId])
+  @@index([supportId])
   @@index([assignedBy])
   @@map("task_assignments")
 }
@@ -338,18 +340,17 @@ model ReportAttachment {
 
 // 10. WeeklyEvaluation
 model WeeklyEvaluation {
-  id            String   @id @default(uuid()) @db.Uuid
-  internId      String   @map("intern_id") @db.Uuid
-  leaderId      String   @map("leader_id") @db.Uuid
+  id            String  @id @default(uuid()) @db.Uuid
+  internId      String  @map("intern_id") @db.Uuid
+  leaderId      String  @map("leader_id") @db.Uuid
   week          Int
   communication Float
   attitude      Float
   learning      Float
   coding        Float
-  totalScore    Float    @map("total_score")
+  totalScore    Float   @map("total_score")
   comment       String?
 
-  // AI suggestion fields (lưu gợi ý gốc của AI, không thay đổi sau khi Leader lưu)
   aiCommunication Float?    @map("ai_communication")
   aiAttitude      Float?    @map("ai_attitude")
   aiLearning      Float?    @map("ai_learning")
@@ -358,8 +359,8 @@ model WeeklyEvaluation {
   aiGeneratedAt   DateTime? @map("ai_generated_at")
   leaderEdited    Boolean   @default(false) @map("leader_edited")
 
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   intern Intern @relation(fields: [internId], references: [id], onDelete: Cascade)
   leader User   @relation("LeaderEvaluations", fields: [leaderId], references: [id], onDelete: Cascade)
@@ -444,13 +445,13 @@ model NotificationTemplate {
 model ActivityLog {
   id          String   @id @default(uuid()) @db.Uuid
   userId      String   @map("user_id") @db.Uuid
-  action      String   // E.g. "LOGIN", "LOGOUT", "CREATE_TASK", etc.
+  action      String
   targetId    String?  @map("target_id") @db.Uuid
   targetType  String?  @map("target_type")
   description String
   createdAt   DateTime @default(now()) @map("created_at")
 
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("activity_logs")
@@ -504,6 +505,3 @@ model Regulation {
 
   @@map("regulations")
 }
-
-
-

@@ -12,23 +12,12 @@ import { ActivityLogService } from "../activity-logs/activity-log.service";
 import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
 import { NotificationDispatcher } from "../notifications/notification.dispatcher";
 
-// ─── Mapping Constants ────────────────────────────────────────────────────────
-
-/**
- * Map Priority từ ký hiệu Excel (P0, P1, P2) sang Prisma enum (HIGH, MEDIUM, LOW)
- * P0 = Bắt buộc MVP → HIGH
- * P1 = Nên có       → MEDIUM
- * P2 = Nâng cấp     → LOW
- */
 const PRIORITY_MAP: Record<string, TaskPriority> = {
   P0: "HIGH",
   P1: "MEDIUM",
   P2: "LOW",
 };
 
-/**
- * Map Status từ Excel sang AssignmentStatus enum
- */
 const STATUS_MAP: Record<string, string> = {
   "To Do": "TODO",
   "In Progress": "IN_PROGRESS",
@@ -37,9 +26,6 @@ const STATUS_MAP: Record<string, string> = {
   Blocked: "BLOCKED",
 };
 
-// ─── Helper Functions ─────────────────────────────────────────────────────────
-
-/** Parse ngày từ giá trị Excel (có thể là JS Date, số serial, hoặc chuỗi) */
 function parseExcelDate(value: unknown): string | undefined {
   if (!value) return undefined;
 
@@ -81,7 +67,6 @@ function parseExcelDate(value: unknown): string | undefined {
   return undefined;
 }
 
-/** Parse danh sách Dependency codes từ chuỗi "BE1-01, BE1-02" */
 function parseDependencies(raw: unknown): string[] {
   if (!raw || typeof raw !== "string") return [];
   return raw
@@ -90,12 +75,6 @@ function parseDependencies(raw: unknown): string[] {
     .filter((s) => s.length > 0);
 }
 
-// ─── Sheet Parsers ────────────────────────────────────────────────────────────
-
-/**
- * Đọc sheet Lists để tạo bảng ánh xạ:
- * { "BE 1": "Thịnh", "BE 2": "Trà", "BE 3": "Thanh" }
- */
 function parseListsSheet(workbook: XLSX.WorkBook): Record<string, string> {
   const sheet = workbook.Sheets["Lists"];
   if (!sheet) return {};
@@ -114,9 +93,6 @@ function parseListsSheet(workbook: XLSX.WorkBook): Record<string, string> {
   return mapping;
 }
 
-/**
- * Đọc sheet Task_Phan_Cong và trả về mảng các row đã được chuẩn hóa.
- */
 function parseTaskSheet(
   workbook: XLSX.WorkBook,
   ownerNameMap: Record<string, string>,
@@ -142,7 +118,6 @@ function parseTaskSheet(
     const errors: string[] = [];
     const excelCode = row["Task ID"] ? String(row["Task ID"]).trim() : undefined;
 
-    // Validate bắt buộc
     if (!excelCode) errors.push("Thiếu Task ID");
     const rawTask = row["Task"];
     if (!rawTask) errors.push("Thiếu tên Task");
@@ -155,23 +130,33 @@ function parseTaskSheet(
     const priority = rawPriority ? PRIORITY_MAP[rawPriority] : null;
     if (!priority) errors.push(`Priority không hợp lệ: "${rawPriority}" (cho phép: P0, P1, P2)`);
 
-    const rawOwner = row["Owner"] ? String(row["Owner"]).trim() : null;
-    // ownerName có thể là tên trực tiếp (Thịnh) hoặc mã (BE 1) → ưu tiên mã → tên
+    const rawStart = row["Start"] && String(row["Start"]).trim() ? String(row["Start"]).trim() : null;
+    let startDate: string | undefined;
+    if (rawStart) {
+      startDate = parseExcelDate(rawStart);
+      if (!startDate) errors.push(`Không parse được ngày Start: "${rawStart}"`);
+    }
+
+    const rawOwner = row["Owner"] && String(row["Owner"]).trim() ? String(row["Owner"]).trim() : null;
     const ownerName = rawOwner ? (ownerNameMap[rawOwner] ?? rawOwner) : undefined;
+
+    const rawSupport = row["Support"] && String(row["Support"]).trim() ? String(row["Support"]).trim() : null;
+    const supportName = rawSupport ? (ownerNameMap[rawSupport] ?? rawSupport) : undefined;
+
+    if (supportName && !ownerName) {
+      errors.push("Không thể chỉ định Intern hỗ trợ nếu thiếu người chịu trách nhiệm chính (Owner)");
+    }
+
+    const rawStatus = row["Status"] && String(row["Status"]).trim() ? String(row["Status"]).trim() : "To Do";
+    if (rawStatus && !STATUS_MAP[rawStatus]) {
+      errors.push(`Trạng thái không hợp lệ: "${rawStatus}" (cho phép: To Do, In Progress, Review, Done, Blocked)`);
+    }
 
     if (errors.length > 0) {
       errorRows.push({ rowIndex: i + 2, excelCode, errors });
       continue;
     }
 
-    // Parse optional fields
-    const rawStart = row["Start"];
-    const startDate = parseExcelDate(rawStart);
-
-    const rawSupport = row["Support"] ? String(row["Support"]).trim() : null;
-    const supportName = rawSupport ? (ownerNameMap[rawSupport] ?? rawSupport) : undefined;
-
-    const rawStatus = row["Status"] ? String(row["Status"]).trim() : "To Do";
     const rawEstDays = row["Est Days"];
 
     validRows.push({
@@ -191,7 +176,7 @@ function parseTaskSheet(
         : undefined,
       taskNotes: row["Notes"] ? String(row["Notes"]).trim() : undefined,
       dependencyCodes: parseDependencies(row["Dependency"]),
-      // Lưu thêm status để dùng khi tạo Assignment
+
       ...(STATUS_MAP[rawStatus] ? { _status: STATUS_MAP[rawStatus] } : {}),
     } as ImportTaskRowDto & { _status?: string });
   }
@@ -199,15 +184,9 @@ function parseTaskSheet(
   return { validRows, errorRows };
 }
 
-// ─── Main Service ─────────────────────────────────────────────────────────────
-
 export class TaskImportService {
   private readonly activityLogService = new ActivityLogService();
 
-  /**
-   * Parse file Excel và trả về dữ liệu preview (không lưu vào DB).
-   * Cho phép UI hiển thị danh sách rows trước khi xác nhận import.
-   */
   async preview(
     buffer: Buffer,
     taskGroupId?: string,
@@ -215,7 +194,6 @@ export class TaskImportService {
   ): Promise<ImportPreviewDto> {
     const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
 
-    // Resolve Task Group
     let resolvedGroupId: string | undefined;
     let resolvedGroupName: string | undefined;
 
@@ -241,13 +219,10 @@ export class TaskImportService {
       resolvedGroupName = name;
     }
 
-    // Đọc ánh xạ tên intern từ sheet Lists
     const ownerNameMap = parseListsSheet(workbook);
 
-    // Parse rows từ sheet Task_Phan_Cong
     const { validRows, errorRows } = parseTaskSheet(workbook, ownerNameMap);
 
-    // Tìm các intern mapping trong DB để preview tình trạng ánh xạ
     const uniqueOwners = [...new Set(validRows.map((r) => r.ownerName).filter((name): name is string => !!name))];
     const internMappings = await Promise.all(
       uniqueOwners.map(async (name) => {
@@ -273,13 +248,6 @@ export class TaskImportService {
     };
   }
 
-  /**
-   * Thực hiện import toàn bộ task từ buffer Excel vào DB.
-   * Sử dụng Two-Pass algorithm trong một prisma.$transaction.
-   *
-   * Pass 1: Tạo Task + TaskAssignment → lưu Map<excelCode, taskUUID>
-   * Pass 2: Tạo mối quan hệ Dependency dựa vào Map đã lưu
-   */
   async execute(
     buffer: Buffer,
     createdBy: string,
@@ -288,7 +256,6 @@ export class TaskImportService {
   ): Promise<ImportResultDto> {
     const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
 
-    // Resolve Task Group
     let resolvedGroupId: string;
     let resolvedGroupName: string;
 
@@ -319,15 +286,28 @@ export class TaskImportService {
     const ownerNameMap = parseListsSheet(workbook);
     const { validRows, errorRows } = parseTaskSheet(workbook, ownerNameMap);
 
-    if (validRows.length === 0) {
+    if (errorRows.length > 0) {
+      const errorDetails = errorRows
+        .map(
+          (r) =>
+            `Dòng ${r.rowIndex}${r.excelCode ? ` (Mã: ${r.excelCode})` : ""}: ${r.errors.join("; ")}`,
+        )
+        .join("\n");
       throw new AppError(
-        "No valid rows found in the Excel file",
+        `File Excel chứa lỗi định dạng dữ liệu. Vui lòng sửa lại các dòng sau trước khi import:\n${errorDetails}`,
         400,
         ERROR_CODE.VALIDATION_ERROR,
       );
     }
 
-    // Lấy intern map từ DB: { fullName (lowercase) → intern }
+    if (validRows.length === 0) {
+      throw new AppError(
+        "Không tìm thấy dòng dữ liệu hợp lệ nào trong file Excel",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
     const allInterns = await prisma.intern.findMany({
       where: { deletedAt: null },
       select: { id: true, fullName: true, userId: true },
@@ -336,22 +316,18 @@ export class TaskImportService {
       allInterns.map((i) => [i.fullName.toLowerCase(), i]),
     );
 
-    // Theo dõi kết quả
     let importedTasks = 0;
     let importedAssignments = 0;
     let importedDependencies = 0;
     const skippedCodes: string[] = [];
     const importErrors: { excelCode?: string; error: string }[] = [];
 
-    // Map tạm: excelCode → taskId trong DB (dùng cho Pass 2)
     const codeToDbId = new Map<string, string>();
 
-    // ── PASS 1: Tạo Task và Assignment ─────────────────────────────────────
     await prisma.$transaction(
       async (tx) => {
         for (const row of validRows) {
           try {
-            // Upsert Task theo (taskGroupId, code) (nếu đã tồn tại thì cập nhật, không tạo mới)
             const existingTask = await tx.task.findFirst({
               where: { taskGroupId: resolvedGroupId, code: row.excelCode },
               select: { id: true },
@@ -360,7 +336,6 @@ export class TaskImportService {
             let taskId: string;
 
             if (existingTask) {
-              // Task đã tồn tại → update thông tin
               const updated = await tx.task.update({
                 where: { id: existingTask.id },
                 data: {
@@ -380,7 +355,6 @@ export class TaskImportService {
               taskId = updated.id;
               skippedCodes.push(row.excelCode);
             } else {
-              // Tạo Task mới
               const created = await tx.task.create({
                 data: {
                   code: row.excelCode,
@@ -403,11 +377,9 @@ export class TaskImportService {
               importedTasks++;
             }
 
-            // Lưu vào map để dùng ở Pass 2
             codeToDbId.set(row.excelCode, taskId);
 
             if (row.ownerName) {
-              // Tìm intern theo ownerName
               const ownerIntern = internByName.get(row.ownerName.toLowerCase());
               if (!ownerIntern) {
                 importErrors.push({
@@ -417,28 +389,49 @@ export class TaskImportService {
                 continue;
               }
 
-              // Kiểm tra TaskAssignment đã tồn tại chưa
+              let supportInternId: string | null = null;
+              if (row.supportName) {
+                const supportIntern = internByName.get(row.supportName.toLowerCase());
+                if (supportIntern) {
+                  supportInternId = supportIntern.id;
+                } else {
+                  importErrors.push({
+                    excelCode: row.excelCode,
+                    error: `Không tìm thấy Intern hỗ trợ với tên "${row.supportName}" trong hệ thống`,
+                  });
+                }
+              }
+
               const existingAssignment = await tx.taskAssignment.findFirst({
                 where: { taskId },
                 select: { id: true },
               });
 
-              if (!existingAssignment) {
-                // Map status từ Excel sang enum DB
-                const rowWithStatus = row as ImportTaskRowDto & { _status?: string };
-                const mappedStatus = rowWithStatus._status ?? "TODO";
+              const rowWithStatus = row as ImportTaskRowDto & { _status?: string };
+              const mappedStatus = rowWithStatus._status;
 
+              if (existingAssignment) {
+                await tx.taskAssignment.update({
+                  where: { id: existingAssignment.id },
+                  data: {
+                    internId: ownerIntern.id,
+                    supportId: supportInternId,
+                    ...(mappedStatus ? { status: mappedStatus as any } : {}),
+                  },
+                });
+              } else {
+                const defaultStatus = mappedStatus ?? "TODO";
                 await tx.taskAssignment.create({
                   data: {
                     taskId,
                     internId: ownerIntern.id,
+                    supportId: supportInternId,
                     assignedBy: createdBy,
-                    status: mappedStatus as any,
+                    status: defaultStatus as any,
                   },
                 });
                 importedAssignments++;
 
-                // Gửi thông báo cho Intern được giao task
                 try {
                   await NotificationDispatcher.dispatch(
                     ownerIntern.userId,
@@ -464,7 +457,6 @@ export class TaskImportService {
       { timeout: 60000 }, // 60s timeout cho import lớn
     );
 
-    // ── PASS 2: Tạo Dependency relations (không cần transaction, best-effort) ─
     for (const row of validRows) {
       if (row.dependencyCodes.length === 0) continue;
 
@@ -472,17 +464,26 @@ export class TaskImportService {
       if (!taskId) continue;
 
       for (const depCode of row.dependencyCodes) {
-        const depTaskId = codeToDbId.get(depCode.trim());
+        let depTaskId = codeToDbId.get(depCode.trim());
+        if (!depTaskId) {
+          const depTask = await prisma.task.findFirst({
+            where: { taskGroupId: resolvedGroupId, code: depCode.trim() },
+            select: { id: true },
+          });
+          if (depTask) {
+            depTaskId = depTask.id;
+          }
+        }
+
         if (!depTaskId) {
           importErrors.push({
             excelCode: row.excelCode,
-            error: `Dependency "${depCode}" không tìm thấy trong file Excel`,
+            error: `Dependency "${depCode}" không tìm thấy trong file Excel hoặc hệ thống`,
           });
           continue;
         }
 
         try {
-          // Tạo quan hệ dependency: task này phụ thuộc vào depTask
           await prisma.task.update({
             where: { id: taskId },
             data: {
@@ -498,7 +499,6 @@ export class TaskImportService {
       }
     }
 
-    // Ghi Activity Log
     await this.activityLogService.log(
       createdBy,
       ACTIVITY_ACTIONS.BULK_IMPORT_TASKS,
