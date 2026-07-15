@@ -27,7 +27,7 @@ export class AuthService {
     data: LoginDto,
     metadata?: { userAgent?: string; ipAddress?: string },
   ): Promise<LoginResponseDto> {
-    const { email, password } = data;
+    const { email, password, rememberMe } = data;
     const user = await this.repository.findByEmail(email);
 
     if (!user) {
@@ -52,14 +52,23 @@ export class AuthService {
       );
     }
 
-    const payload = { id: user.id, email: user.email, role: user.role.name };
+    const payload = {
+      id: user.id,
+      email: user.email,
+      role: user.role.name,
+      rememberMe: !!rememberMe,
+    };
 
     const accessToken = jwt.sign(payload, jwtConfig.accessSecret, {
       expiresIn: jwtConfig.accessExpiresIn as any,
     });
 
+    const refreshTokenExpiresIn = rememberMe
+      ? (jwtConfig.refreshExpiresInRememberMe || "30d")
+      : (jwtConfig.refreshExpiresIn || "7d");
+
     const refreshToken = jwt.sign(payload, jwtConfig.refreshSecret, {
-      expiresIn: jwtConfig.refreshExpiresIn as any,
+      expiresIn: refreshTokenExpiresIn as any,
     });
 
     const decoded = jwt.decode(refreshToken) as { exp: number };
@@ -132,14 +141,24 @@ export class AuthService {
       );
     }
 
-    const newPayload = { id: user.id, email: user.email, role: user.role.name };
+    const rememberMe = !!payload.rememberMe;
+    const newPayload = {
+      id: user.id,
+      email: user.email,
+      role: user.role.name,
+      rememberMe,
+    };
 
     const newAccessToken = jwt.sign(newPayload, jwtConfig.accessSecret, {
       expiresIn: jwtConfig.accessExpiresIn as any,
     });
 
+    const newRefreshTokenExpiresIn = rememberMe
+      ? (jwtConfig.refreshExpiresInRememberMe || "30d")
+      : (jwtConfig.refreshExpiresIn || "7d");
+
     const newRefreshToken = jwt.sign(newPayload, jwtConfig.refreshSecret, {
-      expiresIn: jwtConfig.refreshExpiresIn as any,
+      expiresIn: newRefreshTokenExpiresIn as any,
     });
 
     await this.repository.deleteRefreshToken(token);
@@ -295,7 +314,6 @@ export class AuthService {
       throw new AppError("Account is inactive", 403, ERROR_CODE.USER_INACTIVE);
     }
 
-    // Generate secure random token
     const token = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 3600000); // 1 hour
 

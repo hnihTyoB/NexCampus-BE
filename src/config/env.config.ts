@@ -59,6 +59,7 @@ export const envConfig = {
     refreshSecret: process.env.JWT_REFRESH_SECRET || "default_refresh_secret",
     accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "1d",
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d",
+    refreshExpiresInRememberMe: process.env.JWT_REFRESH_EXPIRES_IN_REMEMBER || "30d",
   },
   redis: {
     host: process.env.REDIS_HOST || "localhost",
