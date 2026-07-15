@@ -318,9 +318,11 @@ export const swaggerSpec = {
           id: { type: "string", format: "uuid" },
           email: { type: "string", format: "email" },
           token: { type: "string" },
-          used: { type: "boolean" },
+          status: { type: "string", enum: ["ACTIVE", "USED", "EXPIRED", "REVOKED"] },
           expiresAt: { type: "string", format: "date-time" },
+          usedAt: { type: "string", format: "date-time", nullable: true },
           createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
         },
       },
       // ─── Regulation ────────────────────────────────────────────────────────
@@ -1066,6 +1068,14 @@ export const swaggerSpec = {
           },
         },
       },
+      BadRequest: {
+        description: "Yêu cầu không hợp lệ",
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/ErrorResponse" },
+          },
+        },
+      },
     },
   },
   tags: [
@@ -1786,6 +1796,87 @@ export const swaggerSpec = {
           401: { $ref: "#/components/responses/Unauthorized" },
           403: { $ref: "#/components/responses/Forbidden" },
           422: { $ref: "#/components/responses/Validation" },
+        },
+      },
+      get: {
+        tags: ["Applications"],
+        summary: "Danh sách lời mời nộp đơn (Admin, Leader)",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { in: "query", name: "email", schema: { type: "string" }, description: "Tìm kiếm theo email" },
+          { in: "query", name: "inviteStatus", schema: { type: "string", enum: ["ACTIVE", "USED", "EXPIRED", "REVOKED"] }, description: "Lọc trạng thái invite" },
+          { in: "query", name: "applicationStatus", schema: { type: "string", enum: ["PENDING", "APPROVED", "REJECTED"] }, description: "Lọc trạng thái application" },
+          { in: "query", name: "department", schema: { type: "string" }, description: "Tìm kiếm phòng ban" },
+          { in: "query", name: "position", schema: { type: "string" }, description: "Tìm kiếm vị trí" },
+          { in: "query", name: "createdFrom", schema: { type: "string", format: "date-time" }, description: "Lọc từ ngày tạo" },
+          { in: "query", name: "createdTo", schema: { type: "string", format: "date-time" }, description: "Lọc đến ngày tạo" },
+          { in: "query", name: "sortBy", schema: { type: "string", enum: ["createdAt", "expiresAt", "email"] }, description: "Sắp xếp theo" },
+          { in: "query", name: "order", schema: { type: "string", enum: ["asc", "desc"] }, description: "Thứ tự" },
+          { in: "query", name: "page", schema: { type: "integer", default: 1 }, description: "Trang" },
+          { in: "query", name: "limit", schema: { type: "integer", default: 20 }, description: "Số lượng/trang" },
+        ],
+        responses: {
+          200: {
+            description: "Danh sách lời mời",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              id: { type: "string", format: "uuid" },
+                              email: { type: "string", format: "email" },
+                              status: { type: "string", enum: ["ACTIVE", "USED", "EXPIRED", "REVOKED"] },
+                              expiresAt: { type: "string", format: "date-time" },
+                              usedAt: { type: "string", format: "date-time", nullable: true },
+                              createdAt: { type: "string", format: "date-time" },
+                              application: {
+                                type: "object", nullable: true,
+                                properties: {
+                                  id: { type: "string", format: "uuid" },
+                                  fullName: { type: "string" },
+                                  department: { type: "string" },
+                                  position: { type: "string" },
+                                  status: { type: "string", enum: ["PENDING", "APPROVED", "REJECTED"] },
+                                  startDate: { type: "string", format: "date-time" },
+                                  duration: { type: "integer" },
+                                },
+                              },
+                              creator: {
+                                type: "object", nullable: true,
+                                properties: {
+                                  id: { type: "string", format: "uuid" },
+                                  fullName: { type: "string" },
+                                },
+                              },
+                            },
+                          },
+                        },
+                        meta: {
+                          type: "object",
+                          properties: {
+                            total: { type: "integer" },
+                            page: { type: "integer" },
+                            limit: { type: "integer" },
+                            totalPages: { type: "integer" },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
         },
       },
     },
@@ -5364,6 +5455,55 @@ export const swaggerSpec = {
         }
       }
     },
+
+    "/applications/invites/{id}/revoke": {
+      patch: {
+        tags: ["Applications"],
+        summary: "Thu hồi lời mời nộp đơn (Admin only)",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "ID của lời mời",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Lời mời đã bị thu hồi",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        message: { type: "string" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          400: {
+            description: "Không thể thu hồi (đã USED/EXPIRED/REVOKED)",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
+
     "/regulations/active": {
       get: {
         tags: ["Regulations"],

@@ -5,6 +5,7 @@ import {
   CreateApplicationDto,
   ReviewApplicationDto,
   CreateInviteDto,
+  GetApplicationInvitesQuery,
 } from "./application.dto";
 
 export class ApplicationController {
@@ -91,6 +92,42 @@ export class ApplicationController {
         success: true,
         data: result,
       });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  revokeInvite = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const actorId = req.user.id;
+      await this.service.revokeInvite(req.params.id, actorId);
+
+      res.json({
+        success: true,
+        message: "Invite revoked successfully",
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getApplicationInvites = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const query = req.query as unknown as GetApplicationInvitesQuery;
+      const result = await this.service.getApplicationInvites(query);
+
+      res.json({ success: true, ...result });
+    } catch (error) {
+      console.error("[getApplicationInvites]", error);
+      next(error);
+    }
+  };
+
+  getInviteById = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.service.getInviteById(req.params.id);
+
+      res.json({ success: true, data: result });
     } catch (error) {
       next(error);
     }

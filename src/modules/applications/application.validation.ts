@@ -53,3 +53,27 @@ export const createInviteSchema = z.object({
   email: z.string().min(1, "Email is required").email("Invalid email format"),
 });
 
+export const getApplicationInvitesSchema = z.object({
+  email: z.string().optional(),
+  inviteStatus: z.enum(["ACTIVE", "USED", "EXPIRED", "REVOKED"]).optional(),
+  applicationStatus: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
+  department: z.string().optional(),
+  position: z.string().optional(),
+  createdFrom: z
+    .string()
+    .refine((v) => !isNaN(Date.parse(v)), {
+      message: "createdFrom must be a valid ISO date",
+    })
+    .optional(),
+  createdTo: z
+    .string()
+    .refine((v) => !isNaN(Date.parse(v)), {
+      message: "createdTo must be a valid ISO date",
+    })
+    .optional(),
+  sortBy: z.enum(["createdAt", "expiresAt", "email"]).optional(),
+  order: z.enum(["asc", "desc"]).optional(),
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+});
+
