@@ -8,6 +8,7 @@ import {
   CreateApplicationDto,
   ReviewApplicationDto,
   CreateInviteDto,
+  GetApplicationInvitesQuery,
 } from "./application.dto";
 import { APPLICATION_STATUS } from "../../common/constants/status.constant";
 import { envConfig } from "../../config/env.config";
@@ -39,9 +40,14 @@ export class ApplicationService {
     const token = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 1 day
 
-    const invite = await this.repository.upsertInvite(data.email, token, expiresAt);
+    const invite = await this.repository.upsertInviteByEmail({
+      email: data.email,
+      token,
+      expiresAt,
+      createdBy: actorId,
+    });
 
-    const applyUrl = `${envConfig.app.baseUrl}/apply?token=${token}`;
+    const applyUrl = `${envConfig.app.baseUrl}/onboarding/${token}/policies`;
 
     const emailSubject = "[NexCampus] Thư mời nộp đơn đăng ký thực tập";
     const emailContent = `
@@ -82,15 +88,33 @@ export class ApplicationService {
       );
     }
 
-    if (invite.used) {
+    if (invite.status === "REVOKED") {
       throw new AppError(
-        "This invitation link has already been used",
+        "This invitation link has been revoked",
         400,
-        ERROR_CODE.TOKEN_INVALID,
+        ERROR_CODE.TOKEN_REVOKED,
       );
     }
 
+    if (invite.status === "USED") {
+      throw new AppError(
+        "This invitation link has already been used",
+        400,
+        ERROR_CODE.TOKEN_USED,
+      );
+    }
+
+    if (invite.status === "EXPIRED") {
+      throw new AppError(
+        "This invitation link has expired",
+        400,
+        ERROR_CODE.TOKEN_EXPIRED,
+      );
+    }
+
+    // Check if expired by time (belt-and-suspenders: also update status in DB)
     if (invite.expiresAt < new Date()) {
+      await this.repository.markInviteExpired(token);
       throw new AppError(
         "This invitation link has expired",
         400,
@@ -116,15 +140,32 @@ export class ApplicationService {
       );
     }
 
-    if (invite.used) {
+    if (invite.status === "REVOKED") {
+      throw new AppError(
+        "This invitation link has been revoked",
+        400,
+        ERROR_CODE.TOKEN_REVOKED,
+      );
+    }
+
+    if (invite.status === "USED") {
       throw new AppError(
         "This invitation link has already been used",
         400,
-        ERROR_CODE.TOKEN_INVALID,
+        ERROR_CODE.TOKEN_USED,
+      );
+    }
+
+    if (invite.status === "EXPIRED") {
+      throw new AppError(
+        "This invitation link has expired",
+        400,
+        ERROR_CODE.TOKEN_EXPIRED,
       );
     }
 
     if (invite.expiresAt < new Date()) {
+      await this.repository.markInviteExpired(data.token);
       throw new AppError(
         "This invitation link has expired",
         400,
@@ -196,7 +237,7 @@ export class ApplicationService {
     });
 
     // 4. Mark invite as used
-    await this.repository.markInviteAsUsed(data.token);
+    await this.repository.markInviteAsUsed(data.token, application.id);
 
     return application;
   }
@@ -321,5 +362,59 @@ export class ApplicationService {
     }
 
     return this.repository.softDelete(id);
+  }
+
+  async revokeInvite(id: string, actorId: string) {
+    const invite = await this.repository.findInviteById(id);
+
+    if (!invite) {
+      throw new AppError("Invite not found", 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    if (invite.status === "USED" || invite.status === "EXPIRED") {
+      throw new AppError(
+        `Cannot revoke invite with status ${invite.status}`,
+        400,
+        ERROR_CODE.TOKEN_REVOKED,
+      );
+    }
+
+    if (invite.status === "REVOKED") {
+      throw new AppError(
+        "Invite is already revoked",
+        400,
+        ERROR_CODE.TOKEN_REVOKED,
+      );
+    }
+
+    await this.repository.revokeInvite(id);
+
+    await this.activityLogService.log(
+      actorId,
+      ACTIVITY_ACTIONS.REVOKE_APPLICATION_INVITE,
+      `Quản trị viên đã thu hồi lời mời ứng tuyển của ${invite.email}`,
+      id,
+      "ApplicationInvite",
+    );
+  }
+
+  async getApplicationInvites(query: GetApplicationInvitesQuery) {
+    try {
+      await this.repository.markExpiredInvites();
+      return await this.repository.findApplicationInvites(query);
+    } catch (err) {
+      console.error("[getApplicationInvites] ERROR:", err);
+      throw err;
+    }
+  }
+
+  async getInviteById(id: string) {
+    const invite = await this.repository.findInviteById(id);
+
+    if (!invite) {
+      throw new AppError("Invite not found", 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    return invite;
   }
 }

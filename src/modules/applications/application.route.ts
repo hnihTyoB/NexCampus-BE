@@ -8,6 +8,7 @@ import {
   findAllApplicationSchema,
   reviewApplicationSchema,
   createInviteSchema,
+  getApplicationInvitesSchema,
 } from "./application.validation";
 import { ROLES } from "../../common/constants/role.constant";
 
@@ -21,7 +22,26 @@ router.post(
   validate(createInviteSchema),
   controller.createInvite,
 );
+router.get(
+  "/invites",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER),
+  validate(getApplicationInvitesSchema, "query"),
+  controller.getApplicationInvites,
+);
 router.get("/invites/verify", controller.verifyInvite);
+router.get(
+  "/invites/:id",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER),
+  controller.getInviteById,
+);
+router.patch(
+  "/invites/:id/revoke",
+  authMiddleware,
+  requireRole(ROLES.ADMIN),
+  controller.revokeInvite,
+);
 
 router.post("/", validate(createApplicationSchema), controller.create);
 router.get(

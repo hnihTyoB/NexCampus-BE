@@ -59,8 +59,23 @@ export interface ApplicationInviteResponseDto {
   id: string;
   email: string;
   token: string;
-  used: boolean;
+  status: string;
   expiresAt: Date;
+  usedAt: Date | null;
   createdAt: Date;
+  updatedAt: Date;
 }
 
+export interface GetApplicationInvitesQuery {
+  email?: string;
+  inviteStatus?: string;
+  applicationStatus?: string;
+  department?: string;
+  position?: string;
+  createdFrom?: string;
+  createdTo?: string;
+  sortBy?: "createdAt" | "expiresAt" | "email";
+  order?: "asc" | "desc";
+  page?: number;
+  limit?: number;
+}

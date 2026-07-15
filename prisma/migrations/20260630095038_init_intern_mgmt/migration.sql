@@ -12,6 +12,19 @@
   - Added the required column `role_id` to the `users` table without a default value. This is not possible if the table is not empty.
 
 */
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "users" (
+    "id" UUID NOT NULL,
+    "email" TEXT NOT NULL,
+    "full_name" TEXT,
+    "password_hash" TEXT,
+    "role" TEXT,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "users_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateEnum
 CREATE TYPE "ApplicationStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
 
@@ -34,59 +47,59 @@ CREATE TYPE "NotificationChannel" AS ENUM ('WEB', 'EMAIL', 'DISCORD');
 CREATE TYPE "NotificationLogStatus" AS ENUM ('SUCCESS', 'FAILED');
 
 -- DropForeignKey
-ALTER TABLE "crawl_assets" DROP CONSTRAINT "crawl_assets_job_id_fkey";
+ALTER TABLE IF EXISTS "crawl_assets" DROP CONSTRAINT IF EXISTS "crawl_assets_job_id_fkey";
 
 -- DropForeignKey
-ALTER TABLE "crawl_assets" DROP CONSTRAINT "crawl_assets_page_id_fkey";
+ALTER TABLE IF EXISTS "crawl_assets" DROP CONSTRAINT IF EXISTS "crawl_assets_page_id_fkey";
 
 -- DropForeignKey
-ALTER TABLE "crawl_exports" DROP CONSTRAINT "crawl_exports_job_id_fkey";
+ALTER TABLE IF EXISTS "crawl_exports" DROP CONSTRAINT IF EXISTS "crawl_exports_job_id_fkey";
 
 -- DropForeignKey
-ALTER TABLE "crawl_jobs" DROP CONSTRAINT "crawl_jobs_user_id_fkey";
+ALTER TABLE IF EXISTS "crawl_jobs" DROP CONSTRAINT IF EXISTS "crawl_jobs_user_id_fkey";
 
 -- DropForeignKey
-ALTER TABLE "crawl_pages" DROP CONSTRAINT "crawl_pages_job_id_fkey";
+ALTER TABLE IF EXISTS "crawl_pages" DROP CONSTRAINT IF EXISTS "crawl_pages_job_id_fkey";
 
 -- AlterTable
-ALTER TABLE "users" DROP COLUMN "full_name",
-DROP COLUMN "password_hash",
-DROP COLUMN "role",
+ALTER TABLE "users" DROP COLUMN IF EXISTS "full_name",
+DROP COLUMN IF EXISTS "password_hash",
+DROP COLUMN IF EXISTS "role",
 ADD COLUMN     "password" TEXT NOT NULL,
 ADD COLUMN     "role_id" UUID NOT NULL;
 
 -- DropTable
-DROP TABLE "crawl_assets";
+DROP TABLE IF EXISTS "crawl_assets";
 
 -- DropTable
-DROP TABLE "crawl_exports";
+DROP TABLE IF EXISTS "crawl_exports";
 
 -- DropTable
-DROP TABLE "crawl_jobs";
+DROP TABLE IF EXISTS "crawl_jobs";
 
 -- DropTable
-DROP TABLE "crawl_pages";
+DROP TABLE IF EXISTS "crawl_pages";
 
 -- DropEnum
-DROP TYPE "AssetType";
+DROP TYPE IF EXISTS "AssetType";
 
 -- DropEnum
-DROP TYPE "CrawlJobStatus";
+DROP TYPE IF EXISTS "CrawlJobStatus";
 
 -- DropEnum
-DROP TYPE "CrawlMode";
+DROP TYPE IF EXISTS "CrawlMode";
 
 -- DropEnum
-DROP TYPE "CrawlPageStatus";
+DROP TYPE IF EXISTS "CrawlPageStatus";
 
 -- DropEnum
-DROP TYPE "ExportStatus";
+DROP TYPE IF EXISTS "ExportStatus";
 
 -- DropEnum
-DROP TYPE "ExportType";
+DROP TYPE IF EXISTS "ExportType";
 
 -- DropEnum
-DROP TYPE "UserRole";
+DROP TYPE IF EXISTS "UserRole";
 
 -- CreateTable
 CREATE TABLE "roles" (

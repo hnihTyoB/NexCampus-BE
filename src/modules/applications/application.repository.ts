@@ -1,6 +1,6 @@
-import { ApplicationStatus, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../database/prisma.client";
-import { ApplicationQueryDto } from "./application.dto";
+import { ApplicationQueryDto, GetApplicationInvitesQuery } from "./application.dto";
 
 const approverSelect = {
   id: true,
@@ -130,34 +130,199 @@ export class ApplicationRepository {
     });
   }
 
-  async upsertInvite(email: string, token: string, expiresAt: Date) {
-    return prisma.applicationInvite.upsert({
-      where: { email },
-      update: {
-        token,
-        expiresAt,
-        used: false,
-        createdAt: new Date(),
-      },
-      create: {
-        email,
-        token,
-        expiresAt,
-        used: false,
+  // ─── Application Invites ────────────────────────────────────────────────
+
+  async upsertInviteByEmail(data: {
+    email: string;
+    token: string;
+    expiresAt: Date;
+    createdBy: string;
+  }) {
+    const [existing] = await prisma.applicationInvite.findMany({
+      where: { email: data.email },
+      take: 1,
+    });
+
+    if (existing) {
+      return prisma.applicationInvite.update({
+        where: { id: existing.id },
+        data: {
+          token: data.token,
+          status: "ACTIVE",
+          expiresAt: data.expiresAt,
+          usedAt: null,
+          applicationId: null,
+          createdBy: data.createdBy,
+          createdAt: new Date(),
+        },
+      });
+    }
+
+    return prisma.applicationInvite.create({
+      data: {
+        email: data.email,
+        token: data.token,
+        status: "ACTIVE",
+        expiresAt: data.expiresAt,
+        createdBy: data.createdBy,
       },
     });
   }
 
-  async findInviteByToken(token: string) {
+  findInviteByToken(token: string) {
     return prisma.applicationInvite.findUnique({
       where: { token },
     });
   }
 
-  async markInviteAsUsed(token: string) {
+  findInviteById(id: string) {
+    return prisma.applicationInvite.findUnique({
+      where: { id },
+      include: {
+        application: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            phone: true,
+            department: true,
+            position: true,
+            status: true,
+            startDate: true,
+            duration: true,
+            createdAt: true,
+          },
+        },
+        creator: {
+          select: {
+            id: true,
+            fullName: true,
+          },
+        },
+      },
+    });
+  }
+
+  markInviteAsUsed(token: string, applicationId: string) {
     return prisma.applicationInvite.update({
       where: { token },
-      data: { used: true },
+      data: { status: "USED", usedAt: new Date(), applicationId },
     });
+  }
+
+  markInviteExpired(token: string) {
+    return prisma.applicationInvite.update({
+      where: { token },
+      data: { status: "EXPIRED" },
+    });
+  }
+
+  revokeInvite(id: string) {
+    return prisma.applicationInvite.update({
+      where: { id },
+      data: { status: "REVOKED" },
+    });
+  }
+
+  // ─── Invite list (GET /applications/invites) ────────────────────────────
+
+  async markExpiredInvites() {
+    return prisma.applicationInvite.updateMany({
+      where: {
+        status: "ACTIVE",
+        expiresAt: { lt: new Date() },
+      },
+      data: { status: "EXPIRED" },
+    });
+  }
+
+  async findApplicationInvites(query: GetApplicationInvitesQuery) {
+    const {
+      email,
+      inviteStatus,
+      applicationStatus,
+      department,
+      position,
+      createdFrom,
+      createdTo,
+      sortBy = "createdAt",
+      order = "desc",
+      page = 1,
+      limit = 20,
+    } = query;
+
+    const where: Prisma.ApplicationInviteWhereInput = {
+      ...(email ? { email: { contains: email, mode: "insensitive" } } : {}),
+      ...(inviteStatus ? { status: inviteStatus as any } : {}),
+      ...(applicationStatus || department || position
+        ? {
+            application: {
+              ...(applicationStatus
+                ? { status: applicationStatus as any }
+                : {}),
+              ...(department
+                ? {
+                    department: {
+                      contains: department,
+                      mode: "insensitive",
+                    },
+                  }
+                : {}),
+              ...(position
+                ? { position: { contains: position, mode: "insensitive" } }
+                : {}),
+            },
+          }
+        : {}),
+      ...(createdFrom || createdTo
+        ? {
+            createdAt: {
+              ...(createdFrom ? { gte: new Date(createdFrom) } : {}),
+              ...(createdTo ? { lte: new Date(createdTo) } : {}),
+            },
+          }
+        : {}),
+    };
+
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await prisma.$transaction([
+      prisma.applicationInvite.findMany({
+        where,
+        orderBy: { [sortBy]: order },
+        skip,
+        take: limit,
+        include: {
+          application: {
+            select: {
+              id: true,
+              fullName: true,
+              department: true,
+              position: true,
+              status: true,
+              startDate: true,
+              duration: true,
+            },
+          },
+          creator: {
+            select: {
+              id: true,
+              fullName: true,
+            },
+          },
+        },
+      }),
+      prisma.applicationInvite.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 }
