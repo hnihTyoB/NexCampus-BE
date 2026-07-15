@@ -132,32 +132,22 @@ export class ApplicationRepository {
 
   // ─── Application Invites ────────────────────────────────────────────────
 
-  async upsertInviteByEmail(data: {
+  async findActiveInviteByEmail(email: string) {
+    return prisma.applicationInvite.findFirst({
+      where: {
+        email,
+        status: "ACTIVE",
+        expiresAt: { gte: new Date() },
+      },
+    });
+  }
+
+  async createInvite(data: {
     email: string;
     token: string;
     expiresAt: Date;
     createdBy: string;
   }) {
-    const [existing] = await prisma.applicationInvite.findMany({
-      where: { email: data.email },
-      take: 1,
-    });
-
-    if (existing) {
-      return prisma.applicationInvite.update({
-        where: { id: existing.id },
-        data: {
-          token: data.token,
-          status: "ACTIVE",
-          expiresAt: data.expiresAt,
-          usedAt: null,
-          applicationId: null,
-          createdBy: data.createdBy,
-          createdAt: new Date(),
-        },
-      });
-    }
-
     return prisma.applicationInvite.create({
       data: {
         email: data.email,

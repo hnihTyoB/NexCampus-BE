@@ -204,6 +204,24 @@ export class ReminderService {
     console.log("[ReminderService] Starting scheduled reminder execution...");
     const { sentCount: tasksSent } = await this.remindTasks();
     const { sentCount: evaluationsSent } = await this.remindEvaluations();
+
+    // Auto-mark expired invites
+    try {
+      const now = new Date();
+      const result = await prisma.applicationInvite.updateMany({
+        where: {
+          status: "ACTIVE",
+          expiresAt: { lt: now },
+        },
+        data: {
+          status: "EXPIRED",
+        },
+      });
+      console.log(`[ReminderService] Auto-marked ${result.count} expired invites.`);
+    } catch (inviteError) {
+      console.error("[ReminderService] Error auto-marking expired invites:", inviteError);
+    }
+
     console.log(
       `[ReminderService] Reminders completed: ${tasksSent} tasks, ${evaluationsSent} evaluations.`
     );
