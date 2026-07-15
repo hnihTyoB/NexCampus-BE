@@ -37,10 +37,19 @@ export class ApplicationService {
   }
 
   async createInvite(actorId: string, data: CreateInviteDto) {
+    const activeInvite = await this.repository.findActiveInviteByEmail(data.email);
+    if (activeInvite) {
+      throw new AppError(
+        "An active invitation already exists for this email",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
     const token = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 1 day
 
-    const invite = await this.repository.upsertInviteByEmail({
+    const invite = await this.repository.createInvite({
       email: data.email,
       token,
       expiresAt,
