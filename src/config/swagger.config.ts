@@ -2459,6 +2459,29 @@ export const swaggerSpec = {
         }
       }
     },
+    "/tasks/import/template": {
+      get: {
+        tags: ["Tasks"],
+        summary: "Tải file mẫu Excel (.xlsx) phục vụ cho import task (Admin / Leader)",
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: {
+            description: "Trả về file mẫu template_tasks.xlsx dưới dạng file stream binary",
+            content: {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                schema: {
+                  type: "string",
+                  format: "binary"
+                }
+              }
+            }
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" }
+        }
+      }
+    },
     "/tasks/import/preview": {
       post: {
         tags: ["Tasks"],

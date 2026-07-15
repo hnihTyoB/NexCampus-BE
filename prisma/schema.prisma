@@ -121,7 +121,8 @@ model Intern {
   leader User? @relation("LeaderInterns", fields: [leaderId], references: [id], onDelete: SetNull)
 
   // Relations
-  assignments       TaskAssignment[]
+  assignments          TaskAssignment[]   @relation("TaskAssignmentOwner")
+  supportedAssignments TaskAssignment[]   @relation("TaskAssignmentSupport")
   dailyReports      DailyReport[]
   weeklyEvaluations WeeklyEvaluation[]
 
@@ -229,17 +230,20 @@ model TaskAssignment {
   id         String           @id @default(uuid()) @db.Uuid
   taskId     String           @unique @map("task_id") @db.Uuid
   internId   String           @map("intern_id") @db.Uuid
+  supportId  String?          @map("support_id") @db.Uuid
   assignedBy String           @map("assigned_by") @db.Uuid
   status     AssignmentStatus @default(TODO)
   assignedAt DateTime         @default(now()) @map("assigned_at")
   updatedAt  DateTime         @updatedAt @map("updated_at")
 
   task        Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  intern      Intern           @relation(fields: [internId], references: [id], onDelete: Cascade)
+  intern      Intern           @relation("TaskAssignmentOwner", fields: [internId], references: [id], onDelete: Cascade)
+  support     Intern?          @relation("TaskAssignmentSupport", fields: [supportId], references: [id], onDelete: SetNull)
   assigner    User             @relation("AssignedTasks", fields: [assignedBy], references: [id], onDelete: Cascade)
   submissions TaskSubmission[]
 
   @@index([internId])
+  @@index([supportId])
   @@index([assignedBy])
   @@map("task_assignments")
 }

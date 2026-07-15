@@ -15,7 +15,6 @@ import { uploadSingle } from "../../middlewares/upload.middleware";
 const router = Router();
 const controller = new TaskController();
 
-// ── Analytics (phải đặt TRƯỚC /:id để tránh xung đột route) ─────────────────
 router.get(
   "/analytics",
   authMiddleware,
@@ -23,12 +22,6 @@ router.get(
   controller.getAnalytics,
 );
 
-// ── Bulk Import ───────────────────────────────────────────────────────────────
-/**
- * POST /api/tasks/import/preview
- * Parse file Excel và trả về JSON để UI xem trước trước khi import.
- * Không lưu vào DB.
- */
 router.post(
   "/import/preview",
   authMiddleware,
@@ -37,10 +30,6 @@ router.post(
   controller.previewImport,
 );
 
-/**
- * POST /api/tasks/import
- * Thực hiện import hàng loạt từ file Excel vào DB (Two-Pass Algorithm).
- */
 router.post(
   "/import",
   authMiddleware,
@@ -49,7 +38,13 @@ router.post(
   controller.executeImport,
 );
 
-// ── CRUD ──────────────────────────────────────────────────────────────────────
+router.get(
+  "/import/template",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER),
+  controller.downloadTemplate,
+);
+
 router.get(
   "/",
   authMiddleware,

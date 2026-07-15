@@ -11,8 +11,6 @@ export class TaskController {
   private readonly importService = new TaskImportService();
   private readonly analyticsService = new TaskAnalyticsService();
 
-  // ── CRUD ────────────────────────────────────────────────────────────────────
-
   findAll = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const query = req.query as unknown as TaskQueryDto;
@@ -69,13 +67,6 @@ export class TaskController {
     }
   };
 
-  // ── Bulk Import ──────────────────────────────────────────────────────────────
-
-  /**
-   * POST /api/tasks/import/preview
-   * Parse file Excel và trả về dữ liệu preview để UI xác nhận trước khi import.
-   * Không ghi gì vào DB.
-   */
   previewImport = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.file) {
@@ -95,11 +86,6 @@ export class TaskController {
     }
   };
 
-  /**
-   * POST /api/tasks/import
-   * Thực hiện import toàn bộ task từ file Excel vào DB.
-   * Two-Pass: Pass 1 tạo Task+Assignment, Pass 2 tạo Dependency relations.
-   */
   executeImport = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.file) {
@@ -121,13 +107,33 @@ export class TaskController {
     }
   };
 
-  // ── Analytics ────────────────────────────────────────────────────────────────
+  downloadTemplate = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const path = require("path");
+      const fs = require("fs");
+      const filePath = path.resolve(__dirname, "../../../templates/template_tasks.xlsx");
 
-  /**
-   * GET /api/tasks/analytics
-   * Trả về toàn bộ analytics: overview, workload theo intern, tiến độ theo phase.
-   * Dữ liệu này là nền tảng cho tính năng AI Task Allocation sau này.
-   */
+      if (!fs.existsSync(filePath)) {
+        throw new AppError(
+          "Không tìm thấy file mẫu template_tasks.xlsx trên máy chủ",
+          404,
+          ERROR_CODE.NOT_FOUND,
+        );
+      }
+
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+      res.setHeader("Content-Disposition", "attachment; filename=template_tasks.xlsx");
+
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+    } catch (error) {
+      next(error);
+    }
+  };
+
   getAnalytics = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const taskGroupId = (req.query.taskGroupId || req.body.taskGroupId) as string | undefined;
