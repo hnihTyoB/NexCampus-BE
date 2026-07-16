@@ -1,6 +1,10 @@
 import { Request, Response, NextFunction } from "express";
 import { AuthService } from "./auth.service";
 import { LoginDto, ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto } from "./auth.dto";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODE } from "../../common/errors/error-code";
+import { envConfig } from "../../config/env.config";
+import { jwtConfig } from "../../config/jwt.config";
 
 export class AuthController {
   private readonly service = new AuthService();
@@ -11,6 +15,16 @@ export class AuthController {
       const userAgent = req.headers["user-agent"];
       const ipAddress = req.ip;
       const result = await this.service.login(body, { userAgent, ipAddress });
+
+      const isProduction = envConfig.nodeEnv === "production";
+      const maxAge = jwtConfig.refreshExpiresInMs;
+
+      res.cookie("refreshToken", result.refreshToken, {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: isProduction ? "none" : "lax",
+        maxAge: maxAge,
+      });
 
       res.json({
         success: true,
@@ -54,12 +68,29 @@ export class AuthController {
 
   refresh = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { refreshToken } = req.body;
+      const refreshToken = req.cookies?.refreshToken || req.body.refreshToken;
+      if (!refreshToken) {
+        throw new AppError(
+          "Refresh token is required",
+          400,
+          ERROR_CODE.TOKEN_INVALID,
+        );
+      }
       const userAgent = req.headers["user-agent"];
       const ipAddress = req.ip;
       const result = await this.service.refresh(refreshToken, {
         userAgent,
         ipAddress,
+      });
+
+      const isProduction = envConfig.nodeEnv === "production";
+      const maxAge = jwtConfig.refreshExpiresInMs;
+
+      res.cookie("refreshToken", result.refreshToken, {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: isProduction ? "none" : "lax",
+        maxAge: maxAge,
       });
 
       res.json({
@@ -73,8 +104,22 @@ export class AuthController {
 
   logout = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { refreshToken } = req.body;
+      const refreshToken = req.cookies?.refreshToken || req.body.refreshToken;
+      if (!refreshToken) {
+        throw new AppError(
+          "Refresh token is required",
+          400,
+          ERROR_CODE.TOKEN_INVALID,
+        );
+      }
       await this.service.logout(refreshToken, req.user.id);
+
+      const isProduction = envConfig.nodeEnv === "production";
+      res.clearCookie("refreshToken", {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: isProduction ? "none" : "lax",
+      });
 
       res.json({
         success: true,

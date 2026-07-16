@@ -140,16 +140,14 @@ export const swaggerSpec = {
       },
       RefreshBody: {
         type: "object",
-        required: ["refreshToken"],
         properties: {
-          refreshToken: { type: "string" },
+          refreshToken: { type: "string", description: "Refresh token (Có thể bỏ trống nếu sử dụng cookie)" },
         },
       },
       LogoutBody: {
         type: "object",
-        required: ["refreshToken"],
         properties: {
-          refreshToken: { type: "string" },
+          refreshToken: { type: "string", description: "Refresh token (Có thể bỏ trống nếu sử dụng cookie)" },
         },
       },
       ForgotPasswordBody: {
@@ -1162,6 +1160,7 @@ export const swaggerSpec = {
       post: {
         tags: ["Auth"],
         summary: "Đăng nhập",
+        description: "Đăng nhập vào hệ thống. API sẽ trả về cặp token ở response body, đồng thời tự động thiết lập Cookie `refreshToken` (HttpOnly, Secure, SameSite) có thời hạn 7 ngày.",
         requestBody: {
           required: true,
           content: {
@@ -1172,7 +1171,7 @@ export const swaggerSpec = {
         },
         responses: {
           200: {
-            description: "Đăng nhập thành công",
+            description: "Đăng nhập thành công (Đồng thời tự động trả về cookie 'refreshToken' HttpOnly)",
             content: {
               "application/json": {
                 schema: {
@@ -1268,8 +1267,9 @@ export const swaggerSpec = {
       post: {
         tags: ["Auth"],
         summary: "Làm mới Access Token",
+        description: "Làm mới cặp token. API hỗ trợ lấy `refreshToken` tự động từ HttpOnly Cookie hoặc từ request body (fallback). Sau khi thành công sẽ thiết lập lại Cookie `refreshToken` mới.",
         requestBody: {
-          required: true,
+          required: false,
           content: {
             "application/json": {
               schema: { $ref: "#/components/schemas/RefreshBody" },
@@ -1304,8 +1304,9 @@ export const swaggerSpec = {
       post: {
         tags: ["Auth"],
         summary: "Đăng xuất (thu hồi Refresh Token)",
+        description: "Đăng xuất tài khoản. API hỗ trợ lấy `refreshToken` tự động từ HttpOnly Cookie hoặc từ request body (fallback). Sau khi thành công sẽ xóa token khỏi database và xóa Cookie `refreshToken` ở trình duyệt.",
         requestBody: {
-          required: true,
+          required: false,
           content: {
             "application/json": {
               schema: { $ref: "#/components/schemas/LogoutBody" },
