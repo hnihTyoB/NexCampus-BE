@@ -63,12 +63,8 @@ export class AuthService {
       expiresIn: jwtConfig.accessExpiresIn as any,
     });
 
-    const refreshTokenExpiresIn = rememberMe
-      ? (jwtConfig.refreshExpiresInRememberMe || "30d")
-      : (jwtConfig.refreshExpiresIn || "7d");
-
     const refreshToken = jwt.sign(payload, jwtConfig.refreshSecret, {
-      expiresIn: refreshTokenExpiresIn as any,
+      expiresIn: (jwtConfig.refreshExpiresIn || "7d") as any,
     });
 
     const decoded = jwt.decode(refreshToken) as { exp: number };
@@ -153,12 +149,8 @@ export class AuthService {
       expiresIn: jwtConfig.accessExpiresIn as any,
     });
 
-    const newRefreshTokenExpiresIn = rememberMe
-      ? (jwtConfig.refreshExpiresInRememberMe || "30d")
-      : (jwtConfig.refreshExpiresIn || "7d");
-
     const newRefreshToken = jwt.sign(newPayload, jwtConfig.refreshSecret, {
-      expiresIn: newRefreshTokenExpiresIn as any,
+      expiresIn: (jwtConfig.refreshExpiresIn || "7d") as any,
     });
 
     await this.repository.deleteRefreshToken(token);
