@@ -237,8 +237,8 @@ export class ApplicationService {
       fullName: data.fullName,
       email: data.email,
       phone: data.phone,
-      department: data.department,
-      position: data.position,
+      departmentId: data.departmentId,
+      positionId: data.positionId,
       startDate: new Date(data.startDate),
       duration: data.duration,
       regulationId: data.regulationId,
@@ -316,8 +316,8 @@ export class ApplicationService {
             userId: user.id,
             fullName: application.fullName,
             phone: application.phone,
-            department: application.department,
-            position: application.position,
+            ...(application.department?.id ? { departmentId: application.department.id } : {}),
+            ...(application.position?.id ? { positionId: application.position.id } : {}),
             startDate: application.startDate,
             duration: application.duration,
           },
@@ -353,7 +353,11 @@ export class ApplicationService {
         "Application",
       );
 
-      return this.findById(id);
+      try {
+        return await this.repository.findById(id);
+      } catch {
+        return { id, message: "Application approved successfully" };
+      }
     }
 
     return this.repository.review(id, dto.status, approverId);

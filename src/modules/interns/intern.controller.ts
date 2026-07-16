@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { InternService } from "./intern.service";
-import { InternQueryDto, CreateInternDto, UpdateInternDto } from "./intern.dto";
+import { InternQueryDto, CreateInternDto, UpdateInternDto, UpdateMeInternDto } from "./intern.dto";
 
 export class InternController {
   private readonly service = new InternService();
@@ -53,6 +53,27 @@ export class InternController {
       await this.service.delete(req.params.id);
 
       res.json({ success: true, message: "Intern deleted successfully" });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getMe = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.service.getMe(req.user.id);
+
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  updateMe = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = req.body as UpdateMeInternDto;
+      const result = await this.service.updateMe(req.user.id, body);
+
+      res.json({ success: true, data: result });
     } catch (error) {
       next(error);
     }

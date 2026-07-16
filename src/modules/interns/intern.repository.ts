@@ -15,8 +15,8 @@ const defaultSelect = {
   leaderId: true,
   fullName: true,
   phone: true,
-  department: true,
-  position: true,
+  department: { select: { id: true, name: true } },
+  position: { select: { id: true, name: true } },
   startDate: true,
   duration: true,
   discordUsername: true,
@@ -32,8 +32,8 @@ export class InternRepository {
   async findAll(query: InternQueryDto) {
     const {
       fullName,
-      department,
-      position,
+      departmentId,
+      positionId,
       status,
       leaderId,
       discordRoleGranted,
@@ -50,11 +50,11 @@ export class InternRepository {
       ...(fullName
         ? { fullName: { contains: fullName, mode: "insensitive" } }
         : {}),
-      ...(department
-        ? { department: { contains: department, mode: "insensitive" } }
+      ...(departmentId
+        ? { departmentId }
         : {}),
-      ...(position
-        ? { position: { contains: position, mode: "insensitive" } }
+      ...(positionId
+        ? { positionId }
         : {}),
       ...(status ? { status } : {}),
       ...(leaderId ? { leaderId } : {}),
@@ -102,6 +102,30 @@ export class InternRepository {
     });
   }
 
+  // Lazy auto-complete: chuyển ACTIVE → COMPLETED nếu đã hết thời gian
+  async completeExpiredInterns() {
+    const expiredInterns = await prisma.intern.findMany({
+      where: { status: "ACTIVE", deletedAt: null },
+      select: { id: true, startDate: true, duration: true },
+    });
+
+    const now = new Date();
+    const expiredIds = expiredInterns
+      .filter((i) => {
+        const endDate = new Date(i.startDate);
+        endDate.setMonth(endDate.getMonth() + i.duration);
+        return endDate < now;
+      })
+      .map((i) => i.id);
+
+    if (expiredIds.length > 0) {
+      await prisma.intern.updateMany({
+        where: { id: { in: expiredIds } },
+        data: { status: "COMPLETED" },
+      });
+    }
+  }
+
   create(data: CreateInternDto) {
     return prisma.intern.create({
       data: {
@@ -109,8 +133,8 @@ export class InternRepository {
         leaderId: data.leaderId,
         fullName: data.fullName,
         phone: data.phone,
-        department: data.department,
-        position: data.position,
+        departmentId: data.departmentId,
+        positionId: data.positionId,
         startDate: new Date(data.startDate),
         duration: data.duration,
         discordUsername: data.discordUsername,
@@ -126,10 +150,10 @@ export class InternRepository {
         ...(data.leaderId !== undefined ? { leaderId: data.leaderId } : {}),
         ...(data.fullName !== undefined ? { fullName: data.fullName } : {}),
         ...(data.phone !== undefined ? { phone: data.phone } : {}),
-        ...(data.department !== undefined
-          ? { department: data.department }
+        ...(data.departmentId !== undefined
+          ? { departmentId: data.departmentId }
           : {}),
-        ...(data.position !== undefined ? { position: data.position } : {}),
+        ...(data.positionId !== undefined ? { positionId: data.positionId } : {}),
         ...(data.startDate !== undefined
           ? { startDate: new Date(data.startDate) }
           : {}),

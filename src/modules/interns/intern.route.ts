@@ -7,11 +7,27 @@ import {
   findAllInternSchema,
   createInternSchema,
   updateInternSchema,
+  updateMeInternSchema,
 } from "./intern.validation";
 import { ROLES } from "../../common/constants/role.constant";
 
 const router = Router();
 const controller = new InternController();
+
+// Intern self-service routes (must come before /:id)
+router.get(
+  "/me",
+  authMiddleware,
+  requireRole(ROLES.INTERN),
+  controller.getMe,
+);
+router.put(
+  "/me",
+  authMiddleware,
+  requireRole(ROLES.INTERN),
+  validate(updateMeInternSchema),
+  controller.updateMe,
+);
 
 router.get(
   "/",

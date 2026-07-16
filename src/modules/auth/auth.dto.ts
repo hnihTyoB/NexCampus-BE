@@ -12,8 +12,8 @@ export interface AuthTokensDto {
 export interface MeInternDto {
   id: string;
   phone: string;
-  department: string;
-  position: string;
+  department: { id: string; name: string } | null;
+  position: { id: string; name: string } | null;
   startDate: Date;
   duration: number;
   discordUsername: string | null;

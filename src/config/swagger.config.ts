@@ -203,8 +203,8 @@ export const swaggerSpec = {
             properties: {
               id: { type: "string", format: "uuid" },
               phone: { type: "string", example: "0912345678" },
-              department: { type: "string", example: "Engineering" },
-              position: { type: "string", example: "Frontend Developer" },
+              department: { type: "object", properties: { id: { type: "string", format: "uuid" }, name: { type: "string", example: "Engineering" } } },
+              position: { type: "object", properties: { id: { type: "string", format: "uuid" }, name: { type: "string", example: "Backend Intern" } } },
               startDate: { type: "string", format: "date-time" },
               duration: { type: "integer", example: 3 },
               discordUsername: { type: "string", nullable: true },
@@ -232,8 +232,8 @@ export const swaggerSpec = {
           fullName: { type: "string", example: "Nguyễn Văn A" },
           email: { type: "string", format: "email" },
           phone: { type: "string", example: "0912345678" },
-          department: { type: "string", example: "Engineering" },
-          position: { type: "string", example: "Frontend Developer" },
+          departmentId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440000" },
+          positionId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440001" },
           startDate: { type: "string", format: "date-time" },
           duration: {
             type: "integer",
@@ -267,8 +267,8 @@ export const swaggerSpec = {
           "fullName",
           "email",
           "phone",
-          "department",
-          "position",
+          "departmentId",
+          "positionId",
           "startDate",
           "duration",
           "token",
@@ -279,8 +279,8 @@ export const swaggerSpec = {
           fullName: { type: "string", example: "Nguyễn Văn A" },
           email: { type: "string", format: "email", example: "vana@gmail.com" },
           phone: { type: "string", example: "0912345678" },
-          department: { type: "string", example: "Engineering" },
-          position: { type: "string", example: "Frontend Developer" },
+          departmentId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440000" },
+          positionId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440001" },
           startDate: { type: "string", format: "date", example: "2025-08-01" },
           duration: {
             type: "integer",
@@ -362,8 +362,8 @@ export const swaggerSpec = {
           leaderId: { type: "string", format: "uuid", nullable: true },
           fullName: { type: "string", example: "Nguyễn Chí Thịnh" },
           phone: { type: "string", example: "0912345678" },
-          department: { type: "string", example: "Engineering" },
-          position: { type: "string", example: "Frontend Developer" },
+          departmentId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440000" },
+          positionId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440001" },
           startDate: { type: "string", format: "date-time" },
           duration: {
             type: "integer",
@@ -407,8 +407,8 @@ export const swaggerSpec = {
           "userId",
           "fullName",
           "phone",
-          "department",
-          "position",
+          "departmentId",
+          "positionId",
           "startDate",
           "duration",
         ],
@@ -417,8 +417,8 @@ export const swaggerSpec = {
           leaderId: { type: "string", format: "uuid" },
           fullName: { type: "string", example: "Nguyễn Chí Thịnh" },
           phone: { type: "string", example: "0912345678" },
-          department: { type: "string", example: "Engineering" },
-          position: { type: "string", example: "Frontend Developer" },
+          departmentId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440000" },
+          positionId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440001" },
           startDate: { type: "string", format: "date", example: "2025-08-01" },
           duration: { type: "integer", example: 3 },
           discordUsername: { type: "string", example: "chithinhdev" },
@@ -1080,6 +1080,7 @@ export const swaggerSpec = {
     { name: "Auth", description: "Đăng nhập, làm mới token, đăng xuất" },
     { name: "Users", description: "Quản lý tài khoản người dùng (Admin only)" },
     { name: "Applications", description: "Đơn xin thực tập (Onboarding)" },
+    { name: "Departments", description: "Phòng ban và vị trí thực tập" },
     { name: "Interns", description: "Hồ sơ thực tập sinh (Interns)" },
     { name: "Tasks", description: "Quản lý công việc (Tasks)" },
     {
@@ -2188,6 +2189,102 @@ export const swaggerSpec = {
             },
           },
           422: { $ref: "#/components/responses/Validation" },
+        },
+      },
+    },
+
+    // ─── Departments ─────────────────────────────────────────────────────────
+    "/departments": {
+      get: {
+        tags: ["Departments"],
+        summary: "Danh sách phòng ban (kèm danh sách vị trí)",
+        description: "Public endpoint. Trả về tất cả phòng ban kèm danh sách vị trí thuộc phòng ban đó.",
+        responses: {
+          200: {
+            description: "Danh sách phòng ban",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              id: { type: "string", format: "uuid" },
+                              name: { type: "string", example: "Engineering" },
+                              positions: {
+                                type: "array",
+                                items: {
+                                  type: "object",
+                                  properties: {
+                                    id: { type: "string", format: "uuid" },
+                                    name: { type: "string", example: "Backend Intern" },
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/departments/{id}": {
+      get: {
+        tags: ["Departments"],
+        summary: "Chi tiết phòng ban",
+        parameters: [{ in: "path", name: "id", required: true, schema: { type: "string", format: "uuid" } }],
+        responses: {
+          200: { description: "Chi tiết phòng ban" },
+          404: { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
+    "/departments/{id}/positions": {
+      get: {
+        tags: ["Departments"],
+        summary: "Danh sách vị trí theo phòng ban",
+        parameters: [{ in: "path", name: "id", required: true, schema: { type: "string", format: "uuid" } }],
+        responses: {
+          200: {
+            description: "Danh sách vị trí",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              id: { type: "string", format: "uuid" },
+                              departmentId: { type: "string", format: "uuid" },
+                              name: { type: "string", example: "Backend Intern" },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
         },
       },
     },

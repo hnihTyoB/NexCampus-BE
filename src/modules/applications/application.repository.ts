@@ -13,8 +13,8 @@ const defaultSelect = {
   fullName: true,
   email: true,
   phone: true,
-  department: true,
-  position: true,
+  department: { select: { id: true, name: true } },
+  position: { select: { id: true, name: true } },
   startDate: true,
   duration: true,
   status: true,
@@ -33,8 +33,8 @@ export class ApplicationRepository {
   async findAll(query: ApplicationQueryDto) {
     const {
       status,
-      department,
-      position,
+      departmentId,
+      positionId,
       email,
       startDateFrom,
       startDateTo,
@@ -47,11 +47,11 @@ export class ApplicationRepository {
     const where: Prisma.ApplicationWhereInput = {
       deletedAt: null,
       ...(status ? { status } : {}),
-      ...(department
-        ? { department: { contains: department, mode: "insensitive" } }
+      ...(departmentId
+        ? { departmentId }
         : {}),
-      ...(position
-        ? { position: { contains: position, mode: "insensitive" } }
+      ...(positionId
+        ? { positionId }
         : {}),
       ...(email ? { email: { contains: email, mode: "insensitive" } } : {}),
       ...(startDateFrom || startDateTo
@@ -99,8 +99,8 @@ export class ApplicationRepository {
     fullName: string;
     email: string;
     phone: string;
-    department: string;
-    position: string;
+    departmentId: string;
+    positionId: string;
     startDate: Date;
     duration: number;
     regulationId: string;
@@ -175,8 +175,8 @@ export class ApplicationRepository {
             fullName: true,
             email: true,
             phone: true,
-            department: true,
-            position: true,
+            department: { select: { id: true, name: true } },
+            position: { select: { id: true, name: true } },
             status: true,
             startDate: true,
             duration: true,
@@ -231,8 +231,8 @@ export class ApplicationRepository {
       email,
       inviteStatus,
       applicationStatus,
-      department,
-      position,
+      departmentId,
+      positionId,
       createdFrom,
       createdTo,
       sortBy = "createdAt",
@@ -244,22 +244,17 @@ export class ApplicationRepository {
     const where: Prisma.ApplicationInviteWhereInput = {
       ...(email ? { email: { contains: email, mode: "insensitive" } } : {}),
       ...(inviteStatus ? { status: inviteStatus as any } : {}),
-      ...(applicationStatus || department || position
+      ...(applicationStatus || departmentId || positionId
         ? {
             application: {
               ...(applicationStatus
                 ? { status: applicationStatus as any }
                 : {}),
-              ...(department
-                ? {
-                    department: {
-                      contains: department,
-                      mode: "insensitive",
-                    },
-                  }
+              ...(departmentId
+                ? { departmentId }
                 : {}),
-              ...(position
-                ? { position: { contains: position, mode: "insensitive" } }
+              ...(positionId
+                ? { positionId }
                 : {}),
             },
           }
@@ -287,8 +282,8 @@ export class ApplicationRepository {
             select: {
               id: true,
               fullName: true,
-              department: true,
-              position: true,
+              department: { select: { id: true, name: true } },
+              position: { select: { id: true, name: true } },
               status: true,
               startDate: true,
               duration: true,

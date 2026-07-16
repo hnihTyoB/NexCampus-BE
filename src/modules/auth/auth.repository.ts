@@ -40,8 +40,8 @@ const fullSelect = {
     select: {
       id: true,
       phone: true,
-      department: true,
-      position: true,
+      department: { select: { id: true, name: true } },
+      position: { select: { id: true, name: true } },
       startDate: true,
       duration: true,
       discordUsername: true,

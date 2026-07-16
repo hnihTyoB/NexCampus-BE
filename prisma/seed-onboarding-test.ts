@@ -32,6 +32,18 @@ async function main() {
     where: { isActive: true },
   });
 
+  // Lấy danh sách department + position để map tên → ID
+  const departments = await prisma.department.findMany({
+    include: { positions: true },
+  });
+  const deptMap = new Map(departments.map((d) => [d.name, d.id]));
+  const posMap = new Map<string, string>();
+  for (const d of departments) {
+    for (const p of d.positions) {
+      posMap.set(p.name, p.id);
+    }
+  }
+
   // Dọn dữ liệu test cũ (optional — xoá invite + app có email test)
   await prisma.applicationInvite.deleteMany({
     where: { email: { contains: "candidate" } },
@@ -95,8 +107,8 @@ async function main() {
           fullName: c.name,
           email: c.email,
           phone: "09" + Math.floor(Math.random() * 90000000 + 10000000),
-          department: c.dept,
-          position: c.pos,
+          departmentId: deptMap.get(c.dept) ?? null,
+          positionId: posMap.get(c.pos) ?? null,
           startDate: appStartDate!,
           duration: c.duration,
           status: appStatus,
@@ -128,8 +140,8 @@ async function main() {
                 userId: user.id,
                 fullName: c.name,
                 phone: app.phone,
-                department: c.dept,
-                position: c.pos,
+                departmentId: deptMap.get(c.dept) ?? null,
+                positionId: posMap.get(c.pos) ?? null,
                 startDate: appStartDate!,
                 duration: c.duration,
               },

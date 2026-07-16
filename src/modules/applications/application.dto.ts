@@ -2,8 +2,8 @@ import { ApplicationStatus } from "@prisma/client";
 
 export interface ApplicationQueryDto {
   status?: ApplicationStatus;
-  department?: string;
-  position?: string;
+  departmentId?: string;
+  positionId?: string;
   email?: string;
   startDateFrom?: string;
   startDateTo?: string;
@@ -17,8 +17,8 @@ export interface CreateApplicationDto {
   fullName: string;
   email: string;
   phone: string;
-  department: string;
-  position: string;
+  departmentId: string;
+  positionId: string;
   startDate: string;
   duration: number;
   token: string;
@@ -70,8 +70,8 @@ export interface GetApplicationInvitesQuery {
   email?: string;
   inviteStatus?: string;
   applicationStatus?: string;
-  department?: string;
-  position?: string;
+  departmentId?: string;
+  positionId?: string;
   createdFrom?: string;
   createdTo?: string;
   sortBy?: "createdAt" | "expiresAt" | "email";

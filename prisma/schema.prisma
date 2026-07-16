@@ -59,6 +59,37 @@ model User {
   @@map("users")
 }
 
+// 2.5 Department
+model Department {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  positions    Position[]
+  applications Application[]
+  interns      Intern[]
+
+  @@map("departments")
+}
+
+// 2.6 Position
+model Position {
+  id           String   @id @default(uuid()) @db.Uuid
+  departmentId String   @map("department_id") @db.Uuid
+  name         String
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  department   Department    @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  applications Application[]
+  interns      Intern[]
+
+  @@unique([departmentId, name])
+  @@index([departmentId])
+  @@map("positions")
+}
+
 // 3. Application
 enum ApplicationStatus {
   PENDING
@@ -67,20 +98,20 @@ enum ApplicationStatus {
 }
 
 model Application {
-  id         String            @id @default(uuid()) @db.Uuid
-  fullName   String            @map("full_name")
-  email      String
-  phone      String
-  department String
-  position   String
-  startDate  DateTime          @map("start_date")
-  duration   Int
-  status     ApplicationStatus @default(PENDING)
-  approvedBy String?           @map("approved_by") @db.Uuid
-  approvedAt DateTime?         @map("approved_at")
-  deletedAt  DateTime?         @map("deleted_at")
-  createdAt  DateTime          @default(now()) @map("created_at")
-  updatedAt  DateTime          @updatedAt @map("updated_at")
+  id           String            @id @default(uuid()) @db.Uuid
+  fullName     String            @map("full_name")
+  email        String
+  phone        String
+  departmentId String?   @map("department_id") @db.Uuid
+  positionId   String?   @map("position_id") @db.Uuid
+  startDate    DateTime          @map("start_date")
+  duration     Int
+  status       ApplicationStatus @default(PENDING)
+  approvedBy   String?           @map("approved_by") @db.Uuid
+  approvedAt   DateTime?         @map("approved_at")
+  deletedAt    DateTime?         @map("deleted_at")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
 
   // Regulations fields
   regulationId String?   @map("regulation_id") @db.Uuid
@@ -88,12 +119,16 @@ model Application {
 
   approver   User?       @relation("ApprovedApplications", fields: [approvedBy], references: [id], onDelete: SetNull)
   regulation Regulation? @relation(fields: [regulationId], references: [id], onDelete: SetNull)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  position   Position?   @relation(fields: [positionId], references: [id], onDelete: Restrict)
 
   // Application invites
   applicationInvites ApplicationInvite[]
 
   @@index([approvedBy])
   @@index([regulationId])
+  @@index([departmentId])
+  @@index([positionId])
   @@map("applications")
 }
 
@@ -111,8 +146,8 @@ model Intern {
   leaderId           String?      @map("leader_id") @db.Uuid
   fullName           String       @map("full_name")
   phone              String
-  department         String
-  position           String
+  departmentId       String?      @map("department_id") @db.Uuid
+  positionId         String?      @map("position_id") @db.Uuid
   startDate          DateTime     @map("start_date")
   duration           Int
   discordUsername    String?      @map("discord_username")
@@ -122,8 +157,10 @@ model Intern {
   createdAt          DateTime     @default(now()) @map("created_at")
   updatedAt          DateTime     @updatedAt @map("updated_at")
 
-  user   User  @relation("InternUser", fields: [userId], references: [id], onDelete: Cascade)
-  leader User? @relation("LeaderInterns", fields: [leaderId], references: [id], onDelete: SetNull)
+  user       User        @relation("InternUser", fields: [userId], references: [id], onDelete: Cascade)
+  leader     User?       @relation("LeaderInterns", fields: [leaderId], references: [id], onDelete: SetNull)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  position   Position?   @relation(fields: [positionId], references: [id], onDelete: Restrict)
 
   // Relations
   assignments          TaskAssignment[]   @relation("TaskAssignmentOwner")
@@ -132,6 +169,7 @@ model Intern {
   weeklyEvaluations WeeklyEvaluation[]
 
   @@index([leaderId])
+  @@index([departmentId])
   @@map("interns")
 }
 

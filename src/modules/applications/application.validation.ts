@@ -2,8 +2,8 @@ import { z } from "zod";
 
 export const findAllApplicationSchema = z.object({
   status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
-  department: z.string().optional(),
-  position: z.string().optional(),
+  departmentId: z.string().uuid().optional(),
+  positionId: z.string().uuid().optional(),
   email: z.string().email("Invalid email").optional(),
   startDateFrom: z
     .string()
@@ -27,8 +27,8 @@ export const createApplicationSchema = z.object({
   fullName: z.string().min(1, "Full name is required").max(100),
   email: z.string().min(1, "Email is required").email("Invalid email format"),
   phone: z.string().min(9, "Phone must be at least 9 digits").max(15),
-  department: z.string().min(1, "Department is required"),
-  position: z.string().min(1, "Position is required"),
+  departmentId: z.string().uuid("Invalid department ID"),
+  positionId: z.string().uuid("Invalid position ID"),
   startDate: z.string().refine((val) => !isNaN(Date.parse(val)), {
     message: "startDate must be a valid ISO date string",
   }),
@@ -57,8 +57,8 @@ export const getApplicationInvitesSchema = z.object({
   email: z.string().optional(),
   inviteStatus: z.enum(["ACTIVE", "USED", "EXPIRED", "REVOKED"]).optional(),
   applicationStatus: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
-  department: z.string().optional(),
-  position: z.string().optional(),
+  departmentId: z.string().uuid().optional(),
+  positionId: z.string().uuid().optional(),
   createdFrom: z
     .string()
     .refine((v) => !isNaN(Date.parse(v)), {
