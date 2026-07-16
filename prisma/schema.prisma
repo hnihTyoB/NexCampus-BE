@@ -54,6 +54,7 @@ model User {
   reportAttachments    ReportAttachment[]     @relation("ReportAttachmentUploader")
   activityLogs         ActivityLog[]
   createdApplicationInvites ApplicationInvite[]
+  exportHistories       ExportHistory[]        @relation("UserExports")
 
   @@index([roleId])
   @@map("users")
@@ -505,3 +506,24 @@ model Regulation {
 
   @@map("regulations")
 }
+
+// 18. ExportHistory
+model ExportHistory {
+  id          String   @id @default(uuid()) @db.Uuid
+  type        String   // WEEKLY_EVALUATION, INTERN_REPORT, TASK_REPORT, DASHBOARD_SUMMARY
+  entityType  String   @map("entity_type")
+  entityId    String   @map("entity_id") @db.Uuid
+  fileName    String   @map("file_name")
+  storagePath String   @map("storage_path")
+  fileUrl     String   @map("file_url")
+  createdById String   @map("created_by_id") @db.Uuid
+  expiresAt   DateTime @map("expires_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  creator User @relation("UserExports", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([createdById])
+  @@index([entityId])
+  @@map("export_histories")
+}
+

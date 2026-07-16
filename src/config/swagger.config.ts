@@ -53,6 +53,40 @@ export const swaggerSpec = {
           code: { type: "string", example: "NOT_FOUND" },
         },
       },
+      // ─── ExportHistory ────────────────────────────────────────────────────
+      ExportHistory: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          type: {
+            type: "string",
+            enum: ["WEEKLY_EVALUATION"],
+            example: "WEEKLY_EVALUATION",
+            description: "Loại báo cáo được xuất",
+          },
+          entityType: { type: "string", example: "WeeklyEvaluation" },
+          entityId: { type: "string", format: "uuid" },
+          fileName: { type: "string", example: "weekly-report-abc123-1721234567890.pdf" },
+          storagePath: {
+            type: "string",
+            example: "reports/weekly/weekly-report-abc123-1721234567890.pdf",
+          },
+          fileUrl: {
+            type: "string",
+            format: "uri",
+            example: "https://[project].supabase.co/storage/v1/object/public/report-attachments/reports/weekly/...",
+            description: "URL công khai để tải báo cáo (có hiệu lực trong 30 ngày)",
+          },
+          createdById: { type: "string", format: "uuid" },
+          expiresAt: {
+            type: "string",
+            format: "date-time",
+            example: "2026-08-16T14:00:00.000Z",
+            description: "Thời điểm file PDF hết hiệu lực trên Supabase Storage",
+          },
+          createdAt: { type: "string", format: "date-time" },
+        },
+      },
       // ─── Role ─────────────────────────────────────────────────────────────
       Role: {
         type: "object",
@@ -5779,6 +5813,108 @@ export const swaggerSpec = {
           404: { $ref: "#/components/responses/NotFound" }
         }
       }
-    }
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // PDF EXPORT
+    // ─────────────────────────────────────────────────────────────────────────
+    "/pdf-exports/weekly-evaluations/{id}": {
+      post: {
+        tags: ["PDF Export"],
+        summary: "Xuất báo cáo đánh giá tuần (Weekly Evaluation PDF)",
+        description:
+          "Leader hoặc Admin gọi API này để sinh báo cáo đánh giá tuần dưới dạng PDF.\n\n" +
+          "**Luồng xử lý:**\n" +
+          "1. Truy vấn dữ liệu từ PostgreSQL (evaluation, intern, tasks, daily reports, previous week)\n" +
+          "2. Render HTML bằng Handlebars template\n" +
+          "3. Chuyển HTML sang PDF bằng Puppeteer (Headless Chromium)\n" +
+          "4. Tải PDF lên Supabase Storage\n" +
+          "5. Lưu lịch sử xuất vào bảng `export_histories`\n" +
+          "6. Trả về URL tải báo cáo (có hiệu lực 30 ngày)\n\n" +
+          "**Nội dung báo cáo bao gồm:**\n" +
+          "- Thông tin intern & leader\n" +
+          "- Bảng điểm so sánh Leader vs AI (với cột chênh lệch)\n" +
+          "- Progress bars từng tiêu chí\n" +
+          "- Phân tích AI có cấu trúc (Strengths / Areas to Improve / Recommendation)\n" +
+          "- AI Progress Analysis so sánh với tuần trước\n" +
+          "- Danh sách task trong tuần kèm trạng thái\n" +
+          "- Thống kê hiệu suất (completion rate, daily reports, submissions)\n" +
+          "- QR code xác minh tài liệu",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "ID của WeeklyEvaluation cần xuất báo cáo",
+            example: "550e8400-e29b-41d4-a716-446655440000",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Xuất báo cáo PDF thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        message: {
+                          type: "string",
+                          example: "Xuất báo cáo PDF thành công",
+                        },
+                        data: {
+                          type: "object",
+                          properties: {
+                            fileUrl: {
+                              type: "string",
+                              format: "uri",
+                              example:
+                                "https://[project].supabase.co/storage/v1/object/public/report-attachments/reports/weekly/weekly-report-abc-1721234567890.pdf",
+                              description: "URL công khai để tải file PDF (có hiệu lực 30 ngày)",
+                            },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: {
+            description: "Không tìm thấy WeeklyEvaluation với ID đã cung cấp",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+                example: {
+                  success: false,
+                  message: "Weekly Evaluation not found",
+                  code: "NOT_FOUND",
+                },
+              },
+            },
+          },
+          500: {
+            description: "Lỗi server khi render PDF hoặc tải lên Supabase Storage",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+                example: {
+                  success: false,
+                  message: "Upload to Supabase Storage failed",
+                  code: "INTERNAL_SERVER_ERROR",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   },
 };
