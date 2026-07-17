@@ -6,41 +6,7 @@ import {
 } from "../../common/constants/status.constant";
 import { notificationQueue } from "../../queues/notification.queue";
 
-const fallbacks: Record<string, { title: string; content: string }> = {
-  [NOTIFICATION_TYPE.TASK_ASSIGNMENT]: {
-    title: "Bạn đã được giao công việc mới",
-    content: 'Công việc: "{{taskTitle}}". Hạn nộp: {{deadline}}',
-  },
-  [NOTIFICATION_TYPE.TASK_SUBMISSION]: {
-    title: "Bản nộp bài mới cần duyệt",
-    content:
-      'Thực tập sinh {{internName}} đã nộp bài cho công việc "{{taskTitle}}" (Lần {{attempt}}).',
-  },
-  [NOTIFICATION_TYPE.SUBMISSION_REVIEW]: {
-    title: "Kết quả duyệt bài nộp",
-    content:
-      'Bài nộp cho công việc "{{taskTitle}}" (Lần {{attempt}}) đã được duyệt: {{reviewStatus}}.',
-  },
-  [NOTIFICATION_TYPE.DAILY_REPORT]: {
-    title: "Báo cáo hàng ngày mới",
-    content: "Thực tập sinh {{internName}} đã gửi báo cáo hàng ngày.",
-  },
-  [NOTIFICATION_TYPE.WEEKLY_EVALUATION]: {
-    title: "Đánh giá hàng tuần mới",
-    content:
-      "Bạn nhận được đánh giá tuần {{week}} với tổng điểm là {{totalScore}}/10.",
-  },
-  [NOTIFICATION_TYPE.TASK_REMINDER]: {
-    title: "Nhắc nhở hoàn thành công việc",
-    content:
-      'Công việc "{{taskTitle}}" của bạn có hạn nộp vào lúc {{deadline}}. Vui lòng hoàn thành đúng hạn.',
-  },
-  [NOTIFICATION_TYPE.EVALUATION_REMINDER]: {
-    title: "Nhắc nhở đánh giá thực tập sinh",
-    content:
-      'Thực tập sinh {{internName}} chưa có đánh giá cho tuần {{week}}. Vui lòng thực hiện đánh giá.',
-  },
-};
+import { TEMPLATE_DEFAULTS } from "../../common/constants/notification-template.constant";
 
 const interpolate = (template: string, variables: Record<string, any>) => {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
@@ -77,13 +43,20 @@ export class NotificationDispatcher {
       });
 
       const titleTemplate =
-        dbTemplate?.titleTemplate || fallbacks[type]?.title || "Thông báo mới";
+        dbTemplate?.titleTemplate || TEMPLATE_DEFAULTS[type]?.titleTemplate || "Thông báo mới";
       const contentTemplate =
-        dbTemplate?.contentTemplate || fallbacks[type]?.content || "";
+        dbTemplate?.contentTemplate || TEMPLATE_DEFAULTS[type]?.contentTemplate || "";
+
+      const emailSubjectTemplate =
+        dbTemplate?.emailSubjectTemplate || titleTemplate;
+      const emailContentTemplate =
+        dbTemplate?.emailContentTemplate || contentTemplate;
 
       // 3. Interpolate parameters
       const title = interpolate(titleTemplate, params);
       const content = interpolate(contentTemplate, params);
+      const emailSubject = interpolate(emailSubjectTemplate, params);
+      const emailContent = interpolate(emailContentTemplate, params);
 
       // 4. Create Notification record
       const notification = await prisma.notification.create({
@@ -111,6 +84,8 @@ export class NotificationDispatcher {
           content,
           emailEnabled: settings.emailEnabled,
           discordEnabled: settings.discordEnabled,
+          emailSubject,
+          emailContent,
         });
       }
 

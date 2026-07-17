@@ -6,11 +6,20 @@ import { validate } from "../../middlewares/validate.middleware";
 import {
   findAllNotificationSchema,
   createNotificationSchema,
+  sendCustomNotificationSchema,
 } from "./notification.validation";
 import { ROLES } from "../../common/constants/role.constant";
 
 const router = Router();
 const controller = new NotificationController();
+
+router.post(
+  "/send-custom",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER),
+  validate(sendCustomNotificationSchema),
+  controller.sendCustom,
+);
 
 router.post(
   "/remind/tasks",

@@ -10,9 +10,10 @@ import {
   CreateInviteDto,
   GetApplicationInvitesQuery,
 } from "./application.dto";
-import { APPLICATION_STATUS, APPLICATION_INVITE_STATUS } from "../../common/constants/status.constant";
+import { APPLICATION_STATUS, APPLICATION_INVITE_STATUS, NOTIFICATION_TYPE } from "../../common/constants/status.constant";
 import { envConfig } from "../../config/env.config";
 import { EmailService } from "../../common/services/email.service";
+import { TemplateEmailHelper } from "../../common/helpers/template-email.helper";
 import { ActivityLogService } from "../activity-logs/activity-log.service";
 import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
 import { prisma } from "../../database/prisma.client";
@@ -59,21 +60,11 @@ export class ApplicationService {
 
     const applyUrl = `${envConfig.app.baseUrl}/onboarding/${token}/policies`;
 
-    const emailSubject = "[NexCampus] Thư mời nộp đơn đăng ký thực tập";
-    const emailContent = `
-      Chào bạn,<br/><br/>
-      Bạn đã nhận được lời mời tham gia ứng tuyển thực tập tại NexCampus.<br/>
-      Vui lòng nhấn vào liên kết dưới đây để điền thông tin đơn ứng tuyển (liên kết này chỉ có giá trị sử dụng một lần và hết hạn sau 24 giờ):<br/>
-      <p style="margin: 16px 0;">
-        <a href="${applyUrl}" style="display:inline-block;background-color:#4f46e5;color:#ffffff;padding:10px 20px;text-decoration:none;border-radius:4px;font-weight:bold;">Nộp đơn ứng tuyển</a>
-      </p>
-      Hoặc sao chép liên kết này vào trình duyệt của bạn:<br/>
-      <a href="${applyUrl}">${applyUrl}</a><br/><br/>
-      Trân trọng,<br/>
-      Đội ngũ NexCampus.
-    `;
-
-    await EmailService.sendMail(data.email, emailSubject, emailContent);
+    await TemplateEmailHelper.send(
+      data.email,
+      NOTIFICATION_TYPE.APPLICATION_INVITE,
+      { applyUrl }
+    );
 
     await this.activityLogService.log(
       actorId,
@@ -329,20 +320,11 @@ export class ApplicationService {
 
       // Send verification/confirmation email to the applicant
       try {
-        const emailSubject = "[NexCampus] Tài khoản thực tập sinh của bạn đã được tạo";
-        const emailContent = `
-          Chào mừng bạn đến với NexCampus!<br/><br/>
-          Đơn đăng ký thực tập của bạn tại NexCampus đã được phê duyệt.<br/>
-          Tài khoản của bạn đã được khởi tạo thành công trên hệ thống. Dưới đây là thông tin đăng nhập của bạn:<br/>
-          <ul>
-            <li><strong>Email đăng nhập:</strong> ${normalizedEmail}</li>
-            <li><strong>Mật khẩu:</strong> ${password}</li>
-          </ul>
-          Vui lòng truy cập <a href="${envConfig.app.baseUrl}" style="color:#4f46e5;font-weight:bold;">NexCampus</a> để đăng nhập và đổi mật khẩu của bạn để bảo mật tài khoản.<br/><br/>
-          Trân trọng,<br/>
-          Đội ngũ NexCampus.
-        `;
-        await EmailService.sendMail(normalizedEmail, emailSubject, emailContent);
+        await TemplateEmailHelper.send(
+          normalizedEmail,
+          NOTIFICATION_TYPE.APPLICATION_APPROVED,
+          { email: normalizedEmail, password, loginUrl: envConfig.app.baseUrl }
+        );
       } catch (emailError) {
         console.error(`[ApplicationService] Failed to send registration email to ${normalizedEmail}:`, emailError);
       }
@@ -373,22 +355,15 @@ export class ApplicationService {
 
       // Send rejection email to the applicant
       try {
-        const emailSubject = "[NexCampus] Kết quả đăng ký thực tập tại NexCampus";
-        const emailContent = `
-          Chào bạn,<br/><br/>
-          Cảm ơn bạn đã quan tâm và nộp đơn đăng ký thực tập tại NexCampus.<br/>
-          Sau khi xem xét kỹ lưỡng, chúng tôi rất tiếc phải thông báo rằng đơn đăng ký của bạn chưa phù hợp với các tiêu chí tuyển chọn hiện tại của chúng tôi.<br/>
-          Thông tin chi tiết về đơn đăng ký của bạn:<br/>
-          <ul>
-            <li><strong>Họ và tên:</strong> ${updatedApplication.fullName}</li>
-            <li><strong>Vị trí ứng tuyển:</strong> ${updatedApplication.position}</li>
-            <li><strong>Phòng ban:</strong> ${updatedApplication.department}</li>
-          </ul>
-          Chúng tôi rất hy vọng sẽ có cơ hội được hợp tác với bạn trong các chương trình tiếp theo. Chúc bạn luôn nhiều sức khỏe và thành công trên con đường sự nghiệp sắp tới.<br/><br/>
-          Trân trọng,<br/>
-          Đội ngũ NexCampus.
-        `;
-        await EmailService.sendMail(normalizedEmail, emailSubject, emailContent);
+        await TemplateEmailHelper.send(
+          normalizedEmail,
+          NOTIFICATION_TYPE.APPLICATION_REJECTED,
+          {
+            fullName: updatedApplication.fullName,
+            position: updatedApplication.position?.name ?? updatedApplication.position ?? "",
+            department: updatedApplication.department?.name ?? updatedApplication.department ?? "",
+          }
+        );
       } catch (emailError) {
         console.error(
           `[ApplicationService] Failed to send rejection email to ${normalizedEmail}:`,

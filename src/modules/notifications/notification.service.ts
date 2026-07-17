@@ -67,4 +67,78 @@ export class NotificationService {
 
     return this.repository.delete(id);
   }
+
+  async sendCustom(data: {
+    email: string;
+    title: string;
+    content: string;
+    emailSubject?: string;
+    emailContent?: string;
+    sendWeb?: boolean;
+    sendEmail?: boolean;
+  }) {
+    const recipient = await prisma.user.findFirst({
+      where: { email: data.email.toLowerCase().trim(), deletedAt: null },
+    });
+
+    if (data.sendWeb !== false && !recipient) {
+      throw new AppError(
+        "A registered user account is required to send Web notifications.",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
+
+    const crypto = await import("crypto");
+    let notificationId: string = crypto.randomUUID();
+    let notification = null;
+
+    if (data.sendWeb !== false && recipient) {
+      notification = await prisma.notification.create({
+        data: {
+          userId: recipient.id,
+          title: data.title,
+          content: data.content,
+          type: "CUSTOM",
+          isRead: false,
+        },
+      });
+      notificationId = notification.id;
+
+      await prisma.notificationLog.create({
+        data: {
+          notificationId,
+          channel: "WEB",
+          status: "SUCCESS",
+        },
+      });
+    }
+
+    if (data.sendEmail !== false) {
+      if (recipient) {
+        // Registered user: queue the email job normally
+        const { notificationQueue } = await import("../../queues/notification.queue");
+        await notificationQueue.add(`notify-custom-${notificationId}`, {
+          notificationId,
+          userId: recipient.id,
+          title: data.title,
+          content: data.content,
+          emailEnabled: true,
+          discordEnabled: false,
+          emailSubject: data.emailSubject || data.title,
+          emailContent: data.emailContent || data.content,
+        });
+      } else {
+        // Guest or onboarding candidate: dispatch directly using EmailService
+        const { EmailService } = await import("../../common/services/email.service");
+        await EmailService.sendMail(
+          data.email.toLowerCase().trim(),
+          data.emailSubject || data.title,
+          data.emailContent || data.content
+        );
+      }
+    }
+
+    return { success: true, notification };
+  }
 }

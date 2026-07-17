@@ -39,23 +39,23 @@ model User {
   role Role @relation(fields: [roleId], references: [id])
 
   // Relations
-  approvedApplications  Application[]          @relation("ApprovedApplications")
-  intern                Intern?                @relation("InternUser")
-  leadedInterns         Intern[]               @relation("LeaderInterns")
-  notificationSetting   NotificationSetting?
-  createdTasks          Task[]                 @relation("CreatedTasks")
-  assignedTasks         TaskAssignment[]       @relation("AssignedTasks")
-  reviewedSubmissions   TaskSubmission[]       @relation("ReviewedSubmissions")
-  leaderEvaluations     WeeklyEvaluation[]     @relation("LeaderEvaluations")
-  notifications         Notification[]
-  refreshTokens         RefreshToken[]
-  taskAttachments       TaskAttachment[]       @relation("TaskAttachmentUploader")
-  submissionAttachments SubmissionAttachment[] @relation("SubmissionAttachmentUploader")
-  reportAttachments    ReportAttachment[]     @relation("ReportAttachmentUploader")
-  activityLogs         ActivityLog[]
+  approvedApplications      Application[]          @relation("ApprovedApplications")
+  intern                    Intern?                @relation("InternUser")
+  leadedInterns             Intern[]               @relation("LeaderInterns")
+  notificationSetting       NotificationSetting?
+  createdTasks              Task[]                 @relation("CreatedTasks")
+  assignedTasks             TaskAssignment[]       @relation("AssignedTasks")
+  reviewedSubmissions       TaskSubmission[]       @relation("ReviewedSubmissions")
+  leaderEvaluations         WeeklyEvaluation[]     @relation("LeaderEvaluations")
+  notifications             Notification[]
+  refreshTokens             RefreshToken[]
+  taskAttachments           TaskAttachment[]       @relation("TaskAttachmentUploader")
+  submissionAttachments     SubmissionAttachment[] @relation("SubmissionAttachmentUploader")
+  reportAttachments         ReportAttachment[]     @relation("ReportAttachmentUploader")
+  activityLogs              ActivityLog[]
   createdApplicationInvites ApplicationInvite[]
-  exportHistories       ExportHistory[]        @relation("UserExports")
-  leader                Leader?
+  exportHistories           ExportHistory[]        @relation("UserExports")
+  leader                    Leader?
 
   @@index([roleId])
   @@map("users")
@@ -95,13 +95,13 @@ model Position {
 
 // 2.7 Leader
 model Leader {
-  id           String    @id @default(uuid()) @db.Uuid
-  userId       String    @unique @map("user_id") @db.Uuid
-  departmentId String?   @map("department_id") @db.Uuid
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @unique @map("user_id") @db.Uuid
+  departmentId String?  @map("department_id") @db.Uuid
   position     String?
-  phone        String?   @unique
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  phone        String?  @unique
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
@@ -122,8 +122,8 @@ model Application {
   fullName     String            @map("full_name")
   email        String
   phone        String
-  departmentId String?   @map("department_id") @db.Uuid
-  positionId   String?   @map("position_id") @db.Uuid
+  departmentId String?           @map("department_id") @db.Uuid
+  positionId   String?           @map("position_id") @db.Uuid
   startDate    DateTime          @map("start_date")
   duration     Int
   status       ApplicationStatus @default(PENDING)
@@ -151,7 +151,6 @@ model Application {
   @@index([positionId])
   @@map("applications")
 }
-
 
 // 4. Intern
 enum InternStatus {
@@ -185,8 +184,8 @@ model Intern {
   // Relations
   assignments          TaskAssignment[]   @relation("TaskAssignmentOwner")
   supportedAssignments TaskAssignment[]   @relation("TaskAssignmentSupport")
-  dailyReports      DailyReport[]
-  weeklyEvaluations WeeklyEvaluation[]
+  dailyReports         DailyReport[]
+  weeklyEvaluations    WeeklyEvaluation[]
 
   @@index([leaderId])
   @@index([departmentId])
@@ -490,12 +489,19 @@ model RefreshToken {
 
 // 14. NotificationTemplate
 model NotificationTemplate {
-  id              String   @id @default(uuid()) @db.Uuid
-  type            String   @unique
-  titleTemplate   String   @map("title_template")
-  contentTemplate String   @map("content_template")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id   String @id @default(uuid()) @db.Uuid
+  type String @unique
+
+  // Web channel
+  titleTemplate   String @map("title_template")
+  contentTemplate String @map("content_template") @db.Text
+
+  // Email channel
+  emailSubjectTemplate String? @map("email_subject_template")
+  emailContentTemplate String? @map("email_content_template") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("notification_templates")
 }
@@ -525,28 +531,27 @@ enum ApplicationInviteStatus {
 }
 
 model ApplicationInvite {
-  id            String                  @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
-  email         String
-  token         String                  @unique
+  email String
+  token String @unique
 
-  status        ApplicationInviteStatus @default(ACTIVE)
+  status ApplicationInviteStatus @default(ACTIVE)
 
-  expiresAt     DateTime                @map("expires_at")
-  usedAt        DateTime?               @map("used_at")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
 
-  applicationId String?                 @db.Uuid
-  application   Application?            @relation(fields: [applicationId], references: [id])
+  applicationId String?      @db.Uuid
+  application   Application? @relation(fields: [applicationId], references: [id])
 
-  createdBy     String?                 @db.Uuid
-  creator        User?                   @relation(fields: [createdBy], references: [id])
+  createdBy String? @db.Uuid
+  creator   User?   @relation(fields: [createdBy], references: [id])
 
-  createdAt     DateTime                @default(now()) @map("created_at")
-  updatedAt     DateTime                @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([applicationId])
   @@index([createdBy])
-
   @@map("application_invites")
 }
 
@@ -568,7 +573,7 @@ model Regulation {
 // 18. ExportHistory
 model ExportHistory {
   id          String   @id @default(uuid()) @db.Uuid
-  type        String   // WEEKLY_EVALUATION, INTERN_REPORT, TASK_REPORT, DASHBOARD_SUMMARY
+  type        String // WEEKLY_EVALUATION, INTERN_REPORT, TASK_REPORT, DASHBOARD_SUMMARY
   entityType  String   @map("entity_type")
   entityId    String   @map("entity_id") @db.Uuid
   fileName    String   @map("file_name")
@@ -584,4 +589,3 @@ model ExportHistory {
   @@index([entityId])
   @@map("export_histories")
 }
-

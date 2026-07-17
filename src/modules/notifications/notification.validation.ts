@@ -19,3 +19,13 @@ export const createNotificationSchema = z.object({
   content: z.string().min(1).max(2000),
   type: z.string().min(1).max(50),
 });
+
+export const sendCustomNotificationSchema = z.object({
+  email: z.string().email(),
+  title: z.string().min(1).max(200),
+  content: z.string().min(1).max(2000),
+  emailSubject: z.string().max(200).optional(),
+  emailContent: z.string().max(5000).optional(),
+  sendWeb: z.boolean().optional(),
+  sendEmail: z.boolean().optional(),
+});

@@ -9,6 +9,8 @@ import { envConfig } from "../../config/env.config";
 import { ActivityLogService } from "../activity-logs/activity-log.service";
 import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
 import { EmailService } from "../../common/services/email.service";
+import { TemplateEmailHelper } from "../../common/helpers/template-email.helper";
+import { NOTIFICATION_TYPE } from "../../common/constants/status.constant";
 import { generateSecurePassword } from "../../common/helpers/password.helper";
 
 export class UserService {
@@ -74,21 +76,12 @@ export class UserService {
       "User",
     );
 
-    // Send confirmation email to the created user
     try {
-      const emailSubject = "[NexCampus] Tài khoản của bạn đã được tạo";
-      const emailContent = `
-        Chào mừng bạn đến với NexCampus!<br/><br/>
-        Tài khoản của bạn đã được quản trị viên khởi tạo thành công trên hệ thống. Dưới đây là thông tin đăng nhập của bạn:<br/>
-        <ul>
-          <li><strong>Email đăng nhập:</strong> ${data.email}</li>
-          <li><strong>Mật khẩu:</strong> ${password}</li>
-        </ul>
-        Vui lòng truy cập <a href="${envConfig.app.baseUrl}" style="color:#4f46e5;font-weight:bold;">NexCampus</a> để đăng nhập và đổi mật khẩu của bạn để bảo mật tài khoản.<br/><br/>
-        Trân trọng,<br/>
-        Đội ngũ NexCampus.
-      `;
-      await EmailService.sendMail(data.email, emailSubject, emailContent);
+      await TemplateEmailHelper.send(
+        data.email,
+        NOTIFICATION_TYPE.USER_CREATED,
+        { email: data.email, password, loginUrl: envConfig.app.baseUrl }
+      );
     } catch (emailError) {
       console.error(`[UserService] Failed to send registration email to ${data.email}:`, emailError);
     }

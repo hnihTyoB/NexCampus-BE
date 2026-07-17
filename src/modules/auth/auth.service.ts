@@ -18,6 +18,8 @@ import {
 import { ActivityLogService } from "../activity-logs/activity-log.service";
 import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
 import { EmailService } from "../../common/services/email.service";
+import { TemplateEmailHelper } from "../../common/helpers/template-email.helper";
+import { NOTIFICATION_TYPE } from "../../common/constants/status.constant";
 
 export class AuthService {
   private readonly repository = new AuthRepository();
@@ -329,18 +331,11 @@ export class AuthService {
 
     const resetLink = `${envConfig.app.baseUrl}/reset-password?token=${token}`;
 
-    const emailSubject = "[NexCampus] Khôi phục mật khẩu";
-    const emailContent = `
-      Bạn đã yêu cầu khôi phục mật khẩu tài khoản NexCampus.<br/>
-      Vui lòng nhấn vào liên kết dưới đây để đặt lại mật khẩu mới (liên kết có hiệu lực trong 1 giờ):<br/>
-      <p style="margin: 16px 0;">
-        <a href="${resetLink}" style="display:inline-block;background-color:#4f46e5;color:#ffffff;padding:10px 20px;text-decoration:none;border-radius:4px;font-weight:bold;">Đặt lại mật khẩu</a>
-      </p>
-      Hoặc sao chép liên kết này vào trình duyệt:<br/>
-      <a href="${resetLink}">${resetLink}</a>
-    `;
-
-    await EmailService.sendMail(user.email, emailSubject, emailContent);
+    await TemplateEmailHelper.send(
+      user.email,
+      NOTIFICATION_TYPE.PASSWORD_RESET,
+      { resetLink }
+    );
 
     await this.activityLogService.log(
       user.id,

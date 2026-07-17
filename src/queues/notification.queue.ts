@@ -8,6 +8,8 @@ export interface NotificationJobData {
   content: string;
   emailEnabled: boolean;
   discordEnabled: boolean;
+  emailSubject?: string;
+  emailContent?: string;
 }
 
 export const notificationQueue = new Queue<NotificationJobData>(

@@ -1,6 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 import { NotificationTemplateService } from "./notification-template.service";
-import { UpdateNotificationTemplateDto } from "./notification-template.dto";
+import {
+  UpdateNotificationTemplateDto,
+  CreateNotificationTemplateDto,
+} from "./notification-template.dto";
 
 export class NotificationTemplateController {
   private readonly service = new NotificationTemplateService();
@@ -25,10 +28,43 @@ export class NotificationTemplateController {
     }
   };
 
+  create = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = req.body as CreateNotificationTemplateDto;
+      const result = await this.service.create(body);
+
+      res.status(201).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   update = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = req.body as UpdateNotificationTemplateDto;
       const result = await this.service.update(req.params.id, body);
+
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  upsertByType = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { type } = req.params;
+      const body = req.body;
+      const result = await this.service.upsertByType(type, body);
+
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  reset = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.service.reset(req.params.id);
 
       res.json({ success: true, data: result });
     } catch (error) {

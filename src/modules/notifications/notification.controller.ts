@@ -94,4 +94,17 @@ export class NotificationController {
       next(error);
     }
   };
+
+  sendCustom = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.service.sendCustom(req.body);
+      res.status(201).json({
+        success: true,
+        message: "Custom notification dispatched successfully",
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

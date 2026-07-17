@@ -31,7 +31,9 @@ async function processNotificationJob(job: Job<NotificationJobData>) {
 
   // Send EMAIL
   if (emailEnabled && recipientEmail) {
-    const success = await EmailService.sendMail(recipientEmail, title, content);
+    const finalSubject = job.data.emailSubject || title;
+    const finalContent = job.data.emailContent || content;
+    const success = await EmailService.sendMail(recipientEmail, finalSubject, finalContent);
     await prisma.notificationLog.create({
       data: {
         notificationId,
