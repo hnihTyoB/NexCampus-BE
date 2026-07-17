@@ -2,8 +2,8 @@ import { z } from "zod";
 
 export const findAllInternSchema = z.object({
   fullName: z.string().optional(),
-  department: z.string().optional(),
-  position: z.string().optional(),
+  departmentId: z.string().uuid().optional(),
+  positionId: z.string().uuid().optional(),
   status: z.enum(["ACTIVE", "COMPLETED", "DROPPED"]).optional(),
   leaderId: z.string().uuid("Invalid leaderId").optional(),
   discordRoleGranted: z
@@ -35,8 +35,8 @@ export const createInternSchema = z.object({
   leaderId: z.string().uuid("Invalid leaderId").optional(),
   fullName: z.string().min(1, "Full name is required").max(100),
   phone: z.string().min(9).max(15),
-  department: z.string().min(1, "Department is required"),
-  position: z.string().min(1, "Position is required"),
+  departmentId: z.string().uuid("Invalid departmentId"),
+  positionId: z.string().uuid("Invalid positionId"),
   startDate: z.string().refine((v) => !isNaN(Date.parse(v)), {
     message: "startDate must be a valid ISO date",
   }),
@@ -48,8 +48,8 @@ export const updateInternSchema = z.object({
   leaderId: z.string().uuid().nullable().optional(),
   fullName: z.string().min(1).max(100).optional(),
   phone: z.string().min(9).max(15).optional(),
-  department: z.string().optional(),
-  position: z.string().optional(),
+  departmentId: z.string().uuid().optional(),
+  positionId: z.string().uuid().optional(),
   startDate: z
     .string()
     .refine((v) => !isNaN(Date.parse(v)), { message: "Invalid date" })
@@ -58,4 +58,11 @@ export const updateInternSchema = z.object({
   discordUsername: z.string().nullable().optional(),
   discordRoleGranted: z.boolean().optional(),
   status: z.enum(["ACTIVE", "COMPLETED", "DROPPED"]).optional(),
+});
+
+export const updateMeInternSchema = z.object({
+  phone: z.string().min(9).max(15).optional(),
+  departmentId: z.string().uuid().optional(),
+  positionId: z.string().uuid().optional(),
+  discordUsername: z.string().nullable().optional(),
 });

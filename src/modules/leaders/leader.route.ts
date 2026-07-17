@@ -1,61 +1,49 @@
 import { Router } from "express";
-import { InternController } from "./intern.controller";
+import { LeaderController } from "./leader.controller";
 import { authMiddleware } from "../../middlewares/auth.middleware";
 import { requireRole } from "../../middlewares/role.middleware";
 import { validate } from "../../middlewares/validate.middleware";
 import {
-  findAllInternSchema,
-  createInternSchema,
-  updateInternSchema,
-  updateMeInternSchema,
-} from "./intern.validation";
+  findAllLeaderSchema,
+  createLeaderSchema,
+  updateLeaderSchema,
+} from "./leader.validation";
 import { ROLES } from "../../common/constants/role.constant";
 
 const router = Router();
-const controller = new InternController();
-
-// Intern self-service routes (must come before /:id)
-router.get(
-  "/me",
-  authMiddleware,
-  requireRole(ROLES.INTERN),
-  controller.getMe,
-);
-router.put(
-  "/me",
-  authMiddleware,
-  requireRole(ROLES.INTERN),
-  validate(updateMeInternSchema),
-  controller.updateMe,
-);
+const controller = new LeaderController();
 
 router.get(
   "/",
   authMiddleware,
   requireRole(ROLES.ADMIN, ROLES.LEADER),
-  validate(findAllInternSchema, "query"),
+  validate(findAllLeaderSchema, "query"),
   controller.findAll,
 );
+
 router.get(
   "/:id",
   authMiddleware,
   requireRole(ROLES.ADMIN, ROLES.LEADER),
   controller.findById,
 );
+
 router.post(
   "/",
   authMiddleware,
-  requireRole(ROLES.ADMIN, ROLES.LEADER),
-  validate(createInternSchema),
+  requireRole(ROLES.ADMIN),
+  validate(createLeaderSchema),
   controller.create,
 );
+
 router.put(
   "/:id",
   authMiddleware,
-  requireRole(ROLES.ADMIN, ROLES.LEADER),
-  validate(updateInternSchema),
+  requireRole(ROLES.ADMIN),
+  validate(updateLeaderSchema),
   controller.update,
 );
+
 router.delete(
   "/:id",
   authMiddleware,

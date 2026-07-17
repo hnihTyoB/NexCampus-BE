@@ -237,13 +237,30 @@ export const swaggerSpec = {
             properties: {
               id: { type: "string", format: "uuid" },
               phone: { type: "string", example: "0912345678" },
-              department: { type: "string", example: "Engineering" },
-              position: { type: "string", example: "Frontend Developer" },
+              department: { type: "object", properties: { id: { type: "string", format: "uuid" }, name: { type: "string", example: "Engineering" } } },
+              position: { type: "object", properties: { id: { type: "string", format: "uuid" }, name: { type: "string", example: "Backend Intern" } } },
               startDate: { type: "string", format: "date-time" },
               duration: { type: "integer", example: 3 },
               discordUsername: { type: "string", nullable: true },
               discordRoleGranted: { type: "boolean" },
               status: { type: "string", enum: ["ACTIVE", "COMPLETED", "DROPPED"] },
+            },
+          },
+          leader: {
+            nullable: true,
+            type: "object",
+            properties: {
+              id: { type: "string", format: "uuid" },
+              department: {
+                type: "object",
+                nullable: true,
+                properties: {
+                  id: { type: "string", format: "uuid" },
+                  name: { type: "string", example: "Engineering" },
+                },
+              },
+              position: { type: "string", nullable: true, example: "Engineering Manager" },
+              phone: { type: "string", nullable: true, example: "0912345678" },
             },
           },
           notificationSetting: {
@@ -266,8 +283,8 @@ export const swaggerSpec = {
           fullName: { type: "string", example: "Nguyễn Văn A" },
           email: { type: "string", format: "email" },
           phone: { type: "string", example: "0912345678" },
-          department: { type: "string", example: "Engineering" },
-          position: { type: "string", example: "Frontend Developer" },
+          departmentId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440000" },
+          positionId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440001" },
           startDate: { type: "string", format: "date-time" },
           duration: {
             type: "integer",
@@ -301,8 +318,8 @@ export const swaggerSpec = {
           "fullName",
           "email",
           "phone",
-          "department",
-          "position",
+          "departmentId",
+          "positionId",
           "startDate",
           "duration",
           "token",
@@ -313,8 +330,8 @@ export const swaggerSpec = {
           fullName: { type: "string", example: "Nguyễn Văn A" },
           email: { type: "string", format: "email", example: "vana@gmail.com" },
           phone: { type: "string", example: "0912345678" },
-          department: { type: "string", example: "Engineering" },
-          position: { type: "string", example: "Frontend Developer" },
+          departmentId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440000" },
+          positionId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440001" },
           startDate: { type: "string", format: "date", example: "2025-08-01" },
           duration: {
             type: "integer",
@@ -396,8 +413,8 @@ export const swaggerSpec = {
           leaderId: { type: "string", format: "uuid", nullable: true },
           fullName: { type: "string", example: "Nguyễn Chí Thịnh" },
           phone: { type: "string", example: "0912345678" },
-          department: { type: "string", example: "Engineering" },
-          position: { type: "string", example: "Frontend Developer" },
+          departmentId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440000" },
+          positionId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440001" },
           startDate: { type: "string", format: "date-time" },
           duration: {
             type: "integer",
@@ -441,8 +458,8 @@ export const swaggerSpec = {
           "userId",
           "fullName",
           "phone",
-          "department",
-          "position",
+          "departmentId",
+          "positionId",
           "startDate",
           "duration",
         ],
@@ -451,8 +468,8 @@ export const swaggerSpec = {
           leaderId: { type: "string", format: "uuid" },
           fullName: { type: "string", example: "Nguyễn Chí Thịnh" },
           phone: { type: "string", example: "0912345678" },
-          department: { type: "string", example: "Engineering" },
-          position: { type: "string", example: "Frontend Developer" },
+          departmentId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440000" },
+          positionId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440001" },
           startDate: { type: "string", format: "date", example: "2025-08-01" },
           duration: { type: "integer", example: 3 },
           discordUsername: { type: "string", example: "chithinhdev" },
@@ -471,6 +488,55 @@ export const swaggerSpec = {
           discordUsername: { type: "string", nullable: true },
           discordRoleGranted: { type: "boolean" },
           status: { type: "string", enum: ["ACTIVE", "COMPLETED", "DROPPED"] },
+        },
+      },
+      // ─── Leader ──────────────────────────────────────────────────
+      Leader: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          userId: { type: "string", format: "uuid" },
+          departmentId: { type: "string", format: "uuid", nullable: true },
+          position: { type: "string", nullable: true, example: "Engineering Manager" },
+          phone: { type: "string", nullable: true, example: "0912345678" },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+          user: {
+            type: "object",
+            properties: {
+              id: { type: "string", format: "uuid" },
+              email: { type: "string", format: "email" },
+              fullName: { type: "string", nullable: true },
+              isActive: { type: "boolean" },
+              avatarUrl: { type: "string", nullable: true },
+            },
+          },
+          department: {
+            type: "object",
+            nullable: true,
+            properties: {
+              id: { type: "string", format: "uuid" },
+              name: { type: "string", example: "Engineering" },
+            },
+          },
+        },
+      },
+      CreateLeaderBody: {
+        type: "object",
+        required: ["userId"],
+        properties: {
+          userId: { type: "string", format: "uuid" },
+          departmentId: { type: "string", format: "uuid" },
+          position: { type: "string", example: "Engineering Manager" },
+          phone: { type: "string", example: "0912345678" },
+        },
+      },
+      UpdateLeaderBody: {
+        type: "object",
+        properties: {
+          departmentId: { type: "string", format: "uuid", nullable: true },
+          position: { type: "string", nullable: true },
+          phone: { type: "string" },
         },
       },
       TaskGroup: {
@@ -1114,7 +1180,9 @@ export const swaggerSpec = {
     { name: "Auth", description: "Đăng nhập, làm mới token, đăng xuất" },
     { name: "Users", description: "Quản lý tài khoản người dùng (Admin only)" },
     { name: "Applications", description: "Đơn xin thực tập (Onboarding)" },
+    { name: "Departments", description: "Phòng ban và vị trí thực tập" },
     { name: "Interns", description: "Hồ sơ thực tập sinh (Interns)" },
+    { name: "Leaders", description: "Hồ sơ leader (Leaders)" },
     { name: "Tasks", description: "Quản lý công việc (Tasks)" },
     {
       name: "TaskAttachments",
@@ -2226,6 +2294,102 @@ export const swaggerSpec = {
       },
     },
 
+    // ─── Departments ─────────────────────────────────────────────────────────
+    "/departments": {
+      get: {
+        tags: ["Departments"],
+        summary: "Danh sách phòng ban (kèm danh sách vị trí)",
+        description: "Public endpoint. Trả về tất cả phòng ban kèm danh sách vị trí thuộc phòng ban đó.",
+        responses: {
+          200: {
+            description: "Danh sách phòng ban",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              id: { type: "string", format: "uuid" },
+                              name: { type: "string", example: "Engineering" },
+                              positions: {
+                                type: "array",
+                                items: {
+                                  type: "object",
+                                  properties: {
+                                    id: { type: "string", format: "uuid" },
+                                    name: { type: "string", example: "Backend Intern" },
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/departments/{id}": {
+      get: {
+        tags: ["Departments"],
+        summary: "Chi tiết phòng ban",
+        parameters: [{ in: "path", name: "id", required: true, schema: { type: "string", format: "uuid" } }],
+        responses: {
+          200: { description: "Chi tiết phòng ban" },
+          404: { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
+    "/departments/{id}/positions": {
+      get: {
+        tags: ["Departments"],
+        summary: "Danh sách vị trí theo phòng ban",
+        parameters: [{ in: "path", name: "id", required: true, schema: { type: "string", format: "uuid" } }],
+        responses: {
+          200: {
+            description: "Danh sách vị trí",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              id: { type: "string", format: "uuid" },
+                              departmentId: { type: "string", format: "uuid" },
+                              name: { type: "string", example: "Backend Intern" },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+
     // ─── Interns ─────────────────────────────────────────────────────────────
     "/interns": {
       get: {
@@ -2790,6 +2954,97 @@ export const swaggerSpec = {
         }
       }
     },
+
+    // ─── Leaders ────────────────────────────────────────────────────────────
+    "/leaders": {
+      get: {
+        tags: ["Leaders"],
+        summary: "Danh sách leader (Admin, Leader)",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { in: "query", name: "fullName", schema: { type: "string" }, description: "Tìm theo tên" },
+          { in: "query", name: "departmentId", schema: { type: "string", format: "uuid" }, description: "Lọc theo phòng ban" },
+          { in: "query", name: "sortBy", schema: { type: "string", enum: ["createdAt", "fullName"] } },
+          { $ref: "#/components/parameters/OrderParam" },
+          { $ref: "#/components/parameters/PageParam" },
+          { $ref: "#/components/parameters/LimitParam" },
+        ],
+        responses: {
+          200: {
+            description: "Danh sách leader",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { type: "array", items: { $ref: "#/components/schemas/Leader" } },
+                        meta: { $ref: "#/components/schemas/PaginationMeta" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        tags: ["Leaders"],
+        summary: "Tạo leader record (Admin only)",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/CreateLeaderBody" } } },
+        },
+        responses: {
+          201: { description: "Leader created" },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+        },
+      },
+    },
+    "/leaders/{id}": {
+      get: {
+        tags: ["Leaders"],
+        summary: "Chi tiết leader",
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: "path", name: "id", required: true, schema: { type: "string", format: "uuid" } }],
+        responses: {
+          200: { description: "Leader detail" },
+          404: { $ref: "#/components/responses/NotFound" },
+        },
+      },
+      put: {
+        tags: ["Leaders"],
+        summary: "Cập nhật leader (Admin only)",
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: "path", name: "id", required: true, schema: { type: "string", format: "uuid" } }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/UpdateLeaderBody" } } },
+        },
+        responses: {
+          200: { description: "Leader updated" },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+        },
+      },
+      delete: {
+        tags: ["Leaders"],
+        summary: "Xoá leader record (Admin only)",
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: "path", name: "id", required: true, schema: { type: "string", format: "uuid" } }],
+        responses: {
+          200: { description: "Leader deleted" },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+        },
+      },
+    },
+
     "/tasks": {
       get: {
         tags: ["Tasks"],

@@ -12,8 +12,8 @@ export interface AuthTokensDto {
 export interface MeInternDto {
   id: string;
   phone: string;
-  department: string;
-  position: string;
+  department: { id: string; name: string } | null;
+  position: { id: string; name: string } | null;
   startDate: Date;
   duration: number;
   discordUsername: string | null;
@@ -28,6 +28,13 @@ export interface MeNotificationSettingDto {
   discordEnabled: boolean;
 }
 
+export interface MeLeaderDto {
+  id: string;
+  department: { id: string; name: string } | null;
+  position: string | null;
+  phone: string | null;
+}
+
 export interface MeDto {
   id: string;
   email: string;
@@ -38,6 +45,7 @@ export interface MeDto {
   createdAt: Date;
   updatedAt: Date;
   intern: MeInternDto | null;
+  leader: MeLeaderDto | null;
   notificationSetting: MeNotificationSettingDto | null;
 }
 

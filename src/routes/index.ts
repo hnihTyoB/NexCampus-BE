@@ -16,6 +16,8 @@ import statsRoute from "../modules/stats/stats.route";
 import activityLogRoute from "../modules/activity-logs/activity-log.route";
 import regulationRoute from "../modules/regulations/regulation.route";
 import pdfExportRoute from "../modules/pdf-export/pdf-export.route";
+import departmentRoute from "../modules/departments/department.route";
+import leaderRoute from "../modules/leaders/leader.route";
 
 const router = Router();
 
@@ -40,5 +42,7 @@ router.use("/stats", statsRoute);
 router.use("/activity-logs", activityLogRoute);
 router.use("/regulations", regulationRoute);
 router.use("/pdf-exports", pdfExportRoute);
+router.use("/departments", departmentRoute);
+router.use("/leaders", leaderRoute);
 
 export default router;

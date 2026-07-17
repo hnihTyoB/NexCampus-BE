@@ -2,8 +2,8 @@ import { InternStatus } from "@prisma/client";
 
 export interface InternQueryDto {
   fullName?: string;
-  department?: string;
-  position?: string;
+  departmentId?: string;
+  positionId?: string;
   status?: InternStatus;
   leaderId?: string;
   discordRoleGranted?: boolean;
@@ -22,8 +22,8 @@ export interface CreateInternDto {
   leaderId?: string;
   fullName: string;
   phone: string;
-  department: string;
-  position: string;
+  departmentId: string;
+  positionId: string;
   startDate: string;
   duration: number;
   discordUsername?: string;
@@ -33,11 +33,18 @@ export interface UpdateInternDto {
   leaderId?: string | null;
   fullName?: string;
   phone?: string;
-  department?: string;
-  position?: string;
+  departmentId?: string;
+  positionId?: string;
   startDate?: string;
   duration?: number;
   discordUsername?: string | null;
   discordRoleGranted?: boolean;
   status?: InternStatus;
+}
+
+export interface UpdateMeInternDto {
+  phone?: string;
+  departmentId?: string;
+  positionId?: string;
+  discordUsername?: string | null;
 }
