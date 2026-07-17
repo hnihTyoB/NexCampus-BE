@@ -34,7 +34,7 @@ export class TaskAssignmentController {
     try {
       const assignedBy = req.user.id;
       const body = req.body as CreateTaskAssignmentDto;
-      const result = await this.service.create(body, assignedBy);
+      const result = await this.service.create(body, assignedBy, req.user.role);
 
       res.status(201).json({ success: true, data: result });
     } catch (error) {
@@ -63,6 +63,24 @@ export class TaskAssignmentController {
         success: true,
         message: "Task assignment deleted successfully",
       });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  approve = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.service.approve(req.params.id, req.user.id, req.user.role);
+      res.json({ success: true, data: result, message: "Phê duyệt giao việc thành công" });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  reject = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await this.service.reject(req.params.id, req.user.id, req.user.role);
+      res.json({ success: true, message: "Từ chối giao việc thành công" });
     } catch (error) {
       next(error);
     }

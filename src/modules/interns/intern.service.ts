@@ -52,6 +52,31 @@ export class InternService {
     return this.repository.update(id, data);
   }
 
+  async assignLeader(id: string, leaderId: string | null) {
+    await this.findById(id);
+
+    if (leaderId) {
+      const leaderUser = await prisma.user.findUnique({
+        where: { id: leaderId },
+        include: { role: true },
+      });
+
+      if (!leaderUser) {
+        throw new AppError("Không tìm thấy Leader", 404, ERROR_CODE.NOT_FOUND);
+      }
+
+      if (leaderUser.role.name !== "LEADER") {
+        throw new AppError(
+          "Người dùng được chọn không phải là LEADER",
+          400,
+          ERROR_CODE.VALIDATION_ERROR,
+        );
+      }
+    }
+
+    return this.repository.update(id, { leaderId });
+  }
+
   async delete(id: string) {
     await this.findById(id);
 

@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, AssignmentStatus } from "@prisma/client";
 import { prisma } from "../../database/prisma.client";
 import {
   TaskAssignmentQueryDto,
@@ -123,12 +123,13 @@ export class TaskAssignmentRepository {
     });
   }
 
-  create(data: CreateTaskAssignmentDto, assignedBy: string) {
+  create(data: CreateTaskAssignmentDto, assignedBy: string, status?: AssignmentStatus) {
     return prisma.taskAssignment.create({
       data: {
         taskId: data.taskId,
         internId: data.internId,
         assignedBy,
+        ...(status ? { status } : {}),
       },
       select: defaultSelect,
     });

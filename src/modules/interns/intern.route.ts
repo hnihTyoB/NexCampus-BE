@@ -8,6 +8,7 @@ import {
   createInternSchema,
   updateInternSchema,
   updateMeInternSchema,
+  assignLeaderSchema,
 } from "./intern.validation";
 import { ROLES } from "../../common/constants/role.constant";
 
@@ -55,6 +56,13 @@ router.put(
   requireRole(ROLES.ADMIN, ROLES.LEADER),
   validate(updateInternSchema),
   controller.update,
+);
+router.patch(
+  "/:id/assign-leader",
+  authMiddleware,
+  requireRole(ROLES.ADMIN),
+  validate(assignLeaderSchema),
+  controller.assignLeader,
 );
 router.delete(
   "/:id",

@@ -478,7 +478,6 @@ export const swaggerSpec = {
       UpdateInternBody: {
         type: "object",
         properties: {
-          leaderId: { type: "string", format: "uuid", nullable: true },
           fullName: { type: "string" },
           phone: { type: "string" },
           department: { type: "string" },
@@ -699,7 +698,7 @@ export const swaggerSpec = {
           assignedBy: { type: "string", format: "uuid" },
           status: {
             type: "string",
-            enum: ["TODO", "IN_PROGRESS", "REVIEW", "DONE", "BLOCKED"],
+            enum: ["PENDING_APPROVAL", "TODO", "IN_PROGRESS", "REVIEW", "DONE", "BLOCKED"],
           },
           assignedAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
@@ -2648,6 +2647,64 @@ export const swaggerSpec = {
         },
       },
     },
+    "/interns/{id}/assign-leader": {
+      patch: {
+        tags: ["Interns"],
+        summary: "Gán hoặc đổi người hướng dẫn cho Thực tập sinh (Admin only)",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  leaderId: {
+                    type: "string",
+                    format: "uuid",
+                    nullable: true,
+                    description: "ID của Leader để gán, hoặc null để gỡ gán",
+                    example: "f8b7e28b-b8dc-4a6c-9c9a-d7b1e2a8c3d9",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Gán người hướng dẫn thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/Intern" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+          422: { $ref: "#/components/responses/Validation" },
+        },
+      },
+    },
     "/tasks/analytics": {
       get: {
         tags: ["Tasks"],
@@ -3675,6 +3732,85 @@ export const swaggerSpec = {
           401: { $ref: "#/components/responses/Unauthorized" },
           403: { $ref: "#/components/responses/Forbidden" },
           404: { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
+    "/task-assignments/{id}/approve": {
+      patch: {
+        tags: ["TaskAssignments"],
+        summary: "Phê duyệt yêu cầu giao việc chéo bộ phận (Admin / Leader)",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          200: {
+            description: "Phê duyệt giao việc thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/TaskAssignment" },
+                        message: { type: "string" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+          422: { $ref: "#/components/responses/Validation" },
+        },
+      },
+    },
+    "/task-assignments/{id}/reject": {
+      patch: {
+        tags: ["TaskAssignments"],
+        summary: "Từ chối yêu cầu giao việc chéo bộ phận (Admin / Leader)",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          200: {
+            description: "Từ chối giao việc thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        message: { type: "string" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+          422: { $ref: "#/components/responses/Validation" },
         },
       },
     },

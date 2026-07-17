@@ -46,7 +46,6 @@ export const createInternSchema = z.object({
 });
 
 export const updateInternSchema = z.object({
-  leaderId: z.string().uuid().nullable().optional(),
   fullName: z.string().min(1).max(100).optional(),
   phone: z.string().min(9).max(15).optional(),
   departmentId: z.string().uuid().optional(),
@@ -58,7 +57,11 @@ export const updateInternSchema = z.object({
   duration: z.number().int().positive().optional(),
   discordUsername: z.string().nullable().optional(),
   discordRoleGranted: z.boolean().optional(),
-  status: z.enum([INTERN_STATUS.ACTIVE, INTERN_STATUS.COMPLETED, INTERN_STATUS.DROPPED]).optional(),
+  status: z.enum(["ACTIVE", "COMPLETED", "DROPPED"]).optional(),
+});
+
+export const assignLeaderSchema = z.object({
+  leaderId: z.string().uuid("Invalid leaderId").nullable(),
 });
 
 export const updateMeInternSchema = z.object({

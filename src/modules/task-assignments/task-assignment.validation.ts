@@ -5,7 +5,16 @@ export const findAllAssignmentSchema = z.object({
   taskId: z.string().uuid().optional(),
   internId: z.string().uuid().optional(),
   assignedBy: z.string().uuid().optional(),
-  status: z.enum([ASSIGNMENT_STATUS.TODO, ASSIGNMENT_STATUS.IN_PROGRESS, ASSIGNMENT_STATUS.REVIEW, ASSIGNMENT_STATUS.DONE]).optional(),
+  status: z
+    .enum([
+      ASSIGNMENT_STATUS.PENDING_APPROVAL,
+      ASSIGNMENT_STATUS.TODO,
+      ASSIGNMENT_STATUS.IN_PROGRESS,
+      ASSIGNMENT_STATUS.REVIEW,
+      ASSIGNMENT_STATUS.DONE,
+      ASSIGNMENT_STATUS.BLOCKED,
+    ])
+    .optional(),
   sortBy: z.enum(["assignedAt", "status"]).optional(),
   order: z.enum(["asc", "desc"]).optional(),
   page: z.coerce.number().int().positive().optional().default(1),
@@ -19,7 +28,15 @@ export const createAssignmentSchema = z.object({
 
 export const updateAssignmentSchema = z
   .object({
-    status: z.enum([ASSIGNMENT_STATUS.TODO, ASSIGNMENT_STATUS.IN_PROGRESS, ASSIGNMENT_STATUS.REVIEW, ASSIGNMENT_STATUS.DONE]).optional(),
+    status: z
+      .enum([
+        ASSIGNMENT_STATUS.TODO,
+        ASSIGNMENT_STATUS.IN_PROGRESS,
+        ASSIGNMENT_STATUS.REVIEW,
+        ASSIGNMENT_STATUS.DONE,
+        ASSIGNMENT_STATUS.BLOCKED,
+      ])
+      .optional(),
     internId: z.string().uuid().optional(),
   })
   .refine((data) => data.status !== undefined || data.internId !== undefined, {

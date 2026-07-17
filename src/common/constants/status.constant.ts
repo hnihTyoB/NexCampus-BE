@@ -23,6 +23,7 @@ export const TASK_PRIORITY = {
 export type TaskPriorityType = keyof typeof TASK_PRIORITY;
 
 export const ASSIGNMENT_STATUS = {
+  PENDING_APPROVAL: "PENDING_APPROVAL",
   TODO: "TODO",
   IN_PROGRESS: "IN_PROGRESS",
   REVIEW: "REVIEW",

@@ -282,6 +282,7 @@ model TaskAttachment {
 
 // 7. TaskAssignment
 enum AssignmentStatus {
+  PENDING_APPROVAL
   TODO
   IN_PROGRESS
   REVIEW

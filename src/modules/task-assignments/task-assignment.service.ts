@@ -12,6 +12,8 @@ import { ROLES } from "../../common/constants/role.constant";
 import { NotificationDispatcher } from "../notifications/notification.dispatcher";
 import { ActivityLogService } from "../activity-logs/activity-log.service";
 import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
+import { prisma } from "../../database/prisma.client";
+import { ASSIGNMENT_STATUS } from "../../common/constants/status.constant";
 
 interface UserPayload {
   id: string;
@@ -54,7 +56,7 @@ export class TaskAssignmentService {
     return assignment;
   }
 
-  async create(data: CreateTaskAssignmentDto, assignedBy: string) {
+  async create(data: CreateTaskAssignmentDto, assignedBy: string, actorRole: string) {
     // 1. Check if Task exists and is not soft-deleted
     const task = await this.taskRepository.findById(data.taskId);
     if (!task) {
@@ -86,23 +88,109 @@ export class TaskAssignmentService {
       );
     }
 
-    const result = await this.repository.create(data, assignedBy);
+    // 5. Determine approval workflow status
+    let status: any = ASSIGNMENT_STATUS.TODO;
+    if (actorRole !== ROLES.ADMIN && intern.leaderId !== assignedBy) {
+      status = ASSIGNMENT_STATUS.PENDING_APPROVAL;
+    }
 
-    // Notify the intern of the new task assignment
-    await NotificationDispatcher.dispatch(intern.userId, "TASK_ASSIGNMENT", {
-      taskTitle: task.title,
-      deadline: new Date(task.deadline).toLocaleDateString(),
-    });
+    const result = await this.repository.create(data, assignedBy, status as any);
+
+    // 6. Only notify if auto-approved
+    if (status === ASSIGNMENT_STATUS.TODO) {
+      await NotificationDispatcher.dispatch(intern.userId, "TASK_ASSIGNMENT", {
+        taskTitle: task.title,
+        deadline: new Date(task.deadline).toLocaleDateString(),
+      });
+    }
 
     await this.activityLogService.log(
       assignedBy,
       ACTIVITY_ACTIONS.ASSIGN_TASK,
-      `Leader đã giao công việc "${task.title}" cho Intern "${intern.fullName}"`,
+      status === ASSIGNMENT_STATUS.TODO
+        ? `Leader đã giao công việc "${task.title}" cho Intern "${intern.fullName}"`
+        : `Leader đã yêu cầu giao công việc "${task.title}" cho Intern "${intern.fullName}" (Chờ duyệt)`,
       result.id,
       "TaskAssignment",
     );
 
     return result;
+  }
+
+  async approve(id: string, actorId: string, actorRole: string) {
+    const assignment = await this.findById(id);
+
+    if (assignment.status !== ASSIGNMENT_STATUS.PENDING_APPROVAL) {
+      throw new AppError(
+        "Yêu cầu giao việc không ở trạng thái chờ duyệt",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    // Only Admin or the direct Leader of the intern is allowed to approve
+    if (actorRole !== ROLES.ADMIN && assignment.intern.leaderId !== actorId) {
+      throw new AppError(
+        "Bạn không có quyền duyệt yêu cầu giao việc này",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
+    }
+
+    const result = await this.repository.update(id, {
+      status: ASSIGNMENT_STATUS.TODO as any,
+    });
+
+    // Notify the intern of the approved assignment
+    await NotificationDispatcher.dispatch(
+      assignment.intern.user.id,
+      "TASK_ASSIGNMENT",
+      {
+        taskTitle: assignment.task.title,
+        deadline: new Date(assignment.task.deadline).toLocaleDateString(),
+      },
+    );
+
+    await this.activityLogService.log(
+      actorId,
+      ACTIVITY_ACTIONS.UPDATE_ASSIGNMENT,
+      `Leader đã phê duyệt phân công công việc "${assignment.task.title}" cho Intern "${assignment.intern.fullName}"`,
+      id,
+      "TaskAssignment",
+    );
+
+    return result;
+  }
+
+  async reject(id: string, actorId: string, actorRole: string) {
+    const assignment = await this.findById(id);
+
+    if (assignment.status !== ASSIGNMENT_STATUS.PENDING_APPROVAL) {
+      throw new AppError(
+        "Yêu cầu giao việc không ở trạng thái chờ duyệt",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    // Only Admin or the direct Leader of the intern is allowed to reject
+    if (actorRole !== ROLES.ADMIN && assignment.intern.leaderId !== actorId) {
+      throw new AppError(
+        "Bạn không có quyền từ chối yêu cầu giao việc này",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
+    }
+
+    await this.repository.delete(id);
+
+    await this.activityLogService.log(
+      actorId,
+      ACTIVITY_ACTIONS.DELETE_ASSIGNMENT,
+      `Leader đã từ chối yêu cầu giao công việc "${assignment.task.title}" cho Intern "${assignment.intern.fullName}"`,
+      id,
+      "TaskAssignment",
+    );
   }
 
   async update(

@@ -48,6 +48,17 @@ export class InternController {
     }
   };
 
+  assignLeader = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { leaderId } = req.body as { leaderId: string | null };
+      const result = await this.service.assignLeader(req.params.id, leaderId);
+
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   delete = async (req: Request, res: Response, next: NextFunction) => {
     try {
       await this.service.delete(req.params.id);

@@ -40,6 +40,18 @@ router.put(
   validate(updateAssignmentSchema),
   controller.update,
 );
+router.patch(
+  "/:id/approve",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER),
+  controller.approve,
+);
+router.patch(
+  "/:id/reject",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER),
+  controller.reject,
+);
 router.delete(
   "/:id",
   authMiddleware,
