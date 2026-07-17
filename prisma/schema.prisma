@@ -54,6 +54,7 @@ model User {
   reportAttachments    ReportAttachment[]     @relation("ReportAttachmentUploader")
   activityLogs         ActivityLog[]
   createdApplicationInvites ApplicationInvite[]
+  leader                Leader?
 
   @@index([roleId])
   @@map("users")
@@ -69,6 +70,7 @@ model Department {
   positions    Position[]
   applications Application[]
   interns      Intern[]
+  leaders      Leader[]
 
   @@map("departments")
 }
@@ -88,6 +90,23 @@ model Position {
   @@unique([departmentId, name])
   @@index([departmentId])
   @@map("positions")
+}
+
+// 2.7 Leader
+model Leader {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @unique @map("user_id") @db.Uuid
+  departmentId String?   @map("department_id") @db.Uuid
+  position     String?
+  phone        String?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  @@index([departmentId])
+  @@map("leaders")
 }
 
 // 3. Application

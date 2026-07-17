@@ -223,6 +223,14 @@ export class AuthService {
             status: user.intern.status,
           }
         : null,
+      leader: user.leader
+        ? {
+            id: user.leader.id,
+            department: user.leader.department,
+            position: user.leader.position,
+            phone: user.leader.phone,
+          }
+        : null,
       notificationSetting: user.notificationSetting
         ? {
             id: user.notificationSetting.id,
@@ -281,6 +289,14 @@ export class AuthService {
             discordUsername: updatedUser.intern.discordUsername,
             discordRoleGranted: updatedUser.intern.discordRoleGranted,
             status: updatedUser.intern.status,
+          }
+        : null,
+      leader: updatedUser.leader
+        ? {
+            id: updatedUser.leader.id,
+            department: updatedUser.leader.department,
+            position: updatedUser.leader.position,
+            phone: updatedUser.leader.phone,
           }
         : null,
       notificationSetting: updatedUser.notificationSetting
