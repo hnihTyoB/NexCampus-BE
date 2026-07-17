@@ -356,6 +356,42 @@ export class ApplicationService {
       return this.findById(id);
     }
 
+    if (dto.status === APPLICATION_STATUS.REJECTED) {
+      const updatedApplication = await this.repository.review(
+        id,
+        APPLICATION_STATUS.REJECTED,
+        approverId,
+      );
+      const normalizedEmail = updatedApplication.email.toLowerCase().trim();
+
+      // Send rejection email to the applicant
+      try {
+        const emailSubject = "[NexCampus] Kết quả đăng ký thực tập tại NexCampus";
+        const emailContent = `
+          Chào bạn,<br/><br/>
+          Cảm ơn bạn đã quan tâm và nộp đơn đăng ký thực tập tại NexCampus.<br/>
+          Sau khi xem xét kỹ lưỡng, chúng tôi rất tiếc phải thông báo rằng đơn đăng ký của bạn chưa phù hợp với các tiêu chí tuyển chọn hiện tại của chúng tôi.<br/>
+          Thông tin chi tiết về đơn đăng ký của bạn:<br/>
+          <ul>
+            <li><strong>Họ và tên:</strong> ${updatedApplication.fullName}</li>
+            <li><strong>Vị trí ứng tuyển:</strong> ${updatedApplication.position}</li>
+            <li><strong>Phòng ban:</strong> ${updatedApplication.department}</li>
+          </ul>
+          Chúng tôi rất hy vọng sẽ có cơ hội được hợp tác với bạn trong các chương trình tiếp theo. Chúc bạn luôn nhiều sức khỏe và thành công trên con đường sự nghiệp sắp tới.<br/><br/>
+          Trân trọng,<br/>
+          Đội ngũ NexCampus.
+        `;
+        await EmailService.sendMail(normalizedEmail, emailSubject, emailContent);
+      } catch (emailError) {
+        console.error(
+          `[ApplicationService] Failed to send rejection email to ${normalizedEmail}:`,
+          emailError,
+        );
+      }
+
+      return updatedApplication;
+    }
+
     return this.repository.review(id, dto.status, approverId);
   }
 
