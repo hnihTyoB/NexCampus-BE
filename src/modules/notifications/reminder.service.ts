@@ -1,14 +1,9 @@
 import { prisma } from "../../database/prisma.client";
 import { NotificationDispatcher } from "./notification.dispatcher";
 import { envConfig } from "../../config/env.config";
-import { NOTIFICATION_TYPE } from "../../common/constants/status.constant";
+import { NOTIFICATION_TYPE, ASSIGNMENT_STATUS, INTERN_STATUS, APPLICATION_INVITE_STATUS } from "../../common/constants/status.constant";
 
 export class ReminderService {
-  /**
-   * Scans for task assignments that are TODO or IN_PROGRESS,
-   * where the task deadline is approaching (within the threshold hours).
-   * Dispatches a TASK_REMINDER notification to the intern.
-   */
   static async remindTasks(): Promise<{ sentCount: number }> {
     const thresholdHours = envConfig.reminders.thresholdHours;
     const now = new Date();
@@ -17,7 +12,7 @@ export class ReminderService {
     // Find assignments that are TODO or IN_PROGRESS, with deadline approaching
     const assignments = await prisma.taskAssignment.findMany({
       where: {
-        status: { in: ["TODO", "IN_PROGRESS"] },
+        status: { in: [ASSIGNMENT_STATUS.TODO, ASSIGNMENT_STATUS.IN_PROGRESS] },
         task: {
           deadline: {
             gte: now,
@@ -26,7 +21,7 @@ export class ReminderService {
           deletedAt: null,
         },
         intern: {
-          status: "ACTIVE",
+          status: INTERN_STATUS.ACTIVE,
           deletedAt: null,
         },
       },
@@ -102,15 +97,10 @@ export class ReminderService {
     return { sentCount };
   }
 
-  /**
-   * Scans all active interns, calculates their current internship week,
-   * checks if any weekly evaluation is missing, and dispatches an EVALUATION_REMINDER
-   * notification to their leaders.
-   */
   static async remindEvaluations(): Promise<{ sentCount: number }> {
     const activeInterns = await prisma.intern.findMany({
       where: {
-        status: "ACTIVE",
+        status: INTERN_STATUS.ACTIVE,
         deletedAt: null,
       },
       select: {
@@ -197,9 +187,6 @@ export class ReminderService {
     return { sentCount };
   }
 
-  /**
-   * Helper method to run both tasks and evaluation reminders.
-   */
   static async runAllReminders(): Promise<{ tasksSent: number; evaluationsSent: number }> {
     console.log("[ReminderService] Starting scheduled reminder execution...");
     const { sentCount: tasksSent } = await this.remindTasks();
@@ -210,11 +197,11 @@ export class ReminderService {
       const now = new Date();
       const result = await prisma.applicationInvite.updateMany({
         where: {
-          status: "ACTIVE",
+          status: APPLICATION_INVITE_STATUS.ACTIVE,
           expiresAt: { lt: now },
         },
         data: {
-          status: "EXPIRED",
+          status: APPLICATION_INVITE_STATUS.EXPIRED,
         },
       });
       console.log(`[ReminderService] Auto-marked ${result.count} expired invites.`);

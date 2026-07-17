@@ -3,6 +3,7 @@ import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import { InternQueryDto, CreateInternDto, UpdateInternDto, UpdateMeInternDto } from "./intern.dto";
 import { prisma } from "../../database/prisma.client";
+import { INTERN_STATUS } from "../../common/constants/status.constant";
 
 export class InternService {
   private readonly repository = new InternRepository();
@@ -41,7 +42,7 @@ export class InternService {
     const intern = await this.findById(id);
 
     // If dropping, deactivate user account
-    if (data.status === "DROPPED" && intern.userId) {
+    if (data.status === INTERN_STATUS.DROPPED && intern.userId) {
       await prisma.user.update({
         where: { id: intern.userId },
         data: { isActive: false },

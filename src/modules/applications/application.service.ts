@@ -10,7 +10,7 @@ import {
   CreateInviteDto,
   GetApplicationInvitesQuery,
 } from "./application.dto";
-import { APPLICATION_STATUS } from "../../common/constants/status.constant";
+import { APPLICATION_STATUS, APPLICATION_INVITE_STATUS } from "../../common/constants/status.constant";
 import { envConfig } from "../../config/env.config";
 import { EmailService } from "../../common/services/email.service";
 import { ActivityLogService } from "../activity-logs/activity-log.service";
@@ -97,7 +97,7 @@ export class ApplicationService {
       );
     }
 
-    if (invite.status === "REVOKED") {
+    if (invite.status === APPLICATION_INVITE_STATUS.REVOKED) {
       throw new AppError(
         "This invitation link has been revoked",
         400,
@@ -105,7 +105,7 @@ export class ApplicationService {
       );
     }
 
-    if (invite.status === "USED") {
+    if (invite.status === APPLICATION_INVITE_STATUS.USED) {
       throw new AppError(
         "This invitation link has already been used",
         400,
@@ -113,7 +113,7 @@ export class ApplicationService {
       );
     }
 
-    if (invite.status === "EXPIRED") {
+    if (invite.status === APPLICATION_INVITE_STATUS.EXPIRED) {
       throw new AppError(
         "This invitation link has expired",
         400,
@@ -149,7 +149,7 @@ export class ApplicationService {
       );
     }
 
-    if (invite.status === "REVOKED") {
+    if (invite.status === APPLICATION_INVITE_STATUS.REVOKED) {
       throw new AppError(
         "This invitation link has been revoked",
         400,
@@ -157,7 +157,7 @@ export class ApplicationService {
       );
     }
 
-    if (invite.status === "USED") {
+    if (invite.status === APPLICATION_INVITE_STATUS.USED) {
       throw new AppError(
         "This invitation link has already been used",
         400,
@@ -165,7 +165,7 @@ export class ApplicationService {
       );
     }
 
-    if (invite.status === "EXPIRED") {
+    if (invite.status === APPLICATION_INVITE_STATUS.EXPIRED) {
       throw new AppError(
         "This invitation link has expired",
         400,
@@ -420,7 +420,7 @@ export class ApplicationService {
       throw new AppError("Invite not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
-    if (invite.status === "USED" || invite.status === "EXPIRED") {
+    if (invite.status === APPLICATION_INVITE_STATUS.USED || invite.status === APPLICATION_INVITE_STATUS.EXPIRED) {
       throw new AppError(
         `Cannot revoke invite with status ${invite.status}`,
         400,
@@ -428,7 +428,7 @@ export class ApplicationService {
       );
     }
 
-    if (invite.status === "REVOKED") {
+    if (invite.status === APPLICATION_INVITE_STATUS.REVOKED) {
       throw new AppError(
         "Invite is already revoked",
         400,

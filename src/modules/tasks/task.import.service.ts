@@ -11,19 +11,20 @@ import { ERROR_CODE } from "../../common/errors/error-code";
 import { ActivityLogService } from "../activity-logs/activity-log.service";
 import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
 import { NotificationDispatcher } from "../notifications/notification.dispatcher";
+import { TASK_PRIORITY, ASSIGNMENT_STATUS } from "../../common/constants/status.constant";
 
 const PRIORITY_MAP: Record<string, TaskPriority> = {
-  P0: "HIGH",
-  P1: "MEDIUM",
-  P2: "LOW",
+  P0: TASK_PRIORITY.HIGH,
+  P1: TASK_PRIORITY.MEDIUM,
+  P2: TASK_PRIORITY.LOW,
 };
 
 const STATUS_MAP: Record<string, string> = {
-  "To Do": "TODO",
-  "In Progress": "IN_PROGRESS",
-  Review: "REVIEW",
-  Done: "DONE",
-  Blocked: "BLOCKED",
+  "To Do": ASSIGNMENT_STATUS.TODO,
+  "In Progress": ASSIGNMENT_STATUS.IN_PROGRESS,
+  Review: ASSIGNMENT_STATUS.REVIEW,
+  Done: ASSIGNMENT_STATUS.DONE,
+  Blocked: ASSIGNMENT_STATUS.BLOCKED,
 };
 
 function parseExcelDate(value: unknown): string | undefined {
@@ -420,7 +421,7 @@ export class TaskImportService {
                   },
                 });
               } else {
-                const defaultStatus = mappedStatus ?? "TODO";
+                const defaultStatus = mappedStatus ?? ASSIGNMENT_STATUS.TODO;
                 await tx.taskAssignment.create({
                   data: {
                     taskId,

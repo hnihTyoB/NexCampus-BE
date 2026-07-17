@@ -3,6 +3,7 @@ import path from "path";
 import handlebars from "handlebars";
 import { prisma } from "../../database/prisma.client";
 import { PuppeteerManager } from "./puppeteer.manager";
+import { ASSIGNMENT_STATUS, REVIEW_STATUS } from "../constants/status.constant";
 import { WeeklyEvaluationPdfDTO, TaskPerformanceItem } from "../../modules/pdf-export/weekly-evaluation-pdf.dto";
 import { StorageService } from "./storage.service";
 import { envConfig } from "../../config/env.config";
@@ -39,9 +40,6 @@ export class PdfService {
     }
   }
 
-  /**
-   * Thu thập toàn bộ dữ liệu cần thiết để sinh báo cáo tuần
-   */
   private async collectWeeklyData(evaluationId: string) {
     // 1. Lấy thông tin đánh giá chính
     const evaluation = await prisma.weeklyEvaluation.findUnique({
@@ -99,9 +97,9 @@ export class PdfService {
 
     // 6. Build task performance items
     const taskItems: TaskPerformanceItem[] = assignments.map((a) => {
-      const isDone = a.status === "DONE";
+      const isDone = a.status === ASSIGNMENT_STATUS.DONE;
       const totalSubs = a.submissions.length;
-      const rejected = a.submissions.filter(s => s.reviewStatus === "REJECTED").length;
+      const rejected = a.submissions.filter(s => s.reviewStatus === REVIEW_STATUS.REJECTED).length;
       return {
         title: a.task.title,
         code: a.task.code,
@@ -114,8 +112,8 @@ export class PdfService {
     // 7. Thống kê submission
     const allSubmissions = assignments.flatMap(a => a.submissions);
     const submissionTotal = allSubmissions.length;
-    const rejectedTotal = allSubmissions.filter(s => s.reviewStatus === "REJECTED").length;
-    const taskCompleted = assignments.filter(a => a.status === "DONE").length;
+    const rejectedTotal = allSubmissions.filter(s => s.reviewStatus === REVIEW_STATUS.REJECTED).length;
+    const taskCompleted = assignments.filter(a => a.status === ASSIGNMENT_STATUS.DONE).length;
 
     return {
       evaluation,
@@ -131,9 +129,6 @@ export class PdfService {
     };
   }
 
-  /**
-   * Sinh PDF Buffer (dùng cho test cục bộ hoặc stream trực tiếp)
-   */
   public async generateWeeklyEvaluationBuffer(evaluationId: string): Promise<Buffer> {
     const { evaluation, prevWeek, stats } = await this.collectWeeklyData(evaluationId);
 
@@ -171,9 +166,6 @@ export class PdfService {
     }
   }
 
-  /**
-   * Sinh PDF và tải lên Supabase Storage, lưu vào ExportHistory
-   */
   public async generateWeeklyEvaluationReport(
     evaluationId: string,
     userId: string,

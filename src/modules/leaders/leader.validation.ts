@@ -3,6 +3,10 @@ import { z } from "zod";
 export const findAllLeaderSchema = z.object({
   fullName: z.string().optional(),
   departmentId: z.string().uuid().optional(),
+  isActive: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .optional(),
   sortBy: z.enum(["createdAt", "fullName"]).optional(),
   order: z.enum(["asc", "desc"]).optional(),
   page: z.coerce.number().int().positive().optional().default(1),

@@ -155,6 +155,26 @@ async function main() {
     console.log("Default active regulation created");
   }
 
+  // Synchronize Leader profiles for users with role LEADER
+  const leaderUsers = await prisma.user.findMany({
+    where: {
+      role: { name: "LEADER" },
+      deletedAt: null,
+    },
+  });
+
+  for (const user of leaderUsers) {
+    const existing = await prisma.leader.findUnique({
+      where: { userId: user.id },
+    });
+    if (!existing) {
+      await prisma.leader.create({
+        data: { userId: user.id },
+      });
+      console.log(`✓ Created leader record for ${user.email}`);
+    }
+  }
+
   console.log("Seed completed successfully");
 }
 

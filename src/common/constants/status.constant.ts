@@ -67,3 +67,13 @@ export const NOTIFICATION_TYPE = {
 
 export type NotificationType = keyof typeof NOTIFICATION_TYPE;
 
+export const APPLICATION_INVITE_STATUS = {
+  ACTIVE: "ACTIVE",
+  USED: "USED",
+  EXPIRED: "EXPIRED",
+  REVOKED: "REVOKED",
+} as const;
+
+export type ApplicationInviteStatusType = keyof typeof APPLICATION_INVITE_STATUS;
+
+

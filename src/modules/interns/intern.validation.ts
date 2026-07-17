@@ -1,10 +1,11 @@
 import { z } from "zod";
+import { INTERN_STATUS } from "../../common/constants/status.constant";
 
 export const findAllInternSchema = z.object({
   fullName: z.string().optional(),
   departmentId: z.string().uuid().optional(),
   positionId: z.string().uuid().optional(),
-  status: z.enum(["ACTIVE", "COMPLETED", "DROPPED"]).optional(),
+  status: z.enum([INTERN_STATUS.ACTIVE, INTERN_STATUS.COMPLETED, INTERN_STATUS.DROPPED]).optional(),
   leaderId: z.string().uuid("Invalid leaderId").optional(),
   discordRoleGranted: z
     .enum(["true", "false"])
@@ -57,7 +58,7 @@ export const updateInternSchema = z.object({
   duration: z.number().int().positive().optional(),
   discordUsername: z.string().nullable().optional(),
   discordRoleGranted: z.boolean().optional(),
-  status: z.enum(["ACTIVE", "COMPLETED", "DROPPED"]).optional(),
+  status: z.enum([INTERN_STATUS.ACTIVE, INTERN_STATUS.COMPLETED, INTERN_STATUS.DROPPED]).optional(),
 });
 
 export const updateMeInternSchema = z.object({

@@ -1,6 +1,8 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../database/prisma.client";
 import { ApplicationQueryDto, GetApplicationInvitesQuery } from "./application.dto";
+import { APPLICATION_INVITE_STATUS } from "../../common/constants/status.constant";
+
 
 const approverSelect = {
   id: true,
@@ -136,7 +138,7 @@ export class ApplicationRepository {
     return prisma.applicationInvite.findFirst({
       where: {
         email,
-        status: "ACTIVE",
+        status: APPLICATION_INVITE_STATUS.ACTIVE,
         expiresAt: { gte: new Date() },
       },
     });
@@ -152,7 +154,7 @@ export class ApplicationRepository {
       data: {
         email: data.email,
         token: data.token,
-        status: "ACTIVE",
+        status: APPLICATION_INVITE_STATUS.ACTIVE,
         expiresAt: data.expiresAt,
         createdBy: data.createdBy,
       },
@@ -196,21 +198,21 @@ export class ApplicationRepository {
   markInviteAsUsed(token: string, applicationId: string) {
     return prisma.applicationInvite.update({
       where: { token },
-      data: { status: "USED", usedAt: new Date(), applicationId },
+      data: { status: APPLICATION_INVITE_STATUS.USED, usedAt: new Date(), applicationId },
     });
   }
 
   markInviteExpired(token: string) {
     return prisma.applicationInvite.update({
       where: { token },
-      data: { status: "EXPIRED" },
+      data: { status: APPLICATION_INVITE_STATUS.EXPIRED },
     });
   }
 
   revokeInvite(id: string) {
     return prisma.applicationInvite.update({
       where: { id },
-      data: { status: "REVOKED" },
+      data: { status: APPLICATION_INVITE_STATUS.REVOKED },
     });
   }
 
@@ -219,10 +221,10 @@ export class ApplicationRepository {
   async markExpiredInvites() {
     return prisma.applicationInvite.updateMany({
       where: {
-        status: "ACTIVE",
+        status: APPLICATION_INVITE_STATUS.ACTIVE,
         expiresAt: { lt: new Date() },
       },
-      data: { status: "EXPIRED" },
+      data: { status: APPLICATION_INVITE_STATUS.EXPIRED },
     });
   }
 

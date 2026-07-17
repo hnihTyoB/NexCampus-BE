@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { APPLICATION_STATUS, APPLICATION_INVITE_STATUS } from "../../common/constants/status.constant";
 
 export const findAllApplicationSchema = z.object({
-  status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
+  status: z.enum([APPLICATION_STATUS.PENDING, APPLICATION_STATUS.APPROVED, APPLICATION_STATUS.REJECTED]).optional(),
   departmentId: z.string().uuid().optional(),
   positionId: z.string().uuid().optional(),
   email: z.string().email("Invalid email").optional(),
@@ -44,8 +45,8 @@ export const createApplicationSchema = z.object({
 });
 
 export const reviewApplicationSchema = z.object({
-  status: z.enum(["APPROVED", "REJECTED"], {
-    errorMap: () => ({ message: "status must be APPROVED or REJECTED" }),
+  status: z.enum([APPLICATION_STATUS.APPROVED, APPLICATION_STATUS.REJECTED], {
+    errorMap: () => ({ message: `status must be ${APPLICATION_STATUS.APPROVED} or ${APPLICATION_STATUS.REJECTED}` }),
   }),
 });
 
@@ -55,8 +56,17 @@ export const createInviteSchema = z.object({
 
 export const getApplicationInvitesSchema = z.object({
   email: z.string().optional(),
-  inviteStatus: z.enum(["ACTIVE", "USED", "EXPIRED", "REVOKED"]).optional(),
-  applicationStatus: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
+  inviteStatus: z.enum([
+    APPLICATION_INVITE_STATUS.ACTIVE,
+    APPLICATION_INVITE_STATUS.USED,
+    APPLICATION_INVITE_STATUS.EXPIRED,
+    APPLICATION_INVITE_STATUS.REVOKED,
+  ]).optional(),
+  applicationStatus: z.enum([
+    APPLICATION_STATUS.PENDING,
+    APPLICATION_STATUS.APPROVED,
+    APPLICATION_STATUS.REJECTED,
+  ]).optional(),
   departmentId: z.string().uuid().optional(),
   positionId: z.string().uuid().optional(),
   createdFrom: z

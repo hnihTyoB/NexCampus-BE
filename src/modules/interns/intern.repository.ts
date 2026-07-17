@@ -1,6 +1,7 @@
 import { InternStatus, Prisma } from "@prisma/client";
 import { prisma } from "../../database/prisma.client";
 import { InternQueryDto, CreateInternDto, UpdateInternDto } from "./intern.dto";
+import { INTERN_STATUS } from "../../common/constants/status.constant";
 
 const userSelect = {
   id: true,
@@ -105,7 +106,7 @@ export class InternRepository {
   // Lazy auto-complete: chuyển ACTIVE → COMPLETED nếu đã hết thời gian
   async completeExpiredInterns() {
     const expiredInterns = await prisma.intern.findMany({
-      where: { status: "ACTIVE", deletedAt: null },
+      where: { status: INTERN_STATUS.ACTIVE, deletedAt: null },
       select: { id: true, startDate: true, duration: true },
     });
 
@@ -121,7 +122,7 @@ export class InternRepository {
     if (expiredIds.length > 0) {
       await prisma.intern.updateMany({
         where: { id: { in: expiredIds } },
-        data: { status: "COMPLETED" },
+        data: { status: INTERN_STATUS.COMPLETED },
       });
     }
   }

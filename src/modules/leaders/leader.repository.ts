@@ -43,12 +43,15 @@ export class LeaderRepository {
     };
 
     const skip = (page - 1) * limit;
+    const orderBy = sortBy === "fullName"
+      ? { user: { fullName: order } }
+      : { [sortBy]: order };
 
     const [data, total] = await prisma.$transaction([
       prisma.leader.findMany({
         where,
         select: defaultSelect,
-        orderBy: { [sortBy]: order },
+        orderBy,
         skip,
         take: limit,
       }),

@@ -2,6 +2,7 @@ import { prisma } from "./database/prisma.client";
 import { PdfService } from "./common/services/pdf.service";
 import { PuppeteerManager } from "./common/services/puppeteer.manager";
 import fs from "fs";
+import { ASSIGNMENT_STATUS, REVIEW_STATUS } from "./common/constants/status.constant";
 
 async function main() {
   console.log("=== BẮT ĐẦU TEST XUẤT PDF ===");
@@ -147,11 +148,11 @@ async function main() {
 
   if (existingAssignments === 0) {
     const tasksData = [
-      { code: "BE-001", title: "Thiết kế API Login & JWT Auth", status: "DONE" as const, submissions: 2, lastReject: true },
-      { code: "BE-002", title: "API User Management (CRUD)", status: "DONE" as const, submissions: 1, lastReject: false },
-      { code: "BE-003", title: "Tích hợp Supabase Storage", status: "DONE" as const, submissions: 2, lastReject: false },
-      { code: "BE-004", title: "Module Export PDF (Puppeteer)", status: "REVIEW" as const, submissions: 1, lastReject: false },
-      { code: "BE-005", title: "Viết Unit Test cho Auth Module", status: "IN_PROGRESS" as const, submissions: 0, lastReject: false },
+      { code: "BE-001", title: "Thiết kế API Login & JWT Auth", status: ASSIGNMENT_STATUS.DONE as const, submissions: 2, lastReject: true },
+      { code: "BE-002", title: "API User Management (CRUD)", status: ASSIGNMENT_STATUS.DONE as const, submissions: 1, lastReject: false },
+      { code: "BE-003", title: "Tích hợp Supabase Storage", status: ASSIGNMENT_STATUS.DONE as const, submissions: 2, lastReject: false },
+      { code: "BE-004", title: "Module Export PDF (Puppeteer)", status: ASSIGNMENT_STATUS.REVIEW as const, submissions: 1, lastReject: false },
+      { code: "BE-005", title: "Viết Unit Test cho Auth Module", status: ASSIGNMENT_STATUS.IN_PROGRESS as const, submissions: 0, lastReject: false },
     ];
 
     for (const t of tasksData) {
@@ -183,9 +184,9 @@ async function main() {
             assignmentId: assignment.id,
             attempt: i + 1,
             note: `Lần nộp thứ ${i + 1}`,
-            reviewStatus: isRejected ? "REJECTED" : (isLast && t.status === "DONE" ? "APPROVED" : "PENDING"),
-            reviewedBy: isRejected || (isLast && t.status === "DONE") ? leaderUser.id : null,
-            reviewedAt: isRejected || (isLast && t.status === "DONE") ? new Date() : null,
+            reviewStatus: isRejected ? REVIEW_STATUS.REJECTED : (isLast && t.status === ASSIGNMENT_STATUS.DONE ? REVIEW_STATUS.APPROVED : REVIEW_STATUS.PENDING),
+            reviewedBy: isRejected || (isLast && t.status === ASSIGNMENT_STATUS.DONE) ? leaderUser.id : null,
+            reviewedAt: isRejected || (isLast && t.status === ASSIGNMENT_STATUS.DONE) ? new Date() : null,
           },
         });
       }

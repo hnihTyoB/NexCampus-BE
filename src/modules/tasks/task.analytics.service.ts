@@ -1,13 +1,8 @@
 import { prisma } from "../../database/prisma.client";
 import { TaskAnalyticsDto } from "./task.dto";
+import { ASSIGNMENT_STATUS } from "../../common/constants/status.constant";
 
 export class TaskAnalyticsService {
-  /**
-   * Tổng hợp chỉ số tổng quan:
-   * - Tổng số task
-   * - Phân phối theo trạng thái phân công (TODO, IN_PROGRESS, REVIEW, DONE, BLOCKED)
-   * - Phân phối theo độ ưu tiên (HIGH/P0, MEDIUM/P1, LOW/P2)
-   */
   private async getOverview(taskGroupId?: string) {
     const taskWhere: any = { deletedAt: null };
     if (taskGroupId) {
@@ -59,15 +54,6 @@ export class TaskAnalyticsService {
     };
   }
 
-  /**
-   * Thống kê tải công việc theo Intern:
-   * - Tổng số task được giao
-   * - Tổng số ngày công ước lượng (estDays)
-   * - Phân phối theo trạng thái
-   *
-   * Đây là dữ liệu cốt lõi để AI Allocation sau này tính toán
-   * Workload Cap và tránh overload một intern.
-   */
   private async getWorkloadByIntern(taskGroupId?: string) {
     const where: any = {
       task: { deletedAt: null },
@@ -143,15 +129,6 @@ export class TaskAnalyticsService {
     }));
   }
 
-  /**
-   * Thống kê tiến độ theo Phase:
-   * - Tổng số task trong phase
-   * - Số task đã Done
-   * - Tỉ lệ hoàn thành (0.0 - 1.0)
-   *
-   * Chỉ tính các task có trường phase (được import từ Excel).
-   * Phục vụ biểu đồ Timeline Roadmap trên Dashboard.
-   */
   private async getProgressByPhase(taskGroupId?: string) {
     const where: any = {
       deletedAt: null,
@@ -187,7 +164,7 @@ export class TaskAnalyticsService {
       const entry = phaseMap.get(phase)!;
       entry.totalTasks++;
 
-      if (task.assignment?.status === "DONE") {
+      if (task.assignment?.status === ASSIGNMENT_STATUS.DONE) {
         entry.doneTasks++;
       }
     }
@@ -206,9 +183,6 @@ export class TaskAnalyticsService {
       }));
   }
 
-  /**
-   * Tổng hợp toàn bộ analytics vào một response duy nhất.
-   */
   async getAll(taskGroupId?: string): Promise<TaskAnalyticsDto> {
     const [overview, workloadByIntern, progressByPhase] = await Promise.all([
       this.getOverview(taskGroupId),

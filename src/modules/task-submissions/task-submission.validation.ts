@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { validateUrl } from "../../common/helpers/url.helper";
+import { REVIEW_STATUS } from "../../common/constants/status.constant";
 
 const isPublicUrl = (val: string | null | undefined) => {
   if (!val) return true;
@@ -13,7 +14,7 @@ const isPublicUrl = (val: string | null | undefined) => {
 
 export const findAllSubmissionSchema = z.object({
   assignmentId: z.string().uuid().optional(),
-  reviewStatus: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
+  reviewStatus: z.enum([REVIEW_STATUS.PENDING, REVIEW_STATUS.APPROVED, REVIEW_STATUS.REJECTED]).optional(),
   reviewedBy: z.string().uuid().optional(),
   internId: z.string().uuid().optional(),
   taskId: z.string().uuid().optional(),
@@ -34,7 +35,7 @@ export const updateSubmissionSchema = z.object({
   prLink: z.string().url().nullable().refine(isPublicUrl, { message: "URL cannot be a private or local address" }).optional().or(z.literal("")),
   videoDemo: z.string().url().nullable().refine(isPublicUrl, { message: "URL cannot be a private or local address" }).optional().or(z.literal("")),
   note: z.string().max(1000).nullable().optional(),
-  reviewStatus: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
+  reviewStatus: z.enum([REVIEW_STATUS.PENDING, REVIEW_STATUS.APPROVED, REVIEW_STATUS.REJECTED]).optional(),
   reviewComment: z.string().max(1000).nullable().optional(),
 });
 

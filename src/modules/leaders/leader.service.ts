@@ -2,6 +2,7 @@ import { LeaderRepository } from "./leader.repository";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import { LeaderQueryDto, CreateLeaderDto, UpdateLeaderDto } from "./leader.dto";
+import { prisma } from "../../database/prisma.client";
 
 export class LeaderService {
   private readonly repository = new LeaderRepository();
@@ -19,10 +20,27 @@ export class LeaderService {
   }
 
   async create(data: CreateLeaderDto) {
+    const user = await prisma.user.findUnique({
+      where: { id: data.userId },
+      include: { role: true },
+    });
+
+    if (!user) {
+      throw new AppError("Không tìm thấy người dùng", 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    if (user.role.name !== "LEADER") {
+      throw new AppError(
+        "Người dùng không có vai trò LEADER",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
     const existing = await this.repository.findByUserId(data.userId);
     if (existing) {
       throw new AppError(
-        "This user already has a leader profile",
+        "Người dùng này đã có hồ sơ leader",
         409,
         ERROR_CODE.DUPLICATE_ENTRY,
       );
