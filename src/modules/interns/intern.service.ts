@@ -4,6 +4,7 @@ import { ERROR_CODE } from "../../common/errors/error-code";
 import { InternQueryDto, CreateInternDto, UpdateInternDto, UpdateMeInternDto } from "./intern.dto";
 import { prisma } from "../../database/prisma.client";
 import { INTERN_STATUS } from "../../common/constants/status.constant";
+import { validatePhoneUniqueness } from "../../common/helpers/phone.helper";
 
 export class InternService {
   private readonly repository = new InternRepository();
@@ -18,7 +19,7 @@ export class InternService {
     const profile = await this.repository.findById(id);
 
     if (!profile) {
-      throw new AppError("Intern not found", 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError("Không tìm thấy thực tập sinh", 404, ERROR_CODE.NOT_FOUND);
     }
 
     return profile;
@@ -29,17 +30,23 @@ export class InternService {
 
     if (existing) {
       throw new AppError(
-        "This user already has an intern profile",
+        "Người dùng này đã có hồ sơ thực tập sinh",
         409,
         ERROR_CODE.DUPLICATE_ENTRY,
       );
     }
+
+    await validatePhoneUniqueness(data.phone);
 
     return this.repository.create(data);
   }
 
   async update(id: string, data: UpdateInternDto) {
     const intern = await this.findById(id);
+
+    if (data.phone) {
+      await validatePhoneUniqueness(data.phone, { internId: id });
+    }
 
     // If dropping, deactivate user account
     if (data.status === INTERN_STATUS.DROPPED && intern.userId) {
@@ -87,7 +94,7 @@ export class InternService {
     const profile = await this.repository.findByUserId(userId);
 
     if (!profile) {
-      throw new AppError("Intern profile not found", 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError("Không tìm thấy hồ sơ thực tập sinh", 404, ERROR_CODE.NOT_FOUND);
     }
 
     return profile;
@@ -96,6 +103,6 @@ export class InternService {
   async updateMe(userId: string, data: UpdateMeInternDto) {
     const profile = await this.getMe(userId);
 
-    return this.repository.update(profile.id, data);
+    return this.update(profile.id, data);
   }
 }

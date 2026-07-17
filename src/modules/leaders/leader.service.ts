@@ -3,6 +3,7 @@ import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import { LeaderQueryDto, CreateLeaderDto, UpdateLeaderDto } from "./leader.dto";
 import { prisma } from "../../database/prisma.client";
+import { validatePhoneUniqueness } from "../../common/helpers/phone.helper";
 
 export class LeaderService {
   private readonly repository = new LeaderRepository();
@@ -14,7 +15,7 @@ export class LeaderService {
   async findById(id: string) {
     const leader = await this.repository.findById(id);
     if (!leader) {
-      throw new AppError("Leader not found", 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError("Không tìm thấy Leader", 404, ERROR_CODE.NOT_FOUND);
     }
     return leader;
   }
@@ -45,11 +46,19 @@ export class LeaderService {
         ERROR_CODE.DUPLICATE_ENTRY,
       );
     }
+
+    if (data.phone) {
+      await validatePhoneUniqueness(data.phone);
+    }
+
     return this.repository.create(data);
   }
 
   async update(id: string, data: UpdateLeaderDto) {
     await this.findById(id);
+    if (data.phone) {
+      await validatePhoneUniqueness(data.phone, { leaderId: id });
+    }
     return this.repository.update(id, data);
   }
 

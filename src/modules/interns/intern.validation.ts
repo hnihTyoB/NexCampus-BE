@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { INTERN_STATUS } from "../../common/constants/status.constant";
+import { VIETNAMESE_PHONE_REGEX } from "../../common/helpers/phone.helper";
 
 export const findAllInternSchema = z.object({
   fullName: z.string().optional(),
@@ -35,7 +36,7 @@ export const createInternSchema = z.object({
   userId: z.string().uuid("Invalid userId"),
   leaderId: z.string().uuid("Invalid leaderId").optional(),
   fullName: z.string().min(1, "Full name is required").max(100),
-  phone: z.string().min(9).max(15),
+  phone: z.string().regex(VIETNAMESE_PHONE_REGEX, "Số điện thoại không đúng định dạng Việt Nam"),
   departmentId: z.string().uuid("Invalid departmentId"),
   positionId: z.string().uuid("Invalid positionId"),
   startDate: z.string().refine((v) => !isNaN(Date.parse(v)), {
@@ -47,7 +48,7 @@ export const createInternSchema = z.object({
 
 export const updateInternSchema = z.object({
   fullName: z.string().min(1).max(100).optional(),
-  phone: z.string().min(9).max(15).optional(),
+  phone: z.string().regex(VIETNAMESE_PHONE_REGEX, "Số điện thoại không đúng định dạng Việt Nam").optional(),
   departmentId: z.string().uuid().optional(),
   positionId: z.string().uuid().optional(),
   startDate: z
@@ -65,7 +66,7 @@ export const assignLeaderSchema = z.object({
 });
 
 export const updateMeInternSchema = z.object({
-  phone: z.string().min(9).max(15).optional(),
+  phone: z.string().regex(VIETNAMESE_PHONE_REGEX, "Số điện thoại không đúng định dạng Việt Nam").optional(),
   departmentId: z.string().uuid().optional(),
   positionId: z.string().uuid().optional(),
   discordUsername: z.string().nullable().optional(),

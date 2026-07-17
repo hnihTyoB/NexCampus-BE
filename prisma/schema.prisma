@@ -99,7 +99,7 @@ model Leader {
   userId       String    @unique @map("user_id") @db.Uuid
   departmentId String?   @map("department_id") @db.Uuid
   position     String?
-  phone        String?
+  phone        String?   @unique
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
@@ -165,7 +165,7 @@ model Intern {
   userId             String       @unique @map("user_id") @db.Uuid
   leaderId           String?      @map("leader_id") @db.Uuid
   fullName           String       @map("full_name")
-  phone              String
+  phone              String       @unique
   departmentId       String?      @map("department_id") @db.Uuid
   positionId         String?      @map("position_id") @db.Uuid
   startDate          DateTime     @map("start_date")

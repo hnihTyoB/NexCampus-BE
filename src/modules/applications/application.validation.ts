@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { APPLICATION_STATUS, APPLICATION_INVITE_STATUS } from "../../common/constants/status.constant";
+import { VIETNAMESE_PHONE_REGEX } from "../../common/helpers/phone.helper";
 
 export const findAllApplicationSchema = z.object({
   status: z.enum([APPLICATION_STATUS.PENDING, APPLICATION_STATUS.APPROVED, APPLICATION_STATUS.REJECTED]).optional(),
@@ -27,7 +28,7 @@ export const findAllApplicationSchema = z.object({
 export const createApplicationSchema = z.object({
   fullName: z.string().min(1, "Full name is required").max(100),
   email: z.string().min(1, "Email is required").email("Invalid email format"),
-  phone: z.string().min(9, "Phone must be at least 9 digits").max(15),
+  phone: z.string().regex(VIETNAMESE_PHONE_REGEX, "Số điện thoại không đúng định dạng Việt Nam"),
   departmentId: z.string().uuid("Invalid department ID"),
   positionId: z.string().uuid("Invalid position ID"),
   startDate: z.string().refine((val) => !isNaN(Date.parse(val)), {

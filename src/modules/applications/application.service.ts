@@ -17,6 +17,7 @@ import { ActivityLogService } from "../activity-logs/activity-log.service";
 import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
 import { prisma } from "../../database/prisma.client";
 import { generateSecurePassword } from "../../common/helpers/password.helper";
+import { validatePhoneUniqueness } from "../../common/helpers/phone.helper";
 
 export class ApplicationService {
   private readonly repository = new ApplicationRepository();
@@ -256,7 +257,7 @@ export class ApplicationService {
 
     if (application.status !== APPLICATION_STATUS.PENDING) {
       throw new AppError(
-        `Application is already ${application.status.toLowerCase()}`,
+        `Đơn đăng ký đã ở trạng thái ${application.status.toLowerCase()}`,
         409,
         ERROR_CODE.DUPLICATE_ENTRY,
       );
@@ -271,18 +272,20 @@ export class ApplicationService {
       });
       if (existingUser) {
         throw new AppError(
-          "A user with this email already exists.",
+          "Người dùng với email này đã tồn tại trên hệ thống.",
           409,
           ERROR_CODE.DUPLICATE_ENTRY,
         );
       }
+
+      await validatePhoneUniqueness(application.phone);
 
       // Get INTERN role
       const role = await prisma.role.findUnique({
         where: { name: "INTERN" },
       });
       if (!role) {
-        throw new AppError("Role 'INTERN' not found", 404, ERROR_CODE.NOT_FOUND);
+        throw new AppError("Không tìm thấy vai trò 'INTERN'", 404, ERROR_CODE.NOT_FOUND);
       }
 
       const password = generateSecurePassword();
