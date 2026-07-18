@@ -37,6 +37,7 @@
     "nodemailer": "^9.0.3",
     "puppeteer": "^25.3.0",
     "swagger-ui-express": "^5.0.1",
+    "socket.io": "^4.8.1",
     "xlsx": "^0.18.5",
     "zod": "^3.24.1"
   },

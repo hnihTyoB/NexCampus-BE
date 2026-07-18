@@ -5336,6 +5336,83 @@ export const swaggerSpec = {
         },
       },
     },
+    "/notifications/ticket": {
+      get: {
+        tags: ["Notifications"],
+        summary: "Lấy One-Time Ticket để kết nối stream thông báo",
+        description: "Tạo ra một ticket ID ngẫu nhiên, ngắn hạn (hạn dùng 30 giây) để client sử dụng mở luồng SSE stream an toàn mà không cần truyền trực tiếp Access Token qua URL.",
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: {
+            description: "Tạo ticket thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    ticket: { type: "string", example: "550e8400-e29b-41d4-a716-446655440000" }
+                  }
+                }
+              }
+            }
+          },
+          401: { $ref: "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/notifications/stream": {
+      get: {
+        tags: ["Notifications"],
+        summary: "Kết nối real-time nhận thông báo (Server-Sent Events)",
+        description: "Thiết lập kết nối stream HTTP EventSource để nhận thông báo thời gian thực. Xác thực bảo mật bằng tham số query '?ticket=TICKET_ID' thu được từ API `/notifications/ticket`.",
+        parameters: [
+          {
+            in: "query",
+            name: "ticket",
+            required: true,
+            schema: { type: "string" },
+            description: "One-time Ticket ID hợp lệ và chưa hết hạn"
+          }
+        ],
+        responses: {
+          200: {
+            description: "Thiết lập kết nối EventSource thành công, phản hồi với header Content-Type: text/event-stream"
+          },
+          401: {
+            description: "Không được xác thực do thiếu ticket, ticket không hợp lệ hoặc đã hết hạn"
+          }
+        }
+      }
+    },
+    "/notifications/read-all": {
+      patch: {
+        tags: ["Notifications"],
+        summary: "Đánh dấu tất cả thông báo của người dùng hiện tại là đã đọc",
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: {
+            description: "Cập nhật thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        message: { type: "string", example: "All notifications marked as read" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          401: { $ref: "#/components/responses/Unauthorized" }
+        }
+      }
+    },
     "/notifications/{id}": {
       get: {
         tags: ["Notifications"],

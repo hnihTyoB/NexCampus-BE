@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { NotificationService } from "./notification.service";
 import { ReminderService } from "./reminder.service";
+import { subscribeNotificationStream, generateOneTimeTicket, validateOneTimeTicket } from "../../lib/sse";
 import {
   NotificationQueryDto,
   CreateNotificationDto,
@@ -8,6 +9,40 @@ import {
 
 export class NotificationController {
   private readonly service = new NotificationService();
+
+  getTicket = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const ticket = generateOneTimeTicket(req.user.id);
+      res.json({ success: true, ticket });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  stream = (req: Request, res: Response) => {
+    const ticketId = req.query.ticket as string | undefined;
+    if (!ticketId) {
+      res.status(401).json({ success: false, message: "Ticket missing" });
+      return;
+    }
+
+    const userId = validateOneTimeTicket(ticketId);
+    if (!userId) {
+      res.status(401).json({ success: false, message: "Invalid or expired ticket" });
+      return;
+    }
+
+    subscribeNotificationStream(userId, res);
+  };
+
+  markAllAsRead = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await this.service.markAllAsRead(req.user.id);
+      res.json({ success: true, message: "All notifications marked as read" });
+    } catch (error) {
+      next(error);
+    }
+  };
 
   findAll = async (req: Request, res: Response, next: NextFunction) => {
     try {

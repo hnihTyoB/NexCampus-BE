@@ -7,6 +7,7 @@ import {
   CreateNotificationDto,
 } from "./notification.dto";
 import { ROLES } from "../../common/constants/role.constant";
+import { emitNotificationToUser } from "../../lib/sse";
 
 interface UserPayload {
   id: string;
@@ -49,7 +50,9 @@ export class NotificationService {
       throw new AppError("Recipient user not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
-    return this.repository.create(data);
+    const created = await this.repository.create(data);
+    emitNotificationToUser(data.userId, created);
+    return created;
   }
 
   async markAsRead(id: string, user: UserPayload) {
@@ -62,9 +65,15 @@ export class NotificationService {
     return this.repository.markAsRead(id);
   }
 
+  async markAllAsRead(userId: string) {
+    return prisma.notification.updateMany({
+      where: { userId, isRead: false },
+      data: { isRead: true },
+    });
+  }
+
   async delete(id: string, user: UserPayload) {
     await this.findById(id, user);
-
     return this.repository.delete(id);
   }
 
@@ -117,6 +126,8 @@ export class NotificationService {
         },
       });
       notificationId = notification.id;
+
+      emitNotificationToUser(recipient.id, notification);
 
       await prisma.notificationLog.create({
         data: {

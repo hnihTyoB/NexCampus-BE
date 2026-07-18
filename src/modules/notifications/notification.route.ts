@@ -38,6 +38,25 @@ router.post(
 );
 
 router.get(
+  "/ticket",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER, ROLES.INTERN),
+  controller.getTicket,
+);
+
+router.get(
+  "/stream",
+  controller.stream,
+);
+
+router.patch(
+  "/read-all",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER, ROLES.INTERN),
+  controller.markAllAsRead,
+);
+
+router.get(
   "/",
   authMiddleware,
   requireRole(ROLES.ADMIN, ROLES.LEADER, ROLES.INTERN),
