@@ -163,13 +163,34 @@ export const swaggerSpec = {
             example: "admin@nexcampus.local",
           },
           password: { type: "string", example: "Admin@123456" },
+          rememberMe: {
+            type: "boolean",
+            example: true,
+            description: "Ghi nhớ đăng nhập (true: cookie 7 ngày, false: session cookie xóa khi đóng trình duyệt)",
+          },
         },
       },
       TokenPair: {
         type: "object",
         properties: {
           accessToken: { type: "string" },
-          refreshToken: { type: "string" },
+          refreshToken: { type: "string", description: "Refresh token (Cũng được thiết lập trong HttpOnly Cookie)" },
+        },
+      },
+      RefreshResponseData: {
+        type: "object",
+        properties: {
+          accessToken: { type: "string", example: "eyJhbGciOi..." },
+          user: {
+            type: "object",
+            properties: {
+              id: { type: "string", format: "uuid" },
+              email: { type: "string", format: "email" },
+              fullName: { type: "string", nullable: true },
+              role: { type: "string", example: "ADMIN" },
+              avatarUrl: { type: "string", format: "uri", nullable: true },
+            },
+          },
         },
       },
       RefreshBody: {
@@ -1261,7 +1282,7 @@ export const swaggerSpec = {
       post: {
         tags: ["Auth"],
         summary: "Đăng nhập",
-        description: "Đăng nhập vào hệ thống. API sẽ trả về cặp token ở response body, đồng thời tự động thiết lập Cookie `refreshToken` (HttpOnly, Secure, SameSite) có thời hạn 7 ngày.",
+        description: "Đăng nhập vào hệ thống. API trả về accessToken và thông tin user ở response body, đồng thời tự động thiết lập Cookie `refreshToken` (HttpOnly, Secure, SameSite). Nếu `rememberMe=true`, cookie có thời hạn 7 ngày; nếu `false`, cookie là session cookie bị xóa khi đóng trình duyệt.",
         requestBody: {
           required: true,
           content: {
@@ -1367,8 +1388,8 @@ export const swaggerSpec = {
     "/auth/refresh": {
       post: {
         tags: ["Auth"],
-        summary: "Làm mới Access Token",
-        description: "Làm mới cặp token. API hỗ trợ lấy `refreshToken` tự động từ HttpOnly Cookie hoặc từ request body (fallback). Sau khi thành công sẽ thiết lập lại Cookie `refreshToken` mới.",
+        summary: "Làm mới Access Token & khôi phục thông tin User",
+        description: "Làm mới cặp token và trả về thông tin User. API lấy `refreshToken` tự động từ HttpOnly Cookie. Sau khi thành công sẽ thiết lập lại Cookie `refreshToken` mới và trả về `accessToken` + `user`.",
         requestBody: {
           required: false,
           content: {
@@ -1379,7 +1400,7 @@ export const swaggerSpec = {
         },
         responses: {
           200: {
-            description: "Cặp token mới",
+            description: "Access token mới và thông tin người dùng",
             content: {
               "application/json": {
                 schema: {
@@ -1388,7 +1409,7 @@ export const swaggerSpec = {
                     {
                       type: "object",
                       properties: {
-                        data: { $ref: "#/components/schemas/TokenPair" },
+                        data: { $ref: "#/components/schemas/RefreshResponseData" },
                       },
                     },
                   ],

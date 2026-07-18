@@ -8,6 +8,13 @@ export interface AuthTokensDto {
   accessToken: string;
   refreshToken: string;
   rememberMe?: boolean;
+  user?: {
+    id: string;
+    email: string;
+    fullName: string | null;
+    role: string;
+    avatarUrl: string | null;
+  };
 }
 
 export interface MeInternDto {

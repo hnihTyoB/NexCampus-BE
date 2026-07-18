@@ -171,6 +171,13 @@ export class AuthService {
       accessToken: newAccessToken,
       refreshToken: newRefreshToken,
       rememberMe,
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role.name,
+        avatarUrl: user.avatarUrl,
+      },
     };
   }
 

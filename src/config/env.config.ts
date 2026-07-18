@@ -42,7 +42,7 @@ export const envConfig = {
   nodeEnv: process.env.NODE_ENV || "development",
   port: parseInt(process.env.PORT || "8888", 10),
   app: {
-    baseUrl: process.env.BASE_URL || "http://localhost:8888",
+    baseUrl: process.env.BASE_URL || "http://localhost:3000",
     // Số lớp proxy tin cậy đứng trước server (Nginx/ALB).
     // false  = không có proxy, dùng socket.remoteAddress (an toàn nhất cho dev).
     // 1      = 1 lớp proxy (phổ biến nhất với Nginx).

@@ -100,7 +100,10 @@ export class AuthController {
 
       res.json({
         success: true,
-        data: { accessToken: result.accessToken },
+        data: {
+          accessToken: result.accessToken,
+          user: result.user,
+        },
       });
     } catch (error) {
       next(error);
