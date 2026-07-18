@@ -13,6 +13,7 @@ async function processNotificationJob(job: Job<NotificationJobData>) {
   const {
     notificationId,
     userId,
+    guestEmail,
     title,
     content,
     emailEnabled,
@@ -20,8 +21,8 @@ async function processNotificationJob(job: Job<NotificationJobData>) {
   } = job.data;
 
   // Resolve recipient email
-  let recipientEmail: string | null = null;
-  if (emailEnabled) {
+  let recipientEmail: string | null = guestEmail ?? null;
+  if (emailEnabled && !recipientEmail && userId) {
     const user = await prisma.user.findFirst({
       where: { id: userId, deletedAt: null },
       select: { email: true },
@@ -31,6 +32,22 @@ async function processNotificationJob(job: Job<NotificationJobData>) {
 
   // Send EMAIL
   if (emailEnabled && recipientEmail) {
+    // Idempotency check: skip sending if an email log with SUCCESS status already exists
+    const existingLog = await prisma.notificationLog.findFirst({
+      where: {
+        notificationId,
+        channel: NOTIFICATION_CHANNEL.EMAIL,
+        status: NOTIFICATION_LOG_STATUS.SUCCESS,
+      },
+    });
+
+    if (existingLog) {
+      console.log(
+        `[NotificationWorker] Notification ${notificationId} email already sent successfully. Skipping retry.`,
+      );
+      return;
+    }
+
     const finalSubject = job.data.emailSubject || title;
     const finalContent = job.data.emailContent || content;
     const success = await EmailService.sendMail(recipientEmail, finalSubject, finalContent);

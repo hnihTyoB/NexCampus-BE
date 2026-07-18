@@ -18,14 +18,26 @@ export class RegulationRepository {
     });
   }
 
-  async findAll(query: { page?: number; limit?: number }) {
+  async findAll(query: { page?: number; limit?: number; title?: string; isActive?: boolean }) {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 20;
     const skip = (page - 1) * limit;
 
+    const where: any = {};
+    if (query.title) {
+      where.title = {
+        contains: query.title,
+        mode: "insensitive",
+      };
+    }
+    if (query.isActive !== undefined) {
+      where.isActive = query.isActive;
+    }
+
     const [total, items] = await Promise.all([
-      prisma.regulation.count(),
+      prisma.regulation.count({ where }),
       prisma.regulation.findMany({
+        where,
         orderBy: { version: "desc" },
         skip,
         take: limit,
@@ -61,6 +73,13 @@ export class RegulationRepository {
     });
   }
 
+  async isUsed(id: string): Promise<boolean> {
+    const count = await prisma.application.count({
+      where: { regulationId: id },
+    });
+    return count > 0;
+  }
+
   async setActive(id: string) {
     return prisma.$transaction(async (tx) => {
       await tx.regulation.updateMany({
@@ -71,6 +90,8 @@ export class RegulationRepository {
         where: { id },
         data: { isActive: true },
       });
+    }, {
+      isolationLevel: "Serializable",
     });
   }
 }

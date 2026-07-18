@@ -10,6 +10,8 @@ import {
 } from "./notification.validation";
 import { ROLES } from "../../common/constants/role.constant";
 
+import { rateLimitMiddleware } from "../../middlewares/rate-limit.middleware";
+
 const router = Router();
 const controller = new NotificationController();
 
@@ -17,6 +19,7 @@ router.post(
   "/send-custom",
   authMiddleware,
   requireRole(ROLES.ADMIN, ROLES.LEADER),
+  rateLimitMiddleware,
   validate(sendCustomNotificationSchema),
   controller.sendCustom,
 );

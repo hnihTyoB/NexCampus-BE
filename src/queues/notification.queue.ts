@@ -3,7 +3,8 @@ import { envConfig } from "../config/env.config";
 
 export interface NotificationJobData {
   notificationId: string;
-  userId: string;
+  userId?: string;
+  guestEmail?: string;
   title: string;
   content: string;
   emailEnabled: boolean;

@@ -1,6 +1,6 @@
-import { prisma } from "../../database/prisma.client";
 import { EmailService } from "../services/email.service";
 import { TEMPLATE_DEFAULTS } from "../constants/notification-template.constant";
+import { TemplateCacheHelper } from "./template-cache.helper";
 
 function interpolate(template: string, params: Record<string, unknown>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) =>
@@ -14,15 +14,7 @@ export class TemplateEmailHelper {
     type: string,
     params: Record<string, unknown>,
   ): Promise<boolean> {
-    const template = await prisma.notificationTemplate.findUnique({
-      where: { type },
-      select: {
-        emailSubjectTemplate: true,
-        emailContentTemplate: true,
-        titleTemplate: true,
-        contentTemplate: true,
-      },
-    });
+    const template = await TemplateCacheHelper.getTemplate(type);
 
     const fallback = TEMPLATE_DEFAULTS[type];
 

@@ -28,4 +28,5 @@ export const sendCustomNotificationSchema = z.object({
   emailContent: z.string().max(5000).optional(),
   sendWeb: z.boolean().optional(),
   sendEmail: z.boolean().optional(),
+  params: z.record(z.unknown()).optional(),
 });

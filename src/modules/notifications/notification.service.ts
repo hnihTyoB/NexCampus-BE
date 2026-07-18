@@ -76,7 +76,20 @@ export class NotificationService {
     emailContent?: string;
     sendWeb?: boolean;
     sendEmail?: boolean;
+    params?: Record<string, unknown>;
   }) {
+    const interpolate = (tpl: string, p?: Record<string, unknown>) => {
+      if (!p) return tpl;
+      return tpl.replace(/\{\{(\w+)\}\}/g, (_, key) =>
+        p[key] !== undefined ? String(p[key]) : `{{${key}}}`,
+      );
+    };
+
+    const finalTitle = interpolate(data.title, data.params);
+    const finalContent = interpolate(data.content, data.params);
+    const finalSubject = interpolate(data.emailSubject || data.title, data.params);
+    const finalBody = interpolate(data.emailContent || data.content, data.params);
+
     const recipient = await prisma.user.findFirst({
       where: { email: data.email.toLowerCase().trim(), deletedAt: null },
     });
@@ -97,8 +110,8 @@ export class NotificationService {
       notification = await prisma.notification.create({
         data: {
           userId: recipient.id,
-          title: data.title,
-          content: data.content,
+          title: finalTitle,
+          content: finalContent,
           type: "CUSTOM",
           isRead: false,
         },
@@ -115,28 +128,18 @@ export class NotificationService {
     }
 
     if (data.sendEmail !== false) {
-      if (recipient) {
-        // Registered user: queue the email job normally
-        const { notificationQueue } = await import("../../queues/notification.queue");
-        await notificationQueue.add(`notify-custom-${notificationId}`, {
-          notificationId,
-          userId: recipient.id,
-          title: data.title,
-          content: data.content,
-          emailEnabled: true,
-          discordEnabled: false,
-          emailSubject: data.emailSubject || data.title,
-          emailContent: data.emailContent || data.content,
-        });
-      } else {
-        // Guest or onboarding candidate: dispatch directly using EmailService
-        const { EmailService } = await import("../../common/services/email.service");
-        await EmailService.sendMail(
-          data.email.toLowerCase().trim(),
-          data.emailSubject || data.title,
-          data.emailContent || data.content
-        );
-      }
+      const { notificationQueue } = await import("../../queues/notification.queue");
+      await notificationQueue.add(`notify-custom-${notificationId}`, {
+        notificationId,
+        userId: recipient?.id,
+        guestEmail: !recipient ? data.email.toLowerCase().trim() : undefined,
+        title: finalTitle,
+        content: finalContent,
+        emailEnabled: true,
+        discordEnabled: false,
+        emailSubject: finalSubject,
+        emailContent: finalBody,
+      });
     }
 
     return { success: true, notification };

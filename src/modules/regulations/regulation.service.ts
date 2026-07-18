@@ -29,7 +29,7 @@ export class RegulationService {
     return regulation;
   }
 
-  async findAll(query: { page?: number; limit?: number }) {
+  async findAll(query: { page?: number; limit?: number; title?: string; isActive?: boolean }) {
     return this.repository.findAll(query);
   }
 
@@ -76,6 +76,11 @@ export class RegulationService {
 
     if (regulation.isActive) {
       throw new AppError("Cannot delete an active regulation. Please activate another regulation first.", 400, ERROR_CODE.VALIDATION_ERROR);
+    }
+
+    const isUsed = await this.repository.isUsed(id);
+    if (isUsed) {
+      throw new AppError("Cannot delete this regulation because it is already accepted by interns.", 400, ERROR_CODE.VALIDATION_ERROR);
     }
 
     await this.repository.delete(id);

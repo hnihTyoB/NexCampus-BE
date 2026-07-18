@@ -9,7 +9,12 @@ export class RegulationController {
     try {
       const page = req.query.page ? Number(req.query.page) : undefined;
       const limit = req.query.limit ? Number(req.query.limit) : undefined;
-      const result = await this.service.findAll({ page, limit });
+      const title = req.query.title ? String(req.query.title) : undefined;
+      let isActive: boolean | undefined = undefined;
+      if (req.query.isActive === "true") isActive = true;
+      if (req.query.isActive === "false") isActive = false;
+
+      const result = await this.service.findAll({ page, limit, title, isActive });
 
       res.json({ success: true, ...result });
     } catch (error) {

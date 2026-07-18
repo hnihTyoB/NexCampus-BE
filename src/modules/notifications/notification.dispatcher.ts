@@ -7,6 +7,7 @@ import {
 import { notificationQueue } from "../../queues/notification.queue";
 
 import { TEMPLATE_DEFAULTS } from "../../common/constants/notification-template.constant";
+import { TemplateCacheHelper } from "../../common/helpers/template-cache.helper";
 
 const interpolate = (template: string, variables: Record<string, any>) => {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
@@ -37,10 +38,8 @@ export class NotificationDispatcher {
         });
       }
 
-      // 2. Fetch template from database
-      const dbTemplate = await prisma.notificationTemplate.findUnique({
-        where: { type },
-      });
+      // 2. Fetch template from cache / database
+      const dbTemplate = await TemplateCacheHelper.getTemplate(type);
 
       const titleTemplate =
         dbTemplate?.titleTemplate || TEMPLATE_DEFAULTS[type]?.titleTemplate || "Thông báo mới";
@@ -48,9 +47,18 @@ export class NotificationDispatcher {
         dbTemplate?.contentTemplate || TEMPLATE_DEFAULTS[type]?.contentTemplate || "";
 
       const emailSubjectTemplate =
-        dbTemplate?.emailSubjectTemplate || titleTemplate;
+        dbTemplate?.emailSubjectTemplate ||
+        dbTemplate?.titleTemplate ||
+        TEMPLATE_DEFAULTS[type]?.emailSubjectTemplate ||
+        TEMPLATE_DEFAULTS[type]?.titleTemplate ||
+        titleTemplate;
+
       const emailContentTemplate =
-        dbTemplate?.emailContentTemplate || contentTemplate;
+        dbTemplate?.emailContentTemplate ||
+        dbTemplate?.contentTemplate ||
+        TEMPLATE_DEFAULTS[type]?.emailContentTemplate ||
+        TEMPLATE_DEFAULTS[type]?.contentTemplate ||
+        contentTemplate;
 
       // 3. Interpolate parameters
       const title = interpolate(titleTemplate, params);

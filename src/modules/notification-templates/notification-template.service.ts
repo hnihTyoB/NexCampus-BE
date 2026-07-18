@@ -7,6 +7,7 @@ import {
 } from "./notification-template.dto";
 
 import { TEMPLATE_DEFAULTS } from "../../common/constants/notification-template.constant";
+import { TemplateCacheHelper } from "../../common/helpers/template-cache.helper";
 
 export class NotificationTemplateService {
   private readonly repository = new NotificationTemplateRepository();
@@ -38,12 +39,16 @@ export class NotificationTemplateService {
         ERROR_CODE.DUPLICATE_ENTRY,
       );
     }
-    return this.repository.create(data);
+    const res = await this.repository.create(data);
+    TemplateCacheHelper.clearCache(data.type);
+    return res;
   }
 
   async update(id: string, data: UpdateNotificationTemplateDto) {
-    await this.findById(id);
-    return this.repository.update(id, data);
+    const template = await this.findById(id);
+    const res = await this.repository.update(id, data);
+    TemplateCacheHelper.clearCache(template.type);
+    return res;
   }
 
   async upsertByType(
@@ -55,7 +60,9 @@ export class NotificationTemplateService {
       emailContentTemplate?: string | null;
     },
   ) {
-    return this.repository.upsertByType(type, data);
+    const res = await this.repository.upsertByType(type, data);
+    TemplateCacheHelper.clearCache(type);
+    return res;
   }
 
   async reset(id: string) {
@@ -70,11 +77,14 @@ export class NotificationTemplateService {
       );
     }
 
-    return this.repository.resetToDefault(id, {
+    const res = await this.repository.resetToDefault(id, {
       titleTemplate: defaults.titleTemplate,
       contentTemplate: defaults.contentTemplate,
       emailSubjectTemplate: defaults.emailSubjectTemplate,
       emailContentTemplate: defaults.emailContentTemplate,
     });
+
+    TemplateCacheHelper.clearCache(template.type);
+    return res;
   }
 }
