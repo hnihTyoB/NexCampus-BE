@@ -17,18 +17,21 @@ export class AuthController {
       const result = await this.service.login(body, { userAgent, ipAddress });
 
       const isProduction = envConfig.nodeEnv === "production";
-      const maxAge = jwtConfig.refreshExpiresInMs;
 
+      // rememberMe=true  → persistent cookie (survives browser restart)
+      // rememberMe=false → session cookie (cleared when browser closes)
       res.cookie("refreshToken", result.refreshToken, {
         httpOnly: true,
         secure: isProduction,
         sameSite: isProduction ? "none" : "lax",
-        maxAge: maxAge,
+        ...(body.rememberMe ? { maxAge: jwtConfig.refreshExpiresInMs } : {}),
       });
 
+      // Never expose refreshToken in the response body - cookie handles it
+      const { refreshToken: _rt, ...publicData } = result;
       res.json({
         success: true,
-        data: result,
+        data: publicData,
       });
     } catch (error) {
       next(error);
@@ -68,7 +71,8 @@ export class AuthController {
 
   refresh = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const refreshToken = req.cookies?.refreshToken || req.body.refreshToken;
+      // Refresh token comes exclusively from the HTTP-only cookie
+      const refreshToken = req.cookies?.refreshToken;
       if (!refreshToken) {
         throw new AppError(
           "Refresh token is required",
@@ -84,18 +88,19 @@ export class AuthController {
       });
 
       const isProduction = envConfig.nodeEnv === "production";
-      const maxAge = jwtConfig.refreshExpiresInMs;
 
+      // Preserve the original rememberMe preference encoded in the JWT payload
+      const decoded = result.rememberMe;
       res.cookie("refreshToken", result.refreshToken, {
         httpOnly: true,
         secure: isProduction,
         sameSite: isProduction ? "none" : "lax",
-        maxAge: maxAge,
+        ...(decoded ? { maxAge: jwtConfig.refreshExpiresInMs } : {}),
       });
 
       res.json({
         success: true,
-        data: result,
+        data: { accessToken: result.accessToken },
       });
     } catch (error) {
       next(error);
@@ -104,7 +109,8 @@ export class AuthController {
 
   logout = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const refreshToken = req.cookies?.refreshToken || req.body.refreshToken;
+      // Refresh token comes exclusively from the HTTP-only cookie
+      const refreshToken = req.cookies?.refreshToken;
       if (!refreshToken) {
         throw new AppError(
           "Refresh token is required",

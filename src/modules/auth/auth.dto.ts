@@ -7,6 +7,7 @@ export interface LoginDto {
 export interface AuthTokensDto {
   accessToken: string;
   refreshToken: string;
+  rememberMe?: boolean;
 }
 
 export interface MeInternDto {

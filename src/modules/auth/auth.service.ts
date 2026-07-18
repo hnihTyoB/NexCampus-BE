@@ -170,6 +170,7 @@ export class AuthService {
     return {
       accessToken: newAccessToken,
       refreshToken: newRefreshToken,
+      rememberMe,
     };
   }
 
