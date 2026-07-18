@@ -43,7 +43,17 @@ export const envConfig = {
   port: parseInt(process.env.PORT || "8888", 10),
   app: {
     baseUrl: process.env.BASE_URL || "http://localhost:8888",
+    // Số lớp proxy tin cậy đứng trước server (Nginx/ALB).
+    // false  = không có proxy, dùng socket.remoteAddress (an toàn nhất cho dev).
+    // 1      = 1 lớp proxy (phổ biến nhất với Nginx).
+    // true   = NGUY HIỂM: client có thể giả mạo X-Forwarded-For.
+    trustProxy: process.env.TRUST_PROXY === "true"
+      ? true
+      : process.env.TRUST_PROXY === "false" || !process.env.TRUST_PROXY
+        ? false
+        : parseInt(process.env.TRUST_PROXY, 10),
   },
+
   database: {
     host: process.env.DB_HOST || "localhost",
     port: parseInt(process.env.DB_PORT || "5432", 10),

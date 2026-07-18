@@ -15,7 +15,7 @@ import { envConfig } from "./config/env.config";
 
 const app = express();
 
-app.set("trust proxy", true);
+app.set("trust proxy", envConfig.app.trustProxy ?? false);
 
 app.use(
   helmet({

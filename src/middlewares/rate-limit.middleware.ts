@@ -21,7 +21,8 @@ export function rateLimitMiddleware(
   res: Response,
   next: NextFunction,
 ): void {
-  const ip = req.ip || req.socket.remoteAddress || "unknown";
+  const ip = req.ip ?? req.socket.remoteAddress ?? "unknown";
+
   const now = Date.now();
 
   const record = requestCounts.get(ip);
