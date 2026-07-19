@@ -92,4 +92,16 @@ export class NotificationRepository {
       where: { id },
     });
   }
+
+  countUnread(userId: string) {
+    return prisma.notification.count({
+      where: { userId, isRead: false },
+    });
+  }
+
+  deleteReadNotifications(userId: string) {
+    return prisma.notification.deleteMany({
+      where: { userId, isRead: true },
+    });
+  }
 }

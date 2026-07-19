@@ -443,6 +443,7 @@ model Notification {
   logs NotificationLog[]
 
   @@index([userId])
+  @@index([userId, isRead, createdAt(sort: Desc)])
   @@map("notifications")
 }
 

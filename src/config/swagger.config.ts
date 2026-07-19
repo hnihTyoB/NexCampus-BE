@@ -5413,6 +5413,58 @@ export const swaggerSpec = {
         }
       }
     },
+    "/notifications/unread-count": {
+      get: {
+        tags: ["Notifications"],
+        summary: "Đếm chính xác tổng số thông báo chưa đọc của người dùng",
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: {
+            description: "Thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    count: { type: "integer", example: 5 }
+                  }
+                }
+              }
+            }
+          },
+          401: { $ref: "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/notifications/clear-read": {
+      delete: {
+        tags: ["Notifications"],
+        summary: "Xóa toàn bộ các thông báo đã đọc của người dùng hiện tại",
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: {
+            description: "Dọn dẹp thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        message: { type: "string", example: "Read notifications cleared successfully" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          401: { $ref: "#/components/responses/Unauthorized" }
+        }
+      }
+    },
     "/notifications/{id}": {
       get: {
         tags: ["Notifications"],

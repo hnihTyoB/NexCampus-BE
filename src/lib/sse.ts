@@ -1,5 +1,6 @@
 import { Response } from "express";
 import crypto from "crypto";
+import { NotificationEventType, NOTIFICATION_EVENT } from "../common/constants/notification-event.constant";
 
 // Map quản lý các connection stream: userId -> Response[]
 const activeClients = new Map<string, Response[]>();
@@ -80,14 +81,24 @@ export function subscribeNotificationStream(userId: string, res: Response) {
   });
 }
 
-export function emitNotificationToUser(userId: string, notification: unknown) {
+export function emitNotificationEventToUser(
+  userId: string,
+  event: { type: NotificationEventType; payload?: unknown }
+) {
   const responses = activeClients.get(userId);
   if (!responses) return;
 
-  const dataString = `data: ${JSON.stringify(notification)}\n\n`;
+  const dataString = `data: ${JSON.stringify(event)}\n\n`;
   for (const res of responses) {
     if (!res.writableEnded) {
       res.write(dataString);
     }
   }
+}
+
+export function emitNotificationToUser(userId: string, notification: unknown) {
+  emitNotificationEventToUser(userId, {
+    type: NOTIFICATION_EVENT.NEW,
+    payload: notification,
+  });
 }

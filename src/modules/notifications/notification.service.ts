@@ -7,7 +7,8 @@ import {
   CreateNotificationDto,
 } from "./notification.dto";
 import { ROLES } from "../../common/constants/role.constant";
-import { emitNotificationToUser } from "../../lib/sse";
+import { NOTIFICATION_EVENT } from "../../common/constants/notification-event.constant";
+import { emitNotificationToUser, emitNotificationEventToUser } from "../../lib/sse";
 
 interface UserPayload {
   id: string;
@@ -19,7 +20,11 @@ export class NotificationService {
   private readonly repository = new NotificationRepository();
 
   async findAll(query: NotificationQueryDto, user: UserPayload) {
-    const userIdFilter = user.role === ROLES.INTERN ? user.id : undefined;
+    // Nếu là INTERN: Bắt buộc chỉ được xem thông báo của chính mình
+    // Nếu là ADMIN/LEADER: Mặc định xem thông báo của chính mình, trừ khi truyền query.userId cụ thể
+    const userIdFilter = user.role === ROLES.INTERN
+      ? user.id
+      : (query.userId || user.id);
     return this.repository.findAll(query, userIdFilter);
   }
 
@@ -66,15 +71,32 @@ export class NotificationService {
   }
 
   async markAllAsRead(userId: string) {
-    return prisma.notification.updateMany({
+    const result = await prisma.notification.updateMany({
       where: { userId, isRead: false },
       data: { isRead: true },
     });
+    emitNotificationEventToUser(userId, { type: NOTIFICATION_EVENT.READ_ALL });
+    return result;
+  }
+
+  async countUnread(userId: string) {
+    return this.repository.countUnread(userId);
+  }
+
+  async deleteReadNotifications(userId: string) {
+    const result = await this.repository.deleteReadNotifications(userId);
+    emitNotificationEventToUser(userId, { type: NOTIFICATION_EVENT.CLEARED_READ });
+    return result;
   }
 
   async delete(id: string, user: UserPayload) {
-    await this.findById(id, user);
-    return this.repository.delete(id);
+    const notification = await this.findById(id, user);
+    const result = await this.repository.delete(id);
+    emitNotificationEventToUser(notification.userId, {
+      type: NOTIFICATION_EVENT.DELETED,
+      payload: { id },
+    });
+    return result;
   }
 
   async sendCustom(data: {

@@ -57,6 +57,20 @@ router.patch(
 );
 
 router.get(
+  "/unread-count",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER, ROLES.INTERN),
+  controller.countUnread,
+);
+
+router.delete(
+  "/clear-read",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER, ROLES.INTERN),
+  controller.clearRead,
+);
+
+router.get(
   "/",
   authMiddleware,
   requireRole(ROLES.ADMIN, ROLES.LEADER, ROLES.INTERN),

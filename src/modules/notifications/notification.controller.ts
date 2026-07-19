@@ -44,6 +44,24 @@ export class NotificationController {
     }
   };
 
+  countUnread = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const count = await this.service.countUnread(req.user.id);
+      res.json({ success: true, count });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  clearRead = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await this.service.deleteReadNotifications(req.user.id);
+      res.json({ success: true, message: "Read notifications cleared successfully" });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   findAll = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const query = req.query as unknown as NotificationQueryDto;
