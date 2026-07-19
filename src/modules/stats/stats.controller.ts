@@ -33,4 +33,17 @@ export class StatsController {
       next(error);
     }
   };
+
+  getInternStats = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const data = await this.service.getInternStats(req.user!);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

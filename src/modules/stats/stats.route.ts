@@ -13,11 +13,19 @@ router.get(
   requireRole(ROLES.ADMIN),
   controller.getAdminStats,
 );
+
 router.get(
   "/my",
   authMiddleware,
   requireRole(ROLES.ADMIN, ROLES.LEADER),
   controller.getLeaderStats,
+);
+
+router.get(
+  "/me",
+  authMiddleware,
+  requireRole(ROLES.INTERN),
+  controller.getInternStats,
 );
 
 export default router;
