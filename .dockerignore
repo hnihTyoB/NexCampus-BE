@@ -1,0 +1,12 @@
+node_modules
+dist
+.env
+.env.local
+.git
+.gitignore
+.vscode
+Dockerfile
+docker-compose.yml
+README.md
+*.log
+weekly-report-test.pdf
