@@ -241,6 +241,17 @@ export const swaggerSpec = {
           confirmPassword: { type: "string", example: "NewPassword@123" },
         },
       },
+      RevokeSessionBody: {
+        type: "object",
+        required: ["token"],
+        properties: {
+          token: {
+            type: "string",
+            example: "eyJhbGciOi...",
+            description: "Revoke JWT Token nhận được từ email cảnh báo bảo mật",
+          },
+        },
+      },
       Me: {
         type: "object",
         properties: {
@@ -1658,6 +1669,52 @@ export const swaggerSpec = {
           },
           401: { $ref: "#/components/responses/Unauthorized" },
           422: { $ref: "#/components/responses/Validation" },
+        },
+      },
+    },
+    "/auth/revoke-session": {
+      post: {
+        tags: ["Auth"],
+        summary: "Vô hiệu hóa & thu hồi tất cả phiên đăng nhập (Đây không phải tôi)",
+        description: "API nhận JWT Revoke Token từ email cảnh báo bảo mật, tiến hành xóa toàn bộ Refresh Token của tài khoản và ghi nhận nhật ký hệ thống.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/RevokeSessionBody" },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Thu hồi tất cả phiên đăng nhập thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        message: {
+                          type: "string",
+                          example: "Đã vô hiệu hóa tất cả các phiên đăng nhập thành công. Tài khoản của bạn hiện đã được bảo mật.",
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          400: {
+            description: "Mã xác thực không hợp lệ hoặc đã hết hạn",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
         },
       },
     },
