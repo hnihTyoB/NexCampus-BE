@@ -683,6 +683,83 @@ export const swaggerSpec = {
           taskGroupId: { type: "string", format: "uuid", nullable: true },
         },
       },
+      TaskAiRecommendationCandidate: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid", example: "3fa85f64-5717-4562-b3fc-2c963f66afa6" },
+          name: { type: "string", example: "Nguyễn Văn A" },
+          position: { type: "string", nullable: true, example: "Backend Developer" },
+          compatibilityScore: { type: "number", example: 92 },
+          workloadScore: { type: "number", example: 80 },
+          performanceScore: { type: "number", example: 85 },
+          skillScore: { type: "number", example: 100 },
+          learningScore: { type: "number", example: 80 },
+          activeTaskDays: { type: "number", example: 2 },
+          codingScore: { type: "number", nullable: true, example: 8.5 },
+        },
+      },
+      TaskAiRecommendationResponse: {
+        type: "object",
+        properties: {
+          owner: {
+            type: "object",
+            properties: {
+              id: { type: "string", format: "uuid", example: "3fa85f64-5717-4562-b3fc-2c963f66afa6" },
+              name: { type: "string", example: "Nguyễn Văn A" },
+              position: { type: "string", nullable: true, example: "Backend Developer" },
+              compatibilityScore: { type: "number", example: 92 },
+              workloadDays: { type: "number", example: 2 },
+              codingScore: { type: "number", nullable: true, example: 8.5 },
+            },
+          },
+          support: {
+            type: "object",
+            nullable: true,
+            properties: {
+              id: { type: "string", format: "uuid", example: "4gb96f75-6828-5673-c4gd-3d074g77bgb7" },
+              name: { type: "string", example: "Trần Văn B" },
+              position: { type: "string", nullable: true, example: "Backend Developer" },
+              compatibilityScore: { type: "number", example: 78 },
+              workloadDays: { type: "number", example: 6 },
+              codingScore: { type: "number", nullable: true, example: 9.0 },
+            },
+          },
+          reasons: {
+            type: "array",
+            items: { type: "string" },
+            example: [
+              "Workload thấp — đang gánh 2 ngày công",
+              "Position phù hợp với yêu cầu của task",
+              "Điểm Coding gần nhất: 8.5/10",
+            ],
+          },
+          riskLevel: {
+            type: "string",
+            enum: ["LOW", "MEDIUM", "HIGH"],
+            example: "LOW",
+          },
+          workloadAnalysis: {
+            type: "string",
+            example: "Nguyễn Văn A hiện đang gánh 2 ngày công (capacity 10 ngày).",
+          },
+          learningOpportunity: {
+            type: "string",
+            example: "Đây là cơ hội tốt để Nguyễn Văn A mở rộng kinh nghiệm với task này.",
+          },
+          allCandidates: {
+            type: "array",
+            items: { $ref: "#/components/schemas/TaskAiRecommendationCandidate" },
+          },
+          meta: {
+            type: "object",
+            properties: {
+              totalEvaluated: { type: "integer", example: 3 },
+              aiFailed: { type: "boolean", example: false },
+              generatedAt: { type: "string", format: "date-time", example: "2026-07-21T12:00:00.000Z" },
+            },
+          },
+        },
+      },
       // ─── TaskAttachment ───────────────────────────────────────────────────────
       TaskAttachment: {
         type: "object",
@@ -3230,6 +3307,72 @@ export const swaggerSpec = {
           401: { $ref: "#/components/responses/Unauthorized" },
           403: { $ref: "#/components/responses/Forbidden" },
           422: { $ref: "#/components/responses/Validation" },
+        },
+      },
+    },
+    "/tasks/{taskId}/ai-recommendation": {
+      post: {
+        tags: ["Tasks"],
+        summary: "Lấy gợi ý phân bổ công việc từ AI (Admin / Leader)",
+        description: "Hệ thống AI hỗ trợ phân tích Workload, Skill Match, Performance và Learning Opportunity để đề xuất Intern phù hợp nhất làm Owner & Support. Không tự động giao task — Leader xem xét và tự quyết định.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "taskId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "ID của Task cần xin gợi ý phân bổ",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Đề xuất phân bổ task thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/TaskAiRecommendationResponse" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+          409: {
+            description: "Task đã được phân công từ trước",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+                example: {
+                  success: false,
+                  message: "Task này đã được giao cho intern. Không thể tạo đề xuất mới.",
+                  code: "DUPLICATE_ENTRY",
+                },
+              },
+            },
+          },
+          422: {
+            description: "Không có intern nào đang active dưới sự quản lý của Leader",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+                example: {
+                  success: false,
+                  message: "Không tìm thấy intern nào đang active dưới sự quản lý của bạn.",
+                  code: "VALIDATION_ERROR",
+                },
+              },
+            },
+          },
         },
       },
     },
