@@ -1,3 +1,6 @@
+import fs from "fs";
+import path from "path";
+
 // Dữ liệu hiệu suất Task trong tuần
 export interface TaskPerformanceItem {
   title: string;
@@ -50,6 +53,7 @@ export class WeeklyEvaluationPdfDTO {
   week: number;
   weekRange: string; // "14/07/2026 – 20/07/2026"
   generatedAt: string;
+  logoBase64?: string;
 
   // Thông tin thực tập sinh
   internName: string;
@@ -122,6 +126,13 @@ export class WeeklyEvaluationPdfDTO {
       day: '2-digit', month: '2-digit', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
     });
+
+    // Logo base64
+    const logoPath = path.join(process.cwd(), 'templates', 'assets', 'logo.png');
+    if (fs.existsSync(logoPath)) {
+      const logoBuf = fs.readFileSync(logoPath);
+      this.logoBase64 = `data:image/png;base64,${logoBuf.toString('base64')}`;
+    }
 
     // Intern info
     this.internName = raw.intern?.fullName || raw.intern?.user?.fullName || 'N/A';

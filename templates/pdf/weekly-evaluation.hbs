@@ -78,6 +78,14 @@
     .header-right {
       text-align: right;
     }
+    .header-right .report-logo {
+      height: 52px;
+      max-width: 140px;
+      object-fit: contain;
+      margin-left: auto;
+      display: block;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));
+    }
     .header-right .logo-box {
       width: 52px;
       height: 52px;
@@ -504,7 +512,11 @@
       <div class="week-range">{{weekRange}}</div>
     </div>
     <div class="header-right">
-      <div class="logo-box">N</div>
+      {{#if logoBase64}}
+        <img src="{{logoBase64}}" alt="NexCampus Logo" class="report-logo" />
+      {{else}}
+        <div class="logo-box">N</div>
+      {{/if}}
       <div class="doc-id">REF: {{id}}</div>
     </div>
   </div>
