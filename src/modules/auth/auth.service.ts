@@ -20,6 +20,7 @@ import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
 import { EmailService } from "../../common/services/email.service";
 import { TemplateEmailHelper } from "../../common/helpers/template-email.helper";
 import { NOTIFICATION_TYPE } from "../../common/constants/status.constant";
+import { extractClientSecurityInfo } from "../../common/helpers/security-info.helper";
 
 export class AuthService {
   private readonly repository = new AuthRepository();
@@ -69,6 +70,12 @@ export class AuthService {
       expiresIn: (jwtConfig.refreshExpiresIn || "7d") as any,
     });
 
+    const isNewDeviceOrIp = await this.repository.checkIsNewDeviceOrIp(
+      user.id,
+      metadata?.userAgent,
+      metadata?.ipAddress,
+    );
+
     const decoded = jwt.decode(refreshToken) as { exp: number };
     const expiresAt = new Date(decoded.exp * 1000);
     await this.repository.saveRefreshToken(
@@ -84,6 +91,38 @@ export class AuthService {
       ACTIVITY_ACTIONS.LOGIN,
       `Người dùng ${user.fullName || user.email} đã đăng nhập hệ thống${metadata?.ipAddress ? ` từ IP ${metadata.ipAddress}` : ""}`
     );
+
+    // Trigger Security Alert Email ONLY if logged in from a NEW device / IP
+    if (isNewDeviceOrIp) {
+      try {
+        const secInfo = extractClientSecurityInfo({
+          headers: { "user-agent": metadata?.userAgent },
+          ip: metadata?.ipAddress,
+        });
+
+        const revokeToken = jwt.sign(
+          { id: user.id, action: "revoke_session" },
+          jwtConfig.accessSecret,
+          { expiresIn: "24h" }
+        );
+        const revokeUrl = `${envConfig.app.baseUrl}/security-alert?token=${revokeToken}`;
+
+        TemplateEmailHelper.send(user.email, NOTIFICATION_TYPE.SECURITY_ALERT, {
+          fullName: user.fullName || user.email,
+          time: secInfo.time,
+          ip: secInfo.ip,
+          location: secInfo.location,
+          device: secInfo.device,
+          os: secInfo.os,
+          browser: secInfo.browser,
+          revokeUrl,
+        }).catch((err) => {
+          console.error("Failed to send security alert email:", err);
+        });
+      } catch (err) {
+        console.error("Failed to prepare security alert email:", err);
+      }
+    }
 
     return {
       accessToken,
@@ -320,7 +359,10 @@ export class AuthService {
     };
   }
 
-  async forgotPassword(data: ForgotPasswordDto): Promise<void> {
+  async forgotPassword(
+    data: ForgotPasswordDto,
+    metadata?: { userAgent?: string; ipAddress?: string },
+  ): Promise<void> {
     const { email } = data;
     const user = await this.repository.findByEmail(email);
 
@@ -339,16 +381,30 @@ export class AuthService {
 
     const resetLink = `${envConfig.app.baseUrl}/reset-password?token=${token}`;
 
+    const secInfo = extractClientSecurityInfo({
+      headers: { "user-agent": metadata?.userAgent },
+      ip: metadata?.ipAddress,
+    });
+
     await TemplateEmailHelper.send(
       user.email,
       NOTIFICATION_TYPE.PASSWORD_RESET,
-      { resetLink }
+      {
+        fullName: user.fullName || user.email,
+        resetLink,
+        time: secInfo.time,
+        ip: secInfo.ip,
+        location: secInfo.location,
+        device: secInfo.device,
+        os: secInfo.os,
+        browser: secInfo.browser,
+      },
     );
 
     await this.activityLogService.log(
       user.id,
       ACTIVITY_ACTIONS.FORGOT_PASSWORD,
-      `Người dùng ${user.fullName || user.email} đã yêu cầu đặt lại mật khẩu`
+      `Người dùng ${user.fullName || user.email} đã yêu cầu đặt lại mật khẩu${metadata?.ipAddress ? ` từ IP ${metadata.ipAddress}` : ""}`
     );
   }
 
@@ -424,5 +480,33 @@ export class AuthService {
       ACTIVITY_ACTIONS.CHANGE_PASSWORD,
       `Người dùng ${user.fullName || user.email} đã đổi mật khẩu thành công`
     );
+  }
+
+  async revokeSession(revokeToken: string): Promise<void> {
+    if (!revokeToken) {
+      throw new AppError("Thẻ xác thực không hợp lệ", 400, ERROR_CODE.TOKEN_INVALID);
+    }
+
+    try {
+      const decoded = jwt.verify(revokeToken, jwtConfig.accessSecret) as {
+        id: string;
+        action: string;
+      };
+
+      if (decoded.action !== "revoke_session") {
+        throw new AppError("Thao tác khóa phiên không hợp lệ", 400, ERROR_CODE.TOKEN_INVALID);
+      }
+
+      await this.repository.deleteAllUserRefreshTokens(decoded.id);
+
+      await this.activityLogService.log(
+        decoded.id,
+        ACTIVITY_ACTIONS.LOGOUT,
+        "Người dùng đã khóa và thu hồi tất cả phiên đăng nhập từ thông báo bảo mật email."
+      );
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError("Thẻ xác thực khóa phiên không hợp lệ hoặc đã hết hạn", 400, ERROR_CODE.TOKEN_INVALID);
+    }
   }
 }

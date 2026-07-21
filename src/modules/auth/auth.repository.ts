@@ -112,6 +112,28 @@ export class AuthRepository {
     });
   }
 
+  async deleteAllUserRefreshTokens(userId: string) {
+    return prisma.refreshToken.deleteMany({
+      where: { userId },
+    });
+  }
+
+  async checkIsNewDeviceOrIp(userId: string, userAgent?: string, ipAddress?: string): Promise<boolean> {
+    if (!userAgent && !ipAddress) return false;
+    const conditions = [];
+    if (userAgent) conditions.push({ userAgent });
+    if (ipAddress) conditions.push({ ipAddress });
+
+    const existing = await prisma.refreshToken.findFirst({
+      where: {
+        userId,
+        OR: conditions,
+      },
+    });
+
+    return !existing;
+  }
+
   async updateMe(
     id: string,
     data: { fullName?: string; password?: string; avatarUrl?: string },
