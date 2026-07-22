@@ -18,17 +18,19 @@ export class TemplateEmailHelper {
 
     const fallback = TEMPLATE_DEFAULTS[type];
 
-    const rawSubject =
-      template?.emailSubjectTemplate ||
-      template?.titleTemplate ||
-      fallback?.titleTemplate ||
-      "Thông báo mới";
+    const isEdited =
+      template &&
+      template.createdAt &&
+      template.updatedAt &&
+      template.createdAt.getTime() !== template.updatedAt.getTime();
 
-    const rawContent =
-      template?.emailContentTemplate ||
-      template?.contentTemplate ||
-      fallback?.contentTemplate ||
-      "";
+    const rawSubject = isEdited
+      ? template.emailSubjectTemplate || template.titleTemplate || fallback?.titleTemplate || "Thông báo mới"
+      : fallback?.emailSubjectTemplate || fallback?.titleTemplate || "Thông báo mới";
+
+    const rawContent = isEdited
+      ? template.emailContentTemplate || template.contentTemplate || fallback?.contentTemplate || ""
+      : fallback?.emailContentTemplate || fallback?.contentTemplate || "";
 
     const subject = interpolate(rawSubject, params);
     const content = interpolate(rawContent, params);
