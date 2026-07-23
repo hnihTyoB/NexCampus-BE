@@ -40,7 +40,6 @@ router.delete(
   controller.deletePosition,
 );
 
-// Department detail (parameterized — must come after specific routes)
 router.get("/:id", controller.findById);
 router.put(
   "/:id",
@@ -56,7 +55,6 @@ router.delete(
   controller.delete,
 );
 
-// Department create
 router.post(
   "/",
   authMiddleware,
