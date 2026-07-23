@@ -20,12 +20,32 @@ export class StorageService {
     this.supabase = createClient(url, secretKey);
   }
 
+  async ensureBucketExists(bucket: string): Promise<void> {
+    try {
+      const { data, error } = await this.supabase.storage.getBucket(bucket);
+      if (error || !data) {
+        const { error: createError } = await this.supabase.storage.createBucket(bucket, {
+          public: true,
+        });
+        if (createError) {
+          console.error(`[StorageService] Failed to create bucket "${bucket}": ${createError.message}`);
+        } else {
+          console.log(`[StorageService] Automatically created missing public bucket: "${bucket}"`);
+        }
+      }
+    } catch (err) {
+      console.error(`[StorageService] Error checking/creating bucket "${bucket}":`, err);
+    }
+  }
+
   async uploadFile(
     bucket: string,
     path: string,
     buffer: Buffer,
     mimeType: string,
   ): Promise<string> {
+    await this.ensureBucketExists(bucket);
+
     const { error } = await this.supabase.storage
       .from(bucket)
       .upload(path, buffer, {

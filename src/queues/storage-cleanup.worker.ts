@@ -326,6 +326,34 @@ async function processCleanupJob(_job: Job<StorageCleanupJobData>) {
     } catch (err) {
       console.error("[StorageCleanupWorker] Error cleaning orphaned avatar files:", err);
     }
+
+    // 6.5. Application Attachments bucket
+    try {
+      const bucket = "application-attachments";
+      const dbAttachments = await prisma.applicationAttachment.findMany({
+        select: { filePath: true },
+      });
+      const dbFilePaths = new Set(dbAttachments.map((a) => a.filePath));
+      const storageFiles = await storageService.listAllFiles(bucket);
+
+      const orphaned = storageFiles.filter(
+        (f) => !dbFilePaths.has(f.path) && new Date(f.created_at) < twoHoursAgo
+      );
+
+      if (orphaned.length > 0) {
+        console.log(`[StorageCleanupWorker] Found ${orphaned.length} orphaned file(s) in application bucket. Deleting...`);
+        for (const file of orphaned) {
+          try {
+            await storageService.deleteFile(bucket, file.path);
+            console.log(`[StorageCleanupWorker] Deleted orphaned application file: ${file.path}`);
+          } catch (err) {
+            console.error(`[StorageCleanupWorker] Failed to delete orphaned application file ${file.path}:`, err);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[StorageCleanupWorker] Error cleaning orphaned application files:", err);
+    }
   } catch (err) {
     console.error("[StorageCleanupWorker] Error in overall orphaned files cleanup:", err);
   }

@@ -342,6 +342,20 @@ export const swaggerSpec = {
               },
             ],
           },
+          attachments: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                fileName: { type: "string" },
+                fileUrl: { type: "string", format: "uri" },
+                fileSize: { type: "integer" },
+                mimeType: { type: "string" },
+                createdAt: { type: "string", format: "date-time" },
+              },
+            },
+          },
         },
       },
       CreateApplicationBody: {
@@ -2193,8 +2207,42 @@ export const swaggerSpec = {
         requestBody: {
           required: true,
           content: {
-            "application/json": {
-              schema: { $ref: "#/components/schemas/CreateApplicationBody" },
+            "multipart/form-data": {
+              schema: {
+                type: "object",
+                required: [
+                  "fullName",
+                  "email",
+                  "phone",
+                  "departmentId",
+                  "positionId",
+                  "startDate",
+                  "duration",
+                  "token",
+                  "regulationId",
+                  "acceptedRegulations",
+                ],
+                properties: {
+                  fullName: { type: "string", example: "Nguyễn Văn A" },
+                  email: { type: "string", format: "email", example: "vana@gmail.com" },
+                  phone: { type: "string", example: "0912345678" },
+                  departmentId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440000" },
+                  positionId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440001" },
+                  startDate: { type: "string", format: "date", example: "2025-08-01" },
+                  duration: { type: "integer", example: 3 },
+                  token: { type: "string", example: "39bdf11f..." },
+                  regulationId: { type: "string", format: "uuid" },
+                  acceptedRegulations: { type: "boolean", example: true },
+                  files: {
+                    type: "array",
+                    items: {
+                      type: "string",
+                      format: "binary",
+                    },
+                    description: "Đính kèm tài liệu ứng tuyển (CV, bảng điểm, giấy giới thiệu...). Tối đa 5 file, mỗi file tối đa 10MB.",
+                  },
+                },
+              },
             },
           },
         },

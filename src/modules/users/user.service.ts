@@ -4,6 +4,7 @@ import { UserRepository } from "./user.repository";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import { UserQueryDto, CreateUserDto, UpdateUserDto } from "./user.dto";
+import { prisma } from "../../database/prisma.client";
 import { StorageService } from "../../common/services/storage.service";
 import { appConfig } from "../../config/app.config";
 import { supabaseConfig } from "../../config/supabase.config";
@@ -154,6 +155,46 @@ export class UserService {
 
   async delete(id: string, actorId: string) {
     const targetUser = await this.findById(id);
+
+    // 1. Tìm đơn ứng tuyển có cùng email đã được duyệt (APPROVED)
+    const email = targetUser.email;
+    const application = await prisma.application.findFirst({
+      where: {
+        email: { equals: email, mode: "insensitive" },
+        status: "APPROVED",
+        deletedAt: null,
+      },
+    });
+
+    if (application) {
+      // 2. Tìm tất cả tệp đính kèm của đơn ứng tuyển này
+      const attachments = await prisma.applicationAttachment.findMany({
+        where: { applicationId: application.id },
+      });
+
+      if (attachments.length > 0) {
+        const storageService = new StorageService();
+        const bucket = "application-attachments";
+
+        // 3. Xóa các tệp này trên Supabase Storage
+        for (const attachment of attachments) {
+          try {
+            await storageService.deleteFile(bucket, attachment.filePath);
+          } catch (storageError) {
+            console.error(
+              `[UserService.delete] Failed to delete file ${attachment.filePath} on Supabase:`,
+              storageError,
+            );
+          }
+        }
+
+        // 4. Xóa các bản ghi đính kèm trong database
+        await prisma.applicationAttachment.deleteMany({
+          where: { applicationId: application.id },
+        });
+      }
+    }
+
     const result = await this.repository.delete(id, actorId);
 
     await this.activityLogService.log(

@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { ApplicationRepository } from "./application.repository";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
+import { StorageService } from "../../common/services/storage.service";
 import {
   ApplicationQueryDto,
   CreateApplicationDto,
@@ -129,7 +130,7 @@ export class ApplicationService {
     };
   }
 
-  async create(data: CreateApplicationDto) {
+  async create(data: CreateApplicationDto, files?: Express.Multer.File[]) {
     // 1. Verify invitation token
     const invite = await this.repository.findInviteByToken(data.token);
 
@@ -224,23 +225,96 @@ export class ApplicationService {
       );
     }
 
-    // 3. Create the application
-    const application = await this.repository.create({
-      fullName: data.fullName,
-      email: data.email,
-      phone: data.phone,
-      departmentId: data.departmentId,
-      positionId: data.positionId,
-      startDate: new Date(data.startDate),
-      duration: data.duration,
-      regulationId: data.regulationId,
-      acceptedAt: new Date(),
+    const applicationId = crypto.randomUUID();
+    const attachmentsToCreate: Array<{
+      fileName: string;
+      fileUrl: string;
+      filePath: string;
+      mimeType: string;
+      fileSize: number;
+    }> = [];
+
+    // 3. Upload files to Supabase first if provided
+    if (files && files.length > 0) {
+      const storageService = new StorageService();
+      const bucket = "application-attachments";
+
+      for (const file of files) {
+        const safeFileName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const filePath = `${applicationId}/${crypto.randomUUID()}_${safeFileName}`;
+
+        try {
+          const fileUrl = await storageService.uploadFile(
+            bucket,
+            filePath,
+            file.buffer,
+            file.mimetype,
+          );
+          attachmentsToCreate.push({
+            fileName: file.originalname,
+            fileUrl,
+            filePath,
+            mimeType: file.mimetype,
+            fileSize: file.size,
+          });
+        } catch (uploadError) {
+          // Clean up already uploaded files in this request
+          for (const att of attachmentsToCreate) {
+            try {
+              await storageService.deleteFile(bucket, att.filePath);
+            } catch (err) {
+              console.error(`[ApplicationService] Clean up failed for ${att.filePath}:`, err);
+            }
+          }
+          throw new AppError("Failed to upload application attachments", 500, ERROR_CODE.INTERNAL_SERVER_ERROR);
+        }
+      }
+    }
+
+    // 4. Create the application & attachments in a transaction
+    const application = await prisma.$transaction(async (tx) => {
+      const app = await tx.application.create({
+        data: {
+          id: applicationId,
+          fullName: data.fullName,
+          email: data.email,
+          phone: data.phone,
+          departmentId: data.departmentId,
+          positionId: data.positionId,
+          startDate: new Date(data.startDate),
+          duration: data.duration,
+          regulationId: data.regulationId,
+          acceptedAt: new Date(),
+        },
+      });
+
+      if (attachmentsToCreate.length > 0) {
+        await tx.applicationAttachment.createMany({
+          data: attachmentsToCreate.map((att) => ({
+            applicationId,
+            ...att,
+          })),
+        });
+      }
+
+      // Mark invite as used
+      await tx.applicationInvite.update({
+        where: { token: data.token },
+        data: {
+          status: APPLICATION_INVITE_STATUS.USED,
+          usedAt: new Date(),
+          applicationId,
+        },
+      });
+
+      return app;
     });
 
-    // 4. Mark invite as used
-    await this.repository.markInviteAsUsed(data.token, application.id);
-
-    return application;
+    try {
+      return await this.repository.findById(application.id);
+    } catch {
+      return application;
+    }
   }
 
   async review(id: string, dto: ReviewApplicationDto, approverId: string) {
