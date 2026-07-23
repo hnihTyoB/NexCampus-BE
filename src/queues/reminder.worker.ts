@@ -1,5 +1,5 @@
 import { Worker, Job } from "bullmq";
-import { envConfig } from "../config/env.config";
+import { redisConfig } from "../config/redis.config";
 import { ReminderService } from "../modules/notifications/reminder.service";
 import type { ReminderJobData } from "./reminder.queue";
 
@@ -20,8 +20,8 @@ export function startReminderWorker() {
     processReminderJob,
     {
       connection: {
-        host: envConfig.redis.host,
-        port: envConfig.redis.port,
+        host: redisConfig.host,
+        port: redisConfig.port,
       },
       concurrency: 1, // Run 1 job at a time
     },

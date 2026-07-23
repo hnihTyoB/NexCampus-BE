@@ -13,7 +13,7 @@ import { ROLES } from "../../common/constants/role.constant";
 import { REVIEW_STATUS } from "../../common/constants/status.constant";
 import { NotificationDispatcher } from "../notifications/notification.dispatcher";
 import { StorageService } from "../../common/services/storage.service";
-import { envConfig } from "../../config/env.config";
+import { supabaseConfig } from "../../config/supabase.config";
 import { ActivityLogService } from "../activity-logs/activity-log.service";
 import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
 
@@ -238,11 +238,11 @@ export class TaskSubmissionService {
     }
 
     // 3. Delete old video file from storage if it exists and was uploaded to our bucket
-    const bucket = envConfig.supabase.storageSubmissionBucket;
+    const bucket = supabaseConfig.storageSubmissionBucket;
     const storageService = new StorageService();
 
     if (submission.videoDemo) {
-      const prefix = `${envConfig.supabase.url}/storage/v1/object/public/${bucket}/`;
+      const prefix = `${supabaseConfig.url}/storage/v1/object/public/${bucket}/`;
       if (submission.videoDemo.startsWith(prefix)) {
         const videoPath = submission.videoDemo.replace(prefix, "");
         try {
@@ -291,7 +291,7 @@ export class TaskSubmissionService {
     }
 
     // Delete associated files from Supabase Storage
-    const bucket = envConfig.supabase.storageSubmissionBucket;
+    const bucket = supabaseConfig.storageSubmissionBucket;
     const storageService = new StorageService();
 
     // 1. Delete submission attachments
@@ -310,7 +310,7 @@ export class TaskSubmissionService {
 
     // 2. Delete video demo if it is uploaded to our bucket
     if (submission.videoDemo) {
-      const prefix = `${envConfig.supabase.url}/storage/v1/object/public/${bucket}/`;
+      const prefix = `${supabaseConfig.url}/storage/v1/object/public/${bucket}/`;
       if (submission.videoDemo.startsWith(prefix)) {
         const videoPath = submission.videoDemo.replace(prefix, "");
         try {

@@ -1,6 +1,6 @@
 import multer, { FileFilterCallback } from "multer";
 import { Request } from "express";
-import { envConfig } from "../config/env.config";
+import { supabaseConfig } from "../config/supabase.config";
 
 const ALLOWED_MIME_TYPES = [
   "image/jpeg",
@@ -39,7 +39,7 @@ const fileFilter = (
 
 const storage = multer.memoryStorage();
 
-const getMaxFileSize = () => envConfig.supabase.maxFileSizeMb * 1024 * 1024;
+const getMaxFileSize = () => supabaseConfig.maxFileSizeMb * 1024 * 1024;
 
 export const uploadSingle = (fieldName: string) =>
   multer({

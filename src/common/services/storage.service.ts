@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { envConfig } from "../../config/env.config";
+import { supabaseConfig } from "../../config/supabase.config";
 import { AppError } from "../errors/app-error";
 import { ERROR_CODE } from "../errors/error-code";
 
@@ -7,7 +7,7 @@ export class StorageService {
   private supabase: SupabaseClient;
 
   constructor() {
-    const { url, secretKey } = envConfig.supabase;
+    const { url, secretKey } = supabaseConfig;
 
     if (!url || !secretKey) {
       throw new AppError(
