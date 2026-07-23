@@ -5,7 +5,8 @@ import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import { UserQueryDto, CreateUserDto, UpdateUserDto } from "./user.dto";
 import { StorageService } from "../../common/services/storage.service";
-import { envConfig } from "../../config/env.config";
+import { appConfig } from "../../config/app.config";
+import { supabaseConfig } from "../../config/supabase.config";
 import { ActivityLogService } from "../activity-logs/activity-log.service";
 import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
 import { EmailService } from "../../common/services/email.service";
@@ -80,7 +81,7 @@ export class UserService {
       await TemplateEmailHelper.send(
         data.email,
         NOTIFICATION_TYPE.USER_CREATED,
-        { email: data.email, password, loginUrl: envConfig.app.baseUrl }
+        { email: data.email, password, loginUrl: appConfig.baseUrl }
       );
     } catch (emailError) {
       console.error(`[UserService] Failed to send registration email to ${data.email}:`, emailError);
@@ -121,12 +122,12 @@ export class UserService {
   async uploadAvatar(id: string, file: Express.Multer.File) {
     const user = await this.findById(id);
 
-    const bucket = envConfig.supabase.storageAvatarBucket;
+    const bucket = supabaseConfig.storageAvatarBucket;
     const storageService = new StorageService();
 
     // 1. Delete old avatar if it exists in storage
     if (user.avatarUrl) {
-      const prefix = `${envConfig.supabase.url}/storage/v1/object/public/${bucket}/`;
+      const prefix = `${supabaseConfig.url}/storage/v1/object/public/${bucket}/`;
       if (user.avatarUrl.startsWith(prefix)) {
         const avatarPath = user.avatarUrl.replace(prefix, "");
         try {

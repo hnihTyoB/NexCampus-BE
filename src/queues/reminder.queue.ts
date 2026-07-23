@@ -1,5 +1,6 @@
 import { Queue } from "bullmq";
-import { envConfig } from "../config/env.config";
+import { redisConfig } from "../config/redis.config";
+import { cronConfig } from "../config/cron.config";
 
 export type ReminderJobData = Record<string, never>;
 
@@ -7,8 +8,8 @@ export const reminderQueue = new Queue<ReminderJobData>(
   "reminder-queue",
   {
     connection: {
-      host: envConfig.redis.host,
-      port: envConfig.redis.port,
+      host: redisConfig.host,
+      port: redisConfig.port,
     },
     defaultJobOptions: {
       attempts: 3,
@@ -26,7 +27,7 @@ export const reminderQueue = new Queue<ReminderJobData>(
  * Schedule repeatable job for reminders based on cron expression in env config.
  */
 export async function scheduleReminderJob() {
-  const cronExpression = envConfig.reminders.cronExpression;
+  const cronExpression = cronConfig.reminders.cronExpression;
 
   // Clear existing repeatable jobs to avoid duplication
   const existingJobs = await reminderQueue.getRepeatableJobs();

@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { envConfig } from "../../config/env.config";
+import { aiConfig } from "../../config/ai.config";
 import { AppError } from "../errors/app-error";
 import { ERROR_CODE } from "../errors/error-code";
 
@@ -11,7 +11,7 @@ export class GeminiService implements IAiProvider {
   private currentKeyIndex = 0;
 
   private constructor() {
-    this.apiKeys = envConfig.gemini.apiKeys;
+    this.apiKeys = aiConfig.gemini.apiKeys;
     if (this.apiKeys.length > 0) {
       console.log(
         `[GeminiService] Initialized with ${this.apiKeys.length} API keys for rotation/backup.`,

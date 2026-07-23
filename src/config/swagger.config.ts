@@ -6657,5 +6657,87 @@ export const swaggerSpec = {
         },
       },
     },
+    "/settings": {
+      get: {
+        tags: ["Settings"],
+        summary: "Lấy thông tin cấu hình hệ thống (Leader/Admin/Intern)",
+        description: "Lấy các thông tin cấu hình hệ thống hiện tại, bao gồm cả giới hạn dung lượng upload cho từng loại tệp.",
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: {
+            description: "Lấy cấu hình thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    data: {
+                      type: "object",
+                      properties: {
+                        AVATAR_MAX_FILE_SIZE_MB: { type: "integer", example: 2 },
+                        REPORT_MAX_FILE_SIZE_MB: { type: "integer", example: 5 },
+                        SUBMISSION_MAX_FILE_SIZE_MB: { type: "integer", example: 50 }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          401: { $ref: "#/components/responses/Unauthorized" }
+        }
+      },
+      put: {
+        tags: ["Settings"],
+        summary: "Cập nhật cấu hình hệ thống (Admin only)",
+        description: "Cập nhật cấu hình hệ thống theo key. Hiện tại hỗ trợ cập nhật `SUBMISSION_MAX_FILE_SIZE_MB` trong khoảng từ 5 đến 50 MB.",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["key", "value"],
+                properties: {
+                  key: { type: "string", example: "SUBMISSION_MAX_FILE_SIZE_MB" },
+                  value: { type: "string", example: "30" }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          200: {
+            description: "Cập nhật cấu hình thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "object",
+                          properties: {
+                            key: { type: "string", example: "SUBMISSION_MAX_FILE_SIZE_MB" },
+                            value: { type: "string", example: "30" }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          422: { $ref: "#/components/responses/Validation" }
+        }
+      }
+    }
   },
 };

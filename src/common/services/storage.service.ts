@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { envConfig } from "../../config/env.config";
+import { supabaseConfig } from "../../config/supabase.config";
 import { AppError } from "../errors/app-error";
 import { ERROR_CODE } from "../errors/error-code";
 
@@ -7,7 +7,7 @@ export class StorageService {
   private supabase: SupabaseClient;
 
   constructor() {
-    const { url, secretKey } = envConfig.supabase;
+    const { url, secretKey } = supabaseConfig;
 
     if (!url || !secretKey) {
       throw new AppError(
@@ -55,5 +55,62 @@ export class StorageService {
         ERROR_CODE.INTERNAL_SERVER_ERROR,
       );
     }
+  }
+
+  /**
+   * Liệt kê đệ quy toàn bộ tệp tin trong một bucket của Supabase Storage.
+   * Trả về danh sách đối tượng chứa thông tin đường dẫn và thời gian khởi tạo của tệp tin.
+   */
+  async listAllFiles(
+    bucket: string,
+    folderPath: string = "",
+  ): Promise<{ name: string; path: string; created_at: string }[]> {
+    const files: { name: string; path: string; created_at: string }[] = [];
+    let offset = 0;
+    const limit = 100;
+
+    while (true) {
+      const { data, error } = await this.supabase.storage
+        .from(bucket)
+        .list(folderPath, {
+          limit,
+          offset,
+          sortBy: { column: "name", order: "asc" },
+        });
+
+      if (error) {
+        throw new AppError(
+          `Failed to list files from Supabase Storage: ${error.message}`,
+          500,
+          ERROR_CODE.INTERNAL_SERVER_ERROR,
+        );
+      }
+
+      if (!data || data.length === 0) {
+        break;
+      }
+
+      for (const item of data) {
+        const itemPath = folderPath ? `${folderPath}/${item.name}` : item.name;
+        // Nếu không có metadata, đây là một thư mục (folder) trên Supabase
+        if (!item.metadata) {
+          const subFiles = await this.listAllFiles(bucket, itemPath);
+          files.push(...subFiles);
+        } else {
+          files.push({
+            name: item.name,
+            path: itemPath,
+            created_at: item.created_at || new Date().toISOString(),
+          });
+        }
+      }
+
+      if (data.length < limit) {
+        break;
+      }
+      offset += limit;
+    }
+
+    return files;
   }
 }

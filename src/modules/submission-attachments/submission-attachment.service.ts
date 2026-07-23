@@ -4,7 +4,7 @@ import { TaskSubmissionRepository } from "../task-submissions/task-submission.re
 import { StorageService } from "../../common/services/storage.service";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
-import { envConfig } from "../../config/env.config";
+import { supabaseConfig } from "../../config/supabase.config";
 import { ROLES } from "../../common/constants/role.constant";
 import { REVIEW_STATUS } from "../../common/constants/status.constant";
 
@@ -14,7 +14,7 @@ export class SubmissionAttachmentService {
   private readonly storageService = new StorageService();
 
   private get bucket() {
-    return envConfig.supabase.storageSubmissionBucket;
+    return supabaseConfig.storageSubmissionBucket;
   }
 
   async uploadAttachment(
@@ -42,6 +42,16 @@ export class SubmissionAttachmentService {
         "You are not authorized to upload for this submission",
         403,
         ERROR_CODE.FORBIDDEN,
+      );
+    }
+
+    // 2.5 Kiem tra gioi han 5 file dinh kem
+    const existing = await this.attachmentRepo.findBySubmissionId(submissionId);
+    if (existing.length >= 5) {
+      throw new AppError(
+        "Maximum 5 attachments allowed per submission",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
       );
     }
 

@@ -46,7 +46,7 @@ router.post(
   "/:id/video",
   authMiddleware,
   requireRole(ROLES.INTERN),
-  uploadSingle("video"),
+  uploadSingle("video", "submission"),
   controller.uploadVideo,
 );
 router.delete(

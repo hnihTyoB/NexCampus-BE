@@ -18,7 +18,7 @@ router.post(
   "/",
   authMiddleware,
   requireRole(ROLES.ADMIN, ROLES.LEADER),
-  uploadSingle("file"),
+  uploadSingle("file", "task"),
   controller.upload,
 );
 router.delete(

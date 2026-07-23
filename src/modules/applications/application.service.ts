@@ -11,7 +11,7 @@ import {
   GetApplicationInvitesQuery,
 } from "./application.dto";
 import { APPLICATION_STATUS, APPLICATION_INVITE_STATUS, NOTIFICATION_TYPE } from "../../common/constants/status.constant";
-import { envConfig } from "../../config/env.config";
+import { appConfig } from "../../config/app.config";
 import { EmailService } from "../../common/services/email.service";
 import { TemplateEmailHelper } from "../../common/helpers/template-email.helper";
 import { ActivityLogService } from "../activity-logs/activity-log.service";
@@ -58,7 +58,7 @@ export class ApplicationService {
       createdBy: actorId,
     });
 
-    const applyUrl = `${envConfig.app.baseUrl}/onboarding/${token}/policies`;
+    const applyUrl = `${appConfig.baseUrl}/onboarding/${token}/policies`;
 
     await TemplateEmailHelper.send(
       data.email,
@@ -323,7 +323,7 @@ export class ApplicationService {
         await TemplateEmailHelper.send(
           normalizedEmail,
           NOTIFICATION_TYPE.APPLICATION_APPROVED,
-          { email: normalizedEmail, password, loginUrl: envConfig.app.baseUrl }
+          { email: normalizedEmail, password, loginUrl: appConfig.baseUrl }
         );
       } catch (emailError) {
         console.error(`[ApplicationService] Failed to send registration email to ${normalizedEmail}:`, emailError);

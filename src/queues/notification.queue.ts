@@ -1,5 +1,5 @@
 import { Queue } from "bullmq";
-import { envConfig } from "../config/env.config";
+import { redisConfig } from "../config/redis.config";
 
 export interface NotificationJobData {
   notificationId: string;
@@ -17,8 +17,8 @@ export const notificationQueue = new Queue<NotificationJobData>(
   "notification-queue",
   {
     connection: {
-      host: envConfig.redis.host,
-      port: envConfig.redis.port,
+      host: redisConfig.host,
+      port: redisConfig.port,
     },
     defaultJobOptions: {
       attempts: 3,
@@ -34,5 +34,5 @@ export const notificationQueue = new Queue<NotificationJobData>(
 
 console.log(
   "[NotificationQueue] Queue initialized — connecting to Redis at",
-  `${envConfig.redis.host}:${envConfig.redis.port}`,
+  `${redisConfig.host}:${redisConfig.port}`,
 );
