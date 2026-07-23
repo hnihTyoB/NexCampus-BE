@@ -39,18 +39,78 @@ const fileFilter = (
 
 const storage = multer.memoryStorage();
 
+import { Response, NextFunction } from "express";
+import { systemSettingService } from "../modules/system-settings/system-setting.service";
+
 const getMaxFileSize = () => supabaseConfig.maxFileSizeMb * 1024 * 1024;
 
-export const uploadSingle = (fieldName: string) =>
-  multer({
-    storage,
-    fileFilter,
-    limits: { fileSize: getMaxFileSize() },
-  }).single(fieldName);
+export const uploadSingle = (
+  fieldName: string,
+  category?: "avatar" | "report" | "submission" | "task",
+) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    let limitBytes = getMaxFileSize();
 
-export const uploadMultiple = (fieldName: string, maxCount = 5) =>
-  multer({
-    storage,
-    fileFilter,
-    limits: { fileSize: getMaxFileSize() },
-  }).array(fieldName, maxCount);
+    try {
+      if (category === "avatar") {
+        limitBytes = 2 * 1024 * 1024; // Khóa cứng 2MB cho Avatar
+      } else if (category === "report") {
+        limitBytes = 5 * 1024 * 1024; // Khóa cứng 5MB cho Báo cáo
+      } else if (category === "submission") {
+        const mb = await systemSettingService.getSubmissionLimitMb();
+        limitBytes = mb * 1024 * 1024;
+      }
+    } catch (err) {
+      console.error(`[UploadMiddleware] Error resolving upload limit:`, err);
+    }
+
+    const upload = multer({
+      storage,
+      fileFilter,
+      limits: { fileSize: limitBytes },
+    }).single(fieldName);
+
+    upload(req, res, (err) => {
+      if (err) {
+        return next(err);
+      }
+      next();
+    });
+  };
+};
+
+export const uploadMultiple = (
+  fieldName: string,
+  maxCount = 5,
+  category?: "avatar" | "report" | "submission" | "task",
+) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    let limitBytes = getMaxFileSize();
+
+    try {
+      if (category === "avatar") {
+        limitBytes = 2 * 1024 * 1024;
+      } else if (category === "report") {
+        limitBytes = 5 * 1024 * 1024;
+      } else if (category === "submission") {
+        const mb = await systemSettingService.getSubmissionLimitMb();
+        limitBytes = mb * 1024 * 1024;
+      }
+    } catch (err) {
+      console.error(`[UploadMiddleware] Error resolving upload limit:`, err);
+    }
+
+    const upload = multer({
+      storage,
+      fileFilter,
+      limits: { fileSize: limitBytes },
+    }).array(fieldName, maxCount);
+
+    upload(req, res, (err) => {
+      if (err) {
+        return next(err);
+      }
+      next();
+    });
+  };
+};

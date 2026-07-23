@@ -45,6 +45,16 @@ export class SubmissionAttachmentService {
       );
     }
 
+    // 2.5 Kiem tra gioi han 5 file dinh kem
+    const existing = await this.attachmentRepo.findBySubmissionId(submissionId);
+    if (existing.length >= 5) {
+      throw new AppError(
+        "Maximum 5 attachments allowed per submission",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
     // 3. Kiem tra trang thai (khong cho phep upload khi da duoc APPROVED)
     if (submission.reviewStatus === REVIEW_STATUS.APPROVED) {
       throw new AppError(

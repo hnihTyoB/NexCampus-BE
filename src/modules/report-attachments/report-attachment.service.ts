@@ -42,6 +42,16 @@ export class ReportAttachmentService {
       }
     }
 
+    // 2.5 Kiem tra gioi han 5 file dinh kem
+    const existing = await this.attachmentRepo.findByReportId(reportId);
+    if (existing.length >= 5) {
+      throw new AppError(
+        "Maximum 5 attachments allowed per daily report",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
     // 3. Tao duong dan duy nhat trong bucket: {reportId}/{uuid}_{originalname}
     const safeFileName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
     const filePath = `${reportId}/${randomUUID()}_${safeFileName}`;

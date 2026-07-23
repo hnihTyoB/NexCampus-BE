@@ -33,4 +33,38 @@ export class SubmissionAttachmentRepository {
       where: { submissionId },
     });
   }
+
+  /**
+   * Tìm các tệp đính kèm bài nộp của học viên đã bị xóa mềm qua retentionDays ngày.
+   */
+  findOrphanedAttachments(retentionDays: number) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - retentionDays);
+
+    return prisma.submissionAttachment.findMany({
+      where: {
+        submission: {
+          assignment: {
+            intern: {
+              deletedAt: {
+                not: null,
+                lte: cutoff,
+              },
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        filePath: true,
+        fileName: true,
+      },
+    });
+  }
+
+  deleteManyByIds(ids: string[]) {
+    return prisma.submissionAttachment.deleteMany({
+      where: { id: { in: ids } },
+    });
+  }
 }

@@ -589,3 +589,13 @@ model ExportHistory {
   @@index([entityId])
   @@map("export_histories")
 }
+
+// 19. SystemSetting
+model SystemSetting {
+  key       String   @id
+  value     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}

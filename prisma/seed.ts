@@ -245,6 +245,20 @@ async function main() {
     }
   }
 
+  // System settings
+  const settings = [
+    { key: "SUBMISSION_MAX_FILE_SIZE_MB", value: "50" }
+  ];
+
+  for (const s of settings) {
+    await prisma.systemSetting.upsert({
+      where: { key: s.key },
+      update: {},
+      create: s,
+    });
+    console.log(`✓ System setting ${s.key} upserted with value "${s.value}"`);
+  }
+
   console.log("Seed completed successfully");
 }
 

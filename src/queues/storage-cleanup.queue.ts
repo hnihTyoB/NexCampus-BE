@@ -46,6 +46,6 @@ export async function scheduleStorageCleanupJob() {
   );
 
   console.log(
-    `[StorageCleanupQueue] Scheduled cleanup job � cron: "${cronExpression}", retention: ${retentionDays} days`,
+    `[StorageCleanupQueue] Scheduled cleanup job cron: "${cronExpression}", retention: ${retentionDays} days`,
   );
 }
