@@ -46,7 +46,7 @@ const getMaxFileSize = () => supabaseConfig.maxFileSizeMb * 1024 * 1024;
 
 export const uploadSingle = (
   fieldName: string,
-  category?: "avatar" | "report" | "submission" | "task",
+  category?: "avatar" | "report" | "submission" | "task" | "application",
 ) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     let limitBytes = getMaxFileSize();
@@ -56,6 +56,8 @@ export const uploadSingle = (
         limitBytes = 2 * 1024 * 1024; // Khóa cứng 2MB cho Avatar
       } else if (category === "report") {
         limitBytes = 5 * 1024 * 1024; // Khóa cứng 5MB cho Báo cáo
+      } else if (category === "application") {
+        limitBytes = 10 * 1024 * 1024; // Khóa cứng 10MB cho Tài liệu ứng tuyển
       } else if (category === "submission") {
         const mb = await systemSettingService.getSubmissionLimitMb();
         limitBytes = mb * 1024 * 1024;
@@ -82,7 +84,7 @@ export const uploadSingle = (
 export const uploadMultiple = (
   fieldName: string,
   maxCount = 5,
-  category?: "avatar" | "report" | "submission" | "task",
+  category?: "avatar" | "report" | "submission" | "task" | "application",
 ) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     let limitBytes = getMaxFileSize();
@@ -92,6 +94,8 @@ export const uploadMultiple = (
         limitBytes = 2 * 1024 * 1024;
       } else if (category === "report") {
         limitBytes = 5 * 1024 * 1024;
+      } else if (category === "application") {
+        limitBytes = 10 * 1024 * 1024; // Khóa cứng 10MB cho Tài liệu ứng tuyển
       } else if (category === "submission") {
         const mb = await systemSettingService.getSubmissionLimitMb();
         limitBytes = mb * 1024 * 1024;

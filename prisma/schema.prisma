@@ -143,6 +143,7 @@ model Application {
 
   // Application invites
   applicationInvites ApplicationInvite[]
+  attachments        ApplicationAttachment[]
 
   @@index([approvedBy])
   @@index([regulationId])
@@ -598,4 +599,21 @@ model SystemSetting {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("system_settings")
+}
+
+// 20. ApplicationAttachment
+model ApplicationAttachment {
+  id            String   @id @default(uuid()) @db.Uuid
+  applicationId String   @map("application_id") @db.Uuid
+  fileName      String   @map("file_name")
+  fileUrl       String   @map("file_url")
+  filePath      String   @map("file_path")
+  mimeType      String   @map("mime_type")
+  fileSize      Int      @map("file_size")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@map("application_attachments")
 }

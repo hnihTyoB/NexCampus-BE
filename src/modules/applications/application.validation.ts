@@ -34,15 +34,21 @@ export const createApplicationSchema = z.object({
   startDate: z.string().refine((val) => !isNaN(Date.parse(val)), {
     message: "startDate must be a valid ISO date string",
   }),
-  duration: z
-    .number({ invalid_type_error: "Duration must be a number" })
-    .int()
-    .positive("Duration must be a positive integer"),
+  duration: z.preprocess(
+    (val) => (typeof val === "string" ? parseInt(val, 10) : val),
+    z
+      .number({ invalid_type_error: "Duration must be a number" })
+      .int()
+      .positive("Duration must be a positive integer")
+  ),
   token: z.string().min(1, "Invitation token is required"),
   regulationId: z.string().uuid("Invalid regulation ID"),
-  acceptedRegulations: z.boolean().refine((val) => val === true, {
-    message: "You must accept the regulations to submit the application",
-  }),
+  acceptedRegulations: z.preprocess(
+    (val) => val === "true" || val === true,
+    z.boolean().refine((val) => val === true, {
+      message: "You must accept the regulations to submit the application",
+    })
+  ),
 });
 
 export const reviewApplicationSchema = z.object({

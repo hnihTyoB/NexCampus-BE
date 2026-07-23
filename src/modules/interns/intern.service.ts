@@ -3,6 +3,7 @@ import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import { InternQueryDto, CreateInternDto, UpdateInternDto, UpdateMeInternDto } from "./intern.dto";
 import { prisma } from "../../database/prisma.client";
+import { StorageService } from "../../common/services/storage.service";
 import { INTERN_STATUS } from "../../common/constants/status.constant";
 import { validatePhoneUniqueness } from "../../common/helpers/phone.helper";
 
@@ -85,7 +86,50 @@ export class InternService {
   }
 
   async delete(id: string) {
-    await this.findById(id);
+    const profile = await this.findById(id);
+    if (!profile) {
+      throw new AppError("Không tìm thấy hồ sơ thực tập sinh", 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    const email = profile.user.email;
+
+    // 1. Tìm đơn ứng tuyển có cùng email đã được duyệt (APPROVED)
+    const application = await prisma.application.findFirst({
+      where: {
+        email: { equals: email, mode: "insensitive" },
+        status: "APPROVED",
+        deletedAt: null,
+      },
+    });
+
+    if (application) {
+      // 2. Tìm tất cả tệp đính kèm của đơn ứng tuyển này
+      const attachments = await prisma.applicationAttachment.findMany({
+        where: { applicationId: application.id },
+      });
+
+      if (attachments.length > 0) {
+        const storageService = new StorageService();
+        const bucket = "application-attachments";
+
+        // 3. Xóa các tệp này trên Supabase Storage
+        for (const attachment of attachments) {
+          try {
+            await storageService.deleteFile(bucket, attachment.filePath);
+          } catch (storageError) {
+            console.error(
+              `[InternService.delete] Failed to delete file ${attachment.filePath} on Supabase:`,
+              storageError,
+            );
+          }
+        }
+
+        // 4. Xóa các bản ghi đính kèm trong database
+        await prisma.applicationAttachment.deleteMany({
+          where: { applicationId: application.id },
+        });
+      }
+    }
 
     return this.repository.softDelete(id);
   }
