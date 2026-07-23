@@ -5,7 +5,7 @@ import { InternRepository } from "../interns/intern.repository";
 import { StorageService } from "../../common/services/storage.service";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
-import { envConfig } from "../../config/env.config";
+import { supabaseConfig } from "../../config/supabase.config";
 import { ROLES } from "../../common/constants/role.constant";
 
 export class ReportAttachmentService {
@@ -15,7 +15,7 @@ export class ReportAttachmentService {
   private readonly storageService = new StorageService();
 
   private get bucket() {
-    return envConfig.supabase.storageReportBucket;
+    return supabaseConfig.storageReportBucket;
   }
 
   async uploadAttachment(

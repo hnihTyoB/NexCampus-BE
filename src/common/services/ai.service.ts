@@ -1,4 +1,4 @@
-import { envConfig } from "../../config/env.config";
+import { aiConfig } from "../../config/ai.config";
 import { geminiService } from "./gemini.service";
 
 export interface IAiProvider {
@@ -10,7 +10,7 @@ export class AiService {
   private provider: IAiProvider;
 
   private constructor() {
-    const providerType = envConfig.aiProvider.toLowerCase();
+    const providerType = aiConfig.provider.toLowerCase();
 
     switch (providerType) {
       case "gemini":

@@ -1,16 +1,16 @@
 import nodemailer from "nodemailer";
-import { envConfig } from "../../config/env.config";
+import { mailConfig } from "../../config/mail.config";
 
 export class EmailService {
   private static transporter = nodemailer.createTransport({
     pool: true,
     maxConnections: 5,
-    host: envConfig.email.host,
-    port: envConfig.email.port,
-    secure: envConfig.email.port === 465,
+    host: mailConfig.host,
+    port: mailConfig.port,
+    secure: mailConfig.secure,
     auth: {
-      user: envConfig.email.user,
-      pass: envConfig.email.pass,
+      user: mailConfig.user,
+      pass: mailConfig.pass,
     },
   });
 
@@ -20,9 +20,9 @@ export class EmailService {
     content: string,
   ): Promise<boolean> {
     if (
-      !envConfig.email.host ||
-      !envConfig.email.user ||
-      !envConfig.email.pass
+      !mailConfig.host ||
+      !mailConfig.user ||
+      !mailConfig.pass
     ) {
       console.warn(
         "[EmailService] SMTP not configured — skipping email to:",
@@ -33,7 +33,7 @@ export class EmailService {
 
     try {
       await this.transporter.sendMail({
-        from: envConfig.email.from,
+        from: mailConfig.from,
         to,
         subject,
         html: `<div style="font-family:sans-serif;max-width:600px;margin:auto">

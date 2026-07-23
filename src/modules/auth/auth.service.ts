@@ -5,7 +5,7 @@ import { AuthRepository } from "./auth.repository";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import { jwtConfig } from "../../config/jwt.config";
-import { envConfig } from "../../config/env.config";
+import { appConfig } from "../../config/app.config";
 import {
   LoginDto,
   LoginResponseDto,
@@ -105,7 +105,7 @@ export class AuthService {
           jwtConfig.accessSecret,
           { expiresIn: "24h" }
         );
-        const revokeUrl = `${envConfig.app.baseUrl}/security-alert?token=${revokeToken}`;
+        const revokeUrl = `${appConfig.baseUrl}/security-alert?token=${revokeToken}`;
 
         TemplateEmailHelper.send(user.email, NOTIFICATION_TYPE.SECURITY_ALERT, {
           fullName: user.fullName || user.email,
@@ -380,7 +380,7 @@ export class AuthService {
 
     await this.repository.updateResetToken(user.id, token, expiresAt);
 
-    const resetLink = `${envConfig.app.baseUrl}/reset-password?token=${token}`;
+    const resetLink = `${appConfig.baseUrl}/reset-password?token=${token}`;
 
     const secInfo = extractClientSecurityInfo({
       headers: { "user-agent": metadata?.userAgent },

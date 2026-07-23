@@ -1,13 +1,13 @@
 import "dotenv/config";
 import app from "./app";
-import { envConfig } from "./config/env.config";
+import { appConfig } from "./config/app.config";
 import { startNotificationWorker } from "./queues/notification.worker";
 import { startStorageCleanupWorker } from "./queues/storage-cleanup.worker";
 import { scheduleStorageCleanupJob } from "./queues/storage-cleanup.queue";
 import { startReminderWorker } from "./queues/reminder.worker";
 import { scheduleReminderJob } from "./queues/reminder.queue";
 
-const PORT = envConfig.port;
+const PORT = appConfig.port;
 
 // Start background workers
 startNotificationWorker();
@@ -24,6 +24,6 @@ scheduleReminderJob().catch((err) => {
 
 app.listen(PORT, () => {
   console.log(
-    `Server running on http://localhost:${PORT} in ${envConfig.nodeEnv} mode`,
+    `Server running on http://localhost:${PORT} in ${appConfig.nodeEnv} mode`,
   );
 });

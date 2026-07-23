@@ -1,12 +1,14 @@
 import { Worker, Job } from "bullmq";
-import { envConfig } from "../config/env.config";
+import { redisConfig } from "../config/redis.config";
+import { supabaseConfig } from "../config/supabase.config";
+import { cronConfig } from "../config/cron.config";
 import { TaskAttachmentRepository } from "../modules/task-attachments/task-attachment.repository";
 import { StorageService } from "../common/services/storage.service";
 import type { StorageCleanupJobData } from "./storage-cleanup.queue";
 
 async function processCleanupJob(_job: Job<StorageCleanupJobData>) {
-  const { retentionDays } = envConfig.storageCleanup;
-  const { storageBucket } = envConfig.supabase;
+  const { retentionDays } = cronConfig.storageCleanup;
+  const { storageBucket } = supabaseConfig;
 
   const attachmentRepo = new TaskAttachmentRepository();
   const storageService = new StorageService();
@@ -83,8 +85,8 @@ export function startStorageCleanupWorker() {
     processCleanupJob,
     {
       connection: {
-        host: envConfig.redis.host,
-        port: envConfig.redis.port,
+        host: redisConfig.host,
+        port: redisConfig.port,
       },
       concurrency: 1, // Chi chay 1 job cung luc de tranh conflict
     },

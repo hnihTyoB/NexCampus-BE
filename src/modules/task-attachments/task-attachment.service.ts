@@ -4,7 +4,7 @@ import { TaskRepository } from "../tasks/task.repository";
 import { StorageService } from "../../common/services/storage.service";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
-import { envConfig } from "../../config/env.config";
+import { supabaseConfig } from "../../config/supabase.config";
 
 export class TaskAttachmentService {
   private readonly attachmentRepo = new TaskAttachmentRepository();
@@ -12,7 +12,7 @@ export class TaskAttachmentService {
   private readonly storageService = new StorageService();
 
   private get bucket() {
-    return envConfig.supabase.storageBucket;
+    return supabaseConfig.storageBucket;
   }
 
   async uploadAttachment(

@@ -1,8 +1,8 @@
-import { envConfig } from "../../config/env.config";
+import { discordConfig } from "../../config/discord.config";
 
 export class DiscordService {
   static async sendMessage(title: string, content: string): Promise<boolean> {
-    if (!envConfig.discord.webhookUrl) {
+    if (!discordConfig.webhookUrl) {
       console.warn(
         "[DiscordService] Webhook URL not configured — skipping Discord notification.",
       );
@@ -10,7 +10,7 @@ export class DiscordService {
     }
 
     try {
-      const response = await fetch(envConfig.discord.webhookUrl, {
+      const response = await fetch(discordConfig.webhookUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
