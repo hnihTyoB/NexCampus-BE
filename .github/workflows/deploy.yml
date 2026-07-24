@@ -27,7 +27,7 @@ jobs:
             git pull origin production
 
             echo "Build và restart Backend container..."
-            docker-compose up -d --build backend --no-deps
+            docker-compose up -d --build --no-deps backend
 
             echo "Backend deploy thành công!"
             docker-compose ps backend
