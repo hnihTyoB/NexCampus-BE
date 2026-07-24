@@ -34,7 +34,7 @@ jobs:
             git pull origin production
 
             echo "Cài đặt dependencies..."
-            pnpm install --no-frozen-lockfile
+            PUPPETEER_SKIP_DOWNLOAD=true pnpm install --no-frozen-lockfile
 
             echo "Prisma Generate..."
             pnpm prisma:generate
