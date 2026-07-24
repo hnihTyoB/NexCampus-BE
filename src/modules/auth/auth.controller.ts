@@ -23,9 +23,9 @@ export class AuthController {
       res.cookie("refreshToken", result.refreshToken, {
         httpOnly: true,
         secure: isProduction,
-        sameSite: isProduction ? "none" : "lax",
+        sameSite: "lax",
         domain: isProduction ? ".nexcampus.io.vn" : undefined,
-        ...(body.rememberMe ? { maxAge: jwtConfig.refreshExpiresInMs } : {}),
+        maxAge: jwtConfig.refreshExpiresInMs,
       });
 
       // Never expose refreshToken in the response body - cookie handles it
@@ -95,9 +95,9 @@ export class AuthController {
       res.cookie("refreshToken", result.refreshToken, {
         httpOnly: true,
         secure: isProduction,
-        sameSite: isProduction ? "none" : "lax",
+        sameSite: "lax",
         domain: isProduction ? ".nexcampus.io.vn" : undefined,
-        ...(decoded ? { maxAge: jwtConfig.refreshExpiresInMs } : {}),
+        maxAge: jwtConfig.refreshExpiresInMs,
       });
 
       res.json({
@@ -112,7 +112,7 @@ export class AuthController {
       res.clearCookie("refreshToken", {
         httpOnly: true,
         secure: isProduction,
-        sameSite: isProduction ? "none" : "lax",
+        sameSite: "lax",
         domain: isProduction ? ".nexcampus.io.vn" : undefined,
       });
       next(error);
@@ -136,7 +136,7 @@ export class AuthController {
       res.clearCookie("refreshToken", {
         httpOnly: true,
         secure: isProduction,
-        sameSite: isProduction ? "none" : "lax",
+        sameSite: "lax",
         domain: isProduction ? ".nexcampus.io.vn" : undefined,
       });
 
