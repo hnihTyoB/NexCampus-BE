@@ -20,6 +20,13 @@ export class AuthController {
 
       // rememberMe=true  → persistent cookie (survives browser restart)
       // rememberMe=false → session cookie (cleared when browser closes)
+      // Clear old subdomain-specific cookie if it exists from previous deployment
+      res.clearCookie("refreshToken", {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: "lax",
+      });
+
       res.cookie("refreshToken", result.refreshToken, {
         httpOnly: true,
         secure: isProduction,
@@ -92,6 +99,13 @@ export class AuthController {
 
       // Preserve the original rememberMe preference encoded in the JWT payload
       const decoded = result.rememberMe;
+      // Clear old subdomain-specific cookie if it exists
+      res.clearCookie("refreshToken", {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: "lax",
+      });
+
       res.cookie("refreshToken", result.refreshToken, {
         httpOnly: true,
         secure: isProduction,
