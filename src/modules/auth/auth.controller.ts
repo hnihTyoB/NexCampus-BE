@@ -24,6 +24,7 @@ export class AuthController {
         httpOnly: true,
         secure: isProduction,
         sameSite: isProduction ? "none" : "lax",
+        domain: isProduction ? ".nexcampus.io.vn" : undefined,
         ...(body.rememberMe ? { maxAge: jwtConfig.refreshExpiresInMs } : {}),
       });
 
@@ -95,6 +96,7 @@ export class AuthController {
         httpOnly: true,
         secure: isProduction,
         sameSite: isProduction ? "none" : "lax",
+        domain: isProduction ? ".nexcampus.io.vn" : undefined,
         ...(decoded ? { maxAge: jwtConfig.refreshExpiresInMs } : {}),
       });
 
@@ -128,6 +130,7 @@ export class AuthController {
         httpOnly: true,
         secure: isProduction,
         sameSite: isProduction ? "none" : "lax",
+        domain: isProduction ? ".nexcampus.io.vn" : undefined,
       });
 
       res.json({
