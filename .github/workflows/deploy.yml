@@ -1,0 +1,51 @@
+name: Deploy Backend to VPS
+
+on:
+  push:
+    branches:
+      - production
+
+jobs:
+  deploy:
+    name: Deploy NexCampus-BE
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: SSH Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -e
+            echo "Chuyển vào thư mục Backend..."
+            cd /var/www/nexcampus/NexCampus-BE
+
+            echo "Pull code mới nhất từ GitHub..."
+            git pull origin production
+
+            echo "Cài đặt dependencies..."
+            pnpm install --frozen-lockfile
+
+            echo "Prisma Generate..."
+            pnpm prisma:generate
+
+            echo "Build TypeScript..."
+            pnpm build
+
+            echo "Đảm bảo Docker containers đang chạy (Postgres & Redis)..."
+            docker-compose up -d
+
+            echo "Thực thi Database Migration..."
+            pnpm db:migrate:deploy
+
+            echo "Reload ứng dụng trên PM2..."
+            pm2 describe nexcampus-be > /dev/null 2>&1 && pm2 reload nexcampus-be || pm2 start dist/server.js --name "nexcampus-be"
+            pm2 save
+
+            echo "Backend deploy thành công!"
