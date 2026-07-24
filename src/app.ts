@@ -22,9 +22,22 @@ app.use(
     contentSecurityPolicy: false, // Tắt CSP để Swagger UI tải được stylesheet
   }),
 );
+const allowedOrigins = [
+  appConfig.baseUrl,
+  appConfig.baseUrl.replace("https://", "https://www."),
+  "https://nexcampus.io.vn",
+  "https://www.nexcampus.io.vn"
+];
+
 app.use(
   cors({
-    origin: appConfig.baseUrl,
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   }),
 );
