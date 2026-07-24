@@ -64,6 +64,10 @@ jobs:
             echo "Pulling backend image from GHCR..."
             docker-compose pull backend
 
+            echo "Stopping and removing old container..."
+            docker-compose stop backend || true
+            docker-compose rm -f backend || true
+
             echo "Re-creating backend container..."
             docker-compose up -d --no-deps backend
 
