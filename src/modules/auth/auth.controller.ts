@@ -108,6 +108,13 @@ export class AuthController {
         },
       });
     } catch (error) {
+      const isProduction = envConfig.nodeEnv === "production";
+      res.clearCookie("refreshToken", {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: isProduction ? "none" : "lax",
+        domain: isProduction ? ".nexcampus.io.vn" : undefined,
+      });
       next(error);
     }
   };
