@@ -23,6 +23,10 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           script: |
             set -e
+            # Load NVM (SSH action dùng non-interactive shell, không tự load ~/.bashrc)
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
             echo "Chuyển vào thư mục Backend..."
             cd /var/www/nexcampus/NexCampus-BE
 
@@ -30,7 +34,7 @@ jobs:
             git pull origin production
 
             echo "Cài đặt dependencies..."
-            pnpm install --frozen-lockfile
+            pnpm install --no-frozen-lockfile
 
             echo "Prisma Generate..."
             pnpm prisma:generate
