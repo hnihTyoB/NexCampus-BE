@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { TaskService } from "./task.service";
 import { TaskImportService } from "./task.import.service";
 import { TaskAnalyticsService } from "./task.analytics.service";
+import { TaskAllocationService } from "./task-allocation.service";
 import { TaskQueryDto, CreateTaskDto, UpdateTaskDto } from "./task.dto";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
@@ -10,6 +11,7 @@ export class TaskController {
   private readonly service = new TaskService();
   private readonly importService = new TaskImportService();
   private readonly analyticsService = new TaskAnalyticsService();
+  private readonly allocationService = new TaskAllocationService();
 
   findAll = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -138,6 +140,16 @@ export class TaskController {
     try {
       const taskGroupId = (req.query.taskGroupId || req.body.taskGroupId) as string | undefined;
       const result = await this.analyticsService.getAll(taskGroupId);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getAiRecommendation = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const taskId = req.params.taskId;
+      const result = await this.allocationService.getAiRecommendation(taskId, req.user);
       res.json({ success: true, data: result });
     } catch (error) {
       next(error);

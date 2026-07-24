@@ -34,6 +34,14 @@ export class DepartmentService {
 
   async delete(id: string) {
     await this.findById(id);
+    const hasLinked = await this.repository.hasAssociations(id);
+    if (hasLinked) {
+      throw new AppError(
+        "Cannot delete department because it is associated with active interns, leaders, or applications.",
+        400,
+        ERROR_CODE.DEPENDENCY_ERROR
+      );
+    }
     return this.repository.delete(id);
   }
 
@@ -64,6 +72,14 @@ export class DepartmentService {
     const pos = await this.repository.findPositionById(id);
     if (!pos) {
       throw new AppError("Position not found", 404, ERROR_CODE.NOT_FOUND);
+    }
+    const hasLinked = await this.repository.hasPositionAssociations(id);
+    if (hasLinked) {
+      throw new AppError(
+        "Cannot delete position because it is associated with active interns or applications.",
+        400,
+        ERROR_CODE.DEPENDENCY_ERROR
+      );
     }
     return this.repository.deletePosition(id);
   }

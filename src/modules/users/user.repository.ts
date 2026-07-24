@@ -119,4 +119,36 @@ export class UserRepository {
     ]);
     return user;
   }
+
+  /**
+   * Tìm người dùng đã bị xóa mềm qua retentionDays ngày và vẫn còn avatarUrl.
+   */
+  findOrphanedAvatars(retentionDays: number) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - retentionDays);
+
+    return prisma.user.findMany({
+      where: {
+        deletedAt: {
+          not: null,
+          lte: cutoff,
+        },
+        avatarUrl: {
+          not: null,
+          notIn: [""],
+        },
+      },
+      select: {
+        id: true,
+        avatarUrl: true,
+      },
+    });
+  }
+
+  clearAvatarUrls(ids: string[]) {
+    return prisma.user.updateMany({
+      where: { id: { in: ids } },
+      data: { avatarUrl: null },
+    });
+  }
 }

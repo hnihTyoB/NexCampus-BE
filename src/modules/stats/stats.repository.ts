@@ -84,13 +84,19 @@ export class StatsRepository {
       totalNotifications,
       unreadNotifications,
 
-      // Detailed Assignments for Modal
+      // Detailed Assignments List
       rawAssignments,
 
       // Raw Leaders for Breakdown
       rawLeaders,
 
-      // Recent Activity Logs
+      // Single Query for Intern Counts by Leader (Eliminates N+1)
+      groupedInternCounts,
+
+      // Single Query for Assignments by Assigner (Eliminates N+1)
+      allAssignerTasks,
+
+      // Recent Activities
       recentSubmissionsRaw,
       recentReportsRaw,
       recentAppsRaw,
@@ -173,11 +179,27 @@ export class StatsRepository {
         },
       }),
 
-      // ─── Raw Leaders for Breakdown ───────────────────────────────────────────
+      // ─── Raw Leaders ─────────────────────────────────────────────────────────
       prisma.leader.findMany({
         include: {
           user: { select: { id: true, fullName: true, email: true } },
           department: { select: { name: true } },
+        },
+      }),
+
+      // ─── Single Grouped Intern Count (Eliminates N+1 Query) ──────────────────
+      prisma.intern.groupBy({
+        by: ["leaderId"],
+        where: { deletedAt: null, leaderId: { not: null } },
+        _count: { _all: true },
+      }),
+
+      // ─── Single Query for all Assignments (Eliminates N+1 Query) ────────────
+      prisma.taskAssignment.findMany({
+        select: {
+          assignedBy: true,
+          status: true,
+          task: { select: { deadline: true } },
         },
       }),
 
@@ -227,51 +249,59 @@ export class StatsRepository {
     const formattedAssignments = this.formatAssignments(rawAssignments);
     const overdueAssignments = formattedAssignments.filter((a) => a.isOverdue);
 
-    // Compute leader team progress breakdown
-    const leaderTeams: LeaderTeamProgressDto[] = await Promise.all(
-      rawLeaders.map(async (l) => {
-        const [internCount, assignments] = await Promise.all([
-          prisma.intern.count({ where: { leaderId: l.userId, deletedAt: null } }),
-          prisma.taskAssignment.findMany({
-            where: { assignedBy: l.userId },
-            include: { task: { select: { deadline: true } } },
-          }),
-        ]);
+    // Build fast lookup maps in memory
+    const internCountMap = new Map<string, number>();
+    groupedInternCounts.forEach((g) => {
+      if (g.leaderId) {
+        internCountMap.set(g.leaderId, g._count._all);
+      }
+    });
 
-        const pendingApproval = assignments.filter(
-          (a) => a.status === ASSIGNMENT_STATUS.PENDING_APPROVAL
-        ).length;
-        const todo = assignments.filter((a) => a.status === ASSIGNMENT_STATUS.TODO).length;
-        const inProgress = assignments.filter(
-          (a) => a.status === ASSIGNMENT_STATUS.IN_PROGRESS
-        ).length;
-        const review = assignments.filter((a) => a.status === ASSIGNMENT_STATUS.REVIEW).length;
-        const done = assignments.filter((a) => a.status === ASSIGNMENT_STATUS.DONE).length;
-        const blocked = assignments.filter((a) => a.status === ASSIGNMENT_STATUS.BLOCKED).length;
+    const leaderAssignmentsMap = new Map<string, typeof allAssignerTasks>();
+    allAssignerTasks.forEach((a) => {
+      const existing = leaderAssignmentsMap.get(a.assignedBy) || [];
+      existing.push(a);
+      leaderAssignmentsMap.set(a.assignedBy, existing);
+    });
 
-        const overdueCount = assignments.filter(
-          (a) => a.task?.deadline && new Date(a.task.deadline) < now && a.status !== ASSIGNMENT_STATUS.DONE
-        ).length;
+    // Compute leader team progress synchronously without DB calls (0 extra queries)
+    const leaderTeams: LeaderTeamProgressDto[] = rawLeaders.map((l) => {
+      const assignments = leaderAssignmentsMap.get(l.userId) || [];
+      const internCount = internCountMap.get(l.userId) || 0;
 
-        return {
-          leaderId: l.id,
-          leaderName: l.user?.fullName ?? "N/A",
-          leaderEmail: l.user?.email ?? "",
-          departmentName: l.department?.name ?? "Chưa xếp phòng",
-          totalInterns: internCount,
-          totalAssignments: assignments.length,
-          assignments: {
-            pendingApproval,
-            todo,
-            inProgress,
-            review,
-            done,
-            blocked,
-          },
-          overdueCount,
-        };
-      })
-    );
+      const pendingApproval = assignments.filter(
+        (a) => a.status === ASSIGNMENT_STATUS.PENDING_APPROVAL
+      ).length;
+      const todo = assignments.filter((a) => a.status === ASSIGNMENT_STATUS.TODO).length;
+      const inProgress = assignments.filter(
+        (a) => a.status === ASSIGNMENT_STATUS.IN_PROGRESS
+      ).length;
+      const review = assignments.filter((a) => a.status === ASSIGNMENT_STATUS.REVIEW).length;
+      const done = assignments.filter((a) => a.status === ASSIGNMENT_STATUS.DONE).length;
+      const blocked = assignments.filter((a) => a.status === ASSIGNMENT_STATUS.BLOCKED).length;
+
+      const overdueCount = assignments.filter(
+        (a) => a.task?.deadline && new Date(a.task.deadline) < now && a.status !== ASSIGNMENT_STATUS.DONE
+      ).length;
+
+      return {
+        leaderId: l.id,
+        leaderName: l.user?.fullName ?? "N/A",
+        leaderEmail: l.user?.email ?? "",
+        departmentName: l.department?.name ?? "Chưa xếp phòng",
+        totalInterns: internCount,
+        totalAssignments: assignments.length,
+        assignments: {
+          pendingApproval,
+          todo,
+          inProgress,
+          review,
+          done,
+          blocked,
+        },
+        overdueCount,
+      };
+    });
 
     // Recent Activities list
     const recentActivities: ActivityLogDto[] = [
@@ -387,6 +417,12 @@ export class StatsRepository {
       avgScore,
       rawAssignments,
       myInterns,
+
+      // Batch query all intern assignments to eliminate N+1 query
+      allMyInternAssignments,
+
+      // Batch query all intern evaluation averages to eliminate N+1 query
+      allMyInternEvaluationAvg,
     ] = await Promise.all([
       prisma.intern.count({ where: { deletedAt: null, leaderId } }),
       prisma.intern.count({
@@ -443,6 +479,23 @@ export class StatsRepository {
         where: { leaderId, deletedAt: null },
         include: { user: { select: { fullName: true, email: true } } },
       }),
+
+      // Batch query for all intern assignments (Eliminates N+1)
+      prisma.taskAssignment.findMany({
+        where: { intern: { leaderId, deletedAt: null } },
+        select: {
+          internId: true,
+          status: true,
+          task: { select: { deadline: true } },
+        },
+      }),
+
+      // Batch query for all evaluation averages (Eliminates N+1)
+      prisma.weeklyEvaluation.groupBy({
+        by: ["internId"],
+        where: { intern: { leaderId, deletedAt: null } },
+        _avg: { totalScore: true },
+      }),
     ]);
 
     const assignmentStatusMap: Record<string, number> = {};
@@ -453,48 +506,51 @@ export class StatsRepository {
     const formattedAssignments = this.formatAssignments(rawAssignments);
     const overdueAssignments = formattedAssignments.filter((a) => a.isOverdue);
 
-    // Compute progress for each intern in leader's team
-    const internProgress: InternTeamProgressDto[] = await Promise.all(
-      myInterns.map(async (intern) => {
-        const [internAssignments, evaluationAvg] = await Promise.all([
-          prisma.taskAssignment.findMany({
-            where: { internId: intern.id },
-            include: { task: { select: { deadline: true } } },
-          }),
-          prisma.weeklyEvaluation.aggregate({
-            where: { internId: intern.id },
-            _avg: { totalScore: true },
-          }),
-        ]);
+    // Build fast lookup maps in memory
+    const internAssignmentsMap = new Map<string, typeof allMyInternAssignments>();
+    allMyInternAssignments.forEach((a) => {
+      const existing = internAssignmentsMap.get(a.internId) || [];
+      existing.push(a);
+      internAssignmentsMap.set(a.internId, existing);
+    });
 
-        const completedTasks = internAssignments.filter(
-          (a) => a.status === ASSIGNMENT_STATUS.DONE
-        ).length;
-        const totalTasks = internAssignments.length;
-        const overdueCount = internAssignments.filter(
-          (a) => a.task?.deadline && new Date(a.task.deadline) < now && a.status !== ASSIGNMENT_STATUS.DONE
-        ).length;
-        const avgScoreVal = parseFloat((evaluationAvg._avg.totalScore ?? 0).toFixed(1));
+    const evalAvgMap = new Map<string, number>();
+    allMyInternEvaluationAvg.forEach((e) => {
+      evalAvgMap.set(e.internId, e._avg.totalScore ?? 0);
+    });
 
-        let healthStatus: "HEALTHY" | "WARNING" | "DANGER" = "HEALTHY";
-        if (overdueCount >= 2 || (avgScoreVal > 0 && avgScoreVal < 5)) {
-          healthStatus = "DANGER";
-        } else if (overdueCount === 1 || (avgScoreVal > 0 && avgScoreVal < 7)) {
-          healthStatus = "WARNING";
-        }
+    // Compute progress for each intern synchronously (0 extra DB queries)
+    const internProgress: InternTeamProgressDto[] = myInterns.map((intern) => {
+      const internAssignments = internAssignmentsMap.get(intern.id) || [];
+      const avgScoreRaw = evalAvgMap.get(intern.id) || 0;
 
-        return {
-          internId: intern.id,
-          internName: intern.fullName ?? intern.user?.fullName ?? "N/A",
-          internEmail: intern.user?.email ?? "",
-          completedTasks,
-          totalTasks,
-          avgScore: avgScoreVal,
-          overdueCount,
-          healthStatus,
-        };
-      })
-    );
+      const completedTasks = internAssignments.filter(
+        (a) => a.status === ASSIGNMENT_STATUS.DONE
+      ).length;
+      const totalTasks = internAssignments.length;
+      const overdueCount = internAssignments.filter(
+        (a) => a.task?.deadline && new Date(a.task.deadline) < now && a.status !== ASSIGNMENT_STATUS.DONE
+      ).length;
+      const avgScoreVal = parseFloat(avgScoreRaw.toFixed(1));
+
+      let healthStatus: "HEALTHY" | "WARNING" | "DANGER" = "HEALTHY";
+      if (overdueCount >= 2 || (avgScoreVal > 0 && avgScoreVal < 5)) {
+        healthStatus = "DANGER";
+      } else if (overdueCount === 1 || (avgScoreVal > 0 && avgScoreVal < 7)) {
+        healthStatus = "WARNING";
+      }
+
+      return {
+        internId: intern.id,
+        internName: intern.fullName ?? intern.user?.fullName ?? "N/A",
+        internEmail: intern.user?.email ?? "",
+        completedTasks,
+        totalTasks,
+        avgScore: avgScoreVal,
+        overdueCount,
+        healthStatus,
+      };
+    });
 
     return {
       interns: {
@@ -537,8 +593,9 @@ export class StatsRepository {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    const intern = await prisma.intern.findUnique({
-      where: { userId },
+    // Filter out deleted interns for soft delete compliance
+    const intern = await prisma.intern.findFirst({
+      where: { userId, deletedAt: null },
       include: { user: { select: { fullName: true } } },
     });
 

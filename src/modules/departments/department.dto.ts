@@ -12,6 +12,7 @@ export interface PositionDto {
 
 export interface CreateDepartmentDto {
   name: string;
+  positions?: string[];
 }
 
 export interface UpdateDepartmentDto {

@@ -11,11 +11,11 @@ import {
 import routes from "./routes";
 import { swaggerSpec, swaggerOptions } from "./config/swagger.config";
 import { rateLimitMiddleware } from "./middlewares/rate-limit.middleware";
-import { envConfig } from "./config/env.config";
+import { appConfig } from "./config/app.config";
 
 const app = express();
 
-app.set("trust proxy", envConfig.app.trustProxy ?? false);
+app.set("trust proxy", appConfig.trustProxy ?? false);
 
 app.use(
   helmet({
@@ -24,7 +24,7 @@ app.use(
 );
 app.use(
   cors({
-    origin: envConfig.app.baseUrl,
+    origin: appConfig.baseUrl,
     credentials: true,
   }),
 );

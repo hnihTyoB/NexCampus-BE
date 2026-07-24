@@ -14,6 +14,10 @@ export class StatsController {
     next: NextFunction,
   ) => {
     try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized access" });
+        return;
+      }
       const data = await this.service.getAdminStats();
       res.json({ success: true, data });
     } catch (error) {
@@ -27,7 +31,11 @@ export class StatsController {
     next: NextFunction,
   ) => {
     try {
-      const data = await this.service.getLeaderStats(req.user!);
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized access" });
+        return;
+      }
+      const data = await this.service.getLeaderStats(req.user);
       res.json({ success: true, data });
     } catch (error) {
       next(error);
@@ -40,7 +48,11 @@ export class StatsController {
     next: NextFunction,
   ) => {
     try {
-      const data = await this.service.getInternStats(req.user!);
+      if (!req.user) {
+        res.status(401).json({ success: false, message: "Unauthorized access" });
+        return;
+      }
+      const data = await this.service.getInternStats(req.user);
       res.json({ success: true, data });
     } catch (error) {
       next(error);

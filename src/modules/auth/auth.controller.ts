@@ -142,7 +142,9 @@ export class AuthController {
   forgotPassword = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = req.body as ForgotPasswordDto;
-      await this.service.forgotPassword(body);
+      const userAgent = req.headers["user-agent"];
+      const ipAddress = req.ip;
+      await this.service.forgotPassword(body, { userAgent, ipAddress });
 
       res.json({
         success: true,
@@ -176,6 +178,20 @@ export class AuthController {
       res.json({
         success: true,
         message: "Thay đổi mật khẩu thành công.",
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  revokeSession = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { token } = req.body;
+      await this.service.revokeSession(token);
+
+      res.json({
+        success: true,
+        message: "Đã vô hiệu hóa tất cả các phiên đăng nhập thành công. Tài khoản của bạn hiện đã được bảo mật.",
       });
     } catch (error) {
       next(error);

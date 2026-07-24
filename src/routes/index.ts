@@ -18,6 +18,7 @@ import regulationRoute from "../modules/regulations/regulation.route";
 import pdfExportRoute from "../modules/pdf-export/pdf-export.route";
 import departmentRoute from "../modules/departments/department.route";
 import leaderRoute from "../modules/leaders/leader.route";
+import systemSettingRoute from "../modules/system-settings/system-setting.route";
 
 const router = Router();
 
@@ -44,5 +45,6 @@ router.use("/regulations", regulationRoute);
 router.use("/pdf-exports", pdfExportRoute);
 router.use("/departments", departmentRoute);
 router.use("/leaders", leaderRoute);
+router.use("/settings", systemSettingRoute);
 
 export default router;

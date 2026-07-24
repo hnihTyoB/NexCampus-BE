@@ -5,7 +5,7 @@ import { InternRepository } from "../interns/intern.repository";
 import { StorageService } from "../../common/services/storage.service";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
-import { envConfig } from "../../config/env.config";
+import { supabaseConfig } from "../../config/supabase.config";
 import { ROLES } from "../../common/constants/role.constant";
 
 export class ReportAttachmentService {
@@ -15,7 +15,7 @@ export class ReportAttachmentService {
   private readonly storageService = new StorageService();
 
   private get bucket() {
-    return envConfig.supabase.storageReportBucket;
+    return supabaseConfig.storageReportBucket;
   }
 
   async uploadAttachment(
@@ -40,6 +40,16 @@ export class ReportAttachmentService {
           ERROR_CODE.FORBIDDEN,
         );
       }
+    }
+
+    // 2.5 Kiem tra gioi han 5 file dinh kem
+    const existing = await this.attachmentRepo.findByReportId(reportId);
+    if (existing.length >= 5) {
+      throw new AppError(
+        "Maximum 5 attachments allowed per daily report",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
     }
 
     // 3. Tao duong dan duy nhat trong bucket: {reportId}/{uuid}_{originalname}
