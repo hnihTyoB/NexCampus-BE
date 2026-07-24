@@ -29,6 +29,16 @@ const defaultSelect = {
   approver: {
     select: approverSelect,
   },
+  attachments: {
+    select: {
+      id: true,
+      fileName: true,
+      fileUrl: true,
+      fileSize: true,
+      mimeType: true,
+      createdAt: true,
+    },
+  },
 };
 
 export class ApplicationRepository {

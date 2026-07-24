@@ -1,11 +1,11 @@
 import { prisma } from "../../database/prisma.client";
 import { NotificationDispatcher } from "./notification.dispatcher";
-import { envConfig } from "../../config/env.config";
+import { cronConfig } from "../../config/cron.config";
 import { NOTIFICATION_TYPE, ASSIGNMENT_STATUS, INTERN_STATUS, APPLICATION_INVITE_STATUS } from "../../common/constants/status.constant";
 
 export class ReminderService {
   static async remindTasks(): Promise<{ sentCount: number }> {
-    const thresholdHours = envConfig.reminders.thresholdHours;
+    const thresholdHours = cronConfig.reminders.thresholdHours;
     const now = new Date();
     const futureLimit = new Date(now.getTime() + thresholdHours * 60 * 60 * 1000);
 

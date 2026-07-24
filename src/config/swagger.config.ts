@@ -241,6 +241,17 @@ export const swaggerSpec = {
           confirmPassword: { type: "string", example: "NewPassword@123" },
         },
       },
+      RevokeSessionBody: {
+        type: "object",
+        required: ["token"],
+        properties: {
+          token: {
+            type: "string",
+            example: "eyJhbGciOi...",
+            description: "Revoke JWT Token nhận được từ email cảnh báo bảo mật",
+          },
+        },
+      },
       Me: {
         type: "object",
         properties: {
@@ -330,6 +341,20 @@ export const swaggerSpec = {
                 },
               },
             ],
+          },
+          attachments: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                fileName: { type: "string" },
+                fileUrl: { type: "string", format: "uri" },
+                fileSize: { type: "integer" },
+                mimeType: { type: "string" },
+                createdAt: { type: "string", format: "date-time" },
+              },
+            },
           },
         },
       },
@@ -681,6 +706,83 @@ export const swaggerSpec = {
           acceptanceCriteria: { type: "string", nullable: true },
           taskNotes: { type: "string", nullable: true },
           taskGroupId: { type: "string", format: "uuid", nullable: true },
+        },
+      },
+      TaskAiRecommendationCandidate: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid", example: "3fa85f64-5717-4562-b3fc-2c963f66afa6" },
+          name: { type: "string", example: "Nguyễn Văn A" },
+          position: { type: "string", nullable: true, example: "Backend Developer" },
+          compatibilityScore: { type: "number", example: 92 },
+          workloadScore: { type: "number", example: 80 },
+          performanceScore: { type: "number", example: 85 },
+          skillScore: { type: "number", example: 100 },
+          learningScore: { type: "number", example: 80 },
+          activeTaskDays: { type: "number", example: 2 },
+          codingScore: { type: "number", nullable: true, example: 8.5 },
+        },
+      },
+      TaskAiRecommendationResponse: {
+        type: "object",
+        properties: {
+          owner: {
+            type: "object",
+            properties: {
+              id: { type: "string", format: "uuid", example: "3fa85f64-5717-4562-b3fc-2c963f66afa6" },
+              name: { type: "string", example: "Nguyễn Văn A" },
+              position: { type: "string", nullable: true, example: "Backend Developer" },
+              compatibilityScore: { type: "number", example: 92 },
+              workloadDays: { type: "number", example: 2 },
+              codingScore: { type: "number", nullable: true, example: 8.5 },
+            },
+          },
+          support: {
+            type: "object",
+            nullable: true,
+            properties: {
+              id: { type: "string", format: "uuid", example: "4gb96f75-6828-5673-c4gd-3d074g77bgb7" },
+              name: { type: "string", example: "Trần Văn B" },
+              position: { type: "string", nullable: true, example: "Backend Developer" },
+              compatibilityScore: { type: "number", example: 78 },
+              workloadDays: { type: "number", example: 6 },
+              codingScore: { type: "number", nullable: true, example: 9.0 },
+            },
+          },
+          reasons: {
+            type: "array",
+            items: { type: "string" },
+            example: [
+              "Workload thấp — đang gánh 2 ngày công",
+              "Position phù hợp với yêu cầu của task",
+              "Điểm Coding gần nhất: 8.5/10",
+            ],
+          },
+          riskLevel: {
+            type: "string",
+            enum: ["LOW", "MEDIUM", "HIGH"],
+            example: "LOW",
+          },
+          workloadAnalysis: {
+            type: "string",
+            example: "Nguyễn Văn A hiện đang gánh 2 ngày công (capacity 10 ngày).",
+          },
+          learningOpportunity: {
+            type: "string",
+            example: "Đây là cơ hội tốt để Nguyễn Văn A mở rộng kinh nghiệm với task này.",
+          },
+          allCandidates: {
+            type: "array",
+            items: { $ref: "#/components/schemas/TaskAiRecommendationCandidate" },
+          },
+          meta: {
+            type: "object",
+            properties: {
+              totalEvaluated: { type: "integer", example: 3 },
+              aiFailed: { type: "boolean", example: false },
+              generatedAt: { type: "string", format: "date-time", example: "2026-07-21T12:00:00.000Z" },
+            },
+          },
         },
       },
       // ─── TaskAttachment ───────────────────────────────────────────────────────
@@ -1584,6 +1686,52 @@ export const swaggerSpec = {
         },
       },
     },
+    "/auth/revoke-session": {
+      post: {
+        tags: ["Auth"],
+        summary: "Vô hiệu hóa & thu hồi tất cả phiên đăng nhập (Đây không phải tôi)",
+        description: "API nhận JWT Revoke Token từ email cảnh báo bảo mật, tiến hành xóa toàn bộ Refresh Token của tài khoản và ghi nhận nhật ký hệ thống.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/RevokeSessionBody" },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Thu hồi tất cả phiên đăng nhập thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        message: {
+                          type: "string",
+                          example: "Đã vô hiệu hóa tất cả các phiên đăng nhập thành công. Tài khoản của bạn hiện đã được bảo mật.",
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          400: {
+            description: "Mã xác thực không hợp lệ hoặc đã hết hạn",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
 
     // ─── Users ───────────────────────────────────────────────────────────────
     "/users": {
@@ -2059,8 +2207,42 @@ export const swaggerSpec = {
         requestBody: {
           required: true,
           content: {
-            "application/json": {
-              schema: { $ref: "#/components/schemas/CreateApplicationBody" },
+            "multipart/form-data": {
+              schema: {
+                type: "object",
+                required: [
+                  "fullName",
+                  "email",
+                  "phone",
+                  "departmentId",
+                  "positionId",
+                  "startDate",
+                  "duration",
+                  "token",
+                  "regulationId",
+                  "acceptedRegulations",
+                ],
+                properties: {
+                  fullName: { type: "string", example: "Nguyễn Văn A" },
+                  email: { type: "string", format: "email", example: "vana@gmail.com" },
+                  phone: { type: "string", example: "0912345678" },
+                  departmentId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440000" },
+                  positionId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440001" },
+                  startDate: { type: "string", format: "date", example: "2025-08-01" },
+                  duration: { type: "integer", example: 3 },
+                  token: { type: "string", example: "39bdf11f..." },
+                  regulationId: { type: "string", format: "uuid" },
+                  acceptedRegulations: { type: "boolean", example: true },
+                  files: {
+                    type: "array",
+                    items: {
+                      type: "string",
+                      format: "binary",
+                    },
+                    description: "Đính kèm tài liệu ứng tuyển (CV, bảng điểm, giấy giới thiệu...). Tối đa 5 file, mỗi file tối đa 10MB.",
+                  },
+                },
+              },
             },
           },
         },
@@ -3230,6 +3412,72 @@ export const swaggerSpec = {
           401: { $ref: "#/components/responses/Unauthorized" },
           403: { $ref: "#/components/responses/Forbidden" },
           422: { $ref: "#/components/responses/Validation" },
+        },
+      },
+    },
+    "/tasks/{taskId}/ai-recommendation": {
+      post: {
+        tags: ["Tasks"],
+        summary: "Lấy gợi ý phân bổ công việc từ AI (Admin / Leader)",
+        description: "Hệ thống AI hỗ trợ phân tích Workload, Skill Match, Performance và Learning Opportunity để đề xuất Intern phù hợp nhất làm Owner & Support. Không tự động giao task — Leader xem xét và tự quyết định.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "taskId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "ID của Task cần xin gợi ý phân bổ",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Đề xuất phân bổ task thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/TaskAiRecommendationResponse" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+          409: {
+            description: "Task đã được phân công từ trước",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+                example: {
+                  success: false,
+                  message: "Task này đã được giao cho intern. Không thể tạo đề xuất mới.",
+                  code: "DUPLICATE_ENTRY",
+                },
+              },
+            },
+          },
+          422: {
+            description: "Không có intern nào đang active dưới sự quản lý của Leader",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+                example: {
+                  success: false,
+                  message: "Không tìm thấy intern nào đang active dưới sự quản lý của bạn.",
+                  code: "VALIDATION_ERROR",
+                },
+              },
+            },
+          },
         },
       },
     },
@@ -6457,5 +6705,87 @@ export const swaggerSpec = {
         },
       },
     },
+    "/settings": {
+      get: {
+        tags: ["Settings"],
+        summary: "Lấy thông tin cấu hình hệ thống (Leader/Admin/Intern)",
+        description: "Lấy các thông tin cấu hình hệ thống hiện tại, bao gồm cả giới hạn dung lượng upload cho từng loại tệp.",
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: {
+            description: "Lấy cấu hình thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    data: {
+                      type: "object",
+                      properties: {
+                        AVATAR_MAX_FILE_SIZE_MB: { type: "integer", example: 2 },
+                        REPORT_MAX_FILE_SIZE_MB: { type: "integer", example: 5 },
+                        SUBMISSION_MAX_FILE_SIZE_MB: { type: "integer", example: 50 }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          401: { $ref: "#/components/responses/Unauthorized" }
+        }
+      },
+      put: {
+        tags: ["Settings"],
+        summary: "Cập nhật cấu hình hệ thống (Admin only)",
+        description: "Cập nhật cấu hình hệ thống theo key. Hiện tại hỗ trợ cập nhật `SUBMISSION_MAX_FILE_SIZE_MB` trong khoảng từ 5 đến 50 MB.",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["key", "value"],
+                properties: {
+                  key: { type: "string", example: "SUBMISSION_MAX_FILE_SIZE_MB" },
+                  value: { type: "string", example: "30" }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          200: {
+            description: "Cập nhật cấu hình thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "object",
+                          properties: {
+                            key: { type: "string", example: "SUBMISSION_MAX_FILE_SIZE_MB" },
+                            value: { type: "string", example: "30" }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          422: { $ref: "#/components/responses/Validation" }
+        }
+      }
+    }
   },
 };

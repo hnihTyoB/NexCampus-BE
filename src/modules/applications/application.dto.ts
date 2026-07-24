@@ -49,6 +49,14 @@ export interface ApplicationResponseDto {
     email: string;
     fullName: string | null;
   } | null;
+  attachments?: Array<{
+    id: string;
+    fileName: string;
+    fileUrl: string;
+    fileSize: number;
+    mimeType: string;
+    createdAt: Date;
+  }>;
 }
 
 export interface CreateInviteDto {

@@ -1,6 +1,6 @@
 import multer, { FileFilterCallback } from "multer";
 import { Request } from "express";
-import { envConfig } from "../config/env.config";
+import { supabaseConfig } from "../config/supabase.config";
 
 const ALLOWED_MIME_TYPES = [
   "image/jpeg",
@@ -39,18 +39,82 @@ const fileFilter = (
 
 const storage = multer.memoryStorage();
 
-const getMaxFileSize = () => envConfig.supabase.maxFileSizeMb * 1024 * 1024;
+import { Response, NextFunction } from "express";
+import { systemSettingService } from "../modules/system-settings/system-setting.service";
 
-export const uploadSingle = (fieldName: string) =>
-  multer({
-    storage,
-    fileFilter,
-    limits: { fileSize: getMaxFileSize() },
-  }).single(fieldName);
+const getMaxFileSize = () => supabaseConfig.maxFileSizeMb * 1024 * 1024;
 
-export const uploadMultiple = (fieldName: string, maxCount = 5) =>
-  multer({
-    storage,
-    fileFilter,
-    limits: { fileSize: getMaxFileSize() },
-  }).array(fieldName, maxCount);
+export const uploadSingle = (
+  fieldName: string,
+  category?: "avatar" | "report" | "submission" | "task" | "application",
+) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    let limitBytes = getMaxFileSize();
+
+    try {
+      if (category === "avatar") {
+        limitBytes = 2 * 1024 * 1024; // Khóa cứng 2MB cho Avatar
+      } else if (category === "report") {
+        limitBytes = 5 * 1024 * 1024; // Khóa cứng 5MB cho Báo cáo
+      } else if (category === "application") {
+        limitBytes = 10 * 1024 * 1024; // Khóa cứng 10MB cho Tài liệu ứng tuyển
+      } else if (category === "submission") {
+        const mb = await systemSettingService.getSubmissionLimitMb();
+        limitBytes = mb * 1024 * 1024;
+      }
+    } catch (err) {
+      console.error(`[UploadMiddleware] Error resolving upload limit:`, err);
+    }
+
+    const upload = multer({
+      storage,
+      fileFilter,
+      limits: { fileSize: limitBytes },
+    }).single(fieldName);
+
+    upload(req, res, (err) => {
+      if (err) {
+        return next(err);
+      }
+      next();
+    });
+  };
+};
+
+export const uploadMultiple = (
+  fieldName: string,
+  maxCount = 5,
+  category?: "avatar" | "report" | "submission" | "task" | "application",
+) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    let limitBytes = getMaxFileSize();
+
+    try {
+      if (category === "avatar") {
+        limitBytes = 2 * 1024 * 1024;
+      } else if (category === "report") {
+        limitBytes = 5 * 1024 * 1024;
+      } else if (category === "application") {
+        limitBytes = 10 * 1024 * 1024; // Khóa cứng 10MB cho Tài liệu ứng tuyển
+      } else if (category === "submission") {
+        const mb = await systemSettingService.getSubmissionLimitMb();
+        limitBytes = mb * 1024 * 1024;
+      }
+    } catch (err) {
+      console.error(`[UploadMiddleware] Error resolving upload limit:`, err);
+    }
+
+    const upload = multer({
+      storage,
+      fileFilter,
+      limits: { fileSize: limitBytes },
+    }).array(fieldName, maxCount);
+
+    upload(req, res, (err) => {
+      if (err) {
+        return next(err);
+      }
+      next();
+    });
+  };
+};

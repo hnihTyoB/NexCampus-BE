@@ -4,7 +4,7 @@ import { InternRepository } from "../interns/intern.repository";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import { StorageService } from "../../common/services/storage.service";
-import { envConfig } from "../../config/env.config";
+import { supabaseConfig } from "../../config/supabase.config";
 import {
   DailyReportQueryDto,
   CreateDailyReportDto,
@@ -114,11 +114,11 @@ export class DailyReportService {
     }
 
     // 2. Delete old video file from storage if it exists and was uploaded to our bucket
-    const bucket = envConfig.supabase.storageReportBucket;
+    const bucket = supabaseConfig.storageReportBucket;
     const storageService = new StorageService();
 
     if (report.videoDemo) {
-      const prefix = `${envConfig.supabase.url}/storage/v1/object/public/${bucket}/`;
+      const prefix = `${supabaseConfig.url}/storage/v1/object/public/${bucket}/`;
       if (report.videoDemo.startsWith(prefix)) {
         const videoPath = report.videoDemo.replace(prefix, "");
         try {
@@ -158,7 +158,7 @@ export class DailyReportService {
     }
 
     // Delete associated files from Supabase Storage
-    const bucket = envConfig.supabase.storageReportBucket;
+    const bucket = supabaseConfig.storageReportBucket;
     const storageService = new StorageService();
 
     // 1. Delete report attachments
@@ -177,7 +177,7 @@ export class DailyReportService {
 
     // 2. Delete video demo if it is uploaded to our bucket
     if (report.videoDemo) {
-      const prefix = `${envConfig.supabase.url}/storage/v1/object/public/${bucket}/`;
+      const prefix = `${supabaseConfig.url}/storage/v1/object/public/${bucket}/`;
       if (report.videoDemo.startsWith(prefix)) {
         const videoPath = report.videoDemo.replace(prefix, "");
         try {

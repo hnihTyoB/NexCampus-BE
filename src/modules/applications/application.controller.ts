@@ -35,7 +35,8 @@ export class ApplicationController {
   create = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = req.body as CreateApplicationDto;
-      const result = await this.service.create(body);
+      const files = req.files as Express.Multer.File[] || [];
+      const result = await this.service.create(body, files);
 
       res.status(201).json({ success: true, data: result });
     } catch (error) {

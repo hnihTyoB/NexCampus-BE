@@ -33,4 +33,31 @@ export class ReportAttachmentRepository {
       where: { reportId },
     });
   }
+
+  /**
+   * Tìm các tệp đính kèm báo cáo cũ hơn retentionDays ngày (kể cả không bị xóa mềm).
+   */
+  findOldAttachments(retentionDays: number) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - retentionDays);
+
+    return prisma.reportAttachment.findMany({
+      where: {
+        createdAt: {
+          lte: cutoff,
+        },
+      },
+      select: {
+        id: true,
+        filePath: true,
+        fileName: true,
+      },
+    });
+  }
+
+  deleteManyByIds(ids: string[]) {
+    return prisma.reportAttachment.deleteMany({
+      where: { id: { in: ids } },
+    });
+  }
 }

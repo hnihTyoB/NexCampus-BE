@@ -40,25 +40,29 @@ export class NotificationDispatcher {
 
       // 2. Fetch template from cache / database
       const dbTemplate = await TemplateCacheHelper.getTemplate(type);
+      const fallback = TEMPLATE_DEFAULTS[type];
 
-      const titleTemplate =
-        dbTemplate?.titleTemplate || TEMPLATE_DEFAULTS[type]?.titleTemplate || "Thông báo mới";
-      const contentTemplate =
-        dbTemplate?.contentTemplate || TEMPLATE_DEFAULTS[type]?.contentTemplate || "";
+      const isEdited =
+        dbTemplate &&
+        dbTemplate.createdAt &&
+        dbTemplate.updatedAt &&
+        dbTemplate.createdAt.getTime() !== dbTemplate.updatedAt.getTime();
 
-      const emailSubjectTemplate =
-        dbTemplate?.emailSubjectTemplate ||
-        dbTemplate?.titleTemplate ||
-        TEMPLATE_DEFAULTS[type]?.emailSubjectTemplate ||
-        TEMPLATE_DEFAULTS[type]?.titleTemplate ||
-        titleTemplate;
+      const titleTemplate = isEdited
+        ? dbTemplate.titleTemplate || fallback?.titleTemplate || "Thông báo mới"
+        : fallback?.titleTemplate || "Thông báo mới";
 
-      const emailContentTemplate =
-        dbTemplate?.emailContentTemplate ||
-        dbTemplate?.contentTemplate ||
-        TEMPLATE_DEFAULTS[type]?.emailContentTemplate ||
-        TEMPLATE_DEFAULTS[type]?.contentTemplate ||
-        contentTemplate;
+      const contentTemplate = isEdited
+        ? dbTemplate.contentTemplate || fallback?.contentTemplate || ""
+        : fallback?.contentTemplate || "";
+
+      const emailSubjectTemplate = isEdited
+        ? dbTemplate.emailSubjectTemplate || dbTemplate.titleTemplate || fallback?.emailSubjectTemplate || fallback?.titleTemplate || titleTemplate
+        : fallback?.emailSubjectTemplate || fallback?.titleTemplate || titleTemplate;
+
+      const emailContentTemplate = isEdited
+        ? dbTemplate.emailContentTemplate || dbTemplate.contentTemplate || fallback?.emailContentTemplate || fallback?.contentTemplate || contentTemplate
+        : fallback?.emailContentTemplate || fallback?.contentTemplate || contentTemplate;
 
       // 3. Interpolate parameters
       const title = interpolate(titleTemplate, params);

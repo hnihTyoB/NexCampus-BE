@@ -49,4 +49,6 @@ router.post(
   controller.changePassword,
 );
 
+router.post("/revoke-session", controller.revokeSession);
+
 export default router;

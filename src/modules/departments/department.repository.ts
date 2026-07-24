@@ -27,8 +27,16 @@ export class DepartmentRepository {
   }
 
   create(data: CreateDepartmentDto) {
+    const hasPositions = data.positions && data.positions.length > 0;
     return prisma.department.create({
-      data: { name: data.name },
+      data: {
+        name: data.name,
+        positions: hasPositions
+          ? {
+              create: data.positions!.map((posName) => ({ name: posName })),
+            }
+          : undefined,
+      },
       select: departmentWithPositions,
     });
   }
@@ -41,11 +49,28 @@ export class DepartmentRepository {
     });
   }
 
+  async hasAssociations(id: string): Promise<boolean> {
+    const [intern, leader, app] = await Promise.all([
+      prisma.intern.findFirst({ where: { departmentId: id } }),
+      prisma.leader.findFirst({ where: { departmentId: id } }),
+      prisma.application.findFirst({ where: { departmentId: id } }),
+    ]);
+    return !!(intern || leader || app);
+  }
+
   delete(id: string) {
     return prisma.department.delete({ where: { id } });
   }
 
   // ─── Positions ───────────────────────────────────────────────────
+
+  async hasPositionAssociations(id: string): Promise<boolean> {
+    const [intern, app] = await Promise.all([
+      prisma.intern.findFirst({ where: { positionId: id } }),
+      prisma.application.findFirst({ where: { positionId: id } }),
+    ]);
+    return !!(intern || app);
+  }
 
   findPositionsByDepartment(departmentId: string) {
     return prisma.position.findMany({

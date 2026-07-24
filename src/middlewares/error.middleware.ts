@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import { Prisma } from "@prisma/client";
 import { AppError } from "../common/errors/app-error";
 import { ERROR_CODE } from "../common/errors/error-code";
 
@@ -29,6 +30,28 @@ export function errorMiddleware(
       code: error.code,
     });
     return;
+  }
+
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === "P2002") {
+      const target = (error.meta?.target as string[]) || [];
+      const fieldName = target.join(", ");
+      res.status(409).json({
+        success: false,
+        message: `Value already exists for field: ${fieldName}`,
+        code: "DUPLICATE_ENTRY",
+      });
+      return;
+    }
+    if (error.code === "P2003") {
+      const fieldName = (error.meta?.field_name as string) || "foreign key";
+      res.status(400).json({
+        success: false,
+        message: `Cannot delete or update because it is referenced by other items (Foreign key constraint failed on: ${fieldName}).`,
+        code: "DEPENDENCY_ERROR",
+      });
+      return;
+    }
   }
 
   console.error("[Unhandled Error]", error);

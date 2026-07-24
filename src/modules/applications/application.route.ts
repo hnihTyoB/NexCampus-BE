@@ -11,6 +11,7 @@ import {
   getApplicationInvitesSchema,
 } from "./application.validation";
 import { ROLES } from "../../common/constants/role.constant";
+import { uploadMultiple } from "../../middlewares/upload.middleware";
 
 const router = Router();
 const controller = new ApplicationController();
@@ -43,7 +44,7 @@ router.patch(
   controller.revokeInvite,
 );
 
-router.post("/", validate(createApplicationSchema), controller.create);
+router.post("/", uploadMultiple("files", 5, "application"), validate(createApplicationSchema), controller.create);
 router.get(
   "/",
   authMiddleware,

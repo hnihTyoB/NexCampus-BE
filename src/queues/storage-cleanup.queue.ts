@@ -1,5 +1,6 @@
 import { Queue } from "bullmq";
-import { envConfig } from "../config/env.config";
+import { redisConfig } from "../config/redis.config";
+import { cronConfig } from "../config/cron.config";
 
 // Job data rong - day la scheduled job, khong can truyen data
 export type StorageCleanupJobData = Record<string, never>;
@@ -8,8 +9,8 @@ export const storageCleanupQueue = new Queue<StorageCleanupJobData>(
   "storage-cleanup-queue",
   {
     connection: {
-      host: envConfig.redis.host,
-      port: envConfig.redis.port,
+      host: redisConfig.host,
+      port: redisConfig.port,
     },
     defaultJobOptions: {
       attempts: 3,
@@ -28,7 +29,7 @@ export const storageCleanupQueue = new Queue<StorageCleanupJobData>(
  * Goi mot lan khi khoi dong server.
  */
 export async function scheduleStorageCleanupJob() {
-  const { cronExpression, retentionDays } = envConfig.storageCleanup;
+  const { cronExpression, retentionDays } = cronConfig.storageCleanup;
 
   // Xoa job cu truoc de tranh trung lap khi restart
   const existingJobs = await storageCleanupQueue.getRepeatableJobs();
@@ -45,6 +46,6 @@ export async function scheduleStorageCleanupJob() {
   );
 
   console.log(
-    `[StorageCleanupQueue] Scheduled cleanup job � cron: "${cronExpression}", retention: ${retentionDays} days`,
+    `[StorageCleanupQueue] Scheduled cleanup job cron: "${cronExpression}", retention: ${retentionDays} days`,
   );
 }

@@ -79,6 +79,13 @@ router.delete(
   controller.delete,
 );
 
+router.post(
+  "/:taskId/ai-recommendation",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER),
+  controller.getAiRecommendation,
+);
+
 router.use("/:taskId/attachments", taskAttachmentRoute);
 
 export default router;

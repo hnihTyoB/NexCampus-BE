@@ -1,5 +1,5 @@
 import { Worker, Job } from "bullmq";
-import { envConfig } from "../config/env.config";
+import { redisConfig } from "../config/redis.config";
 import { prisma } from "../database/prisma.client";
 import { EmailService } from "../common/services/email.service";
 import { DiscordService } from "../common/services/discord.service";
@@ -83,8 +83,8 @@ export function startNotificationWorker() {
     processNotificationJob,
     {
       connection: {
-        host: envConfig.redis.host,
-        port: envConfig.redis.port,
+        host: redisConfig.host,
+        port: redisConfig.port,
       },
       concurrency: 5,
     },

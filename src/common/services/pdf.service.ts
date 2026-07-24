@@ -6,7 +6,7 @@ import { PuppeteerManager } from "./puppeteer.manager";
 import { ASSIGNMENT_STATUS, REVIEW_STATUS } from "../constants/status.constant";
 import { WeeklyEvaluationPdfDTO, TaskPerformanceItem } from "../../modules/pdf-export/weekly-evaluation-pdf.dto";
 import { StorageService } from "./storage.service";
-import { envConfig } from "../../config/env.config";
+import { supabaseConfig } from "../../config/supabase.config";
 
 export class PdfService {
   private puppeteerManager = PuppeteerManager.getInstance();
@@ -174,7 +174,7 @@ export class PdfService {
 
     const fileName = `weekly-report-${evaluationId}-${Date.now()}.pdf`;
     const storagePath = `reports/weekly/${fileName}`;
-    const bucket = envConfig.supabase.storageReportBucket || "report-attachments";
+    const bucket = supabaseConfig.storageReportBucket || "report-attachments";
 
     const fileUrl = await this.storageService.uploadFile(
       bucket, storagePath, pdfBuffer, "application/pdf",
