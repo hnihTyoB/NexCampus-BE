@@ -11,9 +11,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
       - name: SSH Deploy to VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -21,35 +18,16 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
+          command_timeout: 10m
           script: |
             set -e
-            # Load NVM (SSH action dùng non-interactive shell, không tự load ~/.bashrc)
-            export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-
-            echo "Chuyển vào thư mục Backend..."
             cd /var/www/nexcampus/NexCampus-BE
 
             echo "Pull code mới nhất từ GitHub..."
             git pull origin production
 
-            echo "Cài đặt dependencies..."
-            PUPPETEER_SKIP_DOWNLOAD=true pnpm install --no-frozen-lockfile
-
-            echo "Prisma Generate..."
-            pnpm prisma:generate
-
-            echo "Build TypeScript..."
-            pnpm build
-
-            echo "Đảm bảo Docker containers đang chạy (Postgres & Redis)..."
-            docker-compose up -d
-
-            echo "Thực thi Database Migration..."
-            pnpm db:migrate:deploy
-
-            echo "Reload ứng dụng trên PM2..."
-            pm2 describe nexcampus-be > /dev/null 2>&1 && pm2 reload nexcampus-be || pm2 start dist/server.js --name "nexcampus-be"
-            pm2 save
+            echo "Build và restart Backend container..."
+            docker compose up -d --build backend --no-deps
 
             echo "Backend deploy thành công!"
+            docker compose ps backend

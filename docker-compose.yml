@@ -7,8 +7,6 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 118118
       POSTGRES_DB: datanexcampus
-    ports:
-      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -21,8 +19,6 @@ services:
     image: redis:7-alpine
     container_name: nexcampus_redis
     restart: always
-    ports:
-      - "6380:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -31,27 +27,42 @@ services:
       timeout: 5s
       retries: 5
 
-  # Uncomment the backend service if you want to run the App in Docker
-  # app:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   container_name: nexcampus_backend
-  #   restart: always
-  #   ports:
-  #     - "8888:8888"
-  #   environment:
-  #     - NODE_ENV=production
-  #     - PORT=8888
-  #     - DATABASE_URL=postgresql://postgres:118118@postgres:5432/datanexcampus?schema=public
-  #     - DIRECT_URL=postgresql://postgres:118118@postgres:5432/datanexcampus?schema=public
-  #     - REDIS_HOST=redis
-  #     - REDIS_PORT=6379
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_healthy
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nexcampus_be
+    restart: always
+    ports:
+      - "8888:8888"
+    env_file: .env
+    environment:
+      # Override để dùng Docker service names thay vì localhost
+      DATABASE_URL: postgresql://postgres:118118@postgres:5432/datanexcampus?schema=public
+      DIRECT_URL: postgresql://postgres:118118@postgres:5432/datanexcampus?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../NexCampus-FE
+      dockerfile: Dockerfile
+    container_name: nexcampus_fe
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: "0.0.0.0"
+    depends_on:
+      - backend
 
 volumes:
   postgres_data:
