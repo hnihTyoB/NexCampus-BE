@@ -23,7 +23,10 @@ export class TaskAnalyticsService {
 
     const assignmentWhere: any = {
       task: { deletedAt: null },
-      intern: { deletedAt: null },
+      OR: [
+        { internId: null },
+        { intern: { deletedAt: null } }
+      ]
     };
     if (taskGroupId) {
       assignmentWhere.task = { deletedAt: null, taskGroupId: taskGroupId };
