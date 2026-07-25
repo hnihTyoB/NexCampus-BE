@@ -359,6 +359,7 @@ export class TaskImportService {
     const notificationsToDispatch: { userId: string; taskTitle: string; deadline: string }[] = [];
 
     const codeToDbId = new Map<string, string>();
+    const titleToDbId = new Map<string, string>();
 
     await prisma.$transaction(
       async (tx) => {
@@ -414,80 +415,69 @@ export class TaskImportService {
             }
 
             codeToDbId.set(row.excelCode, taskId);
+            titleToDbId.set(row.title.toLowerCase().trim(), taskId);
 
             if (row.ownerName) {
               const ownerMatches = internsByNameMap.get(row.ownerName.toLowerCase()) ?? [];
-              if (ownerMatches.length === 0) {
-                importErrors.push({
-                  excelCode: row.excelCode,
-                  error: `Không tìm thấy Intern với tên "${row.ownerName}" trong hệ thống`,
+              if (ownerMatches.length === 1) {
+                const ownerIntern = ownerMatches[0];
+
+                let supportInternId: string | null = null;
+                if (row.supportName) {
+                  const supportMatches = internsByNameMap.get(row.supportName.toLowerCase()) ?? [];
+                  if (supportMatches.length === 1) {
+                    supportInternId = supportMatches[0].id;
+                  } else if (supportMatches.length > 1) {
+                    importErrors.push({
+                      excelCode: row.excelCode,
+                      error: `Tìm thấy nhiều Intern hỗ trợ trùng tên "${row.supportName}"`,
+                    });
+                  }
+                }
+
+                const existingAssignment = await tx.taskAssignment.findFirst({
+                  where: { taskId },
+                  select: { id: true },
                 });
-                continue;
-              }
-              if (ownerMatches.length > 1) {
+
+                const rowWithStatus = row as ImportTaskRowDto & { _status?: string };
+                const mappedStatus = rowWithStatus._status;
+
+                if (existingAssignment) {
+                  await tx.taskAssignment.update({
+                    where: { id: existingAssignment.id },
+                    data: {
+                      internId: ownerIntern.id,
+                      supportId: supportInternId,
+                      ...(mappedStatus ? { status: mappedStatus as any } : {}),
+                    },
+                  });
+                } else {
+                  const defaultStatus = mappedStatus ?? ASSIGNMENT_STATUS.TODO;
+                  await tx.taskAssignment.create({
+                    data: {
+                      taskId,
+                      internId: ownerIntern.id,
+                      supportId: supportInternId,
+                      assignedBy: createdBy,
+                      status: defaultStatus as any,
+                    },
+                  });
+                  importedAssignments++;
+
+                  if (defaultStatus === ASSIGNMENT_STATUS.TODO) {
+                    notificationsToDispatch.push({
+                      userId: ownerIntern.userId,
+                      taskTitle: row.title,
+                      deadline: new Date(row.deadline).toLocaleDateString("vi-VN"),
+                    });
+                  }
+                }
+              } else if (ownerMatches.length > 1) {
                 importErrors.push({
                   excelCode: row.excelCode,
                   error: `Tìm thấy nhiều Intern trùng tên "${row.ownerName}". Vui lòng giải quyết trùng lặp trước khi import.`,
                 });
-                continue;
-              }
-              const ownerIntern = ownerMatches[0];
-
-              let supportInternId: string | null = null;
-              if (row.supportName) {
-                const supportMatches = internsByNameMap.get(row.supportName.toLowerCase()) ?? [];
-                if (supportMatches.length === 1) {
-                  supportInternId = supportMatches[0].id;
-                } else if (supportMatches.length > 1) {
-                  importErrors.push({
-                    excelCode: row.excelCode,
-                    error: `Tìm thấy nhiều Intern hỗ trợ trùng tên "${row.supportName}"`,
-                  });
-                } else {
-                  importErrors.push({
-                    excelCode: row.excelCode,
-                    error: `Không tìm thấy Intern hỗ trợ với tên "${row.supportName}" trong hệ thống`,
-                  });
-                }
-              }
-
-              const existingAssignment = await tx.taskAssignment.findFirst({
-                where: { taskId },
-                select: { id: true },
-              });
-
-              const rowWithStatus = row as ImportTaskRowDto & { _status?: string };
-              const mappedStatus = rowWithStatus._status;
-
-              if (existingAssignment) {
-                await tx.taskAssignment.update({
-                  where: { id: existingAssignment.id },
-                  data: {
-                    internId: ownerIntern.id,
-                    supportId: supportInternId,
-                    ...(mappedStatus ? { status: mappedStatus as any } : {}),
-                  },
-                });
-              } else {
-                const defaultStatus = mappedStatus ?? ASSIGNMENT_STATUS.TODO;
-                await tx.taskAssignment.create({
-                  data: {
-                    taskId,
-                    internId: ownerIntern.id,
-                    supportId: supportInternId,
-                    assignedBy: createdBy,
-                    status: defaultStatus as any,
-                  },
-                });
-                importedAssignments++;
-
-                if (defaultStatus === ASSIGNMENT_STATUS.TODO) {
-                  notificationsToDispatch.push({
-                    userId: ownerIntern.userId,
-                    taskTitle: row.title,
-                    deadline: new Date(row.deadline).toLocaleDateString("vi-VN"),
-                  });
-                }
               }
             }
           } catch (err) {
@@ -498,30 +488,36 @@ export class TaskImportService {
           }
         }
       },
-      { timeout: 60000 }, // 60s timeout cho import lớn
+      { timeout: 60000 },
     );
 
     // ─── BATCH RESOLVE DEPENDENCIES ───
-    const allDepCodes = new Set<string>();
+    const allDepKeys = new Set<string>();
     for (const row of validRows) {
-      row.dependencyCodes.forEach((c) => allDepCodes.add(c.trim()));
+      row.dependencyCodes.forEach((c) => allDepKeys.add(c.trim()));
     }
-    
-    // Find dependency codes that are not loaded in codeToDbId
-    const missingCodes = Array.from(allDepCodes).filter((c) => !codeToDbId.has(c));
-    if (missingCodes.length > 0) {
+
+    // Find dependency keys that are not loaded in codeToDbId or titleToDbId
+    const missingKeys = Array.from(allDepKeys).filter(
+      (k) => !codeToDbId.has(k) && !titleToDbId.has(k.toLowerCase())
+    );
+    if (missingKeys.length > 0) {
       const dbDepTasks = await prisma.task.findMany({
         where: {
           taskGroupId: resolvedGroupId,
-          code: { in: missingCodes },
+          OR: [
+            { code: { in: missingKeys } },
+            { title: { in: missingKeys, mode: "insensitive" } }
+          ],
           deletedAt: null,
         },
-        select: { id: true, code: true },
+        select: { id: true, code: true, title: true },
       });
       for (const t of dbDepTasks) {
         if (t.code) {
           codeToDbId.set(t.code, t.id);
         }
+        titleToDbId.set(t.title.toLowerCase().trim(), t.id);
       }
     }
 
@@ -532,13 +528,47 @@ export class TaskImportService {
       if (!taskId) continue;
 
       for (const depCode of row.dependencyCodes) {
-        const depTaskId = codeToDbId.get(depCode.trim());
+        const key = depCode.trim();
+        let depTaskId = codeToDbId.get(key) || titleToDbId.get(key.toLowerCase());
         if (!depTaskId) {
-          importErrors.push({
-            excelCode: row.excelCode,
-            error: `Dependency "${depCode}" không tìm thấy trong file Excel hoặc hệ thống`,
-          });
-          continue;
+          try {
+            const existing = await prisma.task.findFirst({
+              where: {
+                taskGroupId: resolvedGroupId,
+                OR: [
+                  { code: key },
+                  { title: { equals: key, mode: 'insensitive' } }
+                ],
+                deletedAt: null
+              },
+              select: { id: true }
+            });
+            if (existing) {
+              depTaskId = existing.id;
+            } else {
+              const placeholder = await prisma.task.create({
+                data: {
+                  code: key,
+                  title: key,
+                  description: `Placeholder task created for dependency "${key}" during import`,
+                  deadline: new Date(row.deadline),
+                  priority: row.priority,
+                  taskGroupId: resolvedGroupId,
+                  createdBy
+                },
+                select: { id: true }
+              });
+              depTaskId = placeholder.id;
+              codeToDbId.set(key, depTaskId);
+              titleToDbId.set(key.toLowerCase(), depTaskId);
+            }
+          } catch (err) {
+            importErrors.push({
+              excelCode: row.excelCode,
+              error: `Dependency "${depCode}" không tìm thấy và không thể tạo tự động: ${err instanceof Error ? err.message : String(err)}`,
+            });
+            continue;
+          }
         }
 
         try {
