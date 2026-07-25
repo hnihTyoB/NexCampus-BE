@@ -417,67 +417,71 @@ export class TaskImportService {
             codeToDbId.set(row.excelCode, taskId);
             titleToDbId.set(row.title.toLowerCase().trim(), taskId);
 
+            let ownerInternId: string | null = null;
             if (row.ownerName) {
               const ownerMatches = internsByNameMap.get(row.ownerName.toLowerCase()) ?? [];
               if (ownerMatches.length === 1) {
-                const ownerIntern = ownerMatches[0];
-
-                let supportInternId: string | null = null;
-                if (row.supportName) {
-                  const supportMatches = internsByNameMap.get(row.supportName.toLowerCase()) ?? [];
-                  if (supportMatches.length === 1) {
-                    supportInternId = supportMatches[0].id;
-                  } else if (supportMatches.length > 1) {
-                    importErrors.push({
-                      excelCode: row.excelCode,
-                      error: `Tìm thấy nhiều Intern hỗ trợ trùng tên "${row.supportName}"`,
-                    });
-                  }
-                }
-
-                const existingAssignment = await tx.taskAssignment.findFirst({
-                  where: { taskId },
-                  select: { id: true },
-                });
-
-                const rowWithStatus = row as ImportTaskRowDto & { _status?: string };
-                const mappedStatus = rowWithStatus._status;
-
-                if (existingAssignment) {
-                  await tx.taskAssignment.update({
-                    where: { id: existingAssignment.id },
-                    data: {
-                      internId: ownerIntern.id,
-                      supportId: supportInternId,
-                      ...(mappedStatus ? { status: mappedStatus as any } : {}),
-                    },
-                  });
-                } else {
-                  const defaultStatus = mappedStatus ?? ASSIGNMENT_STATUS.TODO;
-                  await tx.taskAssignment.create({
-                    data: {
-                      taskId,
-                      internId: ownerIntern.id,
-                      supportId: supportInternId,
-                      assignedBy: createdBy,
-                      status: defaultStatus as any,
-                    },
-                  });
-                  importedAssignments++;
-
-                  if (defaultStatus === ASSIGNMENT_STATUS.TODO) {
-                    notificationsToDispatch.push({
-                      userId: ownerIntern.userId,
-                      taskTitle: row.title,
-                      deadline: new Date(row.deadline).toLocaleDateString("vi-VN"),
-                    });
-                  }
-                }
+                ownerInternId = ownerMatches[0].id;
               } else if (ownerMatches.length > 1) {
                 importErrors.push({
                   excelCode: row.excelCode,
                   error: `Tìm thấy nhiều Intern trùng tên "${row.ownerName}". Vui lòng giải quyết trùng lặp trước khi import.`,
                 });
+              }
+            }
+
+            let supportInternId: string | null = null;
+            if (row.supportName) {
+              const supportMatches = internsByNameMap.get(row.supportName.toLowerCase()) ?? [];
+              if (supportMatches.length === 1) {
+                supportInternId = supportMatches[0].id;
+              } else if (supportMatches.length > 1) {
+                importErrors.push({
+                  excelCode: row.excelCode,
+                  error: `Tìm thấy nhiều Intern hỗ trợ trùng tên "${row.supportName}"`,
+                });
+              }
+            }
+
+            const existingAssignment = await tx.taskAssignment.findFirst({
+              where: { taskId },
+              select: { id: true },
+            });
+
+            const rowWithStatus = row as ImportTaskRowDto & { _status?: string };
+            const mappedStatus = rowWithStatus._status;
+
+            if (existingAssignment) {
+              await tx.taskAssignment.update({
+                where: { id: existingAssignment.id },
+                data: {
+                  internId: ownerInternId,
+                  supportId: supportInternId,
+                  ...(mappedStatus ? { status: mappedStatus as any } : {}),
+                },
+              });
+            } else {
+              const defaultStatus = mappedStatus ?? ASSIGNMENT_STATUS.TODO;
+              await tx.taskAssignment.create({
+                data: {
+                  taskId,
+                  internId: ownerInternId,
+                  supportId: supportInternId,
+                  assignedBy: createdBy,
+                  status: defaultStatus as any,
+                },
+              });
+              importedAssignments++;
+
+              if (ownerInternId && defaultStatus === ASSIGNMENT_STATUS.TODO) {
+                const ownerIntern = internsByNameMap.get(row.ownerName.toLowerCase())?.[0];
+                if (ownerIntern) {
+                  notificationsToDispatch.push({
+                    userId: ownerIntern.userId,
+                    taskTitle: row.title,
+                    deadline: new Date(row.deadline).toLocaleDateString("vi-VN"),
+                  });
+                }
               }
             }
           } catch (err) {

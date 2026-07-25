@@ -291,7 +291,7 @@ enum AssignmentStatus {
 model TaskAssignment {
   id         String           @id @default(uuid()) @db.Uuid
   taskId     String           @unique @map("task_id") @db.Uuid
-  internId   String           @map("intern_id") @db.Uuid
+  internId   String?          @map("intern_id") @db.Uuid
   supportId  String?          @map("support_id") @db.Uuid
   assignedBy String           @map("assigned_by") @db.Uuid
   status     AssignmentStatus @default(TODO)
@@ -299,7 +299,7 @@ model TaskAssignment {
   updatedAt  DateTime         @updatedAt @map("updated_at")
 
   task        Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  intern      Intern           @relation("TaskAssignmentOwner", fields: [internId], references: [id], onDelete: Cascade)
+  intern      Intern?          @relation("TaskAssignmentOwner", fields: [internId], references: [id], onDelete: Cascade)
   support     Intern?          @relation("TaskAssignmentSupport", fields: [supportId], references: [id], onDelete: SetNull)
   assigner    User             @relation("AssignedTasks", fields: [assignedBy], references: [id], onDelete: Cascade)
   submissions TaskSubmission[]
