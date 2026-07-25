@@ -613,6 +613,96 @@
       </div>
     </div>
 
+    <!-- ════ SECTION 3: SCORE OVERVIEW & DETAILS ════ -->
+    {{#if hasRatings}}
+    <div class="section">
+      <div class="section-title">
+        <div class="icon">03</div>
+        Overall Evaluation Score & Ratings
+      </div>
+      <div class="two-col">
+        <!-- Overall Score Box -->
+        <div class="overall-score-box">
+          <div class="score-label">Overall Evaluation Score</div>
+          <div class="score-num">{{formatScore totalScore}}</div>
+          <div class="score-sub">/ 10.0 · Week {{week}} · {{weekRange}}</div>
+        </div>
+        <!-- Score Bars -->
+        <div class="info-card" style="justify-content:center;display:flex;flex-direction:column;">
+          <div class="score-bars">
+            {{#each scoreBars}}
+            <div class="bar-row">
+              <span class="bar-label">{{label}}</span>
+              <div class="bar-track">
+                <div class="bar-fill" style="width:{{percentage}}%;"></div>
+              </div>
+              <span class="bar-score">{{formatScore score}}</span>
+            </div>
+            {{/each}}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ SECTION 4: 12-CRITERIA EVALUATION TABLE ════ -->
+    <div class="section" style="page-break-before: always;">
+      <div class="section-title">
+        <div class="icon">04</div>
+        Nhận xét quá trình thực tập của sinh viên
+      </div>
+      <table class="compare-table" style="margin-top: 10px;">
+        <thead>
+          <tr>
+            <th rowspan="2" style="text-align:left; padding: 10px; font-size: 9pt;">Nội dung đánh giá</th>
+            <th colspan="5" style="font-size: 9pt; border-left: 1.5px solid rgba(255,255,255,0.25);">Xếp loại</th>
+          </tr>
+          <tr>
+            <th style="width:70px; font-size: 8pt; border-left: 1px solid rgba(255,255,255,0.2);">Tốt</th>
+            <th style="width:70px; font-size: 8pt; border-left: 1px solid rgba(255,255,255,0.2);">Khá</th>
+            <th style="width:80px; font-size: 8pt; border-left: 1px solid rgba(255,255,255,0.2);">Trung bình</th>
+            <th style="width:80px; font-size: 8pt; border-left: 1px solid rgba(255,255,255,0.2);">T.bình yếu</th>
+            <th style="width:70px; font-size: 8pt; border-left: 1px solid rgba(255,255,255,0.2);">Yếu</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each criteriaSections}}
+          <tr style="background: var(--brand-light) !important; font-weight: bold; color: var(--brand);">
+            <td colspan="6" style="text-align:left; padding: 8px 12px; font-size: 9.5pt; font-weight: 700; border-bottom: 1.5px solid var(--brand-mid);">
+              {{id}}. {{label}}
+            </td>
+          </tr>
+            {{#each criteria}}
+            <tr>
+              <td style="text-align:left; padding: 7px 12px; font-size: 9pt; font-weight: 500;">
+                {{../id}}.{{index}}. {{label}}
+              </td>
+              <!-- Tốt -->
+              <td style="border-left: 1.5px solid var(--border); font-size: 11pt; font-weight: bold; color: #15803d; text-align: center;">
+                {{#ifCond ratingCode "TOT"}}✔{{/ifCond}}
+              </td>
+              <!-- Khá -->
+              <td style="border-left: 1.5px solid var(--border); font-size: 11pt; font-weight: bold; color: #1d4ed8; text-align: center;">
+                {{#ifCond ratingCode "KHA"}}✔{{/ifCond}}
+              </td>
+              <!-- Trung bình -->
+              <td style="border-left: 1.5px solid var(--border); font-size: 11pt; font-weight: bold; color: #b45309; text-align: center;">
+                {{#ifCond ratingCode "TB"}}✔{{/ifCond}}
+              </td>
+              <!-- Trung bình yếu -->
+              <td style="border-left: 1.5px solid var(--border); font-size: 11pt; font-weight: bold; color: #c2410c; text-align: center;">
+                {{#ifCond ratingCode "TBY"}}✔{{/ifCond}}
+              </td>
+              <!-- Yếu -->
+              <td style="border-left: 1.5px solid var(--border); font-size: 11pt; font-weight: bold; color: #b91c1c; text-align: center;">
+                {{#ifCond ratingCode "YEU"}}✔{{/ifCond}}
+              </td>
+            </tr>
+            {{/each}}
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+    {{else}}
     <!-- ════ SECTION 3: SCORE OVERVIEW ════ -->
     <div class="section">
       <div class="section-title">
@@ -682,6 +772,7 @@
         </tbody>
       </table>
     </div>
+    {{/if}}
 
     <!-- ════ SECTION 5: LEADER EVALUATION ════ -->
     <div class="section">
@@ -826,8 +917,8 @@
     <div class="verify-section">
       <img src="{{qrCodeUrl}}" alt="QR Code" />
       <div class="verify-text">
-        <div class="v-title">Document Verification</div>
-        <div class="v-sub">Quét mã QR để xác minh tính xác thực của báo cáo này trên hệ thống NexCampus.</div>
+        <div class="v-title">Xem báo cáo trực tuyến</div>
+        <div class="v-sub">Quét mã QR để mở trang chi tiết đánh giá này trên hệ thống NexCampus.</div>
         <div class="v-id">PDF-{{id}}</div>
       </div>
     </div>

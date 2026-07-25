@@ -8,7 +8,10 @@ import {
   AiSuggestionRequestDto,
   AiSuggestionResponseDto,
   GeminiEvaluationJson,
+  EvaluationRatings,
+  RatingLevel,
 } from "./weekly-evaluation.dto";
+import { computeLegacyScores, ratingToScore } from "./weekly-evaluation.service";
 
 interface UserPayload {
   id: string;
@@ -16,15 +19,14 @@ interface UserPayload {
   role: string;
 }
 
+const VALID_RATINGS: RatingLevel[] = ["TOT", "KHA", "TB", "TBY", "YEU"];
+
 export class WeeklyEvaluationAiService {
   private readonly internRepository = new InternRepository();
 
   /**
    * Tính ngày bắt đầu và kết thúc của tuần thứ N (1-based)
    * tính từ ngày bắt đầu thực tập của intern.
-   * Tuần 1: startDate → startDate + 6 ngày
-   * Tuần 2: startDate + 7 → startDate + 13 ngày
-   * ...
    */
   private getWeekDateRange(
     startDate: Date,
@@ -44,7 +46,6 @@ export class WeeklyEvaluationAiService {
 
   /**
    * Định dạng Date thành chuỗi dễ đọc (tiếng Việt) cho prompt.
-   * Ví dụ: "Thứ Hai, 01/07/2026"
    */
   private formatDateVi(date: Date): string {
     const days = [
@@ -130,6 +131,7 @@ export class WeeklyEvaluationAiService {
 
   /**
    * Xây dựng prompt tiếng Việt gửi tới Gemini.
+   * Yêu cầu AI trả về xếp loại (TOT/KHA/TB/TBY/YEU) cho 12 tiêu chí.
    */
   private buildPrompt(params: {
     internName: string;
@@ -169,26 +171,16 @@ export class WeeklyEvaluationAiService {
       dailyReportSection = "(Không có báo cáo hàng ngày nào trong tuần này)";
     } else {
       dailyReportSection = dailyReports
-        .map(
-          (
-            r: {
-              createdAt: Date;
-              content: string;
-              prLink: string | null;
-              videoDemo: string | null;
-            },
-            idx: number,
-          ) => {
-            const dateStr = this.formatDateVi(r.createdAt);
-            const lines = [
-              `[${idx + 1}] Ngày: ${dateStr}`,
-              `    Nội dung: ${r.content}`,
-            ];
-            if (r.prLink) lines.push(`    PR Link: ${r.prLink}`);
-            if (r.videoDemo) lines.push(`    Video Demo: ${r.videoDemo}`);
-            return lines.join("\n");
-          },
-        )
+        .map((r, idx) => {
+          const dateStr = this.formatDateVi(r.createdAt);
+          const lines = [
+            `[${idx + 1}] Ngày: ${dateStr}`,
+            `    Nội dung: ${r.content}`,
+          ];
+          if (r.prLink) lines.push(`    PR Link: ${r.prLink}`);
+          if (r.videoDemo) lines.push(`    Video Demo: ${r.videoDemo}`);
+          return lines.join("\n");
+        })
         .join("\n---\n");
     }
 
@@ -198,52 +190,33 @@ export class WeeklyEvaluationAiService {
       taskSection = "(Không có bài nộp task nào trong tuần này)";
     } else {
       taskSection = taskSubmissions
-        .map(
-          (
-            s: {
-              attempt: number;
-              reviewStatus: string;
-              prLink: string | null;
-              videoDemo: string | null;
-              note: string | null;
-              reviewComment: string | null;
-              assignment: {
-                task: {
-                  title: string;
-                  description: string | null;
-                  deadline: Date;
-                };
-              };
-            },
-            idx: number,
-          ) => {
-            const task = s.assignment.task;
-            const deadlineStr = task.deadline
-              ? this.formatDateVi(new Date(task.deadline))
-              : "Không có deadline";
-            const lines = [
-              `[${idx + 1}] Task: ${task.title}`,
-              `    Deadline: ${deadlineStr}`,
-              `    Lần nộp: #${s.attempt}`,
-              `    Trạng thái: ${s.reviewStatus}`,
-            ];
-            if (s.prLink) lines.push(`    PR Link: ${s.prLink}`);
-            if (s.videoDemo) lines.push(`    Video Demo: ${s.videoDemo}`);
-            if (s.note) lines.push(`    Ghi chú của intern: ${s.note}`);
-            if (s.reviewComment)
-              lines.push(`    Nhận xét của Leader: ${s.reviewComment}`);
-            return lines.join("\n");
-          },
-        )
+        .map((s, idx) => {
+          const task = s.assignment.task;
+          const deadlineStr = task.deadline
+            ? this.formatDateVi(new Date(task.deadline))
+            : "Không có deadline";
+          const lines = [
+            `[${idx + 1}] Task: ${task.title}`,
+            `    Deadline: ${deadlineStr}`,
+            `    Lần nộp: #${s.attempt}`,
+            `    Trạng thái: ${s.reviewStatus}`,
+          ];
+          if (s.prLink) lines.push(`    PR Link: ${s.prLink}`);
+          if (s.videoDemo) lines.push(`    Video Demo: ${s.videoDemo}`);
+          if (s.note) lines.push(`    Ghi chú của intern: ${s.note}`);
+          if (s.reviewComment)
+            lines.push(`    Nhận xét của Leader: ${s.reviewComment}`);
+          return lines.join("\n");
+        })
         .join("\n---\n");
     }
 
     const noDataNote =
       dailyReports.length === 0 && taskSubmissions.length === 0
-        ? "\nLưu ý: Không có dữ liệu nào trong tuần này. Hãy đặt điểm mặc định là 5 và ghi rõ trong comment là không đủ dữ liệu để đánh giá.\n"
+        ? "\nLưu ý: Không có dữ liệu nào trong tuần này. Hãy đặt mặc định là TB (trung bình) cho tất cả tiêu chí và ghi rõ trong comment là không đủ dữ liệu để đánh giá.\n"
         : "";
 
-    return `Bạn là Leader của công ty phần mềm, đang đánh giá thực tập sinh cuối tuần.
+    return `Bạn là Leader của công ty phần mềm, đang đánh giá thực tập sinh cuối tuần theo mẫu đánh giá chuẩn.
 
 Hãy phân tích dữ liệu bên dưới và đưa ra đánh giá khách quan, chi tiết.
 ${noDataNote}
@@ -261,23 +234,52 @@ ${taskSection}
 
 Bạn PHẢI trả về JSON. Không được giải thích thêm. Không dùng markdown.
 
+Mức xếp loại (chỉ được dùng đúng 5 giá trị này):
+- "TOT"  = Tốt        (10 điểm)
+- "KHA"  = Khá        (8 điểm)
+- "TB"   = Trung bình (6 điểm)
+- "TBY"  = Trung bình yếu (4 điểm)
+- "YEU"  = Yếu        (2 điểm)
+
 Schema JSON bắt buộc:
 {
-  "communication": <số từ 1 đến 10, bước 0.5>,
-  "attitude": <số từ 1 đến 10, bước 0.5>,
-  "learning": <số từ 1 đến 10, bước 0.5>,
-  "coding": <số từ 1 đến 10, bước 0.5>,
+  "ratings": {
+    "ruleCompliance":   "<mức xếp loại>",
+    "workAttitude":     "<mức xếp loại>",
+    "learningCapacity": "<mức xếp loại>",
+    "resilience":       "<mức xếp loại>",
+    "communication":    "<mức xếp loại>",
+    "knowledge":        "<mức xếp loại>",
+    "practicalSkills":  "<mức xếp loại>",
+    "foreignLanguage":  "<mức xếp loại>",
+    "teamwork":         "<mức xếp loại>",
+    "creativity":       "<mức xếp loại>",
+    "contentQuality":   "<mức xếp loại>",
+    "progressDelivery": "<mức xếp loại>"
+  },
   "comment": "<nhận xét tổng quan khoảng 150 từ bằng tiếng Việt>",
   "strengths": ["<điểm mạnh 1>", "<điểm mạnh 2>", ...],
   "weaknesses": ["<điểm yếu 1>", "<điểm yếu 2>", ...],
   "suggestions": ["<gợi ý cải thiện 1>", "<gợi ý cải thiện 2>", ...]
 }
 
-Tiêu chí chấm điểm:
-- communication (giao tiếp): báo cáo đầy đủ, nội dung rõ ràng, đúng hạn, có cả PR/video khi cần
-- attitude (thái độ): chủ động, tích cực, không bỏ ngày báo cáo, tự giải quyết vấn đề
-- learning (tự học): ghi lại kiến thức mới, cải thiện theo phản hồi, học hỏi từ thất bại
-- coding (viết code): chất lượng bài nộp, tỷ lệ APPROVED vs REJECTED, PR link hợp lệ, số lần phải nộp lại
+Hướng dẫn đánh giá từng tiêu chí (Phần I – Kỷ luật và tư chất):
+- ruleCompliance (Thực hiện nội quy): nộp báo cáo đúng giờ, tuân thủ quy định về giờ làm việc
+- workAttitude (Thái độ làm việc): chủ động, tích cực, không bỏ ngày báo cáo, phản hồi kịp thời
+- learningCapacity (Năng lực tiếp thu): ghi lại kiến thức mới, cải thiện theo phản hồi
+- resilience (Khả năng vượt khó): xử lý khi task bị reject, tiếp tục cải thiện sau thất bại
+- communication (Giao tiếp và ứng xử): nội dung báo cáo rõ ràng, chuyên nghiệp, có PR/video khi cần
+
+Hướng dẫn đánh giá từng tiêu chí (Phần II – Khả năng chuyên môn):
+- knowledge (Kiến thức): độ chính xác và chiều sâu trong báo cáo và bài nộp
+- practicalSkills (Kỹ năng thực hành): chất lượng code, tỷ lệ APPROVED vs REJECTED
+- foreignLanguage (Năng lực ngoại ngữ): sử dụng tiếng Anh trong tên biến/hàm, comment, PR title
+- teamwork (Kỹ năng làm việc nhóm): phối hợp nhóm, tuân theo quy ước nhóm
+- creativity (Tính sáng tạo): đề xuất giải pháp mới, cải tiến workflow
+
+Hướng dẫn đánh giá từng tiêu chí (Phần III – Kết quả thực hiện đề tài):
+- contentQuality (Nội dung): mức độ hoàn thành yêu cầu về chất lượng sản phẩm nộp
+- progressDelivery (Tiến độ): hoàn thành task đúng deadline, số task đã xong / tổng số task
 
 strengths: 2-4 điểm mạnh cụ thể
 weaknesses: 1-3 điểm cần cải thiện (nếu không có thì mảng rỗng [])
@@ -298,17 +300,40 @@ suggestions: 2-4 đề xuất hành động cụ thể giúp intern tiến bộ`
 
     const obj = raw as Record<string, unknown>;
 
-    const clampScore = (val: unknown, field: string): number => {
-      const num = typeof val === "number" ? val : parseFloat(String(val));
-      if (isNaN(num)) {
-        throw new AppError(
-          `AI trả về điểm '${field}' không hợp lệ: ${val}`,
-          502,
-          ERROR_CODE.INTERNAL_SERVER_ERROR,
-        );
+    const validateRatings = (ratingsRaw: unknown): EvaluationRatings => {
+      if (!ratingsRaw || typeof ratingsRaw !== "object") {
+        // Fallback: trả về TB cho tất cả nếu không có ratings
+        return {
+          ruleCompliance: "TB", workAttitude: "TB", learningCapacity: "TB",
+          resilience: "TB", communication: "TB", knowledge: "TB",
+          practicalSkills: "TB", foreignLanguage: "TB", teamwork: "TB",
+          creativity: "TB", contentQuality: "TB", progressDelivery: "TB",
+        };
       }
-      // Làm tròn đến bước 0.5, clamp vào [1, 10]
-      return Math.min(10, Math.max(1, Math.round(num * 2) / 2));
+
+      const r = ratingsRaw as Record<string, unknown>;
+      const sanitize = (val: unknown, field: string): RatingLevel => {
+        if (typeof val === "string" && VALID_RATINGS.includes(val as RatingLevel)) {
+          return val as RatingLevel;
+        }
+        console.warn(`[AI] Invalid rating for field "${field}": ${val}, defaulting to TB`);
+        return "TB";
+      };
+
+      return {
+        ruleCompliance:   sanitize(r.ruleCompliance,   "ruleCompliance"),
+        workAttitude:     sanitize(r.workAttitude,     "workAttitude"),
+        learningCapacity: sanitize(r.learningCapacity, "learningCapacity"),
+        resilience:       sanitize(r.resilience,       "resilience"),
+        communication:    sanitize(r.communication,    "communication"),
+        knowledge:        sanitize(r.knowledge,        "knowledge"),
+        practicalSkills:  sanitize(r.practicalSkills,  "practicalSkills"),
+        foreignLanguage:  sanitize(r.foreignLanguage,  "foreignLanguage"),
+        teamwork:         sanitize(r.teamwork,         "teamwork"),
+        creativity:       sanitize(r.creativity,       "creativity"),
+        contentQuality:   sanitize(r.contentQuality,   "contentQuality"),
+        progressDelivery: sanitize(r.progressDelivery, "progressDelivery"),
+      };
     };
 
     const toStringArray = (val: unknown): string[] => {
@@ -317,10 +342,7 @@ suggestions: 2-4 đề xuất hành động cụ thể giúp intern tiến bộ`
     };
 
     return {
-      communication: clampScore(obj.communication, "communication"),
-      attitude: clampScore(obj.attitude, "attitude"),
-      learning: clampScore(obj.learning, "learning"),
-      coding: clampScore(obj.coding, "coding"),
+      ratings: validateRatings(obj.ratings),
       comment:
         typeof obj.comment === "string"
           ? obj.comment
@@ -383,7 +405,7 @@ suggestions: 2-4 đề xuất hành động cụ thể giúp intern tiến bộ`
       taskSubmissions,
     });
 
-    // 6. Gọi AI Service (Gemini/OpenAI/DeepSeek...) thông qua Interface chung
+    // 6. Gọi AI Service
     let rawResult: unknown;
     try {
       rawResult = await aiService.generateJSON<unknown>(prompt);
@@ -392,16 +414,25 @@ suggestions: 2-4 đề xuất hành động cụ thể giúp intern tiến bộ`
         "[WeeklyEvaluationAiService] Gemini API call failed, using mock fallback data:",
         aiError,
       );
-      // Tạo kết quả giả định dựa trên số lượng báo cáo và bài nộp thực tế để test
       const hasActivity = dailyReports.length > 0 || taskSubmissions.length > 0;
       rawResult = {
-        communication: hasActivity ? 8.0 : 5.0,
-        attitude: hasActivity ? 8.5 : 5.0,
-        learning: hasActivity ? 8.0 : 5.0,
-        coding: hasActivity ? 8.0 : 5.0,
+        ratings: {
+          ruleCompliance:   hasActivity ? "KHA" : "TB",
+          workAttitude:     hasActivity ? "KHA" : "TB",
+          learningCapacity: hasActivity ? "KHA" : "TB",
+          resilience:       hasActivity ? "KHA" : "TB",
+          communication:    hasActivity ? "KHA" : "TB",
+          knowledge:        hasActivity ? "KHA" : "TB",
+          practicalSkills:  hasActivity ? "KHA" : "TB",
+          foreignLanguage:  "TB",
+          teamwork:         hasActivity ? "KHA" : "TB",
+          creativity:       "TB",
+          contentQuality:   hasActivity ? "KHA" : "TB",
+          progressDelivery: hasActivity ? "KHA" : "TB",
+        },
         comment: hasActivity
-          ? "AI gợi ý (Chế độ Fallback do lỗi kết nối Gemini API): Thực tập sinh hoàn thành tốt các công việc được giao, tiến độ ổn định, giao tiếp tích cực với team. Kỹ năng lập trình đạt yêu cầu."
-          : "AI gợi ý (Chế độ Fallback do thiếu dữ liệu hoặc lỗi kết nối Gemini API): Thực tập sinh chưa có báo cáo hàng ngày hay bài nộp nào trong tuần này. Cần nhắc nhở cập nhật thông tin.",
+          ? "AI gợi ý (Chế độ Fallback): Thực tập sinh hoàn thành tốt các công việc được giao, tiến độ ổn định, giao tiếp tích cực với team. Kỹ năng lập trình đạt yêu cầu."
+          : "AI gợi ý (Chế độ Fallback do thiếu dữ liệu): Thực tập sinh chưa có báo cáo hàng ngày hay bài nộp nào trong tuần này. Cần nhắc nhở cập nhật thông tin.",
         strengths: hasActivity ? ["Hoàn thành task đúng hạn", "Thái độ tích cực"] : [],
         weaknesses: hasActivity ? ["Cần cải thiện chất lượng code"] : ["Thiếu báo cáo/sản phẩm thực tế"],
         suggestions: hasActivity
@@ -413,9 +444,17 @@ suggestions: 2-4 đề xuất hành động cụ thể giúp intern tiến bộ`
     // 7. Validate & normalize
     const validated = this.validateGeminiOutput(rawResult);
 
-    // 8. Trả về response
+    // 8. Tính toán điểm số từ ratings để trả về cho client preview
+    const computed = computeLegacyScores(validated.ratings);
+
+    // 9. Trả về response
     return {
-      ...validated,
+      ratings: validated.ratings,
+      ...computed,
+      comment: validated.comment,
+      strengths: validated.strengths,
+      weaknesses: validated.weaknesses,
+      suggestions: validated.suggestions,
       dataUsed: {
         dailyReportsCount: dailyReports.length,
         taskSubmissionsCount: taskSubmissions.length,

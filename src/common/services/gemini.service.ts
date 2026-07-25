@@ -116,12 +116,26 @@ export class GeminiService implements IAiProvider {
 
     // Tạo mock data thực tế dựa trên thông tin prompt
     const mockResponse = {
+      ratings: {
+        ruleCompliance: "KHA",
+        workAttitude: "TOT",
+        learningCapacity: "KHA",
+        resilience: "KHA",
+        communication: "TOT",
+        knowledge: "KHA",
+        practicalSkills: "KHA",
+        foreignLanguage: "TB",
+        teamwork: "TOT",
+        creativity: "TB",
+        contentQuality: "KHA",
+        progressDelivery: "KHA",
+      },
       communication: 8.5,
       attitude: 9.0,
       learning: 8.0,
       coding: 7.5,
       comment:
-        "Thực tập sinh đã thể hiện tinh thần làm việc rất tốt trong tuần qua. Chủ động viết báo cáo hàng ngày đầy đủ chi tiết, nêu rõ tiến độ và khó khăn gặp phải. Bài nộp code có tiến bộ rõ rệt qua các lần chỉnh sửa theo góp ý của Leader.",
+        `[CHẾ ĐỘ MOCK - Lỗi API Key: ${finalMessage}] Thực tập sinh đã thể hiện tinh thần làm việc rất tốt trong tuần qua. Chủ động viết báo cáo hàng ngày đầy đủ chi tiết, nêu rõ tiến độ và khó khăn gặp phải. Bài nộp code có tiến bộ rõ rệt qua các lần chỉnh sửa theo góp ý của Leader.`,
       strengths: [
         "Báo cáo daily đầy đủ chi tiết, nêu rõ tiến độ và bài học rút ra",
         "Chủ động nghiên cứu và tiếp thu nhanh các góp ý về security (refresh token invalidation)",
