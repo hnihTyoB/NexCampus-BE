@@ -590,6 +590,12 @@ export const swaggerSpec = {
           id: { type: "string", format: "uuid" },
           name: { type: "string", example: "Backend Crawl Project" },
           description: { type: "string", nullable: true, example: "Dự án cào dữ liệu Backend" },
+          _count: {
+            type: "object",
+            properties: {
+              tasks: { type: "integer", example: 5 },
+            },
+          },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
         },
@@ -1306,6 +1312,10 @@ export const swaggerSpec = {
     { name: "Interns", description: "Hồ sơ thực tập sinh (Interns)" },
     { name: "Leaders", description: "Hồ sơ leader (Leaders)" },
     { name: "Tasks", description: "Quản lý công việc (Tasks)" },
+    {
+      name: "TaskGroups",
+      description: "Nhóm công việc (Task Groups) — CRUD quản lý nhóm task",
+    },
     {
       name: "TaskAttachments",
       description:
@@ -2588,6 +2598,203 @@ export const swaggerSpec = {
               },
             },
           },
+        },
+      },
+    },
+
+    // ─── Task Groups ─────────────────────────────────────────────────────────
+    "/task-groups": {
+      get: {
+        tags: ["TaskGroups"],
+        summary: "Danh sách nhóm công việc",
+        description: "Public endpoint. Trả về tất cả nhóm công việc kèm số lượng task trong mỗi nhóm.",
+        responses: {
+          200: {
+            description: "Danh sách nhóm công việc",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "array",
+                          items: { $ref: "#/components/schemas/TaskGroup" },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        tags: ["TaskGroups"],
+        summary: "Tạo nhóm công việc mới",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["name"],
+                properties: {
+                  name: { type: "string", example: "Backend Crawl Project" },
+                  description: { type: "string", example: "Dự án cào dữ liệu Backend" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Nhóm công việc đã được tạo",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/TaskGroup" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          400: { $ref: "#/components/responses/BadRequest" },
+          401: { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/task-groups/{id}": {
+      get: {
+        tags: ["TaskGroups"],
+        summary: "Chi tiết nhóm công việc",
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "ID của nhóm công việc",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Chi tiết nhóm công việc",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/TaskGroup" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          404: { $ref: "#/components/responses/NotFound" },
+        },
+      },
+      put: {
+        tags: ["TaskGroups"],
+        summary: "Cập nhật nhóm công việc",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "ID của nhóm công việc",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  name: { type: "string", example: "Backend Crawl Project v2" },
+                  description: { type: "string", nullable: true, example: "Mô tả cập nhật" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Nhóm công việc đã được cập nhật",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/TaskGroup" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          400: { $ref: "#/components/responses/BadRequest" },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          404: { $ref: "#/components/responses/NotFound" },
+        },
+      },
+      delete: {
+        tags: ["TaskGroups"],
+        summary: "Xoá nhóm công việc",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "ID của nhóm công việc",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Nhóm công việc đã được xoá",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        message: { type: "string", example: "Task group deleted successfully" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          404: { $ref: "#/components/responses/NotFound" },
         },
       },
     },

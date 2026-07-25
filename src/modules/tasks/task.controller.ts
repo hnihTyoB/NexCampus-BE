@@ -1,4 +1,6 @@
 import { Request, Response, NextFunction } from "express";
+import path from "path";
+import fs from "fs";
 import { TaskService } from "./task.service";
 import { TaskImportService } from "./task.import.service";
 import { TaskAnalyticsService } from "./task.analytics.service";
@@ -111,8 +113,6 @@ export class TaskController {
 
   downloadTemplate = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const path = require("path");
-      const fs = require("fs");
       const filePath = path.resolve(__dirname, "../../../templates/template_tasks.xlsx");
 
       if (!fs.existsSync(filePath)) {
@@ -130,6 +130,13 @@ export class TaskController {
       res.setHeader("Content-Disposition", "attachment; filename=template_tasks.xlsx");
 
       const fileStream = fs.createReadStream(filePath);
+      fileStream.on("error", (err) => {
+        if (!res.headersSent) {
+          next(err);
+        } else {
+          res.end();
+        }
+      });
       fileStream.pipe(res);
     } catch (error) {
       next(error);
@@ -139,7 +146,9 @@ export class TaskController {
   getAnalytics = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const taskGroupId = (req.query.taskGroupId || req.body.taskGroupId) as string | undefined;
-      const result = await this.analyticsService.getAll(taskGroupId);
+      const dateFrom = req.query.dateFrom as string | undefined;
+      const dateTo = req.query.dateTo as string | undefined;
+      const result = await this.analyticsService.getAll(taskGroupId, dateFrom, dateTo);
       res.json({ success: true, data: result });
     } catch (error) {
       next(error);

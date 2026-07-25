@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { Prisma } from "@prisma/client";
+import multer from "multer";
 import { AppError } from "../common/errors/app-error";
 import { ERROR_CODE } from "../common/errors/error-code";
 
@@ -32,6 +33,7 @@ export function errorMiddleware(
     return;
   }
 
+  // Handle Prisma Known Request Errors
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002") {
       const target = (error.meta?.target as string[]) || [];
@@ -52,6 +54,16 @@ export function errorMiddleware(
       });
       return;
     }
+  }
+
+  // Handle Multer upload errors
+  if (error instanceof multer.MulterError) {
+    res.status(400).json({
+      success: false,
+      message: `Lỗi tải lên tệp: ${error.message} (Mã lỗi: ${error.code})`,
+      code: "FILE_UPLOAD_ERROR",
+    });
+    return;
   }
 
   console.error("[Unhandled Error]", error);

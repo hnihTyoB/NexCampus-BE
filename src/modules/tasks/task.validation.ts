@@ -7,6 +7,8 @@ export const findAllTaskSchema = z.object({
   phase: z.string().optional(),
   module: z.string().optional(),
   taskGroupId: z.string().uuid().optional(),
+  status: z.string().optional(),
+  statusNot: z.string().optional(),
   deadlineFrom: z
     .string()
     .refine((v) => !isNaN(Date.parse(v)), { message: "Invalid deadlineFrom" })

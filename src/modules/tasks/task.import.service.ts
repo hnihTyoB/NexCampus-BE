@@ -11,6 +11,7 @@ import { ERROR_CODE } from "../../common/errors/error-code";
 import { ActivityLogService } from "../activity-logs/activity-log.service";
 import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
 import { NotificationDispatcher } from "../notifications/notification.dispatcher";
+import { TaskAttachmentRepository } from "../task-attachments/task-attachment.repository";
 import { TASK_PRIORITY, ASSIGNMENT_STATUS } from "../../common/constants/status.constant";
 
 const PRIORITY_MAP: Record<string, TaskPriority> = {
@@ -69,6 +70,14 @@ function parseExcelDate(value: unknown): string | undefined {
 }
 
 function parseDependencies(raw: unknown): string[] {
+  if (!raw || typeof raw !== "string") return [];
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+function parseAttachments(raw: unknown): string[] {
   if (!raw || typeof raw !== "string") return [];
   return raw
     .split(",")
@@ -159,6 +168,13 @@ function parseTaskSheet(
     }
 
     const rawEstDays = row["Est Days"];
+    let estDays: number | undefined;
+    if (rawEstDays != null) {
+      estDays = Number(rawEstDays);
+      if (isNaN(estDays)) {
+        errors.push(`Est Days phải là số hợp lệ: "${rawEstDays}"`);
+      }
+    }
 
     validRows.push({
       excelCode: excelCode!,
@@ -171,12 +187,13 @@ function parseTaskSheet(
       supportName,
       phase: row["Giai đoạn"] ? String(row["Giai đoạn"]).trim() : undefined,
       module: row["Module"] ? String(row["Module"]).trim() : undefined,
-      estDays: rawEstDays != null ? Number(rawEstDays) : undefined,
+      estDays,
       acceptanceCriteria: row["Acceptance Criteria"]
         ? String(row["Acceptance Criteria"]).trim()
         : undefined,
       taskNotes: row["Notes"] ? String(row["Notes"]).trim() : undefined,
       dependencyCodes: parseDependencies(row["Dependency"]),
+      attachmentUrls: parseAttachments(row["Attachments"]),
 
       ...(STATUS_MAP[rawStatus] ? { _status: STATUS_MAP[rawStatus] } : {}),
     } as ImportTaskRowDto & { _status?: string });
@@ -187,6 +204,7 @@ function parseTaskSheet(
 
 export class TaskImportService {
   private readonly activityLogService = new ActivityLogService();
+  private readonly attachmentRepo = new TaskAttachmentRepository();
 
   async preview(
     buffer: Buffer,
@@ -225,19 +243,28 @@ export class TaskImportService {
     const { validRows, errorRows } = parseTaskSheet(workbook, ownerNameMap);
 
     const uniqueOwners = [...new Set(validRows.map((r) => r.ownerName).filter((name): name is string => !!name))];
-    const internMappings = await Promise.all(
-      uniqueOwners.map(async (name) => {
-        const intern = await prisma.intern.findFirst({
-          where: { fullName: { equals: name, mode: "insensitive" }, deletedAt: null },
-          select: { id: true, fullName: true },
-        });
-        return {
-          ownerName: name,
-          internId: intern?.id ?? null,
-          internFullName: intern?.fullName ?? null,
-        };
-      }),
+
+    // Batch query interns by names in uniqueOwners
+    const matchingInterns = await prisma.intern.findMany({
+      where: {
+        fullName: { in: uniqueOwners, mode: "insensitive" },
+        deletedAt: null,
+      },
+      select: { id: true, fullName: true },
+    });
+
+    const internByNameMap = new Map(
+      matchingInterns.map((i) => [i.fullName.toLowerCase(), i]),
     );
+
+    const internMappings = uniqueOwners.map((name) => {
+      const intern = internByNameMap.get(name.toLowerCase());
+      return {
+        ownerName: name,
+        internId: intern?.id ?? null,
+        internFullName: intern?.fullName ?? null,
+      };
+    });
 
     return {
       totalRows: validRows.length + errorRows.length,
@@ -313,15 +340,23 @@ export class TaskImportService {
       where: { deletedAt: null },
       select: { id: true, fullName: true, userId: true },
     });
-    const internByName = new Map(
-      allInterns.map((i) => [i.fullName.toLowerCase(), i]),
-    );
+    
+    // Group interns by lowercase fullName to check for name collisions
+    const internsByNameMap = new Map<string, typeof allInterns>();
+    for (const intern of allInterns) {
+      const key = intern.fullName.toLowerCase();
+      if (!internsByNameMap.has(key)) {
+        internsByNameMap.set(key, []);
+      }
+      internsByNameMap.get(key)!.push(intern);
+    }
 
     let importedTasks = 0;
     let importedAssignments = 0;
     let importedDependencies = 0;
     const skippedCodes: string[] = [];
     const importErrors: { excelCode?: string; error: string }[] = [];
+    const notificationsToDispatch: { userId: string; taskTitle: string; deadline: string }[] = [];
 
     const codeToDbId = new Map<string, string>();
 
@@ -381,20 +416,33 @@ export class TaskImportService {
             codeToDbId.set(row.excelCode, taskId);
 
             if (row.ownerName) {
-              const ownerIntern = internByName.get(row.ownerName.toLowerCase());
-              if (!ownerIntern) {
+              const ownerMatches = internsByNameMap.get(row.ownerName.toLowerCase()) ?? [];
+              if (ownerMatches.length === 0) {
                 importErrors.push({
                   excelCode: row.excelCode,
                   error: `Không tìm thấy Intern với tên "${row.ownerName}" trong hệ thống`,
                 });
                 continue;
               }
+              if (ownerMatches.length > 1) {
+                importErrors.push({
+                  excelCode: row.excelCode,
+                  error: `Tìm thấy nhiều Intern trùng tên "${row.ownerName}". Vui lòng giải quyết trùng lặp trước khi import.`,
+                });
+                continue;
+              }
+              const ownerIntern = ownerMatches[0];
 
               let supportInternId: string | null = null;
               if (row.supportName) {
-                const supportIntern = internByName.get(row.supportName.toLowerCase());
-                if (supportIntern) {
-                  supportInternId = supportIntern.id;
+                const supportMatches = internsByNameMap.get(row.supportName.toLowerCase()) ?? [];
+                if (supportMatches.length === 1) {
+                  supportInternId = supportMatches[0].id;
+                } else if (supportMatches.length > 1) {
+                  importErrors.push({
+                    excelCode: row.excelCode,
+                    error: `Tìm thấy nhiều Intern hỗ trợ trùng tên "${row.supportName}"`,
+                  });
                 } else {
                   importErrors.push({
                     excelCode: row.excelCode,
@@ -433,17 +481,12 @@ export class TaskImportService {
                 });
                 importedAssignments++;
 
-                try {
-                  await NotificationDispatcher.dispatch(
-                    ownerIntern.userId,
-                    "TASK_ASSIGNMENT",
-                    {
-                      taskTitle: row.title,
-                      deadline: new Date(row.deadline).toLocaleDateString("vi-VN"),
-                    },
-                  );
-                } catch {
-                  // Không fail import vì lỗi notification
+                if (defaultStatus === ASSIGNMENT_STATUS.TODO) {
+                  notificationsToDispatch.push({
+                    userId: ownerIntern.userId,
+                    taskTitle: row.title,
+                    deadline: new Date(row.deadline).toLocaleDateString("vi-VN"),
+                  });
                 }
               }
             }
@@ -458,6 +501,30 @@ export class TaskImportService {
       { timeout: 60000 }, // 60s timeout cho import lớn
     );
 
+    // ─── BATCH RESOLVE DEPENDENCIES ───
+    const allDepCodes = new Set<string>();
+    for (const row of validRows) {
+      row.dependencyCodes.forEach((c) => allDepCodes.add(c.trim()));
+    }
+    
+    // Find dependency codes that are not loaded in codeToDbId
+    const missingCodes = Array.from(allDepCodes).filter((c) => !codeToDbId.has(c));
+    if (missingCodes.length > 0) {
+      const dbDepTasks = await prisma.task.findMany({
+        where: {
+          taskGroupId: resolvedGroupId,
+          code: { in: missingCodes },
+          deletedAt: null,
+        },
+        select: { id: true, code: true },
+      });
+      for (const t of dbDepTasks) {
+        if (t.code) {
+          codeToDbId.set(t.code, t.id);
+        }
+      }
+    }
+
     for (const row of validRows) {
       if (row.dependencyCodes.length === 0) continue;
 
@@ -465,17 +532,7 @@ export class TaskImportService {
       if (!taskId) continue;
 
       for (const depCode of row.dependencyCodes) {
-        let depTaskId = codeToDbId.get(depCode.trim());
-        if (!depTaskId) {
-          const depTask = await prisma.task.findFirst({
-            where: { taskGroupId: resolvedGroupId, code: depCode.trim() },
-            select: { id: true },
-          });
-          if (depTask) {
-            depTaskId = depTask.id;
-          }
-        }
-
+        const depTaskId = codeToDbId.get(depCode.trim());
         if (!depTaskId) {
           importErrors.push({
             excelCode: row.excelCode,
@@ -500,6 +557,41 @@ export class TaskImportService {
       }
     }
 
+    // Create link attachments from Attachments column
+    let importedAttachments = 0;
+    for (const row of validRows) {
+      if (!row.attachmentUrls || row.attachmentUrls.length === 0) continue;
+      const taskId = codeToDbId.get(row.excelCode);
+      if (!taskId) continue;
+
+      for (const url of row.attachmentUrls) {
+        try {
+          const fileName = url.split("/").pop()?.split("?")[0] || "attachment";
+          await this.attachmentRepo.createLink({
+            taskId,
+            fileName,
+            fileUrl: url,
+            uploadedBy: createdBy,
+          });
+          importedAttachments++;
+        } catch {
+          // Không fail import vì lỗi attachment
+        }
+      }
+    }
+
+    // Dispatch notifications safely outside the database transaction
+    for (const notif of notificationsToDispatch) {
+      try {
+        await NotificationDispatcher.dispatch(notif.userId, "TASK_ASSIGNMENT", {
+          taskTitle: notif.taskTitle,
+          deadline: notif.deadline,
+        });
+      } catch (err) {
+        console.error("Failed to dispatch notification during import:", err);
+      }
+    }
+
     await this.activityLogService.log(
       createdBy,
       ACTIVITY_ACTIONS.BULK_IMPORT_TASKS,
@@ -512,6 +604,7 @@ export class TaskImportService {
       importedTasks,
       importedAssignments,
       importedDependencies,
+      importedAttachments,
       skippedCodes,
       errorRows: [
         ...errorRows.map((r) => ({

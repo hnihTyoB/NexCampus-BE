@@ -5,6 +5,7 @@ import { StorageService } from "../../common/services/storage.service";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import { supabaseConfig } from "../../config/supabase.config";
+import { prisma } from "../../database/prisma.client";
 
 export class TaskAttachmentService {
   private readonly attachmentRepo = new TaskAttachmentRepository();
@@ -50,21 +51,68 @@ export class TaskAttachmentService {
     });
   }
 
-  async deleteAttachment(attachmentId: string) {
+  async deleteAttachment(attachmentId: string, actorId: string, actorRole: string) {
     const attachment = await this.attachmentRepo.findById(attachmentId);
 
     if (!attachment) {
       throw new AppError("Attachment not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
-    // Xoa file tren Supabase Storage truoc
-    await this.storageService.deleteFile(this.bucket, attachment.filePath);
+    // Only Admin or the uploader of the attachment is allowed to delete
+    if (actorRole !== "ADMIN" && attachment.uploadedBy !== actorId) {
+      throw new AppError(
+        "Bạn không có quyền xóa tệp đính kèm này",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
+    }
+
+    // Xoa file tren Supabase Storage truoc (chi khi no khong phai la link ngoai)
+    const isLink =
+      attachment.filePath.startsWith("http://") ||
+      attachment.filePath.startsWith("https://");
+    if (!isLink) {
+      await this.storageService.deleteFile(this.bucket, attachment.filePath);
+    }
 
     // Xoa record trong DB
     await this.attachmentRepo.delete(attachmentId);
   }
 
-  async findByTaskId(taskId: string) {
+  async findByTaskId(taskId: string, actorId: string, actorRole: string) {
+    if (actorRole === "INTERN") {
+      const isAssigned = await prisma.taskAssignment.findFirst({
+        where: {
+          taskId,
+          intern: { userId: actorId },
+        },
+      });
+      if (!isAssigned) {
+        throw new AppError(
+          "Bạn không có quyền truy cập tệp đính kèm của công việc này",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
+      }
+    }
     return this.attachmentRepo.findByTaskId(taskId);
+  }
+
+  async createLinkAttachment(
+    taskId: string,
+    uploadedBy: string,
+    fileName: string,
+    fileUrl: string,
+  ) {
+    const task = await this.taskRepo.findById(taskId);
+    if (!task) {
+      throw new AppError("Task not found", 404, ERROR_CODE.NOT_FOUND);
+    }
+    return this.attachmentRepo.createLink({
+      taskId,
+      fileName,
+      fileUrl,
+      uploadedBy,
+    });
   }
 }

@@ -28,6 +28,25 @@ export class TaskAttachmentRepository {
     return prisma.taskAttachment.delete({ where: { id } });
   }
 
+  createLink(data: {
+    taskId: string;
+    fileName: string;
+    fileUrl: string;
+    uploadedBy: string;
+  }) {
+    return prisma.taskAttachment.create({
+      data: {
+        taskId: data.taskId,
+        fileName: data.fileName,
+        fileUrl: data.fileUrl,
+        filePath: data.fileUrl,
+        mimeType: "application/octet-stream",
+        fileSize: 0,
+        uploadedBy: data.uploadedBy,
+      },
+    });
+  }
+
   /**
    * Tim cac attachment thuoc cac Task da bi soft-delete qua retentionDays ngay.
    * Dung cho cleanup job.

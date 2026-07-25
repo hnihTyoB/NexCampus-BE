@@ -38,6 +38,7 @@ const defaultSelect = {
       status: true,
       assignedAt: true,
       updatedAt: true,
+      intern: { select: { id: true, fullName: true } },
     },
   },
   attachments: {
@@ -77,6 +78,8 @@ export class TaskRepository {
       deadlineFrom,
       deadlineTo,
       taskGroupId,
+      status,
+      statusNot,
       sortBy = "createdAt",
       order = "desc",
       page = 1,
@@ -91,6 +94,8 @@ export class TaskRepository {
       ...(phase ? { phase: { contains: phase, mode: "insensitive" } } : {}),
       ...(module ? { module: { contains: module, mode: "insensitive" } } : {}),
       ...(taskGroupId ? { taskGroupId } : {}),
+      ...(status ? { assignment: { status: status as any } } : {}),
+      ...(statusNot ? { NOT: { assignment: { status: statusNot as any } } } : {}),
       ...(deadlineFrom || deadlineTo
         ? {
             deadline: {

@@ -244,7 +244,7 @@ model Task {
   createdAt          DateTime     @default(now()) @map("created_at")
   updatedAt          DateTime     @updatedAt @map("updated_at")
 
-  taskGroup   TaskGroup?       @relation(fields: [taskGroupId], references: [id], onDelete: Cascade)
+  taskGroup   TaskGroup?       @relation(fields: [taskGroupId], references: [id], onDelete: SetNull)
   creator     User             @relation("CreatedTasks", fields: [createdBy], references: [id], onDelete: Cascade)
   assignment  TaskAssignment?
   attachments TaskAttachment[]
