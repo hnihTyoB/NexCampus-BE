@@ -39,6 +39,7 @@ const defaultSelect = {
       assignedAt: true,
       updatedAt: true,
       intern: { select: { id: true, fullName: true } },
+      support: { select: { id: true, fullName: true } },
     },
   },
   attachments: {
