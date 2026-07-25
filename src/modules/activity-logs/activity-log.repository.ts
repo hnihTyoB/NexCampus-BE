@@ -26,25 +26,19 @@ const defaultSelect = {
 
 export class ActivityLogRepository {
   async findAll(query: ActivityLogQueryDto, userIdFilter?: string) {
-    const {
-      userId,
-      action,
-      targetId,
-      targetType,
-      sortBy = "createdAt",
-      order = "desc",
-      page = 1,
-      limit = 20,
-    } = query;
+    const parsedPage = Number(query.page || 1);
+    const parsedLimit = Number(query.limit || 20);
+    const sortBy = query.sortBy || "createdAt";
+    const order = query.order || "desc";
 
     const where: Prisma.ActivityLogWhereInput = {
-      ...(userIdFilter ? { userId: userIdFilter } : userId ? { userId } : {}),
-      ...(action ? { action } : {}),
-      ...(targetId ? { targetId } : {}),
-      ...(targetType ? { targetType } : {}),
+      ...(userIdFilter ? { userId: userIdFilter } : query.userId ? { userId: query.userId } : {}),
+      ...(query.action ? { action: query.action } : {}),
+      ...(query.targetId ? { targetId: query.targetId } : {}),
+      ...(query.targetType ? { targetType: query.targetType } : {}),
     };
 
-    const skip = (page - 1) * (limit ?? 20);
+    const skip = (parsedPage - 1) * parsedLimit;
 
     const [data, total] = await prisma.$transaction([
       prisma.activityLog.findMany({
@@ -52,14 +46,19 @@ export class ActivityLogRepository {
         select: defaultSelect,
         orderBy: { [sortBy]: order },
         skip,
-        take: limit,
+        take: parsedLimit,
       }),
       prisma.activityLog.count({ where }),
     ]);
 
     return {
       data,
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+      meta: { 
+        total, 
+        page: parsedPage, 
+        limit: parsedLimit, 
+        totalPages: Math.ceil(total / parsedLimit) 
+      },
     };
   }
 
