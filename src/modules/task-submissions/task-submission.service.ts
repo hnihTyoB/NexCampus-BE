@@ -71,6 +71,14 @@ export class TaskSubmissionService {
       );
     }
 
+    if (!assignment.intern) {
+      throw new AppError(
+        "Intern profile associated with this assignment was not found",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
+
     // 2. Authorization check: Intern can only submit their own assignment
     if (user.role === ROLES.INTERN && assignment.intern.userId !== user.id) {
       throw new AppError(
@@ -126,6 +134,14 @@ export class TaskSubmissionService {
 
   async update(id: string, data: UpdateTaskSubmissionDto, user: UserPayload) {
     const submission = await this.findById(id);
+
+    if (!submission.assignment || !submission.assignment.intern) {
+      throw new AppError(
+        "Intern profile associated with this submission was not found",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
 
     if (user.role === ROLES.INTERN) {
       // 1. Intern can only update their own submission
@@ -216,6 +232,14 @@ export class TaskSubmissionService {
   ) {
     const submission = await this.findById(id);
 
+    if (!submission.assignment || !submission.assignment.intern) {
+      throw new AppError(
+        "Intern profile associated with this submission was not found",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
+
     // 1. Authorization check: Intern can only upload for their own submission
     if (
       user.role === ROLES.INTERN &&
@@ -269,6 +293,14 @@ export class TaskSubmissionService {
 
   async delete(id: string, user: UserPayload) {
     const submission = await this.findById(id);
+
+    if (!submission.assignment || !submission.assignment.intern) {
+      throw new AppError(
+        "Intern profile associated with this submission was not found",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
 
     if (user.role === ROLES.INTERN) {
       // Intern can only delete their own submission

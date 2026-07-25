@@ -119,6 +119,14 @@ export class TaskAssignmentService {
   async approve(id: string, actorId: string, actorRole: string) {
     const assignment = await this.findById(id);
 
+    if (!assignment.intern) {
+      throw new AppError(
+        "Intern profile associated with this assignment was not found",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
+
     if (assignment.status !== AssignmentStatus.PENDING_APPROVAL) {
       throw new AppError(
         "Yêu cầu giao việc không ở trạng thái chờ duyệt",
@@ -164,6 +172,14 @@ export class TaskAssignmentService {
   async reject(id: string, actorId: string, actorRole: string) {
     const assignment = await this.findById(id);
 
+    if (!assignment.intern) {
+      throw new AppError(
+        "Intern profile associated with this assignment was not found",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
+
     if (assignment.status !== AssignmentStatus.PENDING_APPROVAL) {
       throw new AppError(
         "Yêu cầu giao việc không ở trạng thái chờ duyệt",
@@ -199,6 +215,14 @@ export class TaskAssignmentService {
     actorRole: string,
   ) {
     const assignment = await this.findById(id);
+
+    if (!assignment.intern) {
+      throw new AppError(
+        "Intern profile associated with this assignment was not found",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
 
     // Only Admin or the direct Leader of the intern is allowed to update
     if (actorRole !== ROLES.ADMIN && assignment.intern.leaderId !== actorId) {
@@ -273,6 +297,14 @@ export class TaskAssignmentService {
 
   async delete(id: string, actorId: string, actorRole: string) {
     const assignment = await this.findById(id);
+
+    if (!assignment.intern) {
+      throw new AppError(
+        "Intern profile associated with this assignment was not found",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
 
     // Only Admin or the direct Leader of the intern is allowed to delete
     if (actorRole !== ROLES.ADMIN && assignment.intern.leaderId !== actorId) {

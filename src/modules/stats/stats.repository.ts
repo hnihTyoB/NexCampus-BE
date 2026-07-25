@@ -509,6 +509,7 @@ export class StatsRepository {
     // Build fast lookup maps in memory
     const internAssignmentsMap = new Map<string, typeof allMyInternAssignments>();
     allMyInternAssignments.forEach((a) => {
+      if (!a.internId) return;
       const existing = internAssignmentsMap.get(a.internId) || [];
       existing.push(a);
       internAssignmentsMap.set(a.internId, existing);
@@ -516,6 +517,7 @@ export class StatsRepository {
 
     const evalAvgMap = new Map<string, number>();
     allMyInternEvaluationAvg.forEach((e) => {
+      if (!e.internId) return;
       evalAvgMap.set(e.internId, e._avg.totalScore ?? 0);
     });
 

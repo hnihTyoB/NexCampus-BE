@@ -58,6 +58,7 @@ export class ReminderService {
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
     for (const assignment of assignments) {
+      if (!assignment.intern) continue;
       const internUser = assignment.intern.user;
       const task = assignment.task;
 

@@ -473,7 +473,7 @@ export class TaskImportService {
               });
               importedAssignments++;
 
-              if (ownerInternId && defaultStatus === ASSIGNMENT_STATUS.TODO) {
+              if (ownerInternId && row.ownerName && defaultStatus === ASSIGNMENT_STATUS.TODO) {
                 const ownerIntern = internsByNameMap.get(row.ownerName.toLowerCase())?.[0];
                 if (ownerIntern) {
                   notificationsToDispatch.push({

@@ -36,7 +36,7 @@ export class SubmissionAttachmentService {
     // 2. Kiem tra quyen so huu (neu la intern, chi duoc upload cho submission cua minh)
     if (
       userRole === ROLES.INTERN &&
-      submission.assignment.intern.userId !== uploadedBy
+      (!submission.assignment || !submission.assignment.intern || submission.assignment.intern.userId !== uploadedBy)
     ) {
       throw new AppError(
         "You are not authorized to upload for this submission",
@@ -112,7 +112,7 @@ export class SubmissionAttachmentService {
 
     // Intern chi duoc xoa attachment cua minh
     if (userRole === ROLES.INTERN) {
-      if (submission.assignment.intern.userId !== userId) {
+      if (!submission.assignment || !submission.assignment.intern || submission.assignment.intern.userId !== userId) {
         throw new AppError(
           "You are not authorized to delete this attachment",
           403,
