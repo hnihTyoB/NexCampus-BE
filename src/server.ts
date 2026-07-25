@@ -11,16 +11,19 @@ const PORT = appConfig.port;
 
 // Start background workers
 startNotificationWorker();
-startStorageCleanupWorker();
-startReminderWorker();
 
-// Schedule repeatable jobs
-scheduleStorageCleanupJob().catch((err) => {
-  console.error("[Server] Failed to schedule storage cleanup job:", err);
-});
-scheduleReminderJob().catch((err) => {
-  console.error("[Server] Failed to schedule reminder job:", err);
-});
+if (appConfig.nodeEnv === "production") {
+  startStorageCleanupWorker();
+  startReminderWorker();
+
+  // Schedule repeatable jobs
+  scheduleStorageCleanupJob().catch((err) => {
+    console.error("[Server] Failed to schedule storage cleanup job:", err);
+  });
+  scheduleReminderJob().catch((err) => {
+    console.error("[Server] Failed to schedule reminder job:", err);
+  });
+}
 
 app.listen(PORT, () => {
   console.log(
