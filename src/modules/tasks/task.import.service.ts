@@ -527,28 +527,64 @@ export class TaskImportService {
       const taskId = codeToDbId.get(row.excelCode);
       if (!taskId) continue;
 
+      const resolvedDepIds = new Set<string>();
+
       for (const depCode of row.dependencyCodes) {
         const key = depCode.trim();
         let depTaskId = codeToDbId.get(key) || titleToDbId.get(key.toLowerCase());
-        if (!depTaskId) {
-          const existing = await prisma.task.findFirst({
+        
+        if (depTaskId) {
+          resolvedDepIds.add(depTaskId);
+          continue;
+        }
+
+        const existing = await prisma.task.findFirst({
+          where: {
+            taskGroupId: resolvedGroupId,
+            OR: [
+              { code: key },
+              { title: { equals: key, mode: 'insensitive' } }
+            ],
+            deletedAt: null
+          },
+          select: { id: true }
+        });
+        if (existing) {
+          resolvedDepIds.add(existing.id);
+          continue;
+        }
+
+        const phaseMatch = key.match(/Phase\s*(\d+)/i);
+        if (phaseMatch) {
+          const phaseNumStr = phaseMatch[1];
+          const phaseRegex = new RegExp(`Phase\\s*${phaseNumStr}`, "i");
+
+          for (const r of validRows) {
+            if (r.phase && phaseRegex.test(r.phase)) {
+              const depId = codeToDbId.get(r.excelCode);
+              if (depId && depId !== taskId) {
+                resolvedDepIds.add(depId);
+              }
+            }
+          }
+
+          const dbPhaseTasks = await prisma.task.findMany({
             where: {
               taskGroupId: resolvedGroupId,
-              OR: [
-                { code: key },
-                { title: { equals: key, mode: 'insensitive' } }
-              ],
+              phase: { contains: `Phase ${phaseNumStr}`, mode: "insensitive" },
               deletedAt: null
             },
             select: { id: true }
           });
-          if (existing) {
-            depTaskId = existing.id;
+          for (const t of dbPhaseTasks) {
+            if (t.id !== taskId) {
+              resolvedDepIds.add(t.id);
+            }
           }
         }
+      }
 
-        if (!depTaskId) continue;
-
+      for (const depTaskId of resolvedDepIds) {
         try {
           await prisma.task.update({
             where: { id: taskId },
