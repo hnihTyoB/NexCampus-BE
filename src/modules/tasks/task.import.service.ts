@@ -85,19 +85,26 @@ function parseAttachments(raw: unknown): string[] {
     .filter((s) => s.length > 0);
 }
 
-function parseListsSheet(workbook: XLSX.WorkBook): Record<string, string> {
+/**
+ * Parse sheet "Lists": Đọc mapping Owners alias → Email (tùy chọn).
+ * Cột Email có thể để trống → không phân công.
+ * Format: | Owners | Email |
+ */
+function parseListsSheet(workbook: XLSX.WorkBook): Record<string, string | null> {
   const sheet = workbook.Sheets["Lists"];
   if (!sheet) return {};
 
-  const rows = XLSX.utils.sheet_to_json<{ Owners: string; Name?: string }>(
+  const rows = XLSX.utils.sheet_to_json<{ Owners: string; Email?: string }>(
     sheet,
     { defval: null },
   );
 
-  const mapping: Record<string, string> = {};
+  const mapping: Record<string, string | null> = {};
   for (const row of rows) {
-    if (row.Owners && row.Name) {
-      mapping[String(row.Owners).trim()] = String(row.Name).trim();
+    if (row.Owners) {
+      const alias = String(row.Owners).trim();
+      const email = row.Email ? String(row.Email).trim().toLowerCase() : null;
+      mapping[alias] = email;
     }
   }
   return mapping;
@@ -105,7 +112,7 @@ function parseListsSheet(workbook: XLSX.WorkBook): Record<string, string> {
 
 function parseTaskSheet(
   workbook: XLSX.WorkBook,
-  ownerNameMap: Record<string, string>,
+  ownerEmailMap: Record<string, string | null>,
 ): { validRows: ImportTaskRowDto[]; errorRows: { rowIndex: number; excelCode?: string; errors: string[] }[] } {
   const sheet = workbook.Sheets["Task_Phan_Cong"];
   if (!sheet) {
@@ -147,13 +154,29 @@ function parseTaskSheet(
       if (!startDate) errors.push(`Không parse được ngày Start: "${rawStart}"`);
     }
 
+    // Owner alias → email (null = chưa phân công, undefined = alias không có trong Lists)
     const rawOwner = row["Owner"] && String(row["Owner"]).trim() ? String(row["Owner"]).trim() : null;
-    const ownerName = rawOwner ? (ownerNameMap[rawOwner] ?? rawOwner) : undefined;
+    let ownerEmail: string | undefined;
+    if (rawOwner) {
+      if (rawOwner in ownerEmailMap) {
+        ownerEmail = ownerEmailMap[rawOwner] ?? undefined; // null → undefined = chưa phân công
+      } else {
+        // Alias không có trong Lists → coi như email trực tiếp (backward-compat)
+        ownerEmail = rawOwner.includes("@") ? rawOwner.toLowerCase() : undefined;
+      }
+    }
 
     const rawSupport = row["Support"] && String(row["Support"]).trim() ? String(row["Support"]).trim() : null;
-    const supportName = rawSupport ? (ownerNameMap[rawSupport] ?? rawSupport) : undefined;
+    let supportEmail: string | undefined;
+    if (rawSupport) {
+      if (rawSupport in ownerEmailMap) {
+        supportEmail = ownerEmailMap[rawSupport] ?? undefined;
+      } else {
+        supportEmail = rawSupport.includes("@") ? rawSupport.toLowerCase() : undefined;
+      }
+    }
 
-    if (supportName && !ownerName) {
+    if (supportEmail && !ownerEmail) {
       errors.push("Không thể chỉ định Intern hỗ trợ nếu thiếu người chịu trách nhiệm chính (Owner)");
     }
 
@@ -183,8 +206,8 @@ function parseTaskSheet(
       deadline: deadline!,
       startDate,
       priority: priority!,
-      ownerName,
-      supportName,
+      ownerEmail,
+      supportEmail,
       phase: row["Giai đoạn"] ? String(row["Giai đoạn"]).trim() : undefined,
       module: row["Module"] ? String(row["Module"]).trim() : undefined,
       estDays,
@@ -238,33 +261,43 @@ export class TaskImportService {
       resolvedGroupName = name;
     }
 
-    const ownerNameMap = parseListsSheet(workbook);
+    const ownerEmailMap = parseListsSheet(workbook);
 
-    const { validRows, errorRows } = parseTaskSheet(workbook, ownerNameMap);
+    const { validRows, errorRows } = parseTaskSheet(workbook, ownerEmailMap);
 
-    const uniqueOwners = [...new Set(validRows.map((r) => r.ownerName).filter((name): name is string => !!name))];
+    // Thu thập các email có trong file (không bị undefined)
+    const uniqueEmails = [...new Set(
+      validRows
+        .flatMap((r) => [r.ownerEmail, r.supportEmail])
+        .filter((e): e is string => !!e),
+    )];
 
-    // Batch query interns by names in uniqueOwners
+    // Batch query intern qua bảng User (email)
     const matchingInterns = await prisma.intern.findMany({
       where: {
-        fullName: { in: uniqueOwners, mode: "insensitive" },
         deletedAt: null,
+        user: { email: { in: uniqueEmails, mode: "insensitive" } },
       },
-      select: { id: true, fullName: true },
+      select: { id: true, fullName: true, user: { select: { email: true } } },
     });
 
-    const internByNameMap = new Map(
-      matchingInterns.map((i) => [i.fullName.toLowerCase(), i]),
+    const internByEmailMap = new Map(
+      matchingInterns.map((i) => [i.user.email.toLowerCase(), i]),
     );
 
-    const internMappings = uniqueOwners.map((name) => {
-      const intern = internByNameMap.get(name.toLowerCase());
-      return {
-        ownerName: name,
-        internId: intern?.id ?? null,
-        internFullName: intern?.fullName ?? null,
-      };
-    });
+    // Build internMappings: mỗi alias → email → intern
+    const ownerEmailMapParsed = parseListsSheet(workbook);
+    const internMappings = Object.entries(ownerEmailMapParsed)
+      .filter(([, email]) => email !== null)
+      .map(([alias, email]) => {
+        const intern = internByEmailMap.get((email as string).toLowerCase());
+        return {
+          ownerAlias: alias,
+          email: email as string,
+          internId: intern?.id ?? null,
+          internFullName: intern?.fullName ?? null,
+        };
+      });
 
     return {
       totalRows: validRows.length + errorRows.length,
@@ -311,8 +344,8 @@ export class TaskImportService {
       resolvedGroupName = tg.name;
     }
 
-    const ownerNameMap = parseListsSheet(workbook);
-    const { validRows, errorRows } = parseTaskSheet(workbook, ownerNameMap);
+    const ownerEmailMap = parseListsSheet(workbook);
+    const { validRows, errorRows } = parseTaskSheet(workbook, ownerEmailMap);
 
     if (errorRows.length > 0) {
       const errorDetails = errorRows
@@ -336,20 +369,28 @@ export class TaskImportService {
       );
     }
 
-    const allInterns = await prisma.intern.findMany({
-      where: { deletedAt: null },
-      select: { id: true, fullName: true, userId: true },
+    // Collect all emails referenced in the file
+    const allEmails = [...new Set(
+      validRows
+        .flatMap((r) => [r.ownerEmail, r.supportEmail])
+        .filter((e): e is string => !!e),
+    )];
+
+    // Lookup intern by email (qua bảng User), tránh mọi vấn đề trùng tên
+    const internsByEmail = await prisma.intern.findMany({
+      where: {
+        deletedAt: null,
+        ...(allEmails.length > 0
+          ? { user: { email: { in: allEmails, mode: "insensitive" } } }
+          : { id: "__none__" }), // không query nếu không có email nào
+      },
+      select: { id: true, fullName: true, userId: true, user: { select: { email: true } } },
     });
-    
-    // Group interns by lowercase fullName to check for name collisions
-    const internsByNameMap = new Map<string, typeof allInterns>();
-    for (const intern of allInterns) {
-      const key = intern.fullName.toLowerCase();
-      if (!internsByNameMap.has(key)) {
-        internsByNameMap.set(key, []);
-      }
-      internsByNameMap.get(key)!.push(intern);
-    }
+
+    // email (lower) → intern
+    const internsByEmailMap = new Map(
+      internsByEmail.map((i) => [i.user.email.toLowerCase(), i]),
+    );
 
     let importedTasks = 0;
     let importedAssignments = 0;
@@ -418,28 +459,19 @@ export class TaskImportService {
             titleToDbId.set(row.title.toLowerCase().trim(), taskId);
 
             let ownerInternId: string | null = null;
-            if (row.ownerName) {
-              const ownerMatches = internsByNameMap.get(row.ownerName.toLowerCase()) ?? [];
-              if (ownerMatches.length === 1) {
-                ownerInternId = ownerMatches[0].id;
-              } else if (ownerMatches.length > 1) {
-                importErrors.push({
-                  excelCode: row.excelCode,
-                  error: `Tìm thấy nhiều Intern trùng tên "${row.ownerName}". Vui lòng giải quyết trùng lặp trước khi import.`,
-                });
+            if (row.ownerEmail) {
+              const ownerIntern = internsByEmailMap.get(row.ownerEmail.toLowerCase());
+              if (ownerIntern) {
+                ownerInternId = ownerIntern.id;
               }
+              // Không có intern với email này → không phân công, không push error (email có thể sai)
             }
 
             let supportInternId: string | null = null;
-            if (row.supportName) {
-              const supportMatches = internsByNameMap.get(row.supportName.toLowerCase()) ?? [];
-              if (supportMatches.length === 1) {
-                supportInternId = supportMatches[0].id;
-              } else if (supportMatches.length > 1) {
-                importErrors.push({
-                  excelCode: row.excelCode,
-                  error: `Tìm thấy nhiều Intern hỗ trợ trùng tên "${row.supportName}"`,
-                });
+            if (row.supportEmail) {
+              const supportIntern = internsByEmailMap.get(row.supportEmail.toLowerCase());
+              if (supportIntern) {
+                supportInternId = supportIntern.id;
               }
             }
 
@@ -473,8 +505,8 @@ export class TaskImportService {
               });
               importedAssignments++;
 
-              if (ownerInternId && row.ownerName && defaultStatus === ASSIGNMENT_STATUS.TODO) {
-                const ownerIntern = internsByNameMap.get(row.ownerName.toLowerCase())?.[0];
+              if (ownerInternId && row.ownerEmail && defaultStatus === ASSIGNMENT_STATUS.TODO) {
+                const ownerIntern = internsByEmailMap.get(row.ownerEmail.toLowerCase());
                 if (ownerIntern) {
                   notificationsToDispatch.push({
                     userId: ownerIntern.userId,

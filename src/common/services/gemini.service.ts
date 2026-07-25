@@ -54,7 +54,7 @@ export class GeminiService implements IAiProvider {
       try {
         const client = new GoogleGenerativeAI(apiKey);
         const model = client.getGenerativeModel({
-          model: "gemini-2.5-flash",
+          model: "gemini-flash-latest",
           generationConfig: {
             responseMimeType: "application/json",
             temperature: 0.4,

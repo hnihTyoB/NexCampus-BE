@@ -64,8 +64,8 @@ export interface ImportTaskRowDto {
   deadline: string;            // ISO date string từ Excel (cột Due)
   startDate?: string;          // ISO date string từ Excel (cột Start)
   priority: TaskPriority;      // P0→HIGH, P1→MEDIUM, P2→LOW
-  ownerName?: string;          // Tên intern (Thịnh, Trà, Thanh...) từ cột Owner (optional)
-  supportName?: string;        // Tên người hỗ trợ từ cột Support
+  ownerEmail?: string;         // Email intern từ cột Owner (tra qua sheet Lists, tùy chọn)
+  supportEmail?: string;       // Email người hỗ trợ từ cột Support (tra qua sheet Lists, tùy chọn)
   phase?: string;
   module?: string;
   estDays?: number;
@@ -82,7 +82,7 @@ export interface ImportPreviewDto {
   totalRows: number;
   validRows: ImportTaskRowDto[];
   errorRows: { rowIndex: number; excelCode?: string; errors: string[] }[];
-  internMappings: { ownerName: string; internId: string | null; internFullName: string | null }[];
+  internMappings: { ownerAlias: string; email: string; internId: string | null; internFullName: string | null }[];
   taskGroupId?: string;
   taskGroupName?: string;
 }
