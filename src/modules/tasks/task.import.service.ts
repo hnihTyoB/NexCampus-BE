@@ -531,45 +531,23 @@ export class TaskImportService {
         const key = depCode.trim();
         let depTaskId = codeToDbId.get(key) || titleToDbId.get(key.toLowerCase());
         if (!depTaskId) {
-          try {
-            const existing = await prisma.task.findFirst({
-              where: {
-                taskGroupId: resolvedGroupId,
-                OR: [
-                  { code: key },
-                  { title: { equals: key, mode: 'insensitive' } }
-                ],
-                deletedAt: null
-              },
-              select: { id: true }
-            });
-            if (existing) {
-              depTaskId = existing.id;
-            } else {
-              const placeholder = await prisma.task.create({
-                data: {
-                  code: key,
-                  title: key,
-                  description: `Placeholder task created for dependency "${key}" during import`,
-                  deadline: new Date(row.deadline),
-                  priority: row.priority,
-                  taskGroupId: resolvedGroupId,
-                  createdBy
-                },
-                select: { id: true }
-              });
-              depTaskId = placeholder.id;
-              codeToDbId.set(key, depTaskId);
-              titleToDbId.set(key.toLowerCase(), depTaskId);
-            }
-          } catch (err) {
-            importErrors.push({
-              excelCode: row.excelCode,
-              error: `Dependency "${depCode}" không tìm thấy và không thể tạo tự động: ${err instanceof Error ? err.message : String(err)}`,
-            });
-            continue;
+          const existing = await prisma.task.findFirst({
+            where: {
+              taskGroupId: resolvedGroupId,
+              OR: [
+                { code: key },
+                { title: { equals: key, mode: 'insensitive' } }
+              ],
+              deletedAt: null
+            },
+            select: { id: true }
+          });
+          if (existing) {
+            depTaskId = existing.id;
           }
         }
+
+        if (!depTaskId) continue;
 
         try {
           await prisma.task.update({
