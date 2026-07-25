@@ -408,6 +408,10 @@ model WeeklyEvaluation {
   totalScore    Float   @map("total_score")
   comment       String?
 
+  // 12-criteria rating fields (new template)
+  ratings   Json? @map("ratings") // EvaluationRatings object
+  aiRatings Json? @map("ai_ratings") // AI-suggested EvaluationRatings object
+
   aiCommunication Float?    @map("ai_communication")
   aiAttitude      Float?    @map("ai_attitude")
   aiLearning      Float?    @map("ai_learning")

@@ -8,6 +8,8 @@ import {
   CreateWeeklyEvaluationDto,
   UpdateWeeklyEvaluationDto,
   AiSuggestionRequestDto,
+  EvaluationRatings,
+  RatingLevel,
 } from "./weekly-evaluation.dto";
 import { ROLES } from "../../common/constants/role.constant";
 import { NotificationDispatcher } from "../notifications/notification.dispatcher";
@@ -18,6 +20,79 @@ interface UserPayload {
   id: string;
   email: string;
   role: string;
+}
+
+/** Quy đổi mức xếp loại thành điểm số (thang 10) */
+export function ratingToScore(rating: RatingLevel): number {
+  switch (rating) {
+    case "TOT": return 10;
+    case "KHA": return 8;
+    case "TB":  return 6;
+    case "TBY": return 4;
+    case "YEU": return 2;
+  }
+}
+
+/**
+ * Tính trung bình cộng của danh sách điểm số.
+ * Làm tròn đến 2 chữ số thập phân.
+ */
+function avg(scores: number[]): number {
+  return parseFloat((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2));
+}
+
+/**
+ * Từ 12 xếp loại, tính 4 nhóm điểm tương thích ngược:
+ *  - communication = I.5 (communication) và II.4 (teamwork)
+ *  - attitude      = I.1 (ruleCompliance) + I.2 (workAttitude) + I.4 (resilience)
+ *  - learning      = I.3 (learningCapacity) + II.1 (knowledge) + II.5 (creativity)
+ *  - coding        = II.2 (practicalSkills) + III.1 (contentQuality) + III.2 (progressDelivery)
+ */
+export function computeLegacyScores(ratings: EvaluationRatings): {
+  communication: number;
+  attitude: number;
+  learning: number;
+  coding: number;
+  totalScore: number;
+} {
+  const communication = avg([
+    ratingToScore(ratings.communication),
+    ratingToScore(ratings.teamwork),
+  ]);
+  const attitude = avg([
+    ratingToScore(ratings.ruleCompliance),
+    ratingToScore(ratings.workAttitude),
+    ratingToScore(ratings.resilience),
+  ]);
+  const learning = avg([
+    ratingToScore(ratings.learningCapacity),
+    ratingToScore(ratings.knowledge),
+    ratingToScore(ratings.creativity),
+  ]);
+  const coding = avg([
+    ratingToScore(ratings.practicalSkills),
+    ratingToScore(ratings.contentQuality),
+    ratingToScore(ratings.progressDelivery),
+  ]);
+
+  // totalScore = trung bình cộng của cả 12 tiêu chí
+  const allScores = [
+    ratingToScore(ratings.ruleCompliance),
+    ratingToScore(ratings.workAttitude),
+    ratingToScore(ratings.learningCapacity),
+    ratingToScore(ratings.resilience),
+    ratingToScore(ratings.communication),
+    ratingToScore(ratings.knowledge),
+    ratingToScore(ratings.practicalSkills),
+    ratingToScore(ratings.foreignLanguage),
+    ratingToScore(ratings.teamwork),
+    ratingToScore(ratings.creativity),
+    ratingToScore(ratings.contentQuality),
+    ratingToScore(ratings.progressDelivery),
+  ];
+  const totalScore = avg(allScores);
+
+  return { communication, attitude, learning, coding, totalScore };
 }
 
 export class WeeklyEvaluationService {
@@ -75,15 +150,29 @@ export class WeeklyEvaluationService {
       );
     }
 
-    // 3. Compute totalScore
-    const totalScore =
-      (data.communication + data.attitude + data.learning + data.coding) / 4;
+    // 3. Compute scores — nếu có ratings mới thì tính từ ratings, ngược lại dùng 4 điểm cũ
+    let communication = data.communication;
+    let attitude = data.attitude;
+    let learning = data.learning;
+    let coding = data.coding;
+    let totalScore: number;
 
-    // 4. Detect leaderEdited: nếu Leader gửi kèm AI fields và đã thay đổi ít nhất 1 điểm
+    if (data.ratings) {
+      const computed = computeLegacyScores(data.ratings);
+      communication = computed.communication;
+      attitude = computed.attitude;
+      learning = computed.learning;
+      coding = computed.coding;
+      totalScore = computed.totalScore;
+    } else {
+      totalScore = (communication + attitude + learning + coding) / 4;
+    }
+
+    // 4. Detect leaderEdited
     const leaderEdited = this.detectLeaderEdited(data);
 
     const result = await this.repository.create(
-      data,
+      { ...data, communication, attitude, learning, coding },
       totalScore,
       leaderId,
       leaderEdited,
@@ -113,28 +202,40 @@ export class WeeklyEvaluationService {
   ) {
     const evaluation = await this.findById(id);
 
+    let communication = data.communication;
+    let attitude = data.attitude;
+    let learning = data.learning;
+    let coding = data.coding;
     let totalScore: number | undefined;
 
-    // Recalculate totalScore if any criteria changes
-    if (
+    // Nếu update có ratings mới thì tính toán lại toàn bộ
+    if (data.ratings) {
+      const computed = computeLegacyScores(data.ratings);
+      communication = computed.communication;
+      attitude = computed.attitude;
+      learning = computed.learning;
+      coding = computed.coding;
+      totalScore = computed.totalScore;
+    } else if (
       data.communication !== undefined ||
       data.attitude !== undefined ||
       data.learning !== undefined ||
       data.coding !== undefined
     ) {
-      const comm =
-        data.communication !== undefined
-          ? data.communication
-          : evaluation.communication;
-      const att =
-        data.attitude !== undefined ? data.attitude : evaluation.attitude;
-      const learn =
-        data.learning !== undefined ? data.learning : evaluation.learning;
-      const code = data.coding !== undefined ? data.coding : evaluation.coding;
+      const comm = communication !== undefined ? communication : evaluation.communication;
+      const att  = attitude !== undefined ? attitude : evaluation.attitude;
+      const learn = learning !== undefined ? learning : evaluation.learning;
+      const code  = coding !== undefined ? coding : evaluation.coding;
       totalScore = (comm + att + learn + code) / 4;
     }
 
-    const result = await this.repository.update(id, data, totalScore);
+    const result = await this.repository.update(id, {
+      ...data,
+      ...(communication !== undefined && { communication }),
+      ...(attitude !== undefined && { attitude }),
+      ...(learning !== undefined && { learning }),
+      ...(coding !== undefined && { coding }),
+    }, totalScore);
 
     // Notify the intern of the evaluation update
     const finalScore =
@@ -189,6 +290,13 @@ export class WeeklyEvaluationService {
    * Nếu có AI fields và điểm giống AI → false (Leader chấp nhận AI).
    */
   private detectLeaderEdited(data: CreateWeeklyEvaluationDto): boolean {
+    // So sánh ratings nếu có
+    if (data.ratings && data.aiRatings) {
+      const keys = Object.keys(data.ratings) as Array<keyof EvaluationRatings>;
+      return keys.some(k => data.ratings![k] !== data.aiRatings![k]);
+    }
+
+    // Fallback: so sánh 4 điểm số cũ
     const hasAiFields =
       data.aiCommunication != null ||
       data.aiAttitude != null ||

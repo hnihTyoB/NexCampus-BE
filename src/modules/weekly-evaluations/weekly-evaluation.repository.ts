@@ -17,6 +17,8 @@ const defaultSelect = {
   coding: true,
   totalScore: true,
   comment: true,
+  ratings: true,
+  aiRatings: true,
   aiCommunication: true,
   aiAttitude: true,
   aiLearning: true,
@@ -137,13 +139,17 @@ export class WeeklyEvaluationRepository {
         totalScore,
         comment: data.comment || null,
 
-        // AI suggestion fields (lưu gợi ý gốc)
+        // 12-criteria ratings (new template)
+        ratings: data.ratings ? (data.ratings as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
+        aiRatings: data.aiRatings ? (data.aiRatings as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
+
+        // AI suggestion fields (legacy — lưu gợi ý gốc)
         aiCommunication: data.aiCommunication ?? null,
         aiAttitude: data.aiAttitude ?? null,
         aiLearning: data.aiLearning ?? null,
         aiCoding: data.aiCoding ?? null,
         aiComment: data.aiComment ?? null,
-        aiGeneratedAt: data.aiCommunication != null ? new Date() : null,
+        aiGeneratedAt: (data.aiCommunication != null || data.aiRatings != null) ? new Date() : null,
         leaderEdited,
       },
       select: defaultSelect,
@@ -154,6 +160,9 @@ export class WeeklyEvaluationRepository {
     return prisma.weeklyEvaluation.update({
       where: { id },
       data: {
+        ...(data.ratings !== undefined
+          ? { ratings: data.ratings ? (data.ratings as unknown as Prisma.InputJsonValue) : Prisma.JsonNull }
+          : {}),
         ...(data.communication !== undefined
           ? { communication: data.communication }
           : {}),

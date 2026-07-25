@@ -259,6 +259,116 @@ async function main() {
     console.log(`✓ System setting ${s.key} upserted with value "${s.value}"`);
   }
 
+  // Create default Department and Position
+  const dept = await prisma.department.upsert({
+    where: { name: "Kỹ thuật Công nghệ" },
+    update: {},
+    create: { name: "Kỹ thuật Công nghệ" },
+  });
+
+  const pos = await prisma.position.findFirst({
+    where: { departmentId: dept.id, name: "Thực tập sinh Frontend" },
+  }) || await prisma.position.create({
+    data: { departmentId: dept.id, name: "Thực tập sinh Frontend" },
+  });
+
+  // Create mock intern profile
+  const leaderUser = await prisma.user.findUnique({ where: { email: leaderEmail } });
+  const internUser = await prisma.user.findUnique({ where: { email: internEmail } });
+
+  if (leaderUser && internUser) {
+    const existingIntern = await prisma.intern.findUnique({
+      where: { userId: internUser.id },
+    });
+
+    if (!existingIntern) {
+      const startOfInternship = new Date();
+      // Set to 3 days ago to make sure they are currently in week 1
+      startOfInternship.setDate(startOfInternship.getDate() - 3);
+
+      const mockIntern = await prisma.intern.create({
+        data: {
+          userId: internUser.id,
+          leaderId: leaderUser.id,
+          fullName: "Nguyễn Văn Thực Tập",
+          phone: "0987654321",
+          departmentId: dept.id,
+          positionId: pos.id,
+          startDate: startOfInternship,
+          duration: 3, // 3 months
+          status: "ACTIVE",
+        },
+      });
+      console.log(`✓ Created mock intern profile for ${internUser.email}`);
+
+      // Seed Daily Reports
+      const reportDate1 = new Date(startOfInternship);
+      const reportDate2 = new Date(startOfInternship);
+      reportDate2.setDate(reportDate2.getDate() + 1);
+
+      await prisma.dailyReport.createMany({
+        data: [
+          {
+            internId: mockIntern.id,
+            content: "Tìm hiểu cấu trúc dự án Next.js, cài đặt môi trường và chạy thử thành công dự án. Giao tiếp tốt với các thành viên và chủ động hỏi đáp khi gặp lỗi.",
+            createdAt: reportDate1,
+            updatedAt: reportDate1,
+          },
+          {
+            internId: mockIntern.id,
+            content: "Hoàn thành code phần Header và Footer cho trang chủ. Đã đẩy PR lên git và gửi mentor review. Tiếp thu tốt các ý kiến đóng góp về CSS.",
+            createdAt: reportDate2,
+            updatedAt: reportDate2,
+          },
+        ],
+      });
+      console.log("✓ Created mock daily reports for the intern");
+
+      // Seed Tasks
+      const taskGroup = await prisma.taskGroup.upsert({
+        where: { name: "Mẫu Đánh Giá Tuần" },
+        update: {},
+        create: { name: "Mẫu Đánh Giá Tuần", description: "Các task thực tập tuần 1" },
+      });
+
+      const task = await prisma.task.create({
+        data: {
+          taskGroupId: taskGroup.id,
+          code: "TASK-001",
+          title: "Xây dựng trang Weekly Evaluation",
+          description: "Thiết kế và code giao diện trang Weekly Evaluation với 12 tiêu chí xếp loại.",
+          deadline: new Date(reportDate2.getTime() + 24 * 60 * 60 * 1000),
+          priority: "HIGH",
+          createdBy: leaderUser.id,
+        },
+      });
+
+      const assignment = await prisma.taskAssignment.create({
+        data: {
+          taskId: task.id,
+          internId: mockIntern.id,
+          assignedBy: leaderUser.id,
+          status: "DONE",
+        },
+      });
+
+      await prisma.taskSubmission.create({
+        data: {
+          assignmentId: assignment.id,
+          attempt: 1,
+          prLink: "https://github.com/NexCampus/FE/pull/42",
+          videoDemo: "https://youtube.com/watch?v=demo",
+          note: "Em đã hoàn thành giao diện 12 tiêu chí theo đúng thiết kế.",
+          reviewStatus: "APPROVED",
+          reviewComment: "Giao diện rất đẹp, code sạch sẽ, tính toán điểm chuẩn xác.",
+          reviewedBy: leaderUser.id,
+          reviewedAt: new Date(),
+        },
+      });
+      console.log("✓ Created mock tasks, assignment, and submissions");
+    }
+  }
+
   console.log("Seed completed successfully");
 }
 
