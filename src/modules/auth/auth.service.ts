@@ -232,16 +232,6 @@ export class AuthService {
       );
     }
 
-    if (userId) {
-      const user = await this.repository.findById(userId);
-      if (user) {
-        await this.activityLogService.log(
-          userId,
-          ACTIVITY_ACTIONS.LOGOUT,
-          `Người dùng ${user.fullName || user.email} đã đăng xuất`
-        );
-      }
-    }
   }
 
   async getMe(userId: string): Promise<MeDto> {
@@ -499,12 +489,6 @@ export class AuthService {
       }
 
       await this.repository.deleteAllUserRefreshTokens(decoded.id);
-
-      await this.activityLogService.log(
-        decoded.id,
-        ACTIVITY_ACTIONS.LOGOUT,
-        "Người dùng đã khóa và thu hồi tất cả phiên đăng nhập từ thông báo bảo mật email."
-      );
     } catch (error) {
       if (error instanceof AppError) throw error;
       throw new AppError("Thẻ xác thực khóa phiên không hợp lệ hoặc đã hết hạn", 400, ERROR_CODE.TOKEN_INVALID);
