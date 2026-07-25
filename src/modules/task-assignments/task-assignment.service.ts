@@ -12,8 +12,7 @@ import { ROLES } from "../../common/constants/role.constant";
 import { NotificationDispatcher } from "../notifications/notification.dispatcher";
 import { ActivityLogService } from "../activity-logs/activity-log.service";
 import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
-import { prisma } from "../../database/prisma.client";
-import { ASSIGNMENT_STATUS } from "../../common/constants/status.constant";
+import { AssignmentStatus } from "@prisma/client";
 
 interface UserPayload {
   id: string;
@@ -89,15 +88,15 @@ export class TaskAssignmentService {
     }
 
     // 5. Determine approval workflow status
-    let status: any = ASSIGNMENT_STATUS.TODO;
+    let status: AssignmentStatus = AssignmentStatus.TODO;
     if (actorRole !== ROLES.ADMIN && intern.leaderId !== assignedBy) {
-      status = ASSIGNMENT_STATUS.PENDING_APPROVAL;
+      status = AssignmentStatus.PENDING_APPROVAL;
     }
 
-    const result = await this.repository.create(data, assignedBy, status as any);
+    const result = await this.repository.create(data, assignedBy, status);
 
     // 6. Only notify if auto-approved
-    if (status === ASSIGNMENT_STATUS.TODO) {
+    if (status === AssignmentStatus.TODO) {
       await NotificationDispatcher.dispatch(intern.userId, "TASK_ASSIGNMENT", {
         taskTitle: task.title,
         deadline: new Date(task.deadline).toLocaleDateString(),
@@ -107,7 +106,7 @@ export class TaskAssignmentService {
     await this.activityLogService.log(
       assignedBy,
       ACTIVITY_ACTIONS.ASSIGN_TASK,
-      status === ASSIGNMENT_STATUS.TODO
+      status === AssignmentStatus.TODO
         ? `Leader đã giao công việc "${task.title}" cho Intern "${intern.fullName}"`
         : `Leader đã yêu cầu giao công việc "${task.title}" cho Intern "${intern.fullName}" (Chờ duyệt)`,
       result.id,
@@ -120,7 +119,7 @@ export class TaskAssignmentService {
   async approve(id: string, actorId: string, actorRole: string) {
     const assignment = await this.findById(id);
 
-    if (assignment.status !== ASSIGNMENT_STATUS.PENDING_APPROVAL) {
+    if (assignment.status !== AssignmentStatus.PENDING_APPROVAL) {
       throw new AppError(
         "Yêu cầu giao việc không ở trạng thái chờ duyệt",
         400,
@@ -138,7 +137,7 @@ export class TaskAssignmentService {
     }
 
     const result = await this.repository.update(id, {
-      status: ASSIGNMENT_STATUS.TODO as any,
+      status: AssignmentStatus.TODO,
     });
 
     // Notify the intern of the approved assignment
@@ -165,7 +164,7 @@ export class TaskAssignmentService {
   async reject(id: string, actorId: string, actorRole: string) {
     const assignment = await this.findById(id);
 
-    if (assignment.status !== ASSIGNMENT_STATUS.PENDING_APPROVAL) {
+    if (assignment.status !== AssignmentStatus.PENDING_APPROVAL) {
       throw new AppError(
         "Yêu cầu giao việc không ở trạng thái chờ duyệt",
         400,

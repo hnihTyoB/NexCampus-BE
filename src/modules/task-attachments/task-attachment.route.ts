@@ -2,7 +2,7 @@ import { Router } from "express";
 import { TaskAttachmentController } from "./task-attachment.controller";
 import { authMiddleware } from "../../middlewares/auth.middleware";
 import { requireRole } from "../../middlewares/role.middleware";
-import { uploadSingle } from "../../middlewares/upload.middleware";
+import { uploadMultiple } from "../../middlewares/upload.middleware";
 import { ROLES } from "../../common/constants/role.constant";
 
 const router = Router({ mergeParams: true });
@@ -18,8 +18,14 @@ router.post(
   "/",
   authMiddleware,
   requireRole(ROLES.ADMIN, ROLES.LEADER),
-  uploadSingle("file"),
+  uploadMultiple("file", 5),
   controller.upload,
+);
+router.post(
+  "/link",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER),
+  controller.createLink,
 );
 router.delete(
   "/:attachmentId",

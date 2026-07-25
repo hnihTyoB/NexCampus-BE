@@ -2,47 +2,67 @@ import { prisma } from "../../database/prisma.client";
 import { TaskAnalyticsDto } from "./task.dto";
 import { ASSIGNMENT_STATUS } from "../../common/constants/status.constant";
 
+function buildDateFilter(dateFrom?: string, dateTo?: string) {
+  const filter: any = {};
+  if (dateFrom) {
+    filter.gte = new Date(dateFrom);
+  }
+  if (dateTo) {
+    filter.lte = new Date(dateTo);
+  }
+  return Object.keys(filter).length > 0 ? filter : undefined;
+}
+
 export class TaskAnalyticsService {
-  private async getOverview(taskGroupId?: string) {
+  private async getOverview(taskGroupId?: string, dateFrom?: string, dateTo?: string) {
+    const createdAt = buildDateFilter(dateFrom, dateTo);
+
     const taskWhere: any = { deletedAt: null };
-    if (taskGroupId) {
-      taskWhere.taskGroupId = taskGroupId;
-    }
+    if (taskGroupId) taskWhere.taskGroupId = taskGroupId;
+    if (createdAt) taskWhere.createdAt = createdAt;
 
     const assignmentWhere: any = {
       task: { deletedAt: null },
       intern: { deletedAt: null },
     };
     if (taskGroupId) {
-      assignmentWhere.task = {
-        deletedAt: null,
-        taskGroupId: taskGroupId,
-      };
+      assignmentWhere.task = { deletedAt: null, taskGroupId: taskGroupId };
+    }
+    if (createdAt) {
+      assignmentWhere.task = { ...assignmentWhere.task, createdAt };
     }
 
-    const [totalTasks, statusGroups, priorityGroups] = await Promise.all([
-      prisma.task.count({ where: taskWhere }),
+    // Overdue: deadline < now AND not done (assignment status != DONE)
+    const overdueWhere: any = {
+      deletedAt: null,
+      deadline: { lt: new Date() },
+    };
+    if (taskGroupId) overdueWhere.taskGroupId = taskGroupId;
+    if (createdAt) overdueWhere.createdAt = createdAt;
+    // Exclude tasks that are already done
+    overdueWhere.NOT = { assignment: { status: "DONE" } };
 
-      // Đếm số task theo status của TaskAssignment
-      // Task chưa được gán sẽ không xuất hiện trong phân phối này
-      prisma.taskAssignment.groupBy({
-        by: ["status"],
-        where: assignmentWhere,
-        _count: { id: true },
-        orderBy: { status: "asc" },
-      }),
-
-      // Đếm số task theo priority của Task
-      prisma.task.groupBy({
-        by: ["priority"],
-        where: taskWhere,
-        _count: { id: true },
-        orderBy: { priority: "asc" },
-      }),
-    ]);
+    const [totalTasks, overdueTasks, statusGroups, priorityGroups] =
+      await Promise.all([
+        prisma.task.count({ where: taskWhere }),
+        prisma.task.count({ where: overdueWhere }),
+        prisma.taskAssignment.groupBy({
+          by: ["status"],
+          where: assignmentWhere,
+          _count: { id: true },
+          orderBy: { status: "asc" },
+        }),
+        prisma.task.groupBy({
+          by: ["priority"],
+          where: taskWhere,
+          _count: { id: true },
+          orderBy: { priority: "asc" },
+        }),
+      ]);
 
     return {
       totalTasks,
+      overdueTasks,
       byStatus: statusGroups.map((g) => ({
         status: g.status,
         count: g._count.id,
@@ -54,38 +74,33 @@ export class TaskAnalyticsService {
     };
   }
 
-  private async getWorkloadByIntern(taskGroupId?: string) {
+  private async getWorkloadByIntern(
+    taskGroupId?: string,
+    dateFrom?: string,
+    dateTo?: string,
+  ) {
+    const createdAt = buildDateFilter(dateFrom, dateTo);
+
     const where: any = {
       task: { deletedAt: null },
       intern: { deletedAt: null },
     };
     if (taskGroupId) {
-      where.task = {
-        deletedAt: null,
-        taskGroupId: taskGroupId,
-      };
+      where.task = { deletedAt: null, taskGroupId: taskGroupId };
+    }
+    if (createdAt) {
+      where.task = { ...where.task, createdAt };
     }
 
-    // Lấy tất cả assignments với đầy đủ thông tin
     const assignments = await prisma.taskAssignment.findMany({
       where,
       select: {
         status: true,
-        intern: {
-          select: {
-            id: true,
-            fullName: true,
-          },
-        },
-        task: {
-          select: {
-            estDays: true,
-          },
-        },
+        intern: { select: { id: true, fullName: true } },
+        task: { select: { estDays: true } },
       },
     });
 
-    // Group by internId trong application layer
     const internMap = new Map<
       string,
       {
@@ -108,7 +123,6 @@ export class TaskAnalyticsService {
           statusCount: new Map(),
         });
       }
-
       const entry = internMap.get(key)!;
       entry.totalTasks++;
       entry.totalEstDays += a.task.estDays ?? 0;
@@ -122,34 +136,32 @@ export class TaskAnalyticsService {
       internId: entry.internId,
       internFullName: entry.internFullName,
       totalTasks: entry.totalTasks,
-      totalEstDays: Math.round(entry.totalEstDays * 100) / 100, // làm tròn 2 chữ số
+      totalEstDays: Math.round(entry.totalEstDays * 100) / 100,
       byStatus: Array.from(entry.statusCount.entries()).map(
         ([status, count]) => ({ status, count }),
       ),
     }));
   }
 
-  private async getProgressByPhase(taskGroupId?: string) {
-    const where: any = {
-      deletedAt: null,
-      phase: { not: null },
-    };
-    if (taskGroupId) {
-      where.taskGroupId = taskGroupId;
-    }
+  private async getProgressByPhase(
+    taskGroupId?: string,
+    dateFrom?: string,
+    dateTo?: string,
+  ) {
+    const createdAt = buildDateFilter(dateFrom, dateTo);
 
-    // Lấy tất cả task có phase
+    const where: any = { deletedAt: null, phase: { not: null } };
+    if (taskGroupId) where.taskGroupId = taskGroupId;
+    if (createdAt) where.createdAt = createdAt;
+
     const tasks = await prisma.task.findMany({
       where,
       select: {
         phase: true,
-        assignment: {
-          select: { status: true },
-        },
+        assignment: { select: { status: true } },
       },
     });
 
-    // Group by phase
     const phaseMap = new Map<
       string,
       { totalTasks: number; doneTasks: number }
@@ -160,16 +172,13 @@ export class TaskAnalyticsService {
       if (!phaseMap.has(phase)) {
         phaseMap.set(phase, { totalTasks: 0, doneTasks: 0 });
       }
-
       const entry = phaseMap.get(phase)!;
       entry.totalTasks++;
-
       if (task.assignment?.status === ASSIGNMENT_STATUS.DONE) {
         entry.doneTasks++;
       }
     }
 
-    // Sắp xếp theo tên phase
     return Array.from(phaseMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([phase, data]) => ({
@@ -183,11 +192,15 @@ export class TaskAnalyticsService {
       }));
   }
 
-  async getAll(taskGroupId?: string): Promise<TaskAnalyticsDto> {
+  async getAll(
+    taskGroupId?: string,
+    dateFrom?: string,
+    dateTo?: string,
+  ): Promise<TaskAnalyticsDto> {
     const [overview, workloadByIntern, progressByPhase] = await Promise.all([
-      this.getOverview(taskGroupId),
-      this.getWorkloadByIntern(taskGroupId),
-      this.getProgressByPhase(taskGroupId),
+      this.getOverview(taskGroupId, dateFrom, dateTo),
+      this.getWorkloadByIntern(taskGroupId, dateFrom, dateTo),
+      this.getProgressByPhase(taskGroupId, dateFrom, dateTo),
     ]);
 
     return { overview, workloadByIntern, progressByPhase };

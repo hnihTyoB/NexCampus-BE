@@ -8,7 +8,8 @@ export class TaskAttachmentController {
 
   upload = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!req.file) {
+      const files = req.files as Express.Multer.File[] | undefined;
+      if (!files || files.length === 0) {
         throw new AppError(
           "No file uploaded",
           400,
@@ -19,13 +20,16 @@ export class TaskAttachmentController {
       const { taskId } = req.params;
       const uploadedBy = req.user.id;
 
-      const attachment = await this.service.uploadAttachment(
-        taskId,
-        uploadedBy,
-        req.file,
+      const results = await Promise.allSettled(
+        files.map((file) => this.service.uploadAttachment(taskId, uploadedBy, file)),
       );
 
-      res.status(201).json({ success: true, data: attachment });
+      const data = results
+        .filter((r) => r.status === "fulfilled")
+        .map((r) => (r as PromiseFulfilledResult<unknown>).value);
+      const failedCount = results.filter((r) => r.status === "rejected").length;
+
+      res.status(201).json({ success: true, data, failedCount });
     } catch (error) {
       next(error);
     }
@@ -49,6 +53,33 @@ export class TaskAttachmentController {
       await this.service.deleteAttachment(attachmentId);
 
       res.json({ success: true, message: "Attachment deleted successfully" });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  createLink = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { taskId } = req.params;
+      const { fileName, fileUrl } = req.body;
+      const uploadedBy = req.user.id;
+
+      if (!fileName || !fileUrl) {
+        throw new AppError(
+          "fileName and fileUrl are required",
+          400,
+          ERROR_CODE.VALIDATION_ERROR,
+        );
+      }
+
+      const attachment = await this.service.createLinkAttachment(
+        taskId,
+        uploadedBy,
+        fileName,
+        fileUrl,
+      );
+
+      res.status(201).json({ success: true, data: attachment });
     } catch (error) {
       next(error);
     }

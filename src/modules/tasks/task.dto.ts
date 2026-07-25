@@ -11,6 +11,8 @@ export interface TaskQueryDto {
   deadlineFrom?: string;
   deadlineTo?: string;
   taskGroupId?: string;
+  status?: string;
+  statusNot?: string;
   sortBy?: "createdAt" | "title" | "deadline" | "priority";
   order?: "asc" | "desc";
   page?: number;
@@ -70,6 +72,7 @@ export interface ImportTaskRowDto {
   acceptanceCriteria?: string;
   taskNotes?: string;
   dependencyCodes: string[];   // ["BE1-01", "BE1-02"] từ cột Dependency
+  attachmentUrls?: string[];   // ["https://..."] từ cột Attachments
 }
 
 /**
@@ -91,6 +94,7 @@ export interface ImportResultDto {
   importedTasks: number;
   importedAssignments: number;
   importedDependencies: number;
+  importedAttachments: number;
   skippedCodes: string[];       // Các task đã tồn tại (theo code) → upsert bỏ qua
   errorRows: { excelCode?: string; error: string }[];
   taskGroupId?: string;
@@ -127,6 +131,7 @@ export interface PhaseProgressDto {
 export interface TaskAnalyticsDto {
   overview: {
     totalTasks: number;
+    overdueTasks: number;
     byStatus: TaskStatusDistributionDto[];
     byPriority: TaskPriorityDistributionDto[];
   };

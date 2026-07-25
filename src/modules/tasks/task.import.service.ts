@@ -11,6 +11,7 @@ import { ERROR_CODE } from "../../common/errors/error-code";
 import { ActivityLogService } from "../activity-logs/activity-log.service";
 import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
 import { NotificationDispatcher } from "../notifications/notification.dispatcher";
+import { TaskAttachmentRepository } from "../task-attachments/task-attachment.repository";
 import { TASK_PRIORITY, ASSIGNMENT_STATUS } from "../../common/constants/status.constant";
 
 const PRIORITY_MAP: Record<string, TaskPriority> = {
@@ -69,6 +70,14 @@ function parseExcelDate(value: unknown): string | undefined {
 }
 
 function parseDependencies(raw: unknown): string[] {
+  if (!raw || typeof raw !== "string") return [];
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+function parseAttachments(raw: unknown): string[] {
   if (!raw || typeof raw !== "string") return [];
   return raw
     .split(",")
@@ -177,6 +186,7 @@ function parseTaskSheet(
         : undefined,
       taskNotes: row["Notes"] ? String(row["Notes"]).trim() : undefined,
       dependencyCodes: parseDependencies(row["Dependency"]),
+      attachmentUrls: parseAttachments(row["Attachments"]),
 
       ...(STATUS_MAP[rawStatus] ? { _status: STATUS_MAP[rawStatus] } : {}),
     } as ImportTaskRowDto & { _status?: string });
@@ -187,6 +197,7 @@ function parseTaskSheet(
 
 export class TaskImportService {
   private readonly activityLogService = new ActivityLogService();
+  private readonly attachmentRepo = new TaskAttachmentRepository();
 
   async preview(
     buffer: Buffer,
@@ -500,6 +511,29 @@ export class TaskImportService {
       }
     }
 
+    // Create link attachments from Attachments column
+    let importedAttachments = 0;
+    for (const row of validRows) {
+      if (!row.attachmentUrls || row.attachmentUrls.length === 0) continue;
+      const taskId = codeToDbId.get(row.excelCode);
+      if (!taskId) continue;
+
+      for (const url of row.attachmentUrls) {
+        try {
+          const fileName = url.split("/").pop()?.split("?")[0] || "attachment";
+          await this.attachmentRepo.createLink({
+            taskId,
+            fileName,
+            fileUrl: url,
+            uploadedBy: createdBy,
+          });
+          importedAttachments++;
+        } catch {
+          // Không fail import vì lỗi attachment
+        }
+      }
+    }
+
     await this.activityLogService.log(
       createdBy,
       ACTIVITY_ACTIONS.BULK_IMPORT_TASKS,
@@ -512,6 +546,7 @@ export class TaskImportService {
       importedTasks,
       importedAssignments,
       importedDependencies,
+      importedAttachments,
       skippedCodes,
       errorRows: [
         ...errorRows.map((r) => ({

@@ -139,7 +139,9 @@ export class TaskController {
   getAnalytics = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const taskGroupId = (req.query.taskGroupId || req.body.taskGroupId) as string | undefined;
-      const result = await this.analyticsService.getAll(taskGroupId);
+      const dateFrom = req.query.dateFrom as string | undefined;
+      const dateTo = req.query.dateTo as string | undefined;
+      const result = await this.analyticsService.getAll(taskGroupId, dateFrom, dateTo);
       res.json({ success: true, data: result });
     } catch (error) {
       next(error);

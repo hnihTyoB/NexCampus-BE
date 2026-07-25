@@ -67,4 +67,22 @@ export class TaskAttachmentService {
   async findByTaskId(taskId: string) {
     return this.attachmentRepo.findByTaskId(taskId);
   }
+
+  async createLinkAttachment(
+    taskId: string,
+    uploadedBy: string,
+    fileName: string,
+    fileUrl: string,
+  ) {
+    const task = await this.taskRepo.findById(taskId);
+    if (!task) {
+      throw new AppError("Task not found", 404, ERROR_CODE.NOT_FOUND);
+    }
+    return this.attachmentRepo.createLink({
+      taskId,
+      fileName,
+      fileUrl,
+      uploadedBy,
+    });
+  }
 }
