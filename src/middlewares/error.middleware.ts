@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import multer from "multer";
 import { AppError } from "../common/errors/app-error";
 import { ERROR_CODE } from "../common/errors/error-code";
 
@@ -27,6 +28,16 @@ export function errorMiddleware(
       success: false,
       message: error.message,
       code: error.code,
+    });
+    return;
+  }
+
+  // Handle Multer upload errors
+  if (error instanceof multer.MulterError) {
+    res.status(400).json({
+      success: false,
+      message: `Lỗi tải lên tệp: ${error.message} (Mã lỗi: ${error.code})`,
+      code: "FILE_UPLOAD_ERROR",
     });
     return;
   }

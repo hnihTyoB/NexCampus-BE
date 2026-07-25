@@ -9,9 +9,9 @@ import { ROLES } from "../../common/constants/role.constant";
 const router = Router();
 const controller = new TaskGroupController();
 
-// Public read
-router.get("/", controller.findAll);
-router.get("/:id", controller.findById);
+// Public read (requires auth)
+router.get("/", authMiddleware, controller.findAll);
+router.get("/:id", authMiddleware, controller.findById);
 
 // Admin / Leader write
 router.post(

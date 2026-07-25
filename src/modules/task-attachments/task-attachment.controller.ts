@@ -38,7 +38,7 @@ export class TaskAttachmentController {
   findByTask = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { taskId } = req.params;
-      const attachments = await this.service.findByTaskId(taskId);
+      const attachments = await this.service.findByTaskId(taskId, req.user.id, req.user.role);
 
       res.json({ success: true, data: attachments });
     } catch (error) {
@@ -50,7 +50,7 @@ export class TaskAttachmentController {
     try {
       const { attachmentId } = req.params;
 
-      await this.service.deleteAttachment(attachmentId);
+      await this.service.deleteAttachment(attachmentId, req.user.id, req.user.role);
 
       res.json({ success: true, message: "Attachment deleted successfully" });
     } catch (error) {

@@ -3,9 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // 1. Role
@@ -245,7 +244,7 @@ model Task {
   createdAt          DateTime     @default(now()) @map("created_at")
   updatedAt          DateTime     @updatedAt @map("updated_at")
 
-  taskGroup   TaskGroup?       @relation(fields: [taskGroupId], references: [id], onDelete: Cascade)
+  taskGroup   TaskGroup?       @relation(fields: [taskGroupId], references: [id], onDelete: SetNull)
   creator     User             @relation("CreatedTasks", fields: [createdBy], references: [id], onDelete: Cascade)
   assignment  TaskAssignment?
   attachments TaskAttachment[]

@@ -196,8 +196,18 @@ export class TaskAssignmentService {
     id: string,
     data: UpdateTaskAssignmentDto,
     actorId: string,
+    actorRole: string,
   ) {
     const assignment = await this.findById(id);
+
+    // Only Admin or the direct Leader of the intern is allowed to update
+    if (actorRole !== ROLES.ADMIN && assignment.intern.leaderId !== actorId) {
+      throw new AppError(
+        "Bạn không có quyền cập nhật phân công này",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
+    }
 
     if (data.internId !== undefined) {
       // Check if updated Intern exists and is not soft-deleted
@@ -261,8 +271,18 @@ export class TaskAssignmentService {
     return result;
   }
 
-  async delete(id: string, actorId: string) {
+  async delete(id: string, actorId: string, actorRole: string) {
     const assignment = await this.findById(id);
+
+    // Only Admin or the direct Leader of the intern is allowed to delete
+    if (actorRole !== ROLES.ADMIN && assignment.intern.leaderId !== actorId) {
+      throw new AppError(
+        "Bạn không có quyền hủy phân công này",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
+    }
+
     const result = await this.repository.delete(id);
 
     await this.activityLogService.log(
