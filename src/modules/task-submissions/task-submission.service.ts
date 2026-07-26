@@ -155,12 +155,22 @@ export class TaskSubmissionService {
         reviewStatus: REVIEW_STATUS.PENDING,
       };
 
-      const result = await this.repository.update(id, internData);
+      // Create a new submission version (preserve history)
+      const count = await this.repository.countAttempts(submission.assignmentId);
+      const result = await this.repository.create(
+        {
+          assignmentId: submission.assignmentId,
+          prLink: internData.prLink ?? undefined,
+          videoDemo: internData.videoDemo ?? undefined,
+          note: internData.note ?? undefined,
+        },
+        count + 1,
+      );
 
       await this.activityLogService.log(
         user.id,
         ACTIVITY_ACTIONS.UPDATE_SUBMISSION,
-        `Intern "${submission.assignment.intern.fullName || user.email}" cập nhật bài giải lần ${submission.attempt} cho Task: "${submission.assignment.task.title}"`,
+        `Intern "${submission.assignment.intern.fullName || user.email}" nộp bài giải lần ${count + 1} cho Task: "${submission.assignment.task.title}"`,
         result.id,
         "TaskSubmission",
       );

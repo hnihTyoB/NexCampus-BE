@@ -11,6 +11,7 @@ const defaultSelect = {
   taskId: true,
   internId: true,
   assignedBy: true,
+  supportId: true,
   status: true,
   assignedAt: true,
   updatedAt: true,
@@ -65,6 +66,12 @@ const defaultSelect = {
     select: {
       id: true,
       email: true,
+      fullName: true,
+    },
+  },
+  support: {
+    select: {
+      id: true,
       fullName: true,
     },
   },
