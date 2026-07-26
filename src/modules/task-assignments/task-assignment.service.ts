@@ -62,8 +62,10 @@ export class TaskAssignmentService {
       throw new AppError("Task not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
-    // 2. Check Task Deadline
-    if (new Date(task.deadline) < new Date()) {
+    // 2. Check Task Deadline (compare date-only, allow today)
+    const deadlineDay = new Date(task.deadline);
+    deadlineDay.setHours(23, 59, 59, 999);
+    if (deadlineDay < new Date()) {
       throw new AppError(
         "Task past deadline cannot be assigned",
         400,

@@ -5,6 +5,7 @@ export interface TaskAssignmentQueryDto {
   internId?: string;
   assignedBy?: string;
   status?: AssignmentStatus;
+  leaderId?: string;
   sortBy?: "assignedAt" | "status";
   order?: "asc" | "desc";
   page?: number;

@@ -41,6 +41,15 @@ const defaultSelect = {
       intern: { select: { id: true, fullName: true } },
     },
   },
+  recreatedTaskId: true,
+  recreatedTask: {
+    select: {
+      id: true, title: true, code: true,
+      assignment: {
+        select: { intern: { select: { fullName: true } } },
+      },
+    },
+  },
   attachments: {
     select: {
       id: true,
@@ -180,6 +189,9 @@ export class TaskRepository {
           : {}),
         ...(data.taskNotes !== undefined ? { taskNotes: data.taskNotes } : {}),
         ...(data.taskGroupId !== undefined ? { taskGroupId: data.taskGroupId } : {}),
+        ...(data.recreatedTaskId !== undefined
+          ? { recreatedTaskId: data.recreatedTaskId }
+          : {}),
       },
       select: defaultSelect,
     });

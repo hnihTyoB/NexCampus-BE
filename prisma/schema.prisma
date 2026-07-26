@@ -250,6 +250,10 @@ model Task {
   assignment  TaskAssignment?
   attachments TaskAttachment[]
 
+  recreatedTaskId String? @map("recreated_task_id") @db.Uuid
+  recreatedTask   Task?   @relation("TaskRecreation", fields: [recreatedTaskId], references: [id])
+  recreatedFrom   Task[]  @relation("TaskRecreation")
+
   dependencies Task[] @relation("TaskDependencies")
   dependsOn    Task[] @relation("TaskDependencies")
 

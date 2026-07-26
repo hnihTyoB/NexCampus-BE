@@ -17,6 +17,7 @@ const defaultSelect = {
   task: {
     select: {
       id: true,
+      code: true,
       title: true,
       description: true,
       deadline: true,
@@ -24,6 +25,15 @@ const defaultSelect = {
       createdBy: true,
       createdAt: true,
       updatedAt: true,
+      recreatedTaskId: true,
+      recreatedTask: {
+        select: {
+          id: true, title: true, code: true,
+          assignment: {
+            select: { intern: { select: { fullName: true } } },
+          },
+        },
+      },
     },
   },
   intern: {
@@ -66,6 +76,7 @@ export class TaskAssignmentRepository {
       taskId,
       internId,
       assignedBy,
+      leaderId,
       status,
       sortBy = "assignedAt",
       order = "desc",
@@ -79,6 +90,7 @@ export class TaskAssignmentRepository {
       ...(taskId ? { taskId } : {}),
       ...(internId ? { internId } : {}),
       ...(assignedBy ? { assignedBy } : {}),
+      ...(leaderId ? { intern: { leaderId } } : {}),
       ...(status ? { status } : {}),
     };
 
