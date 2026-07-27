@@ -10,7 +10,8 @@ import {
   UpdateTaskSubmissionDto,
 } from "./task-submission.dto";
 import { ROLES } from "../../common/constants/role.constant";
-import { REVIEW_STATUS } from "../../common/constants/status.constant";
+import { REVIEW_STATUS, ASSIGNMENT_STATUS } from "../../common/constants/status.constant";
+import { prisma } from "../../database/prisma.client";
 import { NotificationDispatcher } from "../notifications/notification.dispatcher";
 import { StorageService } from "../../common/services/storage.service";
 import { envConfig } from "../../config/env.config";
@@ -85,6 +86,19 @@ export class TaskSubmissionService {
     const attempt = count + 1;
 
     const result = await this.repository.create(data, attempt);
+
+    // Auto-update assignment status to REVIEW when intern submits
+    if (assignment.status === ASSIGNMENT_STATUS.TODO || assignment.status === ASSIGNMENT_STATUS.IN_PROGRESS) {
+      try {
+        await prisma.taskAssignment.update({
+          where: { id: assignment.id },
+          data: { status: "REVIEW" as any },
+        });
+        console.log(`[Submission] Auto-updated assignment ${assignment.id} status to REVIEW`);
+      } catch (err) {
+        console.error("[Submission] Failed to auto-update assignment status:", err);
+      }
+    }
 
     // Notify the assigner (leader/admin)
     await NotificationDispatcher.dispatch(

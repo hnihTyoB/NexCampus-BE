@@ -33,6 +33,9 @@ export class TemplateEmailHelper {
     const subject = interpolate(rawSubject, params);
     const content = interpolate(rawContent, params);
 
-    return EmailService.sendMail(to, subject, content);
+    console.log(`[TemplateEmailHelper] Sending email — to: ${to}, subject: ${subject}`);
+    const result = await EmailService.sendMail(to, subject, content);
+    console.log(`[TemplateEmailHelper] sendMail result: ${result}`);
+    return result;
   }
 }

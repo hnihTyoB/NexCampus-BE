@@ -32,7 +32,7 @@ export class EmailService {
     }
 
     try {
-      await this.transporter.sendMail({
+      const info = await this.transporter.sendMail({
         from: envConfig.email.from,
         to,
         subject,
@@ -43,6 +43,7 @@ export class EmailService {
           <small style="color:#9ca3af">Đây là email tự động, vui lòng không phản hồi.</small>
         </div>`,
       });
+      console.log("[EmailService] Email sent successfully — messageId:", info.messageId, "response:", info.response);
       return true;
     } catch (error) {
       console.error("[EmailService] Failed to send email to:", to, error);

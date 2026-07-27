@@ -183,15 +183,28 @@ export class TaskAssignmentService {
       );
     }
 
-    await this.repository.delete(id);
+    const result = await this.repository.update(id, {
+      status: AssignmentStatus.BLOCKED,
+    });
+
+    await NotificationDispatcher.dispatch(
+      assignment.assignedBy,
+      "TASK_ASSIGNMENT_REJECTED",
+      {
+        taskTitle: assignment.task.title,
+        internName: assignment.intern.fullName,
+      },
+    );
 
     await this.activityLogService.log(
       actorId,
-      ACTIVITY_ACTIONS.DELETE_ASSIGNMENT,
-      `Leader đã từ chối yêu cầu giao công việc "${assignment.task.title}" cho Intern "${assignment.intern.fullName}"`,
+      ACTIVITY_ACTIONS.UPDATE_ASSIGNMENT,
+      `Leader đã từ chối yêu cầu giao công việc "${assignment.task.title}" cho Intern "${assignment.intern.fullName}" (chuyển sang BLOCKED)`,
       id,
       "TaskAssignment",
     );
+
+    return result;
   }
 
   async update(

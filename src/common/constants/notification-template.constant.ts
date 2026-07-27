@@ -46,6 +46,13 @@ export const TEMPLATE_DEFAULTS: Record<string, TemplateDefault> = {
     emailSubjectTemplate: null,
     emailContentTemplate: null,
   },
+  TASK_ASSIGNMENT_REJECTED: {
+    titleTemplate: "Yêu cầu giao việc bị từ chối",
+    contentTemplate:
+      'Yêu cầu giao việc "{{taskTitle}}" cho {{internName}} đã bị từ chối bởi leader quản lý.',
+    emailSubjectTemplate: null,
+    emailContentTemplate: null,
+  },
   EVALUATION_REMINDER: {
     titleTemplate: "Nhắc nhở đánh giá thực tập sinh",
     contentTemplate:
