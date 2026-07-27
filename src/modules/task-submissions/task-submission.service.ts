@@ -206,6 +206,18 @@ export class TaskSubmissionService {
       // Set the reviewedBy property using repository's method
       const result = await this.repository.update(id, reviewData, user.id);
 
+      if (reviewData.reviewStatus === REVIEW_STATUS.APPROVED) {
+        await prisma.taskAssignment.update({
+          where: { id: submission.assignmentId },
+          data: { status: ASSIGNMENT_STATUS.DONE },
+        });
+      } else if (reviewData.reviewStatus === REVIEW_STATUS.REJECTED) {
+        await prisma.taskAssignment.update({
+          where: { id: submission.assignmentId },
+          data: { status: ASSIGNMENT_STATUS.TODO },
+        });
+      }
+
       // Notify the intern of the review status update
       await NotificationDispatcher.dispatch(
         submission.assignment.intern.userId,
