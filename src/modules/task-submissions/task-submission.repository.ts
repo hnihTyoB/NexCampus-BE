@@ -194,4 +194,49 @@ export class TaskSubmissionRepository {
       where: { id },
     });
   }
+
+  findByAssignmentId(assignmentId: string) {
+    return prisma.taskSubmission.findMany({
+      where: {
+        assignmentId,
+        assignment: {
+          task: { deletedAt: null },
+          intern: { deletedAt: null },
+        },
+      },
+      select: {
+        id: true,
+        attempt: true,
+        prLink: true,
+        videoDemo: true,
+        note: true,
+        reviewStatus: true,
+        reviewComment: true,
+        reviewedAt: true,
+        submittedAt: true,
+        updatedAt: true,
+        reviewer: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+          },
+        },
+        attachments: {
+          select: {
+            id: true,
+            fileName: true,
+            fileUrl: true,
+            filePath: true,
+            mimeType: true,
+            fileSize: true,
+            uploadedBy: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "asc" as const },
+        },
+      },
+      orderBy: { attempt: "asc" as const },
+    });
+  }
 }

@@ -23,6 +23,12 @@ router.get(
   controller.findAll,
 );
 router.get(
+  "/thread/:assignmentId",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER, ROLES.INTERN),
+  controller.getThread,
+);
+router.get(
   "/:id",
   authMiddleware,
   requireRole(ROLES.ADMIN, ROLES.LEADER, ROLES.INTERN),

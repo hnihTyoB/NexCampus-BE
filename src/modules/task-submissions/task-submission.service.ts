@@ -59,6 +59,30 @@ export class TaskSubmissionService {
     return submission;
   }
 
+  async getThread(assignmentId: string) {
+    const assignment = await this.assignmentRepository.findById(assignmentId);
+    if (!assignment) {
+      throw new AppError(
+        "Task assignment not found",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
+
+    const submissions = await this.repository.findByAssignmentId(assignmentId);
+
+    return {
+      assignment: {
+        id: assignment.id,
+        status: assignment.status,
+        task: assignment.task,
+        intern: assignment.intern,
+        assigner: assignment.assigner,
+      },
+      thread: submissions,
+    };
+  }
+
   async create(data: CreateTaskSubmissionDto, user: UserPayload) {
     // 1. Find assignment
     const assignment = await this.assignmentRepository.findById(
@@ -180,6 +204,21 @@ export class TaskSubmissionService {
         },
         count + 1,
       );
+
+      // Auto-update assignment status to REVIEW on re-submit
+      if (
+        submission.assignment.status === ASSIGNMENT_STATUS.TODO ||
+        submission.assignment.status === ASSIGNMENT_STATUS.IN_PROGRESS
+      ) {
+        try {
+          await prisma.taskAssignment.update({
+            where: { id: submission.assignmentId },
+            data: { status: ASSIGNMENT_STATUS.REVIEW },
+          });
+        } catch (err) {
+          console.error("[Submission] Failed to auto-update assignment status on re-submit:", err);
+        }
+      }
 
       await this.activityLogService.log(
         user.id,

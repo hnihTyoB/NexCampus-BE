@@ -32,6 +32,16 @@ export class TaskSubmissionController {
     }
   };
 
+  getThread = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.service.getThread(req.params.assignmentId);
+
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   create = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = req.user;
