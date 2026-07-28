@@ -49,11 +49,11 @@ export class InternService {
       await validatePhoneUniqueness(data.phone, { internId: id });
     }
 
-    // If dropping, deactivate user account
-    if (data.status === INTERN_STATUS.DROPPED && intern.userId) {
+    // Sync user.isActive with intern status
+    if (data.status !== undefined && intern.userId) {
       await prisma.user.update({
         where: { id: intern.userId },
-        data: { isActive: false },
+        data: { isActive: data.status !== INTERN_STATUS.DROPPED },
       });
     }
 

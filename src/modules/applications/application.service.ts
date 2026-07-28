@@ -61,11 +61,19 @@ export class ApplicationService {
 
     const applyUrl = `${appConfig.baseUrl}/onboarding/${token}/policies`;
 
-    await TemplateEmailHelper.send(
+    const emailSent = await TemplateEmailHelper.send(
       data.email,
       NOTIFICATION_TYPE.APPLICATION_INVITE,
       { applyUrl }
     );
+
+    if (!emailSent) {
+      throw new AppError(
+        "Failed to send invitation email. Please check SMTP configuration.",
+        500,
+        ERROR_CODE.INTERNAL_SERVER_ERROR,
+      );
+    }
 
     await this.activityLogService.log(
       actorId,

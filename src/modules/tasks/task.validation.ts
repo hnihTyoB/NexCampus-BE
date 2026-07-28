@@ -65,4 +65,5 @@ export const updateTaskSchema = z.object({
   acceptanceCriteria: z.string().nullable().optional(),
   taskNotes: z.string().nullable().optional(),
   taskGroupId: z.string().uuid().nullable().optional(),
+  recreatedTaskId: z.string().uuid().nullable().optional(),
 });

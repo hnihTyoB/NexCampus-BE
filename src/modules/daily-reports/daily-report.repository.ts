@@ -76,7 +76,13 @@ export class DailyReportRepository {
         ? {
             createdAt: {
               ...(createdAtFrom ? { gte: new Date(createdAtFrom) } : {}),
-              ...(createdAtTo ? { lte: new Date(createdAtTo) } : {}),
+              ...(createdAtTo
+                ? {
+                    lt: new Date(
+                      new Date(createdAtTo).getTime() + 24 * 60 * 60 * 1000,
+                    ),
+                  }
+                : {}),
             },
           }
         : {}),

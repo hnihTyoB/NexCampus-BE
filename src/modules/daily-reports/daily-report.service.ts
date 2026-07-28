@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { Prisma } from "@prisma/client";
 import { DailyReportRepository } from "./daily-report.repository";
 import { InternRepository } from "../interns/intern.repository";
 import { AppError } from "../../common/errors/app-error";
@@ -57,7 +58,22 @@ export class DailyReportService {
       throw new AppError("Intern profile not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
-    const result = await this.repository.create(data, intern.id);
+    let result;
+    try {
+      result = await this.repository.create(data, intern.id);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new AppError(
+          "You have already submitted a daily report for today",
+          409,
+          ERROR_CODE.DUPLICATE_ENTRY,
+        );
+      }
+      throw error;
+    }
 
     // Notify the leader of the new daily report
     if (intern.leaderId) {

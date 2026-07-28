@@ -36,7 +36,7 @@ router.post(
 router.put(
   "/:id",
   authMiddleware,
-  requireRole(ROLES.ADMIN, ROLES.LEADER),
+  requireRole(ROLES.ADMIN, ROLES.LEADER, ROLES.INTERN),
   validate(updateAssignmentSchema),
   controller.update,
 );

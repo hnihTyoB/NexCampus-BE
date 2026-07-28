@@ -34,14 +34,7 @@ export class StatsService {
   }
 
   async getLeaderStats(user: UserPayload): Promise<LeaderStatsResponseDto> {
-    const now = Date.now();
-    const cached = this.leaderStatsCacheMap.get(user.id);
-    if (cached && cached.expiresAt > now) {
-      return cached.data;
-    }
-    const data = await this.repository.getLeaderStats(user.id);
-    this.leaderStatsCacheMap.set(user.id, { data, expiresAt: now + this.TTL_MS });
-    return data;
+    return this.repository.getLeaderStats(user.id);
   }
 
   async getInternStats(user: UserPayload): Promise<InternPersonalStatsDto> {

@@ -5,6 +5,7 @@ export const findAllAssignmentSchema = z.object({
   taskId: z.string().uuid().optional(),
   internId: z.string().uuid().optional(),
   assignedBy: z.string().uuid().optional(),
+  leaderId: z.string().uuid().optional(),
   status: z
     .enum([
       ASSIGNMENT_STATUS.PENDING_APPROVAL,
@@ -18,7 +19,7 @@ export const findAllAssignmentSchema = z.object({
   sortBy: z.enum(["assignedAt", "status"]).optional(),
   order: z.enum(["asc", "desc"]).optional(),
   page: z.coerce.number().int().positive().optional().default(1),
-  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+  limit: z.coerce.number().int().min(1).max(500).optional().default(20),
 });
 
 export const createAssignmentSchema = z.object({

@@ -10,7 +10,8 @@ import {
   UpdateTaskSubmissionDto,
 } from "./task-submission.dto";
 import { ROLES } from "../../common/constants/role.constant";
-import { REVIEW_STATUS } from "../../common/constants/status.constant";
+import { REVIEW_STATUS, ASSIGNMENT_STATUS } from "../../common/constants/status.constant";
+import { prisma } from "../../database/prisma.client";
 import { NotificationDispatcher } from "../notifications/notification.dispatcher";
 import { StorageService } from "../../common/services/storage.service";
 import { supabaseConfig } from "../../config/supabase.config";
@@ -94,6 +95,19 @@ export class TaskSubmissionService {
 
     const result = await this.repository.create(data, attempt);
 
+    // Auto-update assignment status to REVIEW when intern submits
+    if (assignment.status === ASSIGNMENT_STATUS.TODO || assignment.status === ASSIGNMENT_STATUS.IN_PROGRESS) {
+      try {
+        await prisma.taskAssignment.update({
+          where: { id: assignment.id },
+          data: { status: "REVIEW" as any },
+        });
+        console.log(`[Submission] Auto-updated assignment ${assignment.id} status to REVIEW`);
+      } catch (err) {
+        console.error("[Submission] Failed to auto-update assignment status:", err);
+      }
+    }
+
     // Notify the assigner (leader/admin)
     await NotificationDispatcher.dispatch(
       assignment.assignedBy,
@@ -171,12 +185,22 @@ export class TaskSubmissionService {
         reviewStatus: REVIEW_STATUS.PENDING,
       };
 
-      const result = await this.repository.update(id, internData);
+      // Create a new submission version (preserve history)
+      const count = await this.repository.countAttempts(submission.assignmentId);
+      const result = await this.repository.create(
+        {
+          assignmentId: submission.assignmentId,
+          prLink: internData.prLink ?? undefined,
+          videoDemo: internData.videoDemo ?? undefined,
+          note: internData.note ?? undefined,
+        },
+        count + 1,
+      );
 
       await this.activityLogService.log(
         user.id,
         ACTIVITY_ACTIONS.UPDATE_SUBMISSION,
-        `Intern "${submission.assignment.intern.fullName || user.email}" cập nhật bài giải lần ${submission.attempt} cho Task: "${submission.assignment.task.title}"`,
+        `Intern "${submission.assignment.intern.fullName || user.email}" nộp bài giải lần ${count + 1} cho Task: "${submission.assignment.task.title}"`,
         result.id,
         "TaskSubmission",
       );
@@ -197,6 +221,18 @@ export class TaskSubmissionService {
 
       // Set the reviewedBy property using repository's method
       const result = await this.repository.update(id, reviewData, user.id);
+
+      if (reviewData.reviewStatus === REVIEW_STATUS.APPROVED) {
+        await prisma.taskAssignment.update({
+          where: { id: submission.assignmentId },
+          data: { status: ASSIGNMENT_STATUS.DONE },
+        });
+      } else if (reviewData.reviewStatus === REVIEW_STATUS.REJECTED) {
+        await prisma.taskAssignment.update({
+          where: { id: submission.assignmentId },
+          data: { status: ASSIGNMENT_STATUS.TODO },
+        });
+      }
 
       // Notify the intern of the review status update
       await NotificationDispatcher.dispatch(

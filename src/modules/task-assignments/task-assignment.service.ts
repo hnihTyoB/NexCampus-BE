@@ -62,8 +62,10 @@ export class TaskAssignmentService {
       throw new AppError("Task not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
-    // 2. Check Task Deadline
-    if (new Date(task.deadline) < new Date()) {
+    // 2. Check Task Deadline (compare date-only, allow today)
+    const deadlineDay = new Date(task.deadline);
+    deadlineDay.setHours(23, 59, 59, 999);
+    if (deadlineDay < new Date()) {
       throw new AppError(
         "Task past deadline cannot be assigned",
         400,
@@ -197,15 +199,28 @@ export class TaskAssignmentService {
       );
     }
 
-    await this.repository.delete(id);
+    const result = await this.repository.update(id, {
+      status: AssignmentStatus.BLOCKED,
+    });
+
+    await NotificationDispatcher.dispatch(
+      assignment.assignedBy,
+      "TASK_ASSIGNMENT_REJECTED",
+      {
+        taskTitle: assignment.task.title,
+        internName: assignment.intern.fullName,
+      },
+    );
 
     await this.activityLogService.log(
       actorId,
-      ACTIVITY_ACTIONS.DELETE_ASSIGNMENT,
-      `Leader đã từ chối yêu cầu giao công việc "${assignment.task.title}" cho Intern "${assignment.intern.fullName}"`,
+      ACTIVITY_ACTIONS.UPDATE_ASSIGNMENT,
+      `Leader đã từ chối yêu cầu giao công việc "${assignment.task.title}" cho Intern "${assignment.intern.fullName}" (chuyển sang BLOCKED)`,
       id,
       "TaskAssignment",
     );
+
+    return result;
   }
 
   async update(
