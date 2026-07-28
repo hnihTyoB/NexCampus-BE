@@ -43,6 +43,17 @@ function parseExcelDate(value: unknown): string | undefined {
     const trimmed = value.trim();
     if (!trimmed) return undefined;
 
+    // Nếu chuỗi là số thuần (Excel serial date bị sheet_to_json trả về dạng string),
+    // parse như Excel serial date thay vì parse như date string (tránh bị hiểu nhầm là year)
+    if (/^\d+$/.test(trimmed)) {
+      const date = XLSX.SSF.parse_date_code(Number(trimmed));
+      if (date) {
+        const d = new Date(Date.UTC(date.y, date.m - 1, date.d));
+        return d.toISOString();
+      }
+      return undefined;
+    }
+
     // Thử parse trực tiếp (ISO hoặc locale string)
     const direct = new Date(trimmed);
     if (!isNaN(direct.getTime())) return direct.toISOString();
@@ -268,33 +279,7 @@ export class TaskImportService {
   ): Promise<ImportResultDto> {
     const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
 
-    let resolvedGroupId: string;
-    let resolvedGroupName: string;
-
-    if (taskGroupId) {
-      const tg = await prisma.taskGroup.findUnique({
-        where: { id: taskGroupId },
-      });
-      if (!tg) {
-        throw new AppError(
-          "Không tìm thấy Nhóm công việc với ID đã cung cấp",
-          404,
-          ERROR_CODE.NOT_FOUND,
-        );
-      }
-      resolvedGroupId = tg.id;
-      resolvedGroupName = tg.name;
-    } else {
-      const name = (taskGroupName && taskGroupName.trim()) || "Nhóm công việc mặc định";
-      const tg = await prisma.taskGroup.upsert({
-        where: { name },
-        update: {},
-        create: { name },
-      });
-      resolvedGroupId = tg.id;
-      resolvedGroupName = tg.name;
-    }
-
+    // Parse and validate BEFORE creating the task group
     const ownerNameMap = parseListsSheet(workbook);
     const { validRows, errorRows } = parseTaskSheet(workbook, ownerNameMap);
 
@@ -334,10 +319,38 @@ export class TaskImportService {
     const skippedCodes: string[] = [];
     const importErrors: { excelCode?: string; error: string }[] = [];
 
+    let resolvedGroupId = "";
+    let resolvedGroupName = "";
+
     const codeToDbId = new Map<string, string>();
 
     await prisma.$transaction(
       async (tx) => {
+        // Resolve/create task group INSIDE the transaction, AFTER validation passes
+        if (taskGroupId) {
+          const tg = await tx.taskGroup.findUnique({
+            where: { id: taskGroupId },
+          });
+          if (!tg) {
+            throw new AppError(
+              "Không tìm thấy Nhóm công việc với ID đã cung cấp",
+              404,
+              ERROR_CODE.NOT_FOUND,
+            );
+          }
+          resolvedGroupId = tg.id;
+          resolvedGroupName = tg.name;
+        } else {
+          const name = (taskGroupName && taskGroupName.trim()) || "Nhóm công việc mặc định";
+          const tg = await tx.taskGroup.upsert({
+            where: { name },
+            update: {},
+            create: { name },
+          });
+          resolvedGroupId = tg.id;
+          resolvedGroupName = tg.name;
+        }
+
         for (const row of validRows) {
           try {
             const existingTask = await tx.task.findFirst({
