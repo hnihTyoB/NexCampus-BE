@@ -26,6 +26,7 @@ const defaultSelect = {
   aiComment: true,
   aiGeneratedAt: true,
   leaderEdited: true,
+  reviewedAt: true,
   createdAt: true,
   updatedAt: true,
   intern: {
@@ -179,6 +180,14 @@ export class WeeklyEvaluationRepository {
   delete(id: string) {
     return prisma.weeklyEvaluation.delete({
       where: { id },
+    });
+  }
+
+  markReviewed(id: string) {
+    return prisma.weeklyEvaluation.update({
+      where: { id },
+      data: { reviewedAt: new Date() },
+      select: defaultSelect,
     });
   }
 }

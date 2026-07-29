@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // 1. Role
@@ -429,6 +430,9 @@ model WeeklyEvaluation {
   aiComment       String?   @map("ai_comment")
   aiGeneratedAt   DateTime? @map("ai_generated_at")
   leaderEdited    Boolean   @default(false) @map("leader_edited")
+
+  // Intern xác nhận đã xem đánh giá
+  reviewedAt DateTime? @map("reviewed_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
