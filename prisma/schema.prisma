@@ -56,10 +56,10 @@ model User {
   exportHistories           ExportHistory[]        @relation("UserExports")
   leader                    Leader?
 
-  createdMeetings    Meeting[]             @relation("CreatedMeetings")
-  hostedMeetings     Meeting[]             @relation("HostedMeetings")
+  createdMeetings     Meeting[]            @relation("CreatedMeetings")
+  hostedMeetings      Meeting[]            @relation("HostedMeetings")
   meetingParticipants MeetingParticipant[]
-  reviewedAbsences   AbsenceRequest[]      @relation("ReviewedAbsences")
+  reviewedAbsences    AbsenceRequest[]     @relation("ReviewedAbsences")
 
   @@index([roleId])
   @@map("users")
@@ -679,24 +679,24 @@ enum AbsenceStatus {
 // ── Meeting Models ─────────────────────────────────────────────────────────
 
 model Meeting {
-  id           String           @id @default(uuid()) @db.Uuid
-  title        String
-  description  String?          @db.Text
-  createdBy    String           @map("created_by") @db.Uuid
-  hostId       String           @map("host_id") @db.Uuid
-  location     String?
-  meetingType  MeetingType      @map("meeting_type")
-  meetingLink  String?          @map("meeting_link")
-  startTime    DateTime         @map("start_time")
-  endTime      DateTime         @map("end_time")
-  status       MeetingStatus    @default(DRAFT)
-  visibility   MeetingVisibility @default(TEAM)
-  deletedAt    DateTime?        @map("deleted_at")
-  createdAt    DateTime         @default(now()) @map("created_at")
-  updatedAt    DateTime         @updatedAt @map("updated_at")
+  id          String            @id @default(uuid()) @db.Uuid
+  title       String
+  description String?           @db.Text
+  createdBy   String            @map("created_by") @db.Uuid
+  hostId      String            @map("host_id") @db.Uuid
+  location    String?
+  meetingType MeetingType       @map("meeting_type")
+  meetingLink String?           @map("meeting_link")
+  startTime   DateTime          @map("start_time")
+  endTime     DateTime          @map("end_time")
+  status      MeetingStatus     @default(DRAFT)
+  visibility  MeetingVisibility @default(TEAM)
+  deletedAt   DateTime?         @map("deleted_at")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
 
-  creator      User                @relation("CreatedMeetings", fields: [createdBy], references: [id], onDelete: Restrict)
-  host         User                @relation("HostedMeetings", fields: [hostId], references: [id], onDelete: Restrict)
+  creator      User                 @relation("CreatedMeetings", fields: [createdBy], references: [id], onDelete: Restrict)
+  host         User                 @relation("HostedMeetings", fields: [hostId], references: [id], onDelete: Restrict)
   participants MeetingParticipant[]
   absences     AbsenceRequest[]
 
@@ -721,8 +721,8 @@ model MeetingParticipant {
   createdAt        DateTime         @default(now()) @map("created_at")
   updatedAt        DateTime         @updatedAt @map("updated_at")
 
-  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  meeting  Meeting          @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   absences AbsenceRequest[]
 
   @@unique([meetingId, userId])
@@ -743,13 +743,12 @@ model AbsenceRequest {
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
 
-  meeting     Meeting             @relation(fields: [meetingId], references: [id], onDelete: Cascade)
-  participant MeetingParticipant  @relation(fields: [participantId], references: [id], onDelete: Cascade)
-  reviewer    User?               @relation("ReviewedAbsences", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  meeting     Meeting            @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  participant MeetingParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  reviewer    User?              @relation("ReviewedAbsences", fields: [reviewedBy], references: [id], onDelete: SetNull)
 
   @@unique([meetingId, participantId])
   @@index([participantId])
   @@index([status])
   @@map("absence_requests")
-}
 }
