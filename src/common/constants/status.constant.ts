@@ -84,4 +84,54 @@ export const APPLICATION_INVITE_STATUS = {
 
 export type ApplicationInviteStatusType = keyof typeof APPLICATION_INVITE_STATUS;
 
+export const MEETING_TYPE = {
+  ONLINE: "ONLINE",
+  OFFLINE: "OFFLINE",
+  HYBRID: "HYBRID",
+} as const;
+export type MeetingTypeType = keyof typeof MEETING_TYPE;
+
+export const MEETING_STATUS = {
+  DRAFT: "DRAFT",
+  SCHEDULED: "SCHEDULED",
+  ONGOING: "ONGOING",
+  COMPLETED: "COMPLETED",
+  CANCELLED: "CANCELLED",
+} as const;
+export type MeetingStatusType = keyof typeof MEETING_STATUS;
+
+export const MEETING_VISIBILITY = {
+  PRIVATE: "PRIVATE",
+  TEAM: "TEAM",
+} as const;
+export type MeetingVisibilityType = keyof typeof MEETING_VISIBILITY;
+
+export const PARTICIPANT_ROLE = {
+  HOST: "HOST",
+  ORGANIZER: "ORGANIZER",
+  PARTICIPANT: "PARTICIPANT",
+} as const;
+export type ParticipantRoleType = keyof typeof PARTICIPANT_ROLE;
+
+export const INVITATION_STATUS = {
+  PENDING: "PENDING",
+  ACCEPTED: "ACCEPTED",
+  DECLINED: "DECLINED",
+} as const;
+export type InvitationStatusType = keyof typeof INVITATION_STATUS;
+
+export const ATTENDANCE_STATUS = {
+  UNKNOWN: "UNKNOWN",
+  ATTENDED: "ATTENDED",
+  ABSENT: "ABSENT",
+} as const;
+export type AttendanceStatusType = keyof typeof ATTENDANCE_STATUS;
+
+export const ABSENCE_STATUS = {
+  PENDING: "PENDING",
+  APPROVED: "APPROVED",
+  REJECTED: "REJECTED",
+} as const;
+export type AbsenceStatusType = keyof typeof ABSENCE_STATUS;
+
 
