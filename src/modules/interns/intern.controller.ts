@@ -1,6 +1,12 @@
 import { Request, Response, NextFunction } from "express";
 import { InternService } from "./intern.service";
-import { InternQueryDto, CreateInternDto, UpdateInternDto, UpdateMeInternDto } from "./intern.dto";
+import {
+  InternQueryDto,
+  CreateInternDto,
+  DirectCreateInternDto,
+  UpdateInternDto,
+  UpdateMeInternDto,
+} from "./intern.dto";
 
 export class InternController {
   private readonly service = new InternService();
@@ -30,6 +36,17 @@ export class InternController {
     try {
       const body = req.body as CreateInternDto;
       const result = await this.service.create(body);
+
+      res.status(201).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  directCreate = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = req.body as DirectCreateInternDto;
+      const result = await this.service.directCreate(body, req.user.id);
 
       res.status(201).json({ success: true, data: result });
     } catch (error) {

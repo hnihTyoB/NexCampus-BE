@@ -46,6 +46,12 @@ export const createInternSchema = z.object({
   discordUsername: z.string().optional(),
 });
 
+export const directCreateInternSchema = createInternSchema
+  .omit({ userId: true })
+  .extend({
+    email: z.string().trim().email("Invalid email").max(255),
+  });
+
 export const updateInternSchema = z.object({
   fullName: z.string().min(1).max(100).optional(),
   phone: z.string().regex(VIETNAMESE_PHONE_REGEX, "Số điện thoại không đúng định dạng Việt Nam").optional(),

@@ -3,11 +3,16 @@ import { ZodSchema } from "zod";
 import { AppError } from "../common/errors/app-error";
 import { ERROR_CODE } from "../common/errors/error-code";
 
-type ValidateTarget = "body" | "query";
+type ValidateTarget = "body" | "query" | "params";
 
 export function validate(schema: ZodSchema, target: ValidateTarget = "body") {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const input = target === "query" ? req.query : req.body;
+    const input =
+      target === "query"
+        ? req.query
+        : target === "params"
+          ? req.params
+          : req.body;
     const result = schema.safeParse(input);
 
     if (!result.success) {
@@ -20,6 +25,8 @@ export function validate(schema: ZodSchema, target: ValidateTarget = "body") {
 
     if (target === "query") {
       req.query = result.data;
+    } else if (target === "params") {
+      req.params = result.data;
     } else {
       req.body = result.data;
     }

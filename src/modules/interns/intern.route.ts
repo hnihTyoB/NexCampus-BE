@@ -6,6 +6,7 @@ import { validate } from "../../middlewares/validate.middleware";
 import {
   findAllInternSchema,
   createInternSchema,
+  directCreateInternSchema,
   updateInternSchema,
   updateMeInternSchema,
   assignLeaderSchema,
@@ -36,6 +37,13 @@ router.get(
   requireRole(ROLES.ADMIN, ROLES.LEADER),
   validate(findAllInternSchema, "query"),
   controller.findAll,
+);
+router.post(
+  "/direct",
+  authMiddleware,
+  requireRole(ROLES.ADMIN),
+  validate(directCreateInternSchema),
+  controller.directCreate,
 );
 router.get(
   "/:id",

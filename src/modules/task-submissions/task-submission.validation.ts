@@ -24,6 +24,10 @@ export const findAllSubmissionSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional().default(20),
 });
 
+export const getSubmissionThreadParamsSchema = z.object({
+  assignmentId: z.string().uuid("Invalid assignmentId"),
+});
+
 export const createSubmissionSchema = z.object({
   assignmentId: z.string().uuid(),
   prLink: z.string().url().refine(isPublicUrl, { message: "URL cannot be a private or local address" }).optional().or(z.literal("")),
@@ -38,4 +42,3 @@ export const updateSubmissionSchema = z.object({
   reviewStatus: z.enum([REVIEW_STATUS.PENDING, REVIEW_STATUS.APPROVED, REVIEW_STATUS.REJECTED]).optional(),
   reviewComment: z.string().max(1000).nullable().optional(),
 });
-

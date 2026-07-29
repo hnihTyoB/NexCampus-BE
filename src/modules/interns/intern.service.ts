@@ -1,14 +1,31 @@
+import bcrypt from "bcryptjs";
 import { InternRepository } from "./intern.repository";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
-import { InternQueryDto, CreateInternDto, UpdateInternDto, UpdateMeInternDto } from "./intern.dto";
+import {
+  InternQueryDto,
+  CreateInternDto,
+  DirectCreateInternDto,
+  UpdateInternDto,
+  UpdateMeInternDto,
+} from "./intern.dto";
 import { prisma } from "../../database/prisma.client";
 import { StorageService } from "../../common/services/storage.service";
-import { INTERN_STATUS } from "../../common/constants/status.constant";
+import {
+  INTERN_STATUS,
+  NOTIFICATION_TYPE,
+} from "../../common/constants/status.constant";
+import { ROLES } from "../../common/constants/role.constant";
 import { validatePhoneUniqueness } from "../../common/helpers/phone.helper";
+import { generateSecurePassword } from "../../common/helpers/password.helper";
+import { TemplateEmailHelper } from "../../common/helpers/template-email.helper";
+import { appConfig } from "../../config/app.config";
+import { ActivityLogService } from "../activity-logs/activity-log.service";
+import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
 
 export class InternService {
   private readonly repository = new InternRepository();
+  private readonly activityLogService = new ActivityLogService();
 
   async findAll(query: InternQueryDto) {
     await this.repository.completeExpiredInterns();
@@ -40,6 +57,110 @@ export class InternService {
     await validatePhoneUniqueness(data.phone);
 
     return this.repository.create(data);
+  }
+
+  async directCreate(data: DirectCreateInternDto, actorId: string) {
+    const normalizedEmail = data.email.toLowerCase().trim();
+
+    const [existingUser, role, department, position, leader] =
+      await Promise.all([
+        prisma.user.findUnique({ where: { email: normalizedEmail } }),
+        prisma.role.findUnique({ where: { name: ROLES.INTERN } }),
+        prisma.department.findUnique({ where: { id: data.departmentId } }),
+        prisma.position.findFirst({
+          where: {
+            id: data.positionId,
+            departmentId: data.departmentId,
+          },
+        }),
+        data.leaderId
+          ? prisma.user.findFirst({
+              where: {
+                id: data.leaderId,
+                deletedAt: null,
+                isActive: true,
+                role: { name: ROLES.LEADER },
+              },
+            })
+          : Promise.resolve(null),
+      ]);
+
+    if (existingUser) {
+      throw new AppError(
+        "Email already exists",
+        409,
+        ERROR_CODE.DUPLICATE_ENTRY,
+      );
+    }
+
+    if (!role) {
+      throw new AppError(
+        "Intern role not found",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
+
+    if (!department) {
+      throw new AppError(
+        "Department not found",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
+
+    if (!position) {
+      throw new AppError(
+        "Position does not belong to the selected department",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    if (data.leaderId && !leader) {
+      throw new AppError(
+        "Active leader not found",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
+
+    await validatePhoneUniqueness(data.phone);
+
+    const password = generateSecurePassword();
+    const passwordHash = await bcrypt.hash(password, 10);
+    const intern = await this.repository.createWithUser(data, {
+      email: normalizedEmail,
+      passwordHash,
+      roleId: role.id,
+    });
+
+    await this.activityLogService.log(
+      actorId,
+      ACTIVITY_ACTIONS.CREATE_USER,
+      `Admin đã tạo trực tiếp tài khoản thực tập sinh ${data.fullName} (${normalizedEmail}).`,
+      intern.id,
+      "Intern",
+    );
+
+    try {
+      await TemplateEmailHelper.send(
+        normalizedEmail,
+        NOTIFICATION_TYPE.USER_CREATED,
+        {
+          email: normalizedEmail,
+          password,
+          loginUrl: appConfig.baseUrl,
+        },
+      );
+    } catch (emailError) {
+      console.error(
+        `[InternService.directCreate] Failed to send registration email to ${normalizedEmail}:`,
+        emailError,
+      );
+    }
+
+    return intern;
   }
 
   async update(id: string, data: UpdateInternDto) {

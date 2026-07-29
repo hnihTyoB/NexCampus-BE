@@ -72,6 +72,7 @@ const defaultSelect = {
   support: {
     select: {
       id: true,
+      userId: true,
       fullName: true,
     },
   },

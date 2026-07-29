@@ -1,6 +1,11 @@
 import { InternStatus, Prisma } from "@prisma/client";
 import { prisma } from "../../database/prisma.client";
-import { InternQueryDto, CreateInternDto, UpdateInternDto } from "./intern.dto";
+import {
+  InternQueryDto,
+  CreateInternDto,
+  DirectCreateInternDto,
+  UpdateInternDto,
+} from "./intern.dto";
 import { INTERN_STATUS } from "../../common/constants/status.constant";
 
 const userSelect = {
@@ -141,6 +146,37 @@ export class InternRepository {
         discordUsername: data.discordUsername,
       },
       select: defaultSelect,
+    });
+  }
+
+  createWithUser(
+    data: DirectCreateInternDto,
+    account: { email: string; passwordHash: string; roleId: string },
+  ) {
+    return prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email: account.email,
+          password: account.passwordHash,
+          fullName: data.fullName,
+          roleId: account.roleId,
+        },
+      });
+
+      return tx.intern.create({
+        data: {
+          userId: user.id,
+          leaderId: data.leaderId,
+          fullName: data.fullName,
+          phone: data.phone,
+          departmentId: data.departmentId,
+          positionId: data.positionId,
+          startDate: new Date(data.startDate),
+          duration: data.duration,
+          discordUsername: data.discordUsername,
+        },
+        select: defaultSelect,
+      });
     });
   }
 

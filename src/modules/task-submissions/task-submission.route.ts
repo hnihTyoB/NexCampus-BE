@@ -5,6 +5,7 @@ import { requireRole } from "../../middlewares/role.middleware";
 import { validate } from "../../middlewares/validate.middleware";
 import {
   findAllSubmissionSchema,
+  getSubmissionThreadParamsSchema,
   createSubmissionSchema,
   updateSubmissionSchema,
 } from "./task-submission.validation";
@@ -21,6 +22,13 @@ router.get(
   requireRole(ROLES.ADMIN, ROLES.LEADER, ROLES.INTERN),
   validate(findAllSubmissionSchema, "query"),
   controller.findAll,
+);
+router.get(
+  "/thread/:assignmentId",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER, ROLES.INTERN),
+  validate(getSubmissionThreadParamsSchema, "params"),
+  controller.getThread,
 );
 router.get(
   "/:id",

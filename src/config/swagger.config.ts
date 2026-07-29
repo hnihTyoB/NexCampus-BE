@@ -521,6 +521,29 @@ export const swaggerSpec = {
           discordUsername: { type: "string", example: "chithinhdev" },
         },
       },
+      DirectCreateInternBody: {
+        type: "object",
+        required: [
+          "email",
+          "fullName",
+          "phone",
+          "departmentId",
+          "positionId",
+          "startDate",
+          "duration",
+        ],
+        properties: {
+          email: { type: "string", format: "email" },
+          leaderId: { type: "string", format: "uuid" },
+          fullName: { type: "string", maxLength: 100 },
+          phone: { type: "string", example: "0912345678" },
+          departmentId: { type: "string", format: "uuid" },
+          positionId: { type: "string", format: "uuid" },
+          startDate: { type: "string", format: "date" },
+          duration: { type: "integer", minimum: 1 },
+          discordUsername: { type: "string" },
+        },
+      },
       UpdateInternBody: {
         type: "object",
         properties: {
@@ -2940,6 +2963,56 @@ export const swaggerSpec = {
         },
       },
     },
+    "/interns/direct": {
+      post: {
+        tags: ["Interns"],
+        summary: "Tạo trực tiếp tài khoản và hồ sơ Intern (Admin only)",
+        description:
+          "Tạo User role INTERN và hồ sơ Intern trong cùng một database transaction. Email thông tin đăng nhập được gửi sau khi transaction thành công.",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/DirectCreateInternBody",
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Tài khoản và hồ sơ Intern đã được tạo",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/Intern" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          409: {
+            description: "Email hoặc số điện thoại đã tồn tại",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          422: { $ref: "#/components/responses/Validation" },
+        },
+      },
+    },
     "/interns/{id}": {
       get: {
         tags: ["Interns"],
@@ -4401,6 +4474,58 @@ export const swaggerSpec = {
           },
           401: { $ref: "#/components/responses/Unauthorized" },
           403: { $ref: "#/components/responses/Forbidden" },
+        },
+      },
+    },
+    "/task-submissions/thread/{assignmentId}": {
+      get: {
+        tags: ["TaskSubmissions"],
+        summary: "Lịch sử bài nộp theo assignment",
+        description:
+          "Admin được xem mọi assignment. Leader chỉ được xem assignment do mình giao hoặc của intern mình quản lý. Intern chỉ được xem assignment của mình hoặc assignment mình hỗ trợ.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "assignmentId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          200: {
+            description: "Assignment và lịch sử các lần nộp",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "object",
+                          properties: {
+                            assignment: { type: "object" },
+                            thread: {
+                              type: "array",
+                              items: {
+                                $ref: "#/components/schemas/TaskSubmission",
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+          422: { $ref: "#/components/responses/Validation" },
         },
       },
     },

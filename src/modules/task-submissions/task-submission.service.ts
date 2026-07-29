@@ -59,6 +59,48 @@ export class TaskSubmissionService {
     return submission;
   }
 
+  async getThread(assignmentId: string, user: UserPayload) {
+    const assignment = await this.assignmentRepository.findById(assignmentId);
+    if (!assignment) {
+      throw new AppError(
+        "Task assignment not found",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
+
+    const canRead =
+      user.role === ROLES.ADMIN ||
+      (user.role === ROLES.LEADER &&
+        (assignment.assignedBy === user.id ||
+          assignment.intern?.leaderId === user.id)) ||
+      (user.role === ROLES.INTERN &&
+        (assignment.intern?.userId === user.id ||
+          assignment.support?.userId === user.id));
+
+    if (!canRead) {
+      throw new AppError(
+        "You are not authorized to view this submission thread",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
+    }
+
+    const submissions = await this.repository.findByAssignmentId(assignmentId);
+
+    return {
+      assignment: {
+        id: assignment.id,
+        status: assignment.status,
+        task: assignment.task,
+        intern: assignment.intern,
+        assigner: assignment.assigner,
+        support: assignment.support,
+      },
+      thread: submissions,
+    };
+  }
+
   async create(data: CreateTaskSubmissionDto, user: UserPayload) {
     // 1. Find assignment
     const assignment = await this.assignmentRepository.findById(
@@ -93,20 +135,10 @@ export class TaskSubmissionService {
     const count = await this.repository.countAttempts(data.assignmentId);
     const attempt = count + 1;
 
-    const result = await this.repository.create(data, attempt);
-
-    // Auto-update assignment status to REVIEW when intern submits
-    if (assignment.status === ASSIGNMENT_STATUS.TODO || assignment.status === ASSIGNMENT_STATUS.IN_PROGRESS) {
-      try {
-        await prisma.taskAssignment.update({
-          where: { id: assignment.id },
-          data: { status: "REVIEW" as any },
-        });
-        console.log(`[Submission] Auto-updated assignment ${assignment.id} status to REVIEW`);
-      } catch (err) {
-        console.error("[Submission] Failed to auto-update assignment status:", err);
-      }
-    }
+    const result = await this.repository.createAndMarkAssignmentForReview(
+      data,
+      attempt,
+    );
 
     // Notify the assigner (leader/admin)
     await NotificationDispatcher.dispatch(
@@ -187,7 +219,7 @@ export class TaskSubmissionService {
 
       // Create a new submission version (preserve history)
       const count = await this.repository.countAttempts(submission.assignmentId);
-      const result = await this.repository.create(
+      const result = await this.repository.createAndMarkAssignmentForReview(
         {
           assignmentId: submission.assignmentId,
           prLink: internData.prLink ?? undefined,

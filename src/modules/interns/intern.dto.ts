@@ -29,6 +29,18 @@ export interface CreateInternDto {
   discordUsername?: string;
 }
 
+export interface DirectCreateInternDto {
+  email: string;
+  leaderId?: string;
+  fullName: string;
+  phone: string;
+  departmentId: string;
+  positionId: string;
+  startDate: string;
+  duration: number;
+  discordUsername?: string;
+}
+
 export interface UpdateInternDto {
   leaderId?: string | null;
   fullName?: string;

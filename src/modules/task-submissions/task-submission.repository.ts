@@ -5,6 +5,7 @@ import {
   CreateTaskSubmissionDto,
   UpdateTaskSubmissionDto,
 } from "./task-submission.dto";
+import { ASSIGNMENT_STATUS } from "../../common/constants/status.constant";
 
 const defaultSelect = {
   id: true,
@@ -169,6 +170,39 @@ export class TaskSubmissionRepository {
     });
   }
 
+  createAndMarkAssignmentForReview(
+    data: CreateTaskSubmissionDto,
+    attempt: number,
+  ) {
+    return prisma.$transaction(async (tx) => {
+      const submission = await tx.taskSubmission.create({
+        data: {
+          assignmentId: data.assignmentId,
+          attempt,
+          prLink: data.prLink || null,
+          videoDemo: data.videoDemo || null,
+          note: data.note || null,
+        },
+        select: defaultSelect,
+      });
+
+      await tx.taskAssignment.updateMany({
+        where: {
+          id: data.assignmentId,
+          status: {
+            in: [
+              ASSIGNMENT_STATUS.TODO,
+              ASSIGNMENT_STATUS.IN_PROGRESS,
+            ],
+          },
+        },
+        data: { status: ASSIGNMENT_STATUS.REVIEW },
+      });
+
+      return submission;
+    });
+  }
+
   update(id: string, data: UpdateTaskSubmissionDto, reviewedBy?: string) {
     return prisma.taskSubmission.update({
       where: { id },
@@ -192,6 +226,51 @@ export class TaskSubmissionRepository {
   delete(id: string) {
     return prisma.taskSubmission.delete({
       where: { id },
+    });
+  }
+
+  findByAssignmentId(assignmentId: string) {
+    return prisma.taskSubmission.findMany({
+      where: {
+        assignmentId,
+        assignment: {
+          task: { deletedAt: null },
+          intern: { deletedAt: null },
+        },
+      },
+      select: {
+        id: true,
+        attempt: true,
+        prLink: true,
+        videoDemo: true,
+        note: true,
+        reviewStatus: true,
+        reviewComment: true,
+        reviewedAt: true,
+        submittedAt: true,
+        updatedAt: true,
+        reviewer: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+          },
+        },
+        attachments: {
+          select: {
+            id: true,
+            fileName: true,
+            fileUrl: true,
+            filePath: true,
+            mimeType: true,
+            fileSize: true,
+            uploadedBy: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "asc" as const },
+        },
+      },
+      orderBy: { attempt: "asc" as const },
     });
   }
 }
