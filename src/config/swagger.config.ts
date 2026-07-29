@@ -1023,6 +1023,16 @@ export const swaggerSpec = {
           coding: { type: "number" },
           totalScore: { type: "number" },
           comment: { type: "string", nullable: true },
+          ratings: {
+            type: "object",
+            nullable: true,
+            description: "Bảng xếp loại 12 tiêu chí (mẫu mới). Null nếu dùng mẫu cũ.",
+          },
+          aiRatings: {
+            type: "object",
+            nullable: true,
+            description: "Bảng xếp loại 12 tiêu chí do AI gợi ý. Null nếu không dùng AI.",
+          },
           aiCommunication: {
             type: "number",
             nullable: true,
@@ -1058,6 +1068,12 @@ export const swaggerSpec = {
             type: "boolean",
             description:
               "Đánh dấu Leader có chỉnh sửa điểm so với AI hay không",
+          },
+          reviewedAt: {
+            type: "string",
+            format: "date-time",
+            nullable: true,
+            description: "Thời điểm Intern xác nhận đã xem đánh giá. Null = chưa xem.",
           },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
@@ -5602,6 +5618,55 @@ export const swaggerSpec = {
           },
           401: { $ref: "#/components/responses/Unauthorized" },
           403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
+
+    // Intern xác nhận đã xem đánh giá
+    "/weekly-evaluations/{id}/mark-reviewed": {
+      patch: {
+        tags: ["WeeklyEvaluations"],
+        summary: "Intern xác nhận đã xem đánh giá (Intern only)",
+        description: "Intern bấm xác nhận đã xem đánh giá của tuần đó. `reviewedAt` chỉ được ghi lần đầu (idempotent). Chỉ intern sở hữu đánh giá mới được gọi.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "ID của WeeklyEvaluation",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Xác nhận thành công — trả về bản ghi đã cập nhật reviewedAt",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/WeeklyEvaluation" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: {
+            description: "Không có quyền — không phải intern sở hữu đánh giá này",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
           404: { $ref: "#/components/responses/NotFound" },
         },
       },

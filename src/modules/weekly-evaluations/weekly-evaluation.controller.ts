@@ -84,4 +84,17 @@ export class WeeklyEvaluationController {
       next(error);
     }
   };
+
+  /**
+   * PATCH /weekly-evaluations/:id/mark-reviewed
+   * Intern xác nhận đã xem đánh giá của mình.
+   */
+  markReviewed = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.service.markReviewed(req.params.id, req.user.id);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

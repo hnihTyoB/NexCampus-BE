@@ -57,4 +57,12 @@ router.delete(
   controller.delete,
 );
 
+// Intern xác nhận đã xem đánh giá — phải đặt SAU /:id (tránh conflict với POST /ai-suggestion)
+router.patch(
+  "/:id/mark-reviewed",
+  authMiddleware,
+  requireRole(ROLES.INTERN),
+  controller.markReviewed,
+);
+
 export default router;

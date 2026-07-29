@@ -284,6 +284,30 @@ export class WeeklyEvaluationService {
   }
 
   /**
+   * Intern xác nhận đã xem đánh giá.
+   * Chỉ cho phép intern sở hữu đánh giá đó gọi; reviewedAt chỉ ghi lần đầu.
+   */
+  async markReviewed(id: string, userId: string) {
+    const evaluation = await this.findById(id);
+
+    // Kiểm tra ownership — intern của evaluation phải trùng userId
+    if (evaluation.intern.userId !== userId) {
+      throw new AppError(
+        "Bạn không có quyền xác nhận đánh giá này",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
+    }
+
+    // Chỉ ghi lần đầu (idempotent)
+    if (evaluation.reviewedAt) {
+      return evaluation;
+    }
+
+    return this.repository.markReviewed(id);
+  }
+
+  /**
    * Phát hiện Leader có chỉnh sửa điểm AI hay không.
    * Nếu không có AI fields → false (không dùng AI).
    * Nếu có AI fields và điểm khác AI → true (Leader đã chỉnh).
