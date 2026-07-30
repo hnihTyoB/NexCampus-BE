@@ -5,6 +5,8 @@ export interface ActivityLogQueryDto {
   action?: ActivityAction;
   targetId?: string;
   targetType?: string;
+  createdFrom?: string;
+  createdTo?: string;
   sortBy?: "createdAt";
   order?: "asc" | "desc";
   page?: number;
