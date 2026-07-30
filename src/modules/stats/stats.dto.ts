@@ -115,7 +115,7 @@ export interface InternPersonalStatsDto {
 
 export interface ActivityLogDto {
   id: string;
-  type: "SUBMISSION" | "DAILY_REPORT" | "APPLICATION";
+  type: string;
   title: string;
   description: string;
   createdAt: string;
