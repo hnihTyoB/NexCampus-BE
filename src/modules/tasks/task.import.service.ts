@@ -244,6 +244,7 @@ export class TaskImportService {
     buffer: Buffer,
     taskGroupId?: string,
     taskGroupName?: string,
+    departmentId?: string,
   ): Promise<ImportPreviewDto> {
     const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
 
@@ -257,7 +258,7 @@ export class TaskImportService {
       if (!tg) {
         throw new AppError(
           "Không tìm thấy Nhóm công việc với ID đã cung cấp",
-          404,
+          400,
           ERROR_CODE.NOT_FOUND,
         );
       }
@@ -265,8 +266,8 @@ export class TaskImportService {
       resolvedGroupName = tg.name;
     } else {
       const name = (taskGroupName && taskGroupName.trim()) || "Nhóm công việc mặc định";
-      const tg = await prisma.taskGroup.findUnique({
-        where: { name },
+      const tg = await prisma.taskGroup.findFirst({
+        where: { name, departmentId: departmentId || null },
       });
       resolvedGroupId = tg?.id;
       resolvedGroupName = name;
@@ -325,6 +326,7 @@ export class TaskImportService {
     createdBy: string,
     taskGroupId?: string,
     taskGroupName?: string,
+    departmentId?: string,
   ): Promise<ImportResultDto> {
     const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
 
@@ -362,15 +364,15 @@ export class TaskImportService {
     )];
 
     // Lookup intern by email (qua bảng User), tránh mọi vấn đề trùng tên
-    const internsByEmail = await prisma.intern.findMany({
-      where: {
-        deletedAt: null,
-        ...(allEmails.length > 0
-          ? { user: { email: { in: allEmails, mode: "insensitive" } } }
-          : { id: "__none__" }), // không query nếu không có email nào
-      },
-      select: { id: true, fullName: true, userId: true, user: { select: { email: true } } },
-    });
+    const internsByEmail = allEmails.length > 0
+      ? await prisma.intern.findMany({
+          where: {
+            deletedAt: null,
+            user: { email: { in: allEmails, mode: "insensitive" } },
+          },
+          select: { id: true, fullName: true, userId: true, user: { select: { email: true } } },
+        })
+      : [];
 
     // email (lower) → intern
     const internsByEmailMap = new Map(
@@ -408,11 +410,14 @@ export class TaskImportService {
           resolvedGroupName = tg.name;
         } else {
           const name = (taskGroupName && taskGroupName.trim()) || "Nhóm công việc mặc định";
-          const tg = await tx.taskGroup.upsert({
-            where: { name },
-            update: {},
-            create: { name },
+          let tg = await tx.taskGroup.findFirst({
+            where: { name, departmentId: departmentId || null },
           });
+          if (!tg) {
+            tg = await tx.taskGroup.create({
+              data: { name, departmentId: departmentId || null },
+            });
+          }
           resolvedGroupId = tg.id;
           resolvedGroupName = tg.name;
         }

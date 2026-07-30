@@ -35,4 +35,19 @@ router.delete(
   controller.delete,
 );
 
+// Group AI Allocation
+router.post(
+  "/:id/ai-recommendation",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER),
+  controller.getAiRecommendation,
+);
+
+router.post(
+  "/:id/ai-allocation/confirm",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER),
+  controller.confirmAiAllocation,
+);
+
 export default router;

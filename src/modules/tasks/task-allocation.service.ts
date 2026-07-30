@@ -7,6 +7,9 @@ import {
   ScoredCandidate,
   AiRecommendationResponseDto,
   CandidateSummaryDto,
+  GroupAiRecommendationResponseDto,
+  ConfirmGroupAllocationPayloadDto,
+  GroupTaskAiRecommendationItemDto,
 } from "./task-allocation.dto";
 
 // ─── Cấu hình thuật toán ──────────────────────────────────────────────────────
@@ -241,7 +244,7 @@ export class TaskAllocationService {
         priority: true,
         estDays: true,
         deadline: true,
-        assignment: { select: { id: true } },
+        assignment: { select: { id: true, internId: true } },
       },
     });
 
@@ -249,7 +252,7 @@ export class TaskAllocationService {
       throw new AppError("Task not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
-    if (task.assignment) {
+    if (task.assignment && task.assignment.internId) {
       throw new AppError(
         "Task này đã được giao cho intern. Không thể tạo đề xuất mới.",
         409,
@@ -485,9 +488,9 @@ export class TaskAllocationService {
     const reasons: string[] = [];
 
     if (owner.workloadScore >= 70) {
-      reasons.push(`Workload thấp — đang gánh ${owner.activeTaskDays} ngày công`);
+      reasons.push(`Workload thấp - đang gánh ${owner.activeTaskDays} ngày công`);
     } else if (owner.workloadScore >= 40) {
-      reasons.push(`Workload ở mức vừa phải — còn ${MAX_WORKLOAD_DAYS - owner.activeTaskDays} ngày trống`);
+      reasons.push(`Workload ở mức vừa phải - còn ${MAX_WORKLOAD_DAYS - owner.activeTaskDays} ngày trống`);
     }
 
     if (owner.skillScore >= 80) {
@@ -500,7 +503,7 @@ export class TaskAllocationService {
 
     if (owner.learningScore >= 60) {
       reasons.push(taskModule
-        ? `Chưa từng làm module ${taskModule} — cơ hội học và phát triển tốt`
+        ? `Chưa từng làm module ${taskModule} - cơ hội học và phát triển tốt`
         : `Có cơ hội học tập và phát triển với task này`);
     }
 
@@ -509,5 +512,303 @@ export class TaskAllocationService {
     }
 
     return reasons;
+  }
+
+  // ─── Group-level Bulk AI Allocation ──────────────────────────────────────
+
+  async getGroupAiRecommendation(
+    taskGroupId: string,
+    user: UserPayload,
+  ): Promise<GroupAiRecommendationResponseDto> {
+    // 1. Lấy TaskGroup info
+    const group = await prisma.taskGroup.findUnique({
+      where: { id: taskGroupId },
+      select: {
+        id: true,
+        name: true,
+        departmentId: true,
+        department: { select: { id: true, name: true } },
+      },
+    });
+
+    if (!group) {
+      throw new AppError("Task group not found", 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    // 2. Lấy tất cả unassigned tasks trong group (bao gồm chưa có record hoặc có record nhưng internId = null)
+    const unassignedTasks = await prisma.task.findMany({
+      where: {
+        taskGroupId,
+        deletedAt: null,
+        OR: [
+          { assignment: null },
+          { assignment: { internId: null } },
+        ],
+      },
+      orderBy: [{ priority: "desc" }, { deadline: "asc" }],
+      select: {
+        id: true,
+        code: true,
+        title: true,
+        description: true,
+        module: true,
+        phase: true,
+        priority: true,
+        estDays: true,
+        deadline: true,
+      },
+    });
+
+    if (unassignedTasks.length === 0) {
+      throw new AppError(
+        "Không có task chưa phân công nào trong nhóm công việc này.",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    // 3. Lấy danh sách intern thuộc leader (và thuộc department của group nếu group có departmentId)
+    const rawInterns = await prisma.intern.findMany({
+      where: {
+        leaderId: user.id,
+        status: "ACTIVE",
+        deletedAt: null,
+        ...(group.departmentId ? { departmentId: group.departmentId } : {}),
+      },
+      select: {
+        id: true,
+        fullName: true,
+        position: { select: { id: true, name: true } },
+        department: { select: { id: true, name: true } },
+        assignments: {
+          where: {
+            status: { in: ["TODO", "IN_PROGRESS", "REVIEW"] },
+            task: { deletedAt: null },
+          },
+          select: {
+            task: { select: { estDays: true, deadline: true } },
+          },
+        },
+        weeklyEvaluations: {
+          orderBy: { week: "desc" },
+          take: 3,
+          select: { coding: true, learning: true, week: true },
+        },
+        supportedAssignments: {
+          where: {
+            status: "DONE",
+            task: { deletedAt: null },
+          },
+          select: { task: { select: { module: true, phase: true } } },
+        },
+      },
+    });
+
+    if (rawInterns.length === 0) {
+      const msg = group.department?.name
+        ? `Không tìm thấy intern active nào của bạn thuộc phòng ban "${group.department.name}".`
+        : "Không tìm thấy intern active nào dưới sự quản lý của bạn.";
+      throw new AppError(msg, 422, ERROR_CODE.VALIDATION_ERROR);
+    }
+
+    // 4. Completed assignments
+    const completedAssignmentsByIntern = await Promise.all(
+      rawInterns.map((intern) =>
+        prisma.taskAssignment.findMany({
+          where: {
+            internId: intern.id,
+            status: "DONE",
+            task: { deletedAt: null },
+          },
+          select: { task: { select: { module: true, phase: true } } },
+        }),
+      ),
+    );
+
+    // 5. Enrich base candidates
+    const baseCandidates: InternCandidateRaw[] = rawInterns.map((intern, idx) => {
+      const activeTaskDays = intern.assignments.reduce(
+        (sum, a) => sum + (a.task.estDays ?? 3),
+        0,
+      );
+      const latestEval = intern.weeklyEvaluations[0] ?? null;
+      const ownerCompleted = completedAssignmentsByIntern[idx];
+      const supportCompleted = intern.supportedAssignments;
+      const allCompleted = [...ownerCompleted, ...supportCompleted];
+
+      return {
+        id: intern.id,
+        fullName: intern.fullName,
+        position: intern.position,
+        department: intern.department,
+        activeTaskDays,
+        activeTaskCount: intern.assignments.length,
+        latestCodingScore: latestEval?.coding ?? null,
+        latestLearningScore: latestEval?.learning ?? null,
+        completedModules: [...new Set(allCompleted.map((a) => a.task.module).filter((m): m is string => !!m))],
+        completedPhases: [...new Set(allCompleted.map((a) => a.task.phase).filter((p): p is string => !!p))],
+      };
+    });
+
+    const simulatedWorkloadMap = new Map<string, number>();
+    baseCandidates.forEach((c) => simulatedWorkloadMap.set(c.id, c.activeTaskDays));
+
+    const taskResults: GroupTaskAiRecommendationItemDto[] = [];
+    let allocatedCount = 0;
+
+    for (const t of unassignedTasks) {
+      const scored: ScoredCandidate[] = baseCandidates.map((intern) => {
+        const curWorkload = simulatedWorkloadMap.get(intern.id) ?? intern.activeTaskDays;
+        const workloadScore = calculateWorkloadScore(curWorkload);
+        const skillScore = calculateSkillScore(intern, t.module, t.phase);
+        const performanceScore = calculatePerformanceScore(intern.latestCodingScore, intern.latestLearningScore);
+        const learningScore = calculateLearningScore(intern, t.module, t.phase);
+        const compatibilityScore = calculateCompatibilityScore({
+          workload: workloadScore,
+          skill: skillScore,
+          performance: performanceScore,
+          learning: learningScore,
+        });
+
+        return {
+          ...intern,
+          activeTaskDays: curWorkload,
+          workloadScore,
+          skillScore,
+          performanceScore,
+          learningScore,
+          compatibilityScore,
+          suggestedRole: "OWNER" as const,
+        };
+      });
+
+      const ranked = [...scored].sort((a, b) => b.compatibilityScore - a.compatibilityScore);
+      const withRoles = assignOwnerSupportRoles(ranked);
+
+      const owner = withRoles.find((c) => c.suggestedRole === "OWNER");
+      const support = withRoles.find((c) => c.suggestedRole === "SUPPORT" && c !== owner);
+
+      if (owner) {
+        const addedDays = t.estDays ?? 3;
+        simulatedWorkloadMap.set(owner.id, (simulatedWorkloadMap.get(owner.id) ?? 0) + addedDays);
+        allocatedCount++;
+
+        const reasons = this.buildFallbackReasons(owner, t.module);
+
+        taskResults.push({
+          taskId: t.id,
+          taskTitle: t.title,
+          taskCode: t.code,
+          priority: t.priority,
+          estDays: t.estDays,
+          deadline: t.deadline.toISOString(),
+          suggestedOwner: {
+            id: owner.id,
+            name: owner.fullName,
+            position: owner.position?.name ?? null,
+            compatibilityScore: owner.compatibilityScore,
+            workloadDays: owner.activeTaskDays,
+          },
+          suggestedSupport: support
+            ? {
+                id: support.id,
+                name: support.fullName,
+                position: support.position?.name ?? null,
+                compatibilityScore: support.compatibilityScore,
+                workloadDays: support.activeTaskDays,
+              }
+            : null,
+          reason: reasons.join(" • "),
+        });
+      } else {
+        taskResults.push({
+          taskId: t.id,
+          taskTitle: t.title,
+          taskCode: t.code,
+          priority: t.priority,
+          estDays: t.estDays,
+          deadline: t.deadline.toISOString(),
+          suggestedOwner: null,
+          suggestedSupport: null,
+          reason: "Không có ứng viên phù hợp",
+        });
+      }
+    }
+
+    return {
+      taskGroupId: group.id,
+      taskGroupName: group.name,
+      department: group.department,
+      tasks: taskResults,
+      summary: {
+        totalUnassignedTasks: unassignedTasks.length,
+        totalAllocated: allocatedCount,
+        unallocatableTasks: unassignedTasks.length - allocatedCount,
+        internsEvaluatedCount: baseCandidates.length,
+      },
+    };
+  }
+
+  async confirmGroupAllocation(
+    taskGroupId: string,
+    payload: ConfirmGroupAllocationPayloadDto,
+    user: UserPayload,
+  ) {
+    if (!payload.assignments || payload.assignments.length === 0) {
+      throw new AppError("Danh sách phân công rỗng", 400, ERROR_CODE.VALIDATION_ERROR);
+    }
+
+    const group = await prisma.taskGroup.findUnique({
+      where: { id: taskGroupId },
+      select: { id: true },
+    });
+    if (!group) {
+      throw new AppError("Task group not found", 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    let createdCount = 0;
+
+    await prisma.$transaction(async (tx) => {
+      for (const item of payload.assignments) {
+        if (!item.taskId || !item.internId) continue;
+
+        const task = await tx.task.findFirst({
+          where: { id: item.taskId, taskGroupId, deletedAt: null },
+          select: { id: true, assignment: { select: { id: true, internId: true } } },
+        });
+
+        if (!task) continue;
+        if (task.assignment?.internId) continue; // Bỏ qua nếu task đã được phân công intern rồi
+
+        if (task.assignment) {
+          await tx.taskAssignment.update({
+            where: { id: task.assignment.id },
+            data: {
+              internId: item.internId,
+              supportId: item.supportId || null,
+              assignedBy: user.id,
+              status: "TODO",
+            },
+          });
+        } else {
+          await tx.taskAssignment.create({
+            data: {
+              taskId: item.taskId,
+              internId: item.internId,
+              supportId: item.supportId || null,
+              assignedBy: user.id,
+              status: "TODO",
+            },
+          });
+        }
+        createdCount++;
+      }
+    });
+
+    return {
+      success: true,
+      message: `Đã hoàn tất phân công ${createdCount} task cho nhóm công việc.`,
+      count: createdCount,
+    };
   }
 }

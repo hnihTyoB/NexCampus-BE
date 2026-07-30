@@ -83,7 +83,8 @@ export class TaskController {
 
       const taskGroupId = (req.body.taskGroupId || req.query.taskGroupId) as string | undefined;
       const taskGroupName = (req.body.taskGroupName || req.query.taskGroupName) as string | undefined;
-      const result = await this.importService.preview(req.file.buffer, taskGroupId, taskGroupName);
+      const departmentId = (req.body.departmentId || req.query.departmentId) as string | undefined;
+      const result = await this.importService.preview(req.file.buffer, taskGroupId, taskGroupName, departmentId);
       res.json({ success: true, data: result });
     } catch (error) {
       next(error);
@@ -103,7 +104,8 @@ export class TaskController {
       const createdBy = req.user.id;
       const taskGroupId = (req.body.taskGroupId || req.query.taskGroupId) as string | undefined;
       const taskGroupName = (req.body.taskGroupName || req.query.taskGroupName) as string | undefined;
-      const result = await this.importService.execute(req.file.buffer, createdBy, taskGroupId, taskGroupName);
+      const departmentId = (req.body.departmentId || req.query.departmentId) as string | undefined;
+      const result = await this.importService.execute(req.file.buffer, createdBy, taskGroupId, taskGroupName, departmentId);
 
       res.status(201).json({ success: true, data: result });
     } catch (error) {
