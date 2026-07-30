@@ -103,3 +103,51 @@ export interface AiRecommendationResponseDto {
     generatedAt: string;
   };
 }
+
+// ─── Group Allocation DTOs ───────────────────────────────────────────────────
+
+export interface GroupTaskAiRecommendationItemDto {
+  taskId: string;
+  taskTitle: string;
+  taskCode: string | null;
+  priority: string;
+  estDays: number | null;
+  deadline: string;
+  suggestedOwner: {
+    id: string;
+    name: string;
+    position: string | null;
+    compatibilityScore: number;
+    workloadDays: number;
+  } | null;
+  suggestedSupport: {
+    id: string;
+    name: string;
+    position: string | null;
+    compatibilityScore: number;
+    workloadDays: number;
+  } | null;
+  reason: string;
+}
+
+export interface GroupAiRecommendationResponseDto {
+  taskGroupId: string;
+  taskGroupName: string;
+  department: { id: string; name: string } | null;
+  tasks: GroupTaskAiRecommendationItemDto[];
+  summary: {
+    totalUnassignedTasks: number;
+    totalAllocated: number;
+    unallocatableTasks: number;
+    internsEvaluatedCount: number;
+  };
+}
+
+export interface ConfirmGroupAllocationPayloadDto {
+  assignments: {
+    taskId: string;
+    internId: string;
+    supportId?: string | null;
+  }[];
+}
+

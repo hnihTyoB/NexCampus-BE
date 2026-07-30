@@ -77,6 +77,7 @@ model Department {
   applications Application[]
   interns      Intern[]
   leaders      Leader[]
+  taskGroups   TaskGroup[]
 
   @@map("departments")
 }
@@ -220,14 +221,18 @@ enum TaskPriority {
 }
 
 model TaskGroup {
-  id          String   @id @default(uuid()) @db.Uuid
-  name        String   @unique
-  description String?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id           String      @id @default(uuid()) @db.Uuid
+  name         String
+  description  String?
+  departmentId String?     @map("department_id") @db.Uuid
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
 
-  tasks Task[]
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  tasks      Task[]
 
+  @@unique([name, departmentId])
+  @@index([departmentId])
   @@map("task_groups")
 }
 

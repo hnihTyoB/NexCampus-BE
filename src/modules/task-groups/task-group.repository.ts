@@ -5,6 +5,8 @@ const defaultSelect = {
   id: true,
   name: true,
   description: true,
+  departmentId: true,
+  department: { select: { id: true, name: true } },
   _count: { select: { tasks: true } },
   createdAt: true,
   updatedAt: true,
@@ -30,6 +32,7 @@ export class TaskGroupRepository {
       data: {
         name: data.name,
         description: data.description,
+        departmentId: data.departmentId || null,
       },
       select: defaultSelect,
     });
@@ -41,6 +44,7 @@ export class TaskGroupRepository {
       data: {
         ...(data.name !== undefined ? { name: data.name } : {}),
         ...(data.description !== undefined ? { description: data.description } : {}),
+        ...(data.departmentId !== undefined ? { departmentId: data.departmentId } : {}),
       },
       select: defaultSelect,
     });

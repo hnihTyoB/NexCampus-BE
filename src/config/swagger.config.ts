@@ -613,6 +613,15 @@ export const swaggerSpec = {
           id: { type: "string", format: "uuid" },
           name: { type: "string", example: "Backend Crawl Project" },
           description: { type: "string", nullable: true, example: "Dự án cào dữ liệu Backend" },
+          departmentId: { type: "string", format: "uuid", nullable: true },
+          department: {
+            type: "object",
+            nullable: true,
+            properties: {
+              id: { type: "string", format: "uuid" },
+              name: { type: "string", example: "Backend Development" },
+            },
+          },
           _count: {
             type: "object",
             properties: {
@@ -782,7 +791,7 @@ export const swaggerSpec = {
             type: "array",
             items: { type: "string" },
             example: [
-              "Workload thấp — đang gánh 2 ngày công",
+              "Workload thấp - đang gánh 2 ngày công",
               "Position phù hợp với yêu cầu của task",
               "Điểm Coding gần nhất: 8.5/10",
             ],
@@ -2685,6 +2694,7 @@ export const swaggerSpec = {
                 properties: {
                   name: { type: "string", example: "Backend Crawl Project" },
                   description: { type: "string", example: "Dự án cào dữ liệu Backend" },
+                  departmentId: { type: "string", format: "uuid", nullable: true },
                 },
               },
             },
@@ -2771,6 +2781,7 @@ export const swaggerSpec = {
                 properties: {
                   name: { type: "string", example: "Backend Crawl Project v2" },
                   description: { type: "string", nullable: true, example: "Mô tả cập nhật" },
+                  departmentId: { type: "string", format: "uuid", nullable: true },
                 },
               },
             },
@@ -2832,6 +2843,79 @@ export const swaggerSpec = {
               },
             },
           },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          404: { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
+    "/task-groups/{id}/ai-recommendation": {
+      post: {
+        tags: ["TaskGroups"],
+        summary: "Xem trước phân công AI cho toàn bộ Task trong nhóm công việc",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "ID của nhóm công việc",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Đề xuất phân công AI cho nhóm công việc",
+          },
+          400: { $ref: "#/components/responses/BadRequest" },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          404: { $ref: "#/components/responses/NotFound" },
+          422: { $ref: "#/components/responses/ValidationError" },
+        },
+      },
+    },
+    "/task-groups/{id}/ai-allocation/confirm": {
+      post: {
+        tags: ["TaskGroups"],
+        summary: "Xác nhận và phân công hàng loạt cho các Task trong nhóm công việc",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "ID của nhóm công việc",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  assignments: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      required: ["taskId", "internId"],
+                      properties: {
+                        taskId: { type: "string", format: "uuid" },
+                        internId: { type: "string", format: "uuid" },
+                        supportId: { type: "string", format: "uuid", nullable: true },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Đã tạo các bản ghi phân công task thành công",
+          },
+          400: { $ref: "#/components/responses/BadRequest" },
           401: { $ref: "#/components/responses/Unauthorized" },
           404: { $ref: "#/components/responses/NotFound" },
         },
