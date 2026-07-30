@@ -60,7 +60,7 @@ export class StatsRepository {
 
       // Tasks
       totalTasks,
-      overdueTasksCount,
+      rawOverdueAssignments,
       tasksByPriority,
 
       // Assignments
@@ -97,9 +97,7 @@ export class StatsRepository {
       allAssignerTasks,
 
       // Recent Activities
-      recentSubmissionsRaw,
-      recentReportsRaw,
-      recentAppsRaw,
+      recentActivitiesRaw,
     ] = await Promise.all([
       // ─── System ──────────────────────────────────────────────────────────────
       prisma.leader.count(),
@@ -132,7 +130,20 @@ export class StatsRepository {
 
       // ─── Tasks ────────────────────────────────────────────────────────────────
       prisma.task.count({ where: { deletedAt: null } }),
-      prisma.task.count({ where: { deletedAt: null, deadline: { lt: now } } }),
+      prisma.taskAssignment.findMany({
+        where: {
+          status: { not: ASSIGNMENT_STATUS.DONE },
+          task: {
+            deletedAt: null,
+            deadline: { lt: now },
+          },
+        },
+        include: {
+          task: { select: { title: true, priority: true, deadline: true } },
+          intern: { select: { fullName: true, user: { select: { fullName: true, email: true } } } },
+          assigner: { select: { fullName: true, email: true } },
+        },
+      }),
       prisma.task.groupBy({
         by: ["priority"],
         where: { deletedAt: null },
@@ -204,34 +215,16 @@ export class StatsRepository {
       }),
 
       // ─── Recent Activities ───────────────────────────────────────────────────
-      prisma.taskSubmission.findMany({
-        take: 3,
-        orderBy: { submittedAt: "desc" },
-        select: {
-          id: true,
-          submittedAt: true,
-          assignment: {
+      prisma.activityLog.findMany({
+        take: 6,
+        orderBy: { createdAt: "desc" },
+        include: {
+          user: {
             select: {
-              task: { select: { title: true } },
-              intern: { select: { fullName: true } },
+              fullName: true,
             },
           },
         },
-      }),
-      prisma.dailyReport.findMany({
-        take: 3,
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          content: true,
-          createdAt: true,
-          intern: { select: { fullName: true } },
-        },
-      }),
-      prisma.application.findMany({
-        take: 3,
-        orderBy: { createdAt: "desc" },
-        select: { id: true, fullName: true, createdAt: true, status: true },
       }),
     ]);
 
@@ -247,7 +240,7 @@ export class StatsRepository {
     });
 
     const formattedAssignments = this.formatAssignments(rawAssignments);
-    const overdueAssignments = formattedAssignments.filter((a) => a.isOverdue);
+    const overdueAssignments = this.formatAssignments(rawOverdueAssignments);
 
     // Build fast lookup maps in memory
     const internCountMap = new Map<string, number>();
@@ -303,32 +296,20 @@ export class StatsRepository {
       };
     });
 
+    const targetMap: Record<string, string> = {
+      TaskSubmission: "SUBMISSION",
+      DailyReport: "DAILY_REPORT",
+      Application: "APPLICATION",
+    };
+
     // Recent Activities list
-    const recentActivities: ActivityLogDto[] = [
-      ...recentSubmissionsRaw.map((s) => ({
-        id: s.id,
-        type: "SUBMISSION" as const,
-        title: `Bài nộp mới: ${s.assignment?.task?.title ?? "Task"}`,
-        description: `Thực tập sinh ${s.assignment?.intern?.fullName ?? "N/A"} đã nộp bài.`,
-        createdAt: s.submittedAt.toISOString(),
-      })),
-      ...recentReportsRaw.map((r) => ({
-        id: r.id,
-        type: "DAILY_REPORT" as const,
-        title: `Báo cáo Daily từ ${r.intern?.fullName ?? "N/A"}`,
-        description: r.content ? r.content.slice(0, 60) + "..." : "Báo cáo công việc ngày.",
-        createdAt: r.createdAt.toISOString(),
-      })),
-      ...recentAppsRaw.map((a) => ({
-        id: a.id,
-        type: "APPLICATION" as const,
-        title: `Đơn ứng tuyển mới: ${a.fullName}`,
-        description: `Trạng thái: ${a.status}`,
-        createdAt: a.createdAt.toISOString(),
-      })),
-    ]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 6);
+    const recentActivities: ActivityLogDto[] = recentActivitiesRaw.map((log) => ({
+      id: log.id,
+      type: (log.targetType && targetMap[log.targetType]) || log.targetType || "SYSTEM",
+      title: log.user?.fullName || "Hệ thống",
+      description: log.description,
+      createdAt: log.createdAt.toISOString(),
+    }));
 
     const doneCount = assignmentStatusMap[ASSIGNMENT_STATUS.DONE] ?? 0;
     const systemCompletionRate = totalAssignments > 0 ? Math.round((doneCount / totalAssignments) * 100) : 0;
@@ -353,7 +334,7 @@ export class StatsRepository {
       },
       tasks: {
         total: totalTasks,
-        overdue: overdueTasksCount,
+        overdue: overdueAssignments.length,
         byPriority: {
           low: taskPriorityMap[TASK_PRIORITY.LOW] ?? 0,
           medium: taskPriorityMap[TASK_PRIORITY.MEDIUM] ?? 0,
@@ -416,6 +397,7 @@ export class StatsRepository {
       totalEvaluations,
       avgScore,
       rawAssignments,
+      rawOverdueAssignments,
       myInterns,
 
       // Batch query all intern assignments to eliminate N+1 query
@@ -475,6 +457,21 @@ export class StatsRepository {
           assigner: { select: { fullName: true, email: true } },
         },
       }),
+      prisma.taskAssignment.findMany({
+        where: {
+          assignedBy: leaderId,
+          status: { not: ASSIGNMENT_STATUS.DONE },
+          task: {
+            deletedAt: null,
+            deadline: { lt: now },
+          },
+        },
+        include: {
+          task: { select: { title: true, priority: true, deadline: true } },
+          intern: { select: { fullName: true, user: { select: { fullName: true, email: true } } } },
+          assigner: { select: { fullName: true, email: true } },
+        },
+      }),
       prisma.intern.findMany({
         where: { leaderId, deletedAt: null },
         include: { user: { select: { fullName: true, email: true } } },
@@ -504,7 +501,7 @@ export class StatsRepository {
     });
 
     const formattedAssignments = this.formatAssignments(rawAssignments);
-    const overdueAssignments = formattedAssignments.filter((a) => a.isOverdue);
+    const overdueAssignments = this.formatAssignments(rawOverdueAssignments);
 
     // Build fast lookup maps in memory
     const internAssignmentsMap = new Map<string, typeof allMyInternAssignments>();
