@@ -108,4 +108,24 @@ export const TEMPLATE_DEFAULTS: Record<string, TemplateDefault> = {
     emailContentTemplate:
       'Chào {{fullName}},<br/><br/>Hệ thống NexCampus ghi nhận một lượt đăng nhập mới vào tài khoản của bạn với chi tiết bảo mật bên dưới:<br/><br/><table style="width:100%;border-collapse:collapse;margin:16px 0;background-color:#0f172a;color:#f8fafc;border-radius:8px;overflow:hidden;"><tr style="border-bottom:1px solid #1e293b;"><td style="padding:10px 16px;color:#94a3b8;width:140px;">Thời gian:</td><td style="padding:10px 16px;font-weight:bold;">{{time}}</td></tr><tr style="border-bottom:1px solid #1e293b;"><td style="padding:10px 16px;color:#94a3b8;">Địa chỉ IP:</td><td style="padding:10px 16px;font-weight:bold;">{{ip}}</td></tr><tr style="border-bottom:1px solid #1e293b;"><td style="padding:10px 16px;color:#94a3b8;">Vị trí (ước tính):</td><td style="padding:10px 16px;font-weight:bold;">{{location}}</td></tr><tr style="border-bottom:1px solid #1e293b;"><td style="padding:10px 16px;color:#94a3b8;">Thiết bị:</td><td style="padding:10px 16px;font-weight:bold;">{{device}}</td></tr><tr style="border-bottom:1px solid #1e293b;"><td style="padding:10px 16px;color:#94a3b8;">Hệ điều hành:</td><td style="padding:10px 16px;font-weight:bold;">{{os}}</td></tr><tr><td style="padding:10px 16px;color:#94a3b8;">Trình duyệt:</td><td style="padding:10px 16px;font-weight:bold;">{{browser}}</td></tr></table>Nếu chính bạn thực hiện đăng nhập này, bạn có thể bỏ qua email này.<br/><br/>Nếu <strong style="color:#ef4444;">ĐÂY KHÔNG PHẢI LÀ BẠN</strong>, tài khoản của bạn có nguy cơ bị xâm nhập. Vui lòng nhấn vào nút bên dưới để vô hiệu hóa phiên đăng nhập này ngay lập tức:<br/><p style="margin: 20px 0;"><a href="{{revokeUrl}}" style="display:inline-block;background-color:#dc2626;color:#ffffff;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:bold;box-shadow:0 4px 12px rgba(220,38,38,0.3);">⚠️ ĐÂY KHÔNG PHẢI TÔI (Khóa phiên ngay)</a></p>Trân trọng,<br/>Đội ngũ NexCampus.',
   },
+  MEETING_CREATED: {
+    titleTemplate: "New Meeting: {{meetingTitle}}",
+    contentTemplate: "{{creatorName}} scheduled a meeting at {{startTime}}.",
+  },
+  MEETING_INVITATION: {
+    titleTemplate: "Meeting Invitation: {{meetingTitle}}",
+    contentTemplate: "{{creatorName}} invited you to a meeting at {{startTime}}.",
+  },
+  MEETING_CANCELLED: {
+    titleTemplate: "Meeting Cancelled: {{meetingTitle}}",
+    contentTemplate: "The meeting {{meetingTitle}} at {{startTime}} has been cancelled.",
+  },
+  ABSENCE_SUBMITTED: {
+    titleTemplate: "Leave Request: {{meetingTitle}}",
+    contentTemplate: "{{userName}} submitted a leave request. Reason: {{reason}}",
+  },
+  ABSENCE_REVIEWED: {
+    titleTemplate: "Leave Request {{status}}: {{meetingTitle}}",
+    contentTemplate: "Your leave request for {{meetingTitle}} has been {{status}}.",
+  },
 };

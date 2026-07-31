@@ -48,11 +48,35 @@ const defaultSelect = {
 };
 
 export class MeetingRepository {
+  private async syncMeetingStatuses() {
+    const now = new Date();
+    await prisma.$transaction([
+      prisma.meeting.updateMany({
+        where: {
+          status: "SCHEDULED",
+          startTime: { lte: now },
+          deletedAt: null,
+        },
+        data: { status: "ONGOING" },
+      }),
+      prisma.meeting.updateMany({
+        where: {
+          status: "ONGOING",
+          endTime: { lte: now },
+          deletedAt: null,
+        },
+        data: { status: "COMPLETED" },
+      }),
+    ]);
+  }
+
   async findAll(
     query: MeetingQueryDto,
     actorId: string,
     actorRole: string,
   ) {
+    await this.syncMeetingStatuses();
+
     const {
       title,
       status,
@@ -108,11 +132,15 @@ export class MeetingRepository {
           { createdBy: actorId },
           { hostId: actorId },
           { participants: { some: { userId: actorId } } },
+          { visibility: "TEAM" },
         ],
       });
     } else if (actorRole === "INTERN") {
       filters.push({
-        participants: { some: { userId: actorId } },
+        OR: [
+          { participants: { some: { userId: actorId } } },
+          { visibility: "TEAM" },
+        ],
       });
     }
 
@@ -143,7 +171,8 @@ export class MeetingRepository {
     };
   }
 
-  findById(id: string) {
+  async findById(id: string) {
+    await this.syncMeetingStatuses();
     return prisma.meeting.findFirst({
       where: { id, deletedAt: null },
       select: defaultSelect,
@@ -457,6 +486,41 @@ export class MeetingRepository {
         },
         reviewer: { select: { id: true, email: true, fullName: true } },
       },
+    });
+  }
+
+  async findAbsencesByUser(userId: string) {
+    return prisma.absenceRequest.findMany({
+      where: {
+        participant: { userId },
+        status: "APPROVED",
+      },
+      select: { meetingId: true, status: true },
+    });
+  }
+
+  async findAllAbsences() {
+    return prisma.absenceRequest.findMany({
+      select: {
+        id: true,
+        meetingId: true,
+        participantId: true,
+        reason: true,
+        attachmentUrl: true,
+        status: true,
+        createdAt: true,
+        participant: {
+          select: {
+            id: true,
+            userId: true,
+            user: { select: { id: true, email: true, fullName: true } },
+          },
+        },
+        meeting: {
+          select: { id: true, title: true, createdBy: true, hostId: true },
+        },
+      },
+      orderBy: { createdAt: "desc" as const },
     });
   }
 }
