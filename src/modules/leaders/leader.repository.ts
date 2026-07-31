@@ -36,7 +36,14 @@ export class LeaderRepository {
 
     const where: Prisma.LeaderWhereInput = {
       ...(fullName
-        ? { user: { fullName: { contains: fullName, mode: "insensitive" } } }
+        ? {
+            user: {
+              OR: [
+                { fullName: { contains: fullName, mode: "insensitive" } },
+                { email: { contains: fullName, mode: "insensitive" } },
+              ],
+            },
+          }
         : {}),
       ...(departmentId ? { departmentId } : {}),
       ...(isActive !== undefined ? { user: { isActive } } : {}),

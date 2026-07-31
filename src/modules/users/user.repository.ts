@@ -35,7 +35,12 @@ export class UserRepository {
       deletedAt: null,
       ...(email ? { email: { equals: email, mode: "insensitive" } } : {}),
       ...(fullName
-        ? { fullName: { contains: fullName, mode: "insensitive" } }
+        ? {
+            OR: [
+              { fullName: { contains: fullName, mode: "insensitive" } },
+              { email: { contains: fullName, mode: "insensitive" } },
+            ],
+          }
         : {}),
       ...(isActive !== undefined ? { isActive } : {}),
       ...(roleName ? { role: { name: roleName } } : {}),

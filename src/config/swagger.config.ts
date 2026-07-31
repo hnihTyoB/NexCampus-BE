@@ -2559,7 +2559,23 @@ export const swaggerSpec = {
       get: {
         tags: ["Departments"],
         summary: "Danh sách phòng ban (kèm danh sách vị trí)",
-        description: "Public endpoint. Trả về tất cả phòng ban kèm danh sách vị trí thuộc phòng ban đó.",
+        description: "Public endpoint. Trả về tất cả phòng ban kèm danh sách vị trí thuộc phòng ban đó. Hỗ trợ lọc theo tên và theo thông tin leader.",
+        parameters: [
+          {
+            name: "name",
+            in: "query",
+            required: false,
+            description: "Lọc theo tên phòng ban (không phân biệt hoa thường)",
+            schema: { type: "string" },
+          },
+          {
+            name: "leader",
+            in: "query",
+            required: false,
+            description: "Lọc theo tên hoặc email của leader (không phân biệt hoa thường)",
+            schema: { type: "string" },
+          },
+        ],
         responses: {
           200: {
             description: "Danh sách phòng ban",
@@ -2600,6 +2616,70 @@ export const swaggerSpec = {
           },
         },
       },
+      post: {
+        tags: ["Departments"],
+        summary: "Tạo phòng ban mới (Admin only)",
+        description: "Tạo phòng ban mới, có thể kèm danh sách vị trí ban đầu. **Chỉ ADMIN** mới có quyền này — LEADER không thể tạo phòng ban.",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["name"],
+                properties: {
+                  name: { type: "string", example: "Engineering", maxLength: 100 },
+                  positions: {
+                    type: "array",
+                    items: { type: "string", example: "Backend Intern" },
+                    description: "Danh sách tên vị trí ban đầu (tuỳ chọn)",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Phòng ban đã được tạo",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "object",
+                          properties: {
+                            id: { type: "string", format: "uuid" },
+                            name: { type: "string", example: "Engineering" },
+                            positions: {
+                              type: "array",
+                              items: {
+                                type: "object",
+                                properties: {
+                                  id: { type: "string", format: "uuid" },
+                                  name: { type: "string", example: "Backend Intern" },
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          422: { $ref: "#/components/responses/Validation" },
+        },
+      },
     },
     "/departments/{id}": {
       get: {
@@ -2608,6 +2688,80 @@ export const swaggerSpec = {
         parameters: [{ in: "path", name: "id", required: true, schema: { type: "string", format: "uuid" } }],
         responses: {
           200: { description: "Chi tiết phòng ban" },
+          404: { $ref: "#/components/responses/NotFound" },
+        },
+      },
+      put: {
+        tags: ["Departments"],
+        summary: "Đổi tên phòng ban (Admin only)",
+        description: "Cập nhật tên phòng ban. **Chỉ ADMIN** mới có quyền này — LEADER không thể đổi tên phòng ban.",
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: "path", name: "id", required: true, schema: { type: "string", format: "uuid" } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  name: { type: "string", example: "Engineering Team", maxLength: 100 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Phòng ban đã được cập nhật",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "object",
+                          properties: {
+                            id: { type: "string", format: "uuid" },
+                            name: { type: "string", example: "Engineering Team" },
+                            positions: {
+                              type: "array",
+                              items: {
+                                type: "object",
+                                properties: {
+                                  id: { type: "string", format: "uuid" },
+                                  name: { type: "string" },
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+          422: { $ref: "#/components/responses/Validation" },
+        },
+      },
+      delete: {
+        tags: ["Departments"],
+        summary: "Xóa phòng ban (Admin only)",
+        description: "Xóa phòng ban. **Chỉ ADMIN** mới có quyền này — LEADER không thể xóa phòng ban. Sẽ thất bại nếu phòng ban còn liên kết với intern, leader, hoặc application đang hoạt động.",
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: "path", name: "id", required: true, schema: { type: "string", format: "uuid" } }],
+        responses: {
+          200: { description: "Xóa phòng ban thành công" },
+          400: { $ref: "#/components/responses/BadRequest" },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
           404: { $ref: "#/components/responses/NotFound" },
         },
       },
@@ -2646,6 +2800,128 @@ export const swaggerSpec = {
               },
             },
           },
+        },
+      },
+    },
+    "/departments/positions": {
+      post: {
+        tags: ["Departments"],
+        summary: "Tạo vị trí mới trong phòng ban (Admin hoặc Leader)",
+        description: "Tạo vị trí mới cho một phòng ban. **ADMIN và LEADER** đều có quyền này.",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["departmentId", "name"],
+                properties: {
+                  departmentId: { type: "string", format: "uuid" },
+                  name: { type: "string", example: "Backend Intern", maxLength: 100 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Vị trí đã được tạo",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "object",
+                          properties: {
+                            id: { type: "string", format: "uuid" },
+                            departmentId: { type: "string", format: "uuid" },
+                            name: { type: "string", example: "Backend Intern" },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+          422: { $ref: "#/components/responses/Validation" },
+        },
+      },
+    },
+    "/departments/positions/{id}": {
+      put: {
+        tags: ["Departments"],
+        summary: "Cập nhật vị trí (Admin hoặc Leader)",
+        description: "Cập nhật tên vị trí. **ADMIN và LEADER** đều có quyền này.",
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: "path", name: "id", required: true, schema: { type: "string", format: "uuid" } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  name: { type: "string", example: "Senior Backend Intern", maxLength: 100 },
+                  departmentId: { type: "string", format: "uuid" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Vị trí đã được cập nhật",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "object",
+                          properties: {
+                            id: { type: "string", format: "uuid" },
+                            departmentId: { type: "string", format: "uuid" },
+                            name: { type: "string" },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+          422: { $ref: "#/components/responses/Validation" },
+        },
+      },
+      delete: {
+        tags: ["Departments"],
+        summary: "Xóa vị trí (Admin hoặc Leader)",
+        description: "Xóa vị trí. **ADMIN và LEADER** đều có quyền này. Sẽ thất bại nếu vị trí còn liên kết với intern hoặc application.",
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: "path", name: "id", required: true, schema: { type: "string", format: "uuid" } }],
+        responses: {
+          200: { description: "Xóa vị trí thành công" },
+          400: { $ref: "#/components/responses/BadRequest" },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
         },
       },
     },

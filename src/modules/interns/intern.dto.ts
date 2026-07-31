@@ -6,6 +6,7 @@ export interface InternQueryDto {
   positionId?: string;
   status?: InternStatus;
   leaderId?: string;
+  leader?: string;
   discordRoleGranted?: boolean;
   startDateFrom?: string;
   startDateTo?: string;
