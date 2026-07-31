@@ -2,6 +2,8 @@ import { z } from "zod";
 
 export const findAllTaskSchema = z.object({
   title: z.string().optional(),
+  code: z.string().optional(),
+  owner: z.string().optional(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH"]).optional(),
   createdBy: z.string().uuid().optional(),
   phase: z.string().optional(),

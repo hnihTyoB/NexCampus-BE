@@ -35,6 +35,9 @@ const defaultSelect = {
           },
         },
       },
+      taskGroup: {
+        select: { id: true, name: true, departmentId: true },
+      },
     },
   },
   intern: {

@@ -26,7 +26,7 @@ const defaultSelect = {
   createdAt: true,
   updatedAt: true,
   taskGroup: {
-    select: { id: true, name: true },
+    select: { id: true, name: true, departmentId: true },
   },
   creator: { select: creatorSelect },
   assignment: {
@@ -81,6 +81,8 @@ export class TaskRepository {
   async findAll(query: TaskQueryDto) {
     const {
       title,
+      code,
+      owner,
       priority,
       createdBy,
       phase,
@@ -99,6 +101,19 @@ export class TaskRepository {
     const where: Prisma.TaskWhereInput = {
       deletedAt: null,
       ...(title ? { title: { contains: title, mode: "insensitive" } } : {}),
+      ...(code ? { code: { contains: code, mode: "insensitive" } } : {}),
+      ...(owner
+        ? {
+            assignment: {
+              intern: {
+                OR: [
+                  { fullName: { contains: owner, mode: "insensitive" } },
+                  { user: { email: { contains: owner, mode: "insensitive" } } },
+                ],
+              },
+            },
+          }
+        : {}),
       ...(priority ? { priority } : {}),
       ...(createdBy ? { createdBy } : {}),
       ...(phase ? { phase: { contains: phase, mode: "insensitive" } } : {}),
