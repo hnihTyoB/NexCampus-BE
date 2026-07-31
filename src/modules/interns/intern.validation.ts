@@ -8,6 +8,7 @@ export const findAllInternSchema = z.object({
   positionId: z.string().uuid().optional(),
   status: z.enum([INTERN_STATUS.ACTIVE, INTERN_STATUS.COMPLETED, INTERN_STATUS.DROPPED]).optional(),
   leaderId: z.string().uuid("Invalid leaderId").optional(),
+  leader: z.string().optional(),
   discordRoleGranted: z
     .enum(["true", "false"])
     .transform((v) => v === "true")

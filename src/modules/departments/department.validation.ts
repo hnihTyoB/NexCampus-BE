@@ -18,3 +18,8 @@ export const updatePositionSchema = z.object({
   departmentId: z.string().uuid("Invalid departmentId").optional(),
   name: z.string().trim().min(1).max(100).optional(),
 });
+
+export const findAllDepartmentSchema = z.object({
+  name: z.string().optional(),
+  leader: z.string().optional(),
+});

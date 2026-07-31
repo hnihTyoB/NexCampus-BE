@@ -10,9 +10,10 @@ import {
 export class DepartmentController {
   private readonly service = new DepartmentService();
 
-  findAll = async (_req: Request, res: Response, next: NextFunction) => {
+  findAll = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const data = await this.service.findAll();
+      const filters = req.query as { name?: string; leader?: string };
+      const data = await this.service.findAll(req.user, filters);
       res.json({ success: true, data });
     } catch (error) {
       next(error);

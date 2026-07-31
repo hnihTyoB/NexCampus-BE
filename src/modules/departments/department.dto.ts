@@ -2,6 +2,13 @@ export interface DepartmentDto {
   id: string;
   name: string;
   positions: PositionDto[];
+  leaders?: {
+    id: string;
+    user: {
+      fullName: string | null;
+      email: string;
+    };
+  }[];
 }
 
 export interface PositionDto {

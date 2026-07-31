@@ -65,7 +65,14 @@ export class ApplicationRepository {
       ...(positionId
         ? { positionId }
         : {}),
-      ...(email ? { email: { contains: email, mode: "insensitive" } } : {}),
+      ...(email
+        ? {
+            OR: [
+              { email: { contains: email, mode: "insensitive" } },
+              { fullName: { contains: email, mode: "insensitive" } },
+            ],
+          }
+        : {}),
       ...(startDateFrom || startDateTo
         ? {
             startDate: {
@@ -254,7 +261,18 @@ export class ApplicationRepository {
     } = query;
 
     const where: Prisma.ApplicationInviteWhereInput = {
-      ...(email ? { email: { contains: email, mode: "insensitive" } } : {}),
+      ...(email
+        ? {
+            OR: [
+              { email: { contains: email, mode: "insensitive" } },
+              {
+                application: {
+                  fullName: { contains: email, mode: "insensitive" },
+                },
+              },
+            ],
+          }
+        : {}),
       ...(inviteStatus ? { status: inviteStatus as any } : {}),
       ...(applicationStatus || departmentId || positionId
         ? {

@@ -11,8 +11,15 @@ import {
 export class DepartmentService {
   private readonly repository = new DepartmentRepository();
 
-  async findAll() {
-    return this.repository.findAll();
+  async findAll(user?: { id: string; role: string }, filters?: { name?: string; leader?: string }) {
+    if (user?.role === "LEADER") {
+      const departmentId = await this.repository.findDepartmentIdByLeaderUserId(user.id);
+      if (!departmentId) {
+        return [];
+      }
+      return this.repository.findAll(departmentId, filters);
+    }
+    return this.repository.findAll(undefined, filters);
   }
 
   async findById(id: string) {

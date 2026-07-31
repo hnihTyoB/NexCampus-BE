@@ -42,6 +42,7 @@ export class InternRepository {
       positionId,
       status,
       leaderId,
+      leader,
       discordRoleGranted,
       startDateFrom,
       startDateTo,
@@ -54,7 +55,12 @@ export class InternRepository {
     const where: Prisma.InternWhereInput = {
       deletedAt: null,
       ...(fullName
-        ? { fullName: { contains: fullName, mode: "insensitive" } }
+        ? {
+            OR: [
+              { fullName: { contains: fullName, mode: "insensitive" } },
+              { user: { email: { contains: fullName, mode: "insensitive" } } },
+            ],
+          }
         : {}),
       ...(departmentId
         ? { departmentId }
@@ -64,6 +70,16 @@ export class InternRepository {
         : {}),
       ...(status ? { status } : {}),
       ...(leaderId ? { leaderId } : {}),
+      ...(leader
+        ? {
+            leader: {
+              OR: [
+                { fullName: { contains: leader, mode: "insensitive" } },
+                { email: { contains: leader, mode: "insensitive" } },
+              ],
+            },
+          }
+        : {}),
       ...(discordRoleGranted !== undefined ? { discordRoleGranted } : {}),
       ...(startDateFrom || startDateTo
         ? {

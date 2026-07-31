@@ -7,16 +7,59 @@ const departmentWithPositions = {
   id: true,
   name: true,
   positions: { select: { id: true, name: true } },
+  leaders: {
+    select: {
+      id: true,
+      user: {
+        select: {
+          fullName: true,
+          email: true,
+        },
+      },
+    },
+  },
 };
 
 export class DepartmentRepository {
   // ─── Departments ─────────────────────────────────────────────────
 
-  findAll() {
+  findAll(departmentId?: string, filters?: { name?: string; leader?: string }) {
+    const where: any = {};
+    if (departmentId) {
+      where.id = departmentId;
+    }
+    if (filters?.name) {
+      where.name = {
+        contains: filters.name,
+        mode: "insensitive",
+      };
+    }
+    if (filters?.leader) {
+      where.leaders = {
+        some: {
+          user: {
+            OR: [
+              { fullName: { contains: filters.leader, mode: "insensitive" } },
+              { email: { contains: filters.leader, mode: "insensitive" } },
+            ],
+          },
+        },
+      };
+    }
+
     return prisma.department.findMany({
+      where,
       select: departmentWithPositions,
       orderBy: { name: "asc" },
     });
+  }
+
+  async findDepartmentIdByLeaderUserId(userId: string): Promise<string | null> {
+    const leader = await prisma.leader.findFirst({
+      where: { userId },
+      select: { departmentId: true },
+    });
+    return leader?.departmentId || null;
   }
 
   findById(id: string) {

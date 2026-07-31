@@ -57,3 +57,41 @@ export async function authMiddleware(
     }
   }
 }
+
+export async function optionalAuthMiddleware(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return next();
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const payload = jwt.verify(token, jwtConfig.accessSecret) as {
+      id: string;
+      email: string;
+      role: string;
+    };
+
+    const user = await prisma.user.findFirst({
+      where: { id: payload.id, deletedAt: null },
+      select: { isActive: true },
+    });
+
+    if (user && user.isActive) {
+      req.user = {
+        id: payload.id,
+        email: payload.email,
+        role: payload.role as Role,
+      };
+    }
+  } catch (error) {
+    // optional auth does not block the request
+  }
+  next();
+}
