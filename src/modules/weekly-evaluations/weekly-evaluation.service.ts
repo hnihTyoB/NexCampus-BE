@@ -112,6 +112,8 @@ export class WeeklyEvaluationService {
         );
       }
       query.internId = intern.id;
+    } else if (user.role === ROLES.LEADER) {
+      query.leaderId = user.id;
     }
     return this.repository.findAll(query);
   }
@@ -135,6 +137,39 @@ export class WeeklyEvaluationService {
     const intern = await this.internRepository.findById(data.internId);
     if (!intern) {
       throw new AppError("Intern profile not found", 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    // Validate week number against intern's timeline
+    const start = new Date(intern.startDate);
+    start.setHours(0, 0, 0, 0);
+
+    const today = new Date();
+    const todayMidnight = new Date(today);
+    todayMidnight.setHours(0, 0, 0, 0);
+    const elapsedWeeks = Math.ceil((todayMidnight.getTime() - start.getTime()) / (7 * 24 * 3600 * 1000));
+    const maxAllowedWeek = Math.max(1, elapsedWeeks);
+
+    if (data.week < 1 || data.week > maxAllowedWeek) {
+      throw new AppError(
+        `Tuần đánh giá phải nằm trong khoảng từ 1 đến ${maxAllowedWeek} (tuần thực tập hiện tại)`,
+        400,
+        ERROR_CODE.BAD_REQUEST,
+      );
+    }
+
+    if (data.week === maxAllowedWeek) {
+      const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 5 = Friday, 6 = Saturday
+      const hours = today.getHours();
+      const isSaturdayAllowed = dayOfWeek === 6 && hours >= 11;
+      const isSundayAllowed = dayOfWeek === 0;
+
+      if (!isSaturdayAllowed && !isSundayAllowed) {
+        throw new AppError(
+          "Chỉ có thể đánh giá tuần hiện tại từ Thứ Bảy (sau 11:00 sáng) đến hết Chủ Nhật",
+          400,
+          ERROR_CODE.BAD_REQUEST,
+        );
+      }
     }
 
     // 2. Ensure unique evaluation per week for that intern
@@ -280,6 +315,43 @@ export class WeeklyEvaluationService {
    * Chỉ ADMIN và LEADER mới có quyền gọi (đã enforce ở route).
    */
   async getAiSuggestion(data: AiSuggestionRequestDto, user: UserPayload) {
+    const intern = await this.internRepository.findById(data.internId);
+    if (!intern) {
+      throw new AppError("Intern profile not found", 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    const start = new Date(intern.startDate);
+    start.setHours(0, 0, 0, 0);
+
+    const today = new Date();
+    const todayMidnight = new Date(today);
+    todayMidnight.setHours(0, 0, 0, 0);
+    const elapsedWeeks = Math.ceil((todayMidnight.getTime() - start.getTime()) / (7 * 24 * 3600 * 1000));
+    const maxAllowedWeek = Math.max(1, elapsedWeeks);
+
+    if (data.week < 1 || data.week > maxAllowedWeek) {
+      throw new AppError(
+        `Tuần đánh giá phải nằm trong khoảng từ 1 đến ${maxAllowedWeek} (tuần thực tập hiện tại)`,
+        400,
+        ERROR_CODE.BAD_REQUEST,
+      );
+    }
+
+    if (data.week === maxAllowedWeek) {
+      const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 5 = Friday, 6 = Saturday
+      const hours = today.getHours();
+      const isSaturdayAllowed = dayOfWeek === 6 && hours >= 11;
+      const isSundayAllowed = dayOfWeek === 0;
+
+      if (!isSaturdayAllowed && !isSundayAllowed) {
+        throw new AppError(
+          "Chỉ có thể đánh giá tuần hiện tại từ Thứ Bảy (sau 11:00 sáng) đến hết Chủ Nhật",
+          400,
+          ERROR_CODE.BAD_REQUEST,
+        );
+      }
+    }
+
     return this.aiService.getSuggestion(data, user);
   }
 
