@@ -97,6 +97,20 @@ router.get(
   controller.findAbsencesByMeeting,
 );
 
+router.get(
+  "/absences/my",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER, ROLES.INTERN),
+  controller.getMyAbsences,
+);
+
+router.get(
+  "/absences/pending",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER),
+  controller.getPendingAbsences,
+);
+
 router.put(
   "/absences/:absenceId/review",
   authMiddleware,
