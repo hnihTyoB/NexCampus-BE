@@ -138,4 +138,22 @@ export class MeetingController {
       next(error);
     }
   };
+
+  getMyAbsences = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.service.getMyAbsences(req.user.id);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getPendingAbsences = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.service.getAllAbsences();
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
