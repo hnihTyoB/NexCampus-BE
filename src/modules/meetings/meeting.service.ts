@@ -1,4 +1,5 @@
 import { MeetingRepository } from "./meeting.repository";
+import { prisma } from "../../database/prisma.client";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import {
@@ -12,6 +13,8 @@ import {
 } from "./meeting.dto";
 import { ActivityLogService } from "../activity-logs/activity-log.service";
 import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
+import { NotificationDispatcher } from "../notifications/notification.dispatcher";
+import { NOTIFICATION_TYPE } from "../../common/constants/status.constant";
 
 interface Actor {
   id: string;
@@ -93,6 +96,35 @@ export class MeetingService {
       result.id,
       "Meeting",
     );
+
+    // Notify participants
+    if (result.visibility === "TEAM") {
+      // COMPANY visibility: notify all leaders and interns
+      const allUsers = await prisma.user.findMany({
+        where: { deletedAt: null, isActive: true, role: { name: { in: ["LEADER", "INTERN"] } } },
+        select: { id: true },
+      });
+      for (const u of allUsers) {
+        if (u.id !== createdBy) {
+          NotificationDispatcher.dispatch(u.id, NOTIFICATION_TYPE.MEETING_INVITATION, {
+            meetingTitle: result.title,
+            creatorName: result.creator?.fullName || result.creator?.email || "Someone",
+            startTime: new Date(result.startTime).toLocaleString(),
+          }).catch(() => {});
+        }
+      }
+    } else {
+      const participants = result.participants || [];
+      for (const p of participants) {
+        if (p.userId !== createdBy) {
+          NotificationDispatcher.dispatch(p.userId, NOTIFICATION_TYPE.MEETING_INVITATION, {
+            meetingTitle: result.title,
+            creatorName: result.creator?.fullName || result.creator?.email || "Someone",
+            startTime: new Date(result.startTime).toLocaleString(),
+          }).catch(() => {});
+        }
+      }
+    }
 
     return result;
   }
@@ -413,6 +445,16 @@ export class MeetingService {
       "AbsenceRequest",
     );
 
+    // Notify host & creator
+    const notifyIds = [meeting.hostId, meeting.createdBy].filter((id) => id !== actor.id);
+    for (const uid of [...new Set(notifyIds)]) {
+      NotificationDispatcher.dispatch(uid, NOTIFICATION_TYPE.ABSENCE_SUBMITTED, {
+        meetingTitle: meeting.title,
+        userName: result.participant?.user?.fullName || result.participant?.user?.email || "Someone",
+        reason: result.reason,
+      }).catch(() => {});
+    }
+
     return result;
   }
 
@@ -491,6 +533,20 @@ export class MeetingService {
       "AbsenceRequest",
     );
 
+    // Notify absence requester
+    NotificationDispatcher.dispatch(absence.participant.userId, NOTIFICATION_TYPE.ABSENCE_REVIEWED, {
+      meetingTitle: absence.meeting.title,
+      status: data.status === "APPROVED" ? "approved" : "rejected",
+    }).catch(() => {});
+
     return result;
+  }
+
+  async getMyAbsences(userId: string) {
+    return this.repository.findAbsencesByUser(userId);
+  }
+
+  async getAllAbsences() {
+    return this.repository.findAllAbsences();
   }
 }

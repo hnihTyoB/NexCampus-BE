@@ -79,6 +79,17 @@ export class TaskAssignmentService {
       throw new AppError("Intern profile not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
+    // 3b. Check Department matching
+    if (task.taskGroup && task.taskGroup.departmentId) {
+      if (intern.department?.id !== task.taskGroup.departmentId) {
+        throw new AppError(
+          "Intern must belong to the same department as the task group",
+          400,
+          ERROR_CODE.VALIDATION_ERROR,
+        );
+      }
+    }
+
     // 4. Check if task is already assigned
     const existing = await this.repository.findByTaskId(data.taskId);
     if (existing) {
@@ -257,6 +268,17 @@ export class TaskAssignmentService {
           404,
           ERROR_CODE.NOT_FOUND,
         );
+      }
+
+      // Check Task Department Match
+      if (assignment.task.taskGroup && assignment.task.taskGroup.departmentId) {
+        if (intern.department?.id !== assignment.task.taskGroup.departmentId) {
+          throw new AppError(
+            "Intern must belong to the same department as the task group",
+            400,
+            ERROR_CODE.VALIDATION_ERROR,
+          );
+        }
       }
 
       // Check Task Deadline

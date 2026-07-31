@@ -33,7 +33,7 @@ export class UserRepository {
 
     const where: Prisma.UserWhereInput = {
       deletedAt: null,
-      ...(email ? { email: { contains: email, mode: "insensitive" } } : {}),
+      ...(email ? { email: { equals: email, mode: "insensitive" } } : {}),
       ...(fullName
         ? { fullName: { contains: fullName, mode: "insensitive" } }
         : {}),

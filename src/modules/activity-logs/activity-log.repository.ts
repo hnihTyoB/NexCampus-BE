@@ -36,6 +36,14 @@ export class ActivityLogRepository {
       ...(query.action ? { action: query.action } : {}),
       ...(query.targetId ? { targetId: query.targetId } : {}),
       ...(query.targetType ? { targetType: query.targetType } : {}),
+      ...(query.createdFrom || query.createdTo
+        ? {
+            createdAt: {
+              ...(query.createdFrom ? { gte: new Date(`${query.createdFrom}T00:00:00.000Z`) } : {}),
+              ...(query.createdTo ? { lte: new Date(`${query.createdTo}T23:59:59.999Z`) } : {}),
+            },
+          }
+        : {}),
     };
 
     const skip = (parsedPage - 1) * parsedLimit;

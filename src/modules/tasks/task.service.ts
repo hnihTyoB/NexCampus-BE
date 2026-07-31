@@ -38,7 +38,45 @@ export class TaskService {
   }
 
   async update(id: string, data: UpdateTaskDto, actorId: string) {
-    await this.findById(id);
+    const current = await this.findById(id);
+
+    const keys = [
+      "title",
+      "description",
+      "deadline",
+      "priority",
+      "code",
+      "startDate",
+      "estDays",
+      "phase",
+      "module",
+      "acceptanceCriteria",
+      "taskNotes",
+      "taskGroupId",
+    ] as const;
+
+    const hasChanges = keys.some((key) => {
+      if (data[key] === undefined) return false;
+
+      const currentVal = current[key];
+      const newVal = data[key];
+
+      if (key === "deadline" || key === "startDate") {
+        if (!currentVal && !newVal) return false;
+        if (!currentVal || !newVal) return true;
+        return new Date(currentVal).getTime() !== new Date(newVal as string).getTime();
+      }
+
+      const normCurrent = currentVal === null || currentVal === undefined ? "" : currentVal;
+      const normNew = newVal === null || newVal === undefined ? "" : newVal;
+
+      return normCurrent !== normNew;
+    });
+
+    if (!hasChanges) {
+      return current;
+    }
+
     const result = await this.repository.update(id, data);
 
     await this.activityLogService.log(
