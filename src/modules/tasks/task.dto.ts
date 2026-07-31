@@ -4,6 +4,8 @@ import { TaskPriority } from "@prisma/client";
 
 export interface TaskQueryDto {
   title?: string;
+  code?: string;
+  owner?: string;
   priority?: TaskPriority;
   createdBy?: string;
   phase?: string;
