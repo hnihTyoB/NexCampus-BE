@@ -6,6 +6,8 @@ export const findAllInternSchema = z.object({
   fullName: z.string().optional(),
   departmentId: z.string().uuid().optional(),
   positionId: z.string().uuid().optional(),
+  department: z.string().optional(),
+  position: z.string().optional(),
   status: z.enum([INTERN_STATUS.ACTIVE, INTERN_STATUS.COMPLETED, INTERN_STATUS.DROPPED]).optional(),
   leaderId: z.string().uuid("Invalid leaderId").optional(),
   leader: z.string().optional(),

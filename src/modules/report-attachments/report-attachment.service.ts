@@ -5,7 +5,7 @@ import { InternRepository } from "../interns/intern.repository";
 import { StorageService } from "../../common/services/storage.service";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
-import { supabaseConfig } from "../../config/supabase.config";
+import { storageConfig } from "../../config/storage.config";
 import { ROLES } from "../../common/constants/role.constant";
 
 export class ReportAttachmentService {
@@ -15,7 +15,7 @@ export class ReportAttachmentService {
   private readonly storageService = new StorageService();
 
   private get bucket() {
-    return supabaseConfig.storageReportBucket;
+    return storageConfig.namespaces.reports;
   }
 
   async uploadAttachment(
@@ -56,7 +56,7 @@ export class ReportAttachmentService {
     const safeFileName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
     const filePath = `${reportId}/${randomUUID()}_${safeFileName}`;
 
-    // 4. Upload len Supabase Storage
+    // 4. Upload to Cloudflare R2
     const fileUrl = await this.storageService.uploadFile(
       this.bucket,
       filePath,
@@ -64,16 +64,23 @@ export class ReportAttachmentService {
       file.mimetype,
     );
 
-    // 5. Luu record vao DB
-    return this.attachmentRepo.create({
-      reportId,
-      fileName: file.originalname,
-      fileUrl,
-      filePath,
-      mimeType: file.mimetype,
-      fileSize: file.size,
-      uploadedBy,
-    });
+    // 5. Persist metadata; roll back the object if the database write fails.
+    try {
+      return await this.attachmentRepo.create({
+        reportId,
+        fileName: file.originalname,
+        fileUrl,
+        filePath,
+        mimeType: file.mimetype,
+        fileSize: file.size,
+        uploadedBy,
+      });
+    } catch (error) {
+      await this.storageService.deleteFile(this.bucket, filePath).catch((cleanupError) => {
+        console.error(`[ReportAttachmentService] Failed to roll back R2 object ${filePath}:`, cleanupError);
+      });
+      throw error;
+    }
   }
 
   async deleteAttachment(
@@ -104,7 +111,7 @@ export class ReportAttachmentService {
       }
     }
 
-    // Xoa file tren Supabase Storage
+    // Delete the Cloudflare R2 object.
     await this.storageService.deleteFile(this.bucket, attachment.filePath);
 
     // Xoa record trong DB

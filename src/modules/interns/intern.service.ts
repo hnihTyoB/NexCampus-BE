@@ -11,6 +11,7 @@ import {
 } from "./intern.dto";
 import { prisma } from "../../database/prisma.client";
 import { StorageService } from "../../common/services/storage.service";
+import { storageConfig } from "../../config/storage.config";
 import {
   INTERN_STATUS,
   NOTIFICATION_TYPE,
@@ -231,15 +232,15 @@ export class InternService {
 
       if (attachments.length > 0) {
         const storageService = new StorageService();
-        const bucket = "application-attachments";
+        const bucket = storageConfig.namespaces.applications;
 
-        // 3. Xóa các tệp này trên Supabase Storage
+        // 3. Delete these files from Cloudflare R2.
         for (const attachment of attachments) {
           try {
             await storageService.deleteFile(bucket, attachment.filePath);
           } catch (storageError) {
             console.error(
-              `[InternService.delete] Failed to delete file ${attachment.filePath} on Supabase:`,
+              `[InternService.delete] Failed to delete R2 object ${attachment.filePath}:`,
               storageError,
             );
           }

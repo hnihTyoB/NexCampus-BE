@@ -5,7 +5,7 @@ import { InternRepository } from "../interns/intern.repository";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import { StorageService } from "../../common/services/storage.service";
-import { supabaseConfig } from "../../config/supabase.config";
+import { storageConfig } from "../../config/storage.config";
 import {
   DailyReportQueryDto,
   CreateDailyReportDto,
@@ -129,23 +129,13 @@ export class DailyReportService {
       }
     }
 
-    // 2. Delete old video file from storage if it exists and was uploaded to our bucket
-    const bucket = supabaseConfig.storageReportBucket;
+    const bucket = storageConfig.namespaces.reports;
     const storageService = new StorageService();
+    const oldVideoPath = report.videoDemo
+      ? storageService.getPathFromPublicUrl(bucket, report.videoDemo)
+      : null;
 
-    if (report.videoDemo) {
-      const prefix = `${supabaseConfig.url}/storage/v1/object/public/${bucket}/`;
-      if (report.videoDemo.startsWith(prefix)) {
-        const videoPath = report.videoDemo.replace(prefix, "");
-        try {
-          await storageService.deleteFile(bucket, videoPath);
-        } catch (err) {
-          console.error(`Failed to delete old video demo from storage:`, err);
-        }
-      }
-    }
-
-    // 3. Upload new video file
+    // 2. Upload the replacement before changing the database or old object.
     const safeFileName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
     const filePath = `${id}/video_${randomUUID()}_${safeFileName}`;
     const videoUrl = await storageService.uploadFile(
@@ -155,8 +145,24 @@ export class DailyReportService {
       file.mimetype,
     );
 
-    // 4. Update report in DB
-    return this.repository.update(id, { videoDemo: videoUrl });
+    // 3. Update the database, rolling back the new object on failure.
+    let updatedReport;
+    try {
+      updatedReport = await this.repository.update(id, { videoDemo: videoUrl });
+    } catch (error) {
+      await storageService.deleteFile(bucket, filePath).catch((cleanupError) => {
+        console.error(`[DailyReportService] Failed to roll back R2 video ${filePath}:`, cleanupError);
+      });
+      throw error;
+    }
+
+    if (oldVideoPath) {
+      await storageService.deleteFile(bucket, oldVideoPath).catch((error) => {
+        console.error(`[DailyReportService] Failed to delete old R2 video ${oldVideoPath}:`, error);
+      });
+    }
+
+    return updatedReport;
   }
 
   async delete(id: string, user: UserPayload) {
@@ -173,8 +179,8 @@ export class DailyReportService {
       }
     }
 
-    // Delete associated files from Supabase Storage
-    const bucket = supabaseConfig.storageReportBucket;
+    // Delete associated files from Cloudflare R2.
+    const bucket = storageConfig.namespaces.reports;
     const storageService = new StorageService();
 
     // 1. Delete report attachments
@@ -193,9 +199,8 @@ export class DailyReportService {
 
     // 2. Delete video demo if it is uploaded to our bucket
     if (report.videoDemo) {
-      const prefix = `${supabaseConfig.url}/storage/v1/object/public/${bucket}/`;
-      if (report.videoDemo.startsWith(prefix)) {
-        const videoPath = report.videoDemo.replace(prefix, "");
+      const videoPath = storageService.getPathFromPublicUrl(bucket, report.videoDemo);
+      if (videoPath) {
         try {
           await storageService.deleteFile(bucket, videoPath);
         } catch (err) {

@@ -4,6 +4,8 @@ export interface InternQueryDto {
   fullName?: string;
   departmentId?: string;
   positionId?: string;
+  department?: string;
+  position?: string;
   status?: InternStatus;
   leaderId?: string;
   leader?: string;

@@ -1,17 +1,17 @@
 const MIN_FILE_SIZE_MB = 1;
-const MAX_FILE_SIZE_MB = 500;
+const MAX_FILE_SIZE_MB = 50;
 
 function parseFileSizeMb(raw: string | undefined): number {
   const value = parseInt(raw ?? "50", 10);
 
   if (isNaN(value)) {
     throw new Error(
-      `[env] SUPABASE_STORAGE_MAX_FILE_SIZE_MB must be a number, got "${raw}".`,
+      `[env] R2_MAX_FILE_SIZE_MB must be a number, got "${raw}".`,
     );
   }
   if (value < MIN_FILE_SIZE_MB || value > MAX_FILE_SIZE_MB) {
     throw new Error(
-      `[env] SUPABASE_STORAGE_MAX_FILE_SIZE_MB must be between ${MIN_FILE_SIZE_MB} and ${MAX_FILE_SIZE_MB} MB, got ${value}.`,
+      `[env] R2_MAX_FILE_SIZE_MB must be between ${MIN_FILE_SIZE_MB} and ${MAX_FILE_SIZE_MB} MB, got ${value}.`,
     );
   }
 
@@ -84,21 +84,21 @@ export const envConfig = {
   discord: {
     webhookUrl: process.env.DISCORD_WEBHOOK_URL || "",
   },
-  supabase: {
-    url: process.env.SUPABASE_URL || "",
-    secretKey: process.env.SUPABASE_SECRET_KEY || "",
-    storageBucket:
-      process.env.SUPABASE_STORAGE_TASK_BUCKET || "task-attachments",
-    storageSubmissionBucket:
-      process.env.SUPABASE_STORAGE_SUBMISSION_BUCKET ||
-      "submission-attachments",
-    storageReportBucket:
-      process.env.SUPABASE_STORAGE_REPORT_BUCKET || "report-attachments",
-    storageAvatarBucket:
-      process.env.SUPABASE_STORAGE_AVATAR_BUCKET || "avatars",
-    maxFileSizeMb: parseFileSizeMb(
-      process.env.SUPABASE_STORAGE_MAX_FILE_SIZE_MB,
-    ),
+  r2: {
+    accountId: process.env.R2_ACCOUNT_ID || "",
+    endpoint: process.env.R2_ENDPOINT || "",
+    accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
+    bucketName: process.env.R2_BUCKET_NAME || "",
+    publicUrl: process.env.R2_PUBLIC_URL || "",
+    taskPrefix: process.env.R2_TASK_PREFIX || "task-attachments",
+    submissionPrefix:
+      process.env.R2_SUBMISSION_PREFIX || "submission-attachments",
+    reportPrefix: process.env.R2_REPORT_PREFIX || "report-attachments",
+    avatarPrefix: process.env.R2_AVATAR_PREFIX || "avatars",
+    applicationPrefix:
+      process.env.R2_APPLICATION_PREFIX || "application-attachments",
+    maxFileSizeMb: parseFileSizeMb(process.env.R2_MAX_FILE_SIZE_MB),
   },
   storageCleanup: {
     retentionDays: parseRetentionDays(

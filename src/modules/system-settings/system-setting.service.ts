@@ -12,9 +12,14 @@ export class SystemSettingService {
   async getSettings() {
     const list = await this.repository.getAll();
     const settings: Record<string, string | number> = {
-      AVATAR_MAX_FILE_SIZE_MB: 2, // Khóa cứng 2MB
-      REPORT_MAX_FILE_SIZE_MB: 5, // Khóa cứng 5MB
-      SUBMISSION_MAX_FILE_SIZE_MB: 50, // Mặc định 50MB
+      AVATAR_MAX_FILE_SIZE_MB: 5,
+      REPORT_MAX_FILE_SIZE_MB: 10,
+      REPORT_VIDEO_MAX_FILE_SIZE_MB: 50,
+      SUBMISSION_ATTACHMENT_MAX_FILE_SIZE_MB: 25,
+      SUBMISSION_MAX_FILE_SIZE_MB: 50,
+      TASK_ATTACHMENT_MAX_FILE_SIZE_MB: 25,
+      APPLICATION_MAX_FILE_SIZE_MB: 10,
+      TASK_IMPORT_MAX_FILE_SIZE_MB: 10,
     };
 
     for (const item of list) {
@@ -60,7 +65,7 @@ export class SystemSettingService {
     try {
       const setting = await this.repository.get("SUBMISSION_MAX_FILE_SIZE_MB");
       const mb = setting ? parseInt(setting.value, 10) : 50;
-      cachedSubmissionLimitMb = Math.min(Math.max(mb, 5), 100); // Giới hạn trần 100MB bảo vệ RAM
+      cachedSubmissionLimitMb = Math.min(Math.max(mb, 5), 50);
       cacheTimestamp = now;
       return cachedSubmissionLimitMb;
     } catch (err) {

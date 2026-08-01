@@ -1,76 +1,121 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { supabaseConfig } from "../../config/supabase.config";
+import {
+  DeleteObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+  type ListObjectsV2CommandOutput,
+} from "@aws-sdk/client-s3";
+import { storageConfig } from "../../config/storage.config";
 import { AppError } from "../errors/app-error";
 import { ERROR_CODE } from "../errors/error-code";
 
 export class StorageService {
-  private supabase: SupabaseClient;
+  private readonly client: S3Client;
 
   constructor() {
-    const { url, secretKey } = supabaseConfig;
+    const {
+      endpoint,
+      accessKeyId,
+      secretAccessKey,
+      bucketName,
+      publicUrl,
+    } = storageConfig;
 
-    if (!url || !secretKey) {
+    if (
+      !endpoint ||
+      !accessKeyId ||
+      !secretAccessKey ||
+      !bucketName ||
+      !publicUrl
+    ) {
       throw new AppError(
-        "Supabase URL or Secret Key is missing in environment variables",
+        "Cloudflare R2 storage configuration is incomplete",
         500,
         ERROR_CODE.INTERNAL_SERVER_ERROR,
       );
     }
 
-    this.supabase = createClient(url, secretKey);
+    this.client = new S3Client({
+      region: "auto",
+      endpoint,
+      credentials: { accessKeyId, secretAccessKey },
+    });
   }
 
-  async ensureBucketExists(bucket: string): Promise<void> {
+  private getObjectKey(namespace: string, path: string): string {
+    const normalizedNamespace = namespace.replace(/^\/+|\/+$/g, "");
+    const normalizedPath = path.replace(/^\/+/, "");
+
+    if (!normalizedNamespace || !normalizedPath) {
+      throw new AppError(
+        "Storage namespace and path are required",
+        500,
+        ERROR_CODE.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    return `${normalizedNamespace}/${normalizedPath}`;
+  }
+
+  private getPublicUrl(objectKey: string): string {
+    const encodedKey = objectKey
+      .split("/")
+      .map((segment) => encodeURIComponent(segment))
+      .join("/");
+    return `${storageConfig.publicUrl}/${encodedKey}`;
+  }
+
+  getPathFromPublicUrl(namespace: string, fileUrl: string): string | null {
+    const normalizedNamespace = namespace.replace(/^\/+|\/+$/g, "");
+    const namespacePrefix = `${storageConfig.publicUrl}/${normalizedNamespace}/`;
+    if (!fileUrl.startsWith(namespacePrefix)) {
+      return null;
+    }
+
     try {
-      const { data, error } = await this.supabase.storage.getBucket(bucket);
-      if (error || !data) {
-        const { error: createError } = await this.supabase.storage.createBucket(bucket, {
-          public: true,
-        });
-        if (createError) {
-          console.error(`[StorageService] Failed to create bucket "${bucket}": ${createError.message}`);
-        } else {
-          console.log(`[StorageService] Automatically created missing public bucket: "${bucket}"`);
-        }
-      }
-    } catch (err) {
-      console.error(`[StorageService] Error checking/creating bucket "${bucket}":`, err);
+      return decodeURIComponent(fileUrl.slice(namespacePrefix.length));
+    } catch {
+      return null;
     }
   }
 
   async uploadFile(
-    bucket: string,
+    namespace: string,
     path: string,
     buffer: Buffer,
     mimeType: string,
   ): Promise<string> {
-    await this.ensureBucketExists(bucket);
+    const objectKey = this.getObjectKey(namespace, path);
 
-    const { error } = await this.supabase.storage
-      .from(bucket)
-      .upload(path, buffer, {
-        contentType: mimeType,
-        upsert: false,
-      });
-
-    if (error) {
+    try {
+      await this.client.send(new PutObjectCommand({
+        Bucket: storageConfig.bucketName,
+        Key: objectKey,
+        Body: buffer,
+        ContentType: mimeType,
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       throw new AppError(
-        `Upload to Supabase Storage failed: ${error.message}`,
+        `Upload to Cloudflare R2 failed: ${message}`,
         500,
         ERROR_CODE.INTERNAL_SERVER_ERROR,
       );
     }
 
-    const { data } = this.supabase.storage.from(bucket).getPublicUrl(path);
-    return data.publicUrl;
+    return this.getPublicUrl(objectKey);
   }
 
-  async deleteFile(bucket: string, path: string): Promise<void> {
-    const { error } = await this.supabase.storage.from(bucket).remove([path]);
-
-    if (error) {
+  async deleteFile(namespace: string, path: string): Promise<void> {
+    try {
+      await this.client.send(new DeleteObjectCommand({
+        Bucket: storageConfig.bucketName,
+        Key: this.getObjectKey(namespace, path),
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       throw new AppError(
-        `Failed to delete file from Supabase Storage: ${error.message}`,
+        `Failed to delete file from Cloudflare R2: ${message}`,
         500,
         ERROR_CODE.INTERNAL_SERVER_ERROR,
       );
@@ -78,58 +123,49 @@ export class StorageService {
   }
 
   /**
-   * Liệt kê đệ quy toàn bộ tệp tin trong một bucket của Supabase Storage.
-   * Trả về danh sách đối tượng chứa thông tin đường dẫn và thời gian khởi tạo của tệp tin.
+   * List all objects in a logical namespace. Returned paths exclude the
+   * namespace prefix so they remain comparable with database storage paths.
    */
   async listAllFiles(
-    bucket: string,
-    folderPath: string = "",
+    namespace: string,
   ): Promise<{ name: string; path: string; created_at: string }[]> {
     const files: { name: string; path: string; created_at: string }[] = [];
-    let offset = 0;
-    const limit = 100;
+    const normalizedNamespace = namespace.replace(/^\/+|\/+$/g, "");
+    const prefix = `${normalizedNamespace}/`;
+    let continuationToken: string | undefined;
 
-    while (true) {
-      const { data, error } = await this.supabase.storage
-        .from(bucket)
-        .list(folderPath, {
-          limit,
-          offset,
-          sortBy: { column: "name", order: "asc" },
-        });
-
-      if (error) {
+    do {
+      let result: ListObjectsV2CommandOutput;
+      try {
+        result = await this.client.send(new ListObjectsV2Command({
+          Bucket: storageConfig.bucketName,
+          Prefix: prefix,
+          ContinuationToken: continuationToken,
+        }));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
         throw new AppError(
-          `Failed to list files from Supabase Storage: ${error.message}`,
+          `Failed to list files from Cloudflare R2: ${message}`,
           500,
           ERROR_CODE.INTERNAL_SERVER_ERROR,
         );
       }
 
-      if (!data || data.length === 0) {
-        break;
+      for (const item of result.Contents ?? []) {
+        if (!item.Key || !item.Key.startsWith(prefix)) continue;
+        const path = item.Key.slice(prefix.length);
+        if (!path) continue;
+        files.push({
+          name: path.split("/").pop() ?? path,
+          path,
+          created_at: item.LastModified?.toISOString() ?? new Date().toISOString(),
+        });
       }
 
-      for (const item of data) {
-        const itemPath = folderPath ? `${folderPath}/${item.name}` : item.name;
-        // Nếu không có metadata, đây là một thư mục (folder) trên Supabase
-        if (!item.metadata) {
-          const subFiles = await this.listAllFiles(bucket, itemPath);
-          files.push(...subFiles);
-        } else {
-          files.push({
-            name: item.name,
-            path: itemPath,
-            created_at: item.created_at || new Date().toISOString(),
-          });
-        }
-      }
-
-      if (data.length < limit) {
-        break;
-      }
-      offset += limit;
-    }
+      continuationToken = result.IsTruncated
+        ? result.NextContinuationToken
+        : undefined;
+    } while (continuationToken);
 
     return files;
   }

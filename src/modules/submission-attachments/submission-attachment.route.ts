@@ -18,7 +18,7 @@ router.post(
   "/",
   authMiddleware,
   requireRole(ROLES.ADMIN, ROLES.LEADER, ROLES.INTERN),
-  uploadSingle("file", "submission"),
+  uploadSingle("file", "submissionAttachment"),
   controller.upload,
 );
 router.delete(

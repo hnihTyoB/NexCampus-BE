@@ -4,7 +4,7 @@ import { TaskRepository } from "../tasks/task.repository";
 import { StorageService } from "../../common/services/storage.service";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
-import { supabaseConfig } from "../../config/supabase.config";
+import { storageConfig } from "../../config/storage.config";
 import { prisma } from "../../database/prisma.client";
 
 export class TaskAttachmentService {
@@ -13,7 +13,7 @@ export class TaskAttachmentService {
   private readonly storageService = new StorageService();
 
   private get bucket() {
-    return supabaseConfig.storageBucket;
+    return storageConfig.namespaces.tasks;
   }
 
   async uploadAttachment(
@@ -31,7 +31,7 @@ export class TaskAttachmentService {
     const safeFileName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
     const filePath = `${taskId}/${randomUUID()}_${safeFileName}`;
 
-    // Upload len Supabase Storage
+    // Upload to Cloudflare R2
     const fileUrl = await this.storageService.uploadFile(
       this.bucket,
       filePath,
@@ -39,16 +39,23 @@ export class TaskAttachmentService {
       file.mimetype,
     );
 
-    // Luu record vao DB
-    return this.attachmentRepo.create({
-      taskId,
-      fileName: file.originalname,
-      fileUrl,
-      filePath,
-      mimeType: file.mimetype,
-      fileSize: file.size,
-      uploadedBy,
-    });
+    // Persist metadata; roll back the object if the database write fails.
+    try {
+      return await this.attachmentRepo.create({
+        taskId,
+        fileName: file.originalname,
+        fileUrl,
+        filePath,
+        mimeType: file.mimetype,
+        fileSize: file.size,
+        uploadedBy,
+      });
+    } catch (error) {
+      await this.storageService.deleteFile(this.bucket, filePath).catch((cleanupError) => {
+        console.error(`[TaskAttachmentService] Failed to roll back R2 object ${filePath}:`, cleanupError);
+      });
+      throw error;
+    }
   }
 
   async deleteAttachment(attachmentId: string, actorId: string, actorRole: string) {
@@ -67,7 +74,7 @@ export class TaskAttachmentService {
       );
     }
 
-    // Xoa file tren Supabase Storage truoc (chi khi no khong phai la link ngoai)
+    // Delete the R2 object first (external links do not have managed objects).
     const isLink =
       attachment.filePath.startsWith("http://") ||
       attachment.filePath.startsWith("https://");

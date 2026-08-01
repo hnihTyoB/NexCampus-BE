@@ -40,6 +40,8 @@ export class InternRepository {
       fullName,
       departmentId,
       positionId,
+      department,
+      position,
       status,
       leaderId,
       leader,
@@ -67,6 +69,20 @@ export class InternRepository {
         : {}),
       ...(positionId
         ? { positionId }
+        : {}),
+      ...(department
+        ? {
+            department: {
+              name: { contains: department, mode: "insensitive" },
+            },
+          }
+        : {}),
+      ...(position
+        ? {
+            position: {
+              name: { contains: position, mode: "insensitive" },
+            },
+          }
         : {}),
       ...(status ? { status } : {}),
       ...(leaderId ? { leaderId } : {}),
