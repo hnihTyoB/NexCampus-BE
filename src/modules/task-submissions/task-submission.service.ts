@@ -14,7 +14,7 @@ import { REVIEW_STATUS, ASSIGNMENT_STATUS } from "../../common/constants/status.
 import { prisma } from "../../database/prisma.client";
 import { NotificationDispatcher } from "../notifications/notification.dispatcher";
 import { StorageService } from "../../common/services/storage.service";
-import { supabaseConfig } from "../../config/supabase.config";
+import { storageConfig } from "../../config/storage.config";
 import { ActivityLogService } from "../activity-logs/activity-log.service";
 import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
 
@@ -329,23 +329,13 @@ export class TaskSubmissionService {
       );
     }
 
-    // 3. Delete old video file from storage if it exists and was uploaded to our bucket
-    const bucket = supabaseConfig.storageSubmissionBucket;
+    const bucket = storageConfig.namespaces.submissions;
     const storageService = new StorageService();
+    const oldVideoPath = submission.videoDemo
+      ? storageService.getPathFromPublicUrl(bucket, submission.videoDemo)
+      : null;
 
-    if (submission.videoDemo) {
-      const prefix = `${supabaseConfig.url}/storage/v1/object/public/${bucket}/`;
-      if (submission.videoDemo.startsWith(prefix)) {
-        const videoPath = submission.videoDemo.replace(prefix, "");
-        try {
-          await storageService.deleteFile(bucket, videoPath);
-        } catch (err) {
-          console.error(`Failed to delete old video demo from storage:`, err);
-        }
-      }
-    }
-
-    // 4. Upload new video file
+    // 3. Upload the replacement before changing the database or old object.
     const safeFileName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
     const filePath = `${id}/video_${randomUUID()}_${safeFileName}`;
     const videoUrl = await storageService.uploadFile(
@@ -355,8 +345,24 @@ export class TaskSubmissionService {
       file.mimetype,
     );
 
-    // 5. Update submission in DB
-    return this.repository.update(id, { videoDemo: videoUrl });
+    // 4. Update the database, rolling back the new object on failure.
+    let updatedSubmission;
+    try {
+      updatedSubmission = await this.repository.update(id, { videoDemo: videoUrl });
+    } catch (error) {
+      await storageService.deleteFile(bucket, filePath).catch((cleanupError) => {
+        console.error(`[TaskSubmissionService] Failed to roll back R2 video ${filePath}:`, cleanupError);
+      });
+      throw error;
+    }
+
+    if (oldVideoPath) {
+      await storageService.deleteFile(bucket, oldVideoPath).catch((error) => {
+        console.error(`[TaskSubmissionService] Failed to delete old R2 video ${oldVideoPath}:`, error);
+      });
+    }
+
+    return updatedSubmission;
   }
 
   async delete(id: string, user: UserPayload) {
@@ -390,8 +396,8 @@ export class TaskSubmissionService {
       }
     }
 
-    // Delete associated files from Supabase Storage
-    const bucket = supabaseConfig.storageSubmissionBucket;
+    // Delete associated files from Cloudflare R2.
+    const bucket = storageConfig.namespaces.submissions;
     const storageService = new StorageService();
 
     // 1. Delete submission attachments
@@ -410,9 +416,8 @@ export class TaskSubmissionService {
 
     // 2. Delete video demo if it is uploaded to our bucket
     if (submission.videoDemo) {
-      const prefix = `${supabaseConfig.url}/storage/v1/object/public/${bucket}/`;
-      if (submission.videoDemo.startsWith(prefix)) {
-        const videoPath = submission.videoDemo.replace(prefix, "");
+      const videoPath = storageService.getPathFromPublicUrl(bucket, submission.videoDemo);
+      if (videoPath) {
         try {
           await storageService.deleteFile(bucket, videoPath);
         } catch (err) {

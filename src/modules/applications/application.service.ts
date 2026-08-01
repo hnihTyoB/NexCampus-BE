@@ -4,6 +4,7 @@ import { ApplicationRepository } from "./application.repository";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import { StorageService } from "../../common/services/storage.service";
+import { storageConfig } from "../../config/storage.config";
 import {
   ApplicationQueryDto,
   CreateApplicationDto,
@@ -242,10 +243,10 @@ export class ApplicationService {
       fileSize: number;
     }> = [];
 
-    // 3. Upload files to Supabase first if provided
+    // 3. Upload files to Cloudflare R2 first if provided
     if (files && files.length > 0) {
       const storageService = new StorageService();
-      const bucket = "application-attachments";
+      const bucket = storageConfig.namespaces.applications;
 
       for (const file of files) {
         const safeFileName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -280,42 +281,56 @@ export class ApplicationService {
     }
 
     // 4. Create the application & attachments in a transaction
-    const application = await prisma.$transaction(async (tx) => {
-      const app = await tx.application.create({
-        data: {
-          id: applicationId,
-          fullName: data.fullName,
-          email: data.email,
-          phone: data.phone,
-          departmentId: data.departmentId,
-          positionId: data.positionId,
-          startDate: new Date(data.startDate),
-          duration: data.duration,
-          regulationId: data.regulationId,
-          acceptedAt: new Date(),
-        },
-      });
-
-      if (attachmentsToCreate.length > 0) {
-        await tx.applicationAttachment.createMany({
-          data: attachmentsToCreate.map((att) => ({
-            applicationId,
-            ...att,
-          })),
+    const createApplication = () =>
+      prisma.$transaction(async (tx) => {
+        const app = await tx.application.create({
+          data: {
+            id: applicationId,
+            fullName: data.fullName,
+            email: data.email,
+            phone: data.phone,
+            departmentId: data.departmentId,
+            positionId: data.positionId,
+            startDate: new Date(data.startDate),
+            duration: data.duration,
+            regulationId: data.regulationId,
+            acceptedAt: new Date(),
+          },
         });
-      }
 
-      // Mark invite as used
-      await tx.applicationInvite.update({
-        where: { token: data.token },
-        data: {
-          status: APPLICATION_INVITE_STATUS.USED,
-          usedAt: new Date(),
-          applicationId,
-        },
+        if (attachmentsToCreate.length > 0) {
+          await tx.applicationAttachment.createMany({
+            data: attachmentsToCreate.map((att) => ({
+              applicationId,
+              ...att,
+            })),
+          });
+        }
+
+        // Mark invite as used
+        await tx.applicationInvite.update({
+          where: { token: data.token },
+          data: {
+            status: APPLICATION_INVITE_STATUS.USED,
+            usedAt: new Date(),
+            applicationId,
+          },
+        });
+
+        return app;
       });
 
-      return app;
+    const application = await createApplication().catch(async (error) => {
+      if (attachmentsToCreate.length > 0) {
+        const storageService = new StorageService();
+        const namespace = storageConfig.namespaces.applications;
+        for (const attachment of attachmentsToCreate) {
+          await storageService.deleteFile(namespace, attachment.filePath).catch((cleanupError) => {
+            console.error(`[ApplicationService] Failed to roll back R2 object ${attachment.filePath}:`, cleanupError);
+          });
+        }
+      }
+      throw error;
     });
 
     try {

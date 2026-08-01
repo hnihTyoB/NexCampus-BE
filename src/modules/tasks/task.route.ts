@@ -26,7 +26,7 @@ router.post(
   "/import/preview",
   authMiddleware,
   requireRole(ROLES.ADMIN, ROLES.LEADER),
-  uploadSingle("file"),
+  uploadSingle("file", "taskImport"),
   controller.previewImport,
 );
 
@@ -34,7 +34,7 @@ router.post(
   "/import",
   authMiddleware,
   requireRole(ROLES.ADMIN, ROLES.LEADER),
-  uploadSingle("file"),
+  uploadSingle("file", "taskImport"),
   controller.executeImport,
 );
 

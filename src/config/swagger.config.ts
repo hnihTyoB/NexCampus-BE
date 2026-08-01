@@ -74,7 +74,7 @@ export const swaggerSpec = {
           fileUrl: {
             type: "string",
             format: "uri",
-            example: "https://[project].supabase.co/storage/v1/object/public/report-attachments/reports/weekly/...",
+            example: "https://assets.example.com/report-attachments/reports/weekly/...",
             description: "URL công khai để tải báo cáo (có hiệu lực trong 30 ngày)",
           },
           createdById: { type: "string", format: "uuid" },
@@ -82,7 +82,7 @@ export const swaggerSpec = {
             type: "string",
             format: "date-time",
             example: "2026-08-16T14:00:00.000Z",
-            description: "Thời điểm file PDF hết hiệu lực trên Supabase Storage",
+            description: "Thời điểm file PDF hết hiệu lực trên Cloudflare R2",
           },
           createdAt: { type: "string", format: "date-time" },
         },
@@ -110,7 +110,7 @@ export const swaggerSpec = {
             format: "uri",
             nullable: true,
             example:
-              "https://[project].supabase.co/storage/v1/object/public/avatars/...",
+              "https://assets.example.com/avatars/...",
           },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
@@ -834,7 +834,7 @@ export const swaggerSpec = {
             type: "string",
             format: "uri",
             example:
-              "https://[project].supabase.co/storage/v1/object/public/task-attachments/...",
+              "https://assets.example.com/task-attachments/...",
           },
           filePath: {
             type: "string",
@@ -942,7 +942,7 @@ export const swaggerSpec = {
             type: "string",
             format: "uri",
             example:
-              "https://[project].supabase.co/storage/v1/object/public/submission-attachments/...",
+              "https://assets.example.com/submission-attachments/...",
           },
           filePath: {
             type: "string",
@@ -1003,7 +1003,7 @@ export const swaggerSpec = {
             type: "string",
             format: "uri",
             example:
-              "https://[project].supabase.co/storage/v1/object/public/report-attachments/...",
+              "https://assets.example.com/report-attachments/...",
           },
           filePath: {
             type: "string",
@@ -2031,7 +2031,7 @@ export const swaggerSpec = {
         tags: ["Users"],
         summary: "Tải lên hoặc cập nhật ảnh đại diện (Avatar) của chính mình",
         description:
-          "Tải lên ảnh đại diện của tài khoản đang đăng nhập. Hỗ trợ các định dạng hình ảnh (JPEG, PNG, WEBP, GIF). Dung lượng tối đa cấu hình qua `SUPABASE_STORAGE_MAX_FILE_SIZE_MB`. Sau khi tải lên thành công, hệ thống tự động xóa ảnh đại diện cũ trên Storage (nếu có) và cập nhật trường `avatarUrl` của User.",
+          "Tải lên ảnh đại diện của tài khoản đang đăng nhập. Chỉ hỗ trợ JPEG, PNG, WEBP hoặc GIF, tối đa 5 MB. Sau khi tải lên và cập nhật database thành công, hệ thống tự động xóa ảnh đại diện cũ trên Cloudflare R2 (nếu có).",
         security: [{ BearerAuth: [] }],
         requestBody: {
           required: true,
@@ -2293,6 +2293,7 @@ export const swaggerSpec = {
                   acceptedRegulations: { type: "boolean", example: true },
                   files: {
                     type: "array",
+                    maxItems: 5,
                     items: {
                       type: "string",
                       format: "binary",
@@ -2604,6 +2605,22 @@ export const swaggerSpec = {
                                   },
                                 },
                               },
+                              leaders: {
+                                type: "array",
+                                items: {
+                                  type: "object",
+                                  properties: {
+                                    id: { type: "string", format: "uuid" },
+                                    user: {
+                                      type: "object",
+                                      properties: {
+                                        fullName: { type: "string", nullable: true, example: "Nguyễn Văn A" },
+                                        email: { type: "string", format: "email", example: "leader@nexcampus.local" },
+                                      },
+                                    },
+                                  },
+                                },
+                              },
                             },
                           },
                         },
@@ -2666,6 +2683,22 @@ export const swaggerSpec = {
                                 },
                               },
                             },
+                            leaders: {
+                              type: "array",
+                              items: {
+                                type: "object",
+                                properties: {
+                                  id: { type: "string", format: "uuid" },
+                                  user: {
+                                    type: "object",
+                                    properties: {
+                                      fullName: { type: "string", nullable: true, example: "Nguyễn Văn A" },
+                                      email: { type: "string", format: "email", example: "leader@nexcampus.local" },
+                                    },
+                                  },
+                                },
+                              },
+                            },
                           },
                         },
                       },
@@ -2687,7 +2720,56 @@ export const swaggerSpec = {
         summary: "Chi tiết phòng ban",
         parameters: [{ in: "path", name: "id", required: true, schema: { type: "string", format: "uuid" } }],
         responses: {
-          200: { description: "Chi tiết phòng ban" },
+          200: {
+            description: "Chi tiết phòng ban",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "object",
+                          properties: {
+                            id: { type: "string", format: "uuid" },
+                            name: { type: "string", example: "Engineering" },
+                            positions: {
+                              type: "array",
+                              items: {
+                                type: "object",
+                                properties: {
+                                  id: { type: "string", format: "uuid" },
+                                  name: { type: "string", example: "Backend Intern" },
+                                },
+                              },
+                            },
+                            leaders: {
+                              type: "array",
+                              items: {
+                                type: "object",
+                                properties: {
+                                  id: { type: "string", format: "uuid" },
+                                  user: {
+                                    type: "object",
+                                    properties: {
+                                      fullName: { type: "string", nullable: true, example: "Nguyễn Văn A" },
+                                      email: { type: "string", format: "email", example: "leader@nexcampus.local" },
+                                    },
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
           404: { $ref: "#/components/responses/NotFound" },
         },
       },
@@ -2733,6 +2815,22 @@ export const swaggerSpec = {
                                 properties: {
                                   id: { type: "string", format: "uuid" },
                                   name: { type: "string" },
+                                },
+                              },
+                            },
+                            leaders: {
+                              type: "array",
+                              items: {
+                                type: "object",
+                                properties: {
+                                  id: { type: "string", format: "uuid" },
+                                  user: {
+                                    type: "object",
+                                    properties: {
+                                      fullName: { type: "string", nullable: true, example: "Nguyễn Văn A" },
+                                      email: { type: "string", format: "email", example: "leader@nexcampus.local" },
+                                    },
+                                  },
                                 },
                               },
                             },
@@ -3704,7 +3802,7 @@ export const swaggerSpec = {
                   file: {
                     type: "string",
                     format: "binary",
-                    description: "File Excel (.xlsx hoặc .xls) chứa danh sách task"
+                    description: "File Excel .xlsx chứa danh sách task, tối đa 10 MB"
                   },
                   taskGroupId: {
                     type: "string",
@@ -3809,7 +3907,7 @@ export const swaggerSpec = {
                   file: {
                     type: "string",
                     format: "binary",
-                    description: "File Excel (.xlsx hoặc .xls) chứa danh sách task"
+                    description: "File Excel .xlsx chứa danh sách task, tối đa 10 MB"
                   },
                   taskGroupId: {
                     type: "string",
@@ -4304,7 +4402,7 @@ export const swaggerSpec = {
         tags: ["TaskAttachments"],
         summary: "Upload file đính kèm cho task (Admin / Leader)",
         description:
-          "Gửi file qua `multipart/form-data` với field tên là `file`. Hỗ trợ: ảnh (JPEG, PNG, WEBP, GIF), PDF, DOCX, ZIP, RAR, 7z, MP4, WEBM. Dung lượng tối đa cấu hình qua `SUPABASE_STORAGE_MAX_FILE_SIZE_MB`.",
+          "Gửi tối đa 3 file qua `multipart/form-data` với field tên là `file`. Mỗi file tối đa 25 MB, tổng request tối đa 75 MB. Hỗ trợ ảnh, PDF, DOC/DOCX, bảng tính, ZIP/RAR/7z, MP4 và WEBM.",
         security: [{ BearerAuth: [] }],
         parameters: [
           {
@@ -4324,10 +4422,12 @@ export const swaggerSpec = {
                 required: ["file"],
                 properties: {
                   file: {
-                    type: "string",
-                    format: "binary",
+                    type: "array",
+                    minItems: 1,
+                    maxItems: 3,
+                    items: { type: "string", format: "binary" },
                     description:
-                      "File cần upload (ảnh, PDF, DOCX, ZIP, RAR, 7z, MP4, WEBM)",
+                      "Các file cần upload; tối đa 3 file và 25 MB mỗi file",
                   },
                 },
               },
@@ -4345,7 +4445,11 @@ export const swaggerSpec = {
                     {
                       type: "object",
                       properties: {
-                        data: { $ref: "#/components/schemas/TaskAttachment" },
+                        data: {
+                          type: "array",
+                          items: { $ref: "#/components/schemas/TaskAttachment" },
+                        },
+                        failedCount: { type: "integer", example: 0 },
                       },
                     },
                   ],
@@ -4373,7 +4477,7 @@ export const swaggerSpec = {
         tags: ["TaskAttachments"],
         summary: "Xoá file đính kèm (Admin / Leader)",
         description:
-          "Xoá file cả trên Supabase Storage lẫn record trong database.",
+          "Xoá object trên Cloudflare R2 và record tương ứng trong database.",
         security: [{ BearerAuth: [] }],
         parameters: [
           {
@@ -5035,7 +5139,7 @@ export const swaggerSpec = {
         tags: ["TaskSubmissions"],
         summary: "Upload trực tiếp file video demo cho bài nộp (Intern only)",
         description:
-          "Tải lên video demo dạng `.mp4` hoặc `.webm`. Hạn mức dung lượng tối đa cấu hình qua `SUPABASE_STORAGE_MAX_FILE_SIZE_MB`. Sau khi tải lên thành công, hệ thống tự động cập nhật trường `videoDemo` của TaskSubmission.",
+          "Tải lên video demo dạng `.mp4` hoặc `.webm`, tối đa 50 MB (có thể giảm trong System Settings, tối thiểu 5 MB). Sau khi tải lên thành công, hệ thống tự động cập nhật trường `videoDemo` của TaskSubmission.",
         security: [{ BearerAuth: [] }],
         parameters: [
           {
@@ -5169,7 +5273,7 @@ export const swaggerSpec = {
                     type: "string",
                     format: "binary",
                     description:
-                      "File cần upload (ảnh, PDF, DOCX, ZIP, RAR, 7z)",
+                      "File cần upload (ảnh, PDF, DOCX, ZIP, RAR, 7z), tối đa 25 MB",
                   },
                 },
               },
@@ -5217,7 +5321,7 @@ export const swaggerSpec = {
         tags: ["SubmissionAttachments"],
         summary: "Xoá file đính kèm của bài nộp (Admin / Leader / Intern)",
         description:
-          "Xoá file trên Supabase Storage và xoá record trong database.",
+          "Xoá object trên Cloudflare R2 và record tương ứng trong database.",
         security: [{ BearerAuth: [] }],
         parameters: [
           {
@@ -5492,7 +5596,7 @@ export const swaggerSpec = {
         summary:
           "Upload trực tiếp file video demo cho báo cáo hàng ngày (Intern only)",
         description:
-          "Tải lên video demo dạng `.mp4` hoặc `.webm` cho báo cáo ngày. Dung lượng tối đa cấu hình qua `SUPABASE_STORAGE_MAX_FILE_SIZE_MB`. Sau khi tải lên thành công, hệ thống tự động cập nhật trường `videoDemo` của DailyReport.",
+          "Tải lên video demo dạng `.mp4` hoặc `.webm` cho báo cáo ngày, tối đa 50 MB. Sau khi tải lên thành công, hệ thống tự động cập nhật trường `videoDemo` của DailyReport.",
         security: [{ BearerAuth: [] }],
         parameters: [
           {
@@ -5626,7 +5730,7 @@ export const swaggerSpec = {
                   file: {
                     type: "string",
                     format: "binary",
-                    description: "File cần upload (ảnh, PDF, ZIP/RAR, v.v.)",
+                    description: "File cần upload (ảnh, PDF, DOC/DOCX, ZIP/RAR/7z), tối đa 10 MB",
                   },
                 },
               },
@@ -5671,7 +5775,7 @@ export const swaggerSpec = {
         tags: ["ReportAttachments"],
         summary: "Xoá file đính kèm của báo cáo ngày (Admin / Leader / Intern)",
         description:
-          "Xoá file trên Supabase Storage và xoá record tương ứng dưới DB.",
+          "Xoá object trên Cloudflare R2 và record tương ứng trong database.",
         security: [{ BearerAuth: [] }],
         parameters: [
           {
@@ -7374,7 +7478,7 @@ export const swaggerSpec = {
           "1. Truy vấn dữ liệu từ PostgreSQL (evaluation, intern, tasks, daily reports, previous week)\n" +
           "2. Render HTML bằng Handlebars template\n" +
           "3. Chuyển HTML sang PDF bằng Puppeteer (Headless Chromium)\n" +
-          "4. Tải PDF lên Supabase Storage\n" +
+          "4. Tải PDF lên Cloudflare R2\n" +
           "5. Lưu lịch sử xuất vào bảng `export_histories`\n" +
           "6. Trả về URL tải báo cáo (có hiệu lực 30 ngày)\n\n" +
           "**Nội dung báo cáo bao gồm:**\n" +
@@ -7419,7 +7523,7 @@ export const swaggerSpec = {
                               type: "string",
                               format: "uri",
                               example:
-                                "https://[project].supabase.co/storage/v1/object/public/report-attachments/reports/weekly/weekly-report-abc-1721234567890.pdf",
+                                "https://assets.example.com/report-attachments/reports/weekly/weekly-report-abc-1721234567890.pdf",
                               description: "URL công khai để tải file PDF (có hiệu lực 30 ngày)",
                             },
                           },
@@ -7447,13 +7551,13 @@ export const swaggerSpec = {
             },
           },
           500: {
-            description: "Lỗi server khi render PDF hoặc tải lên Supabase Storage",
+            description: "Lỗi server khi render PDF hoặc tải lên Cloudflare R2",
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/ErrorResponse" },
                 example: {
                   success: false,
-                  message: "Upload to Supabase Storage failed",
+                  message: "Upload to Cloudflare R2 failed",
                   code: "INTERNAL_SERVER_ERROR",
                 },
               },
@@ -7480,9 +7584,14 @@ export const swaggerSpec = {
                     data: {
                       type: "object",
                       properties: {
-                        AVATAR_MAX_FILE_SIZE_MB: { type: "integer", example: 2 },
-                        REPORT_MAX_FILE_SIZE_MB: { type: "integer", example: 5 },
-                        SUBMISSION_MAX_FILE_SIZE_MB: { type: "integer", example: 50 }
+                        AVATAR_MAX_FILE_SIZE_MB: { type: "integer", example: 5 },
+                        REPORT_MAX_FILE_SIZE_MB: { type: "integer", example: 10 },
+                        REPORT_VIDEO_MAX_FILE_SIZE_MB: { type: "integer", example: 50 },
+                        SUBMISSION_ATTACHMENT_MAX_FILE_SIZE_MB: { type: "integer", example: 25 },
+                        SUBMISSION_MAX_FILE_SIZE_MB: { type: "integer", example: 50 },
+                        TASK_ATTACHMENT_MAX_FILE_SIZE_MB: { type: "integer", example: 25 },
+                        APPLICATION_MAX_FILE_SIZE_MB: { type: "integer", example: 10 },
+                        TASK_IMPORT_MAX_FILE_SIZE_MB: { type: "integer", example: 10 }
                       }
                     }
                   }

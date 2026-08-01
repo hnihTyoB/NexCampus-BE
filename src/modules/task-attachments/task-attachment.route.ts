@@ -18,7 +18,7 @@ router.post(
   "/",
   authMiddleware,
   requireRole(ROLES.ADMIN, ROLES.LEADER),
-  uploadMultiple("file", 5),
+  uploadMultiple("file", 3, "taskAttachment"),
   controller.upload,
 );
 router.post(

@@ -6,7 +6,7 @@ import { PuppeteerManager } from "./puppeteer.manager";
 import { ASSIGNMENT_STATUS, REVIEW_STATUS } from "../constants/status.constant";
 import { WeeklyEvaluationPdfDTO, TaskPerformanceItem } from "../../modules/pdf-export/weekly-evaluation-pdf.dto";
 import { StorageService } from "./storage.service";
-import { supabaseConfig } from "../../config/supabase.config";
+import { storageConfig } from "../../config/storage.config";
 
 export class PdfService {
   private puppeteerManager = PuppeteerManager.getInstance();
@@ -174,27 +174,34 @@ export class PdfService {
 
     const fileName = `weekly-report-${evaluationId}-${Date.now()}.pdf`;
     const storagePath = `reports/weekly/${fileName}`;
-    const bucket = supabaseConfig.storageReportBucket || "report-attachments";
+    const namespace = storageConfig.namespaces.reports;
 
     const fileUrl = await this.storageService.uploadFile(
-      bucket, storagePath, pdfBuffer, "application/pdf",
+      namespace, storagePath, pdfBuffer, "application/pdf",
     );
 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30);
 
-    await prisma.exportHistory.create({
-      data: {
-        type: "WEEKLY_EVALUATION",
-        entityType: "WeeklyEvaluation",
-        entityId: evaluationId,
-        fileName,
-        storagePath,
-        fileUrl,
-        createdById: userId,
-        expiresAt,
-      },
-    });
+    try {
+      await prisma.exportHistory.create({
+        data: {
+          type: "WEEKLY_EVALUATION",
+          entityType: "WeeklyEvaluation",
+          entityId: evaluationId,
+          fileName,
+          storagePath,
+          fileUrl,
+          createdById: userId,
+          expiresAt,
+        },
+      });
+    } catch (error) {
+      await this.storageService.deleteFile(namespace, storagePath).catch((cleanupError) => {
+        console.error(`[PdfService] Failed to roll back R2 object ${storagePath}:`, cleanupError);
+      });
+      throw error;
+    }
 
     return fileUrl;
   }

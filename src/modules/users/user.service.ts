@@ -7,7 +7,7 @@ import { UserQueryDto, CreateUserDto, UpdateUserDto } from "./user.dto";
 import { prisma } from "../../database/prisma.client";
 import { StorageService } from "../../common/services/storage.service";
 import { appConfig } from "../../config/app.config";
-import { supabaseConfig } from "../../config/supabase.config";
+import { storageConfig } from "../../config/storage.config";
 import { ActivityLogService } from "../activity-logs/activity-log.service";
 import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
 import { EmailService } from "../../common/services/email.service";
@@ -123,25 +123,15 @@ export class UserService {
   async uploadAvatar(id: string, file: Express.Multer.File) {
     const user = await this.findById(id);
 
-    const bucket = supabaseConfig.storageAvatarBucket;
+    const bucket = storageConfig.namespaces.avatars;
     const storageService = new StorageService();
+    const oldAvatarPath = user.avatarUrl
+      ? storageService.getPathFromPublicUrl(bucket, user.avatarUrl)
+      : null;
 
-    // 1. Delete old avatar if it exists in storage
-    if (user.avatarUrl) {
-      const prefix = `${supabaseConfig.url}/storage/v1/object/public/${bucket}/`;
-      if (user.avatarUrl.startsWith(prefix)) {
-        const avatarPath = user.avatarUrl.replace(prefix, "");
-        try {
-          await storageService.deleteFile(bucket, avatarPath);
-        } catch (err) {
-          console.error(`Failed to delete old avatar from storage:`, err);
-        }
-      }
-    }
-
-    // 2. Upload new avatar
+    // 1. Upload the replacement before changing the database or old object.
     const safeFileName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const filePath = `${id}/${safeFileName}`;
+    const filePath = `${id}/${crypto.randomUUID()}_${safeFileName}`;
     const avatarUrl = await storageService.uploadFile(
       bucket,
       filePath,
@@ -149,8 +139,25 @@ export class UserService {
       file.mimetype,
     );
 
-    // 3. Update database
-    return this.repository.update(id, { avatarUrl });
+    // 2. Update the database, rolling back the new object on failure.
+    let updatedUser;
+    try {
+      updatedUser = await this.repository.update(id, { avatarUrl });
+    } catch (error) {
+      await storageService.deleteFile(bucket, filePath).catch((cleanupError) => {
+        console.error(`[UserService] Failed to roll back R2 avatar ${filePath}:`, cleanupError);
+      });
+      throw error;
+    }
+
+    // 3. The old URL may belong to the legacy provider or be external.
+    if (oldAvatarPath) {
+      await storageService.deleteFile(bucket, oldAvatarPath).catch((error) => {
+        console.error(`[UserService] Failed to delete old R2 avatar ${oldAvatarPath}:`, error);
+      });
+    }
+
+    return updatedUser;
   }
 
   async delete(id: string, actorId: string) {
@@ -174,15 +181,15 @@ export class UserService {
 
       if (attachments.length > 0) {
         const storageService = new StorageService();
-        const bucket = "application-attachments";
+        const bucket = storageConfig.namespaces.applications;
 
-        // 3. Xóa các tệp này trên Supabase Storage
+        // 3. Delete these files from Cloudflare R2.
         for (const attachment of attachments) {
           try {
             await storageService.deleteFile(bucket, attachment.filePath);
           } catch (storageError) {
             console.error(
-              `[UserService.delete] Failed to delete file ${attachment.filePath} on Supabase:`,
+              `[UserService.delete] Failed to delete R2 object ${attachment.filePath}:`,
               storageError,
             );
           }

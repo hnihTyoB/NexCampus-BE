@@ -1,6 +1,6 @@
 import { Worker, Job } from "bullmq";
 import { redisConfig } from "../config/redis.config";
-import { supabaseConfig } from "../config/supabase.config";
+import { storageConfig } from "../config/storage.config";
 import { cronConfig } from "../config/cron.config";
 import { TaskAttachmentRepository } from "../modules/task-attachments/task-attachment.repository";
 import { SubmissionAttachmentRepository } from "../modules/submission-attachments/submission-attachment.repository";
@@ -20,7 +20,7 @@ async function processCleanupJob(_job: Job<StorageCleanupJobData>) {
 
   // 1. Dọn dẹp Task Attachments
   try {
-    const bucket = supabaseConfig.storageBucket;
+    const bucket = storageConfig.namespaces.tasks;
     const repo = new TaskAttachmentRepository();
     const orphaned = await repo.findOrphanedAttachments(retentionDays);
     if (orphaned.length > 0) {
@@ -52,7 +52,7 @@ async function processCleanupJob(_job: Job<StorageCleanupJobData>) {
 
   // 2. Dọn dẹp Submission Attachments
   try {
-    const bucket = supabaseConfig.storageSubmissionBucket;
+    const bucket = storageConfig.namespaces.submissions;
     const repo = new SubmissionAttachmentRepository();
     const orphaned = await repo.findOrphanedAttachments(retentionDays);
     if (orphaned.length > 0) {
@@ -84,7 +84,7 @@ async function processCleanupJob(_job: Job<StorageCleanupJobData>) {
 
   // 3. Dọn dẹp Report Attachments (Xóa tất cả báo cáo cũ hơn 30 ngày)
   try {
-    const bucket = supabaseConfig.storageReportBucket;
+    const bucket = storageConfig.namespaces.reports;
     const repo = new ReportAttachmentRepository();
     const oldAttachments = await repo.findOldAttachments(retentionDays);
     if (oldAttachments.length > 0) {
@@ -116,18 +116,18 @@ async function processCleanupJob(_job: Job<StorageCleanupJobData>) {
 
   // 4. Dọn dẹp User Avatars
   try {
-    const bucket = supabaseConfig.storageAvatarBucket;
+    const bucket = storageConfig.namespaces.avatars;
     const repo = new UserRepository();
     const orphaned = await repo.findOrphanedAvatars(retentionDays);
     if (orphaned.length > 0) {
       console.log(`[StorageCleanupWorker] Found ${orphaned.length} orphaned user avatar(s) to delete.`);
-      const prefix = `${supabaseConfig.url}/storage/v1/object/public/${bucket}/`;
       const successIds: string[] = [];
       for (const user of orphaned) {
         if (!user.avatarUrl) continue;
-        let avatarPath = user.avatarUrl;
-        if (avatarPath.startsWith(prefix)) {
-          avatarPath = avatarPath.replace(prefix, "");
+        const avatarPath = storageService.getPathFromPublicUrl(bucket, user.avatarUrl);
+        if (!avatarPath) {
+          successIds.push(user.id);
+          continue;
         }
         try {
           await storageService.deleteFile(bucket, avatarPath);
@@ -154,7 +154,7 @@ async function processCleanupJob(_job: Job<StorageCleanupJobData>) {
 
   // 5. Dọn dẹp Expired Export PDFs
   try {
-    const bucket = supabaseConfig.storageReportBucket || "report-attachments";
+    const bucket = storageConfig.namespaces.reports;
     const now = new Date();
     const expiredExports = await prisma.exportHistory.findMany({
       where: {
@@ -204,7 +204,7 @@ async function processCleanupJob(_job: Job<StorageCleanupJobData>) {
 
     // 6.1. Task Attachments bucket
     try {
-      const bucket = supabaseConfig.storageBucket;
+      const bucket = storageConfig.namespaces.tasks;
       const dbAttachments = await prisma.taskAttachment.findMany({
         select: { filePath: true },
       });
@@ -230,13 +230,24 @@ async function processCleanupJob(_job: Job<StorageCleanupJobData>) {
       console.error("[StorageCleanupWorker] Error cleaning orphaned task files:", err);
     }
 
-    // 6.2. Submission Attachments bucket
+    // 6.2. Submission attachments and uploaded demo videos
     try {
-      const bucket = supabaseConfig.storageSubmissionBucket;
+      const bucket = storageConfig.namespaces.submissions;
       const dbAttachments = await prisma.submissionAttachment.findMany({
         select: { filePath: true },
       });
-      const dbFilePaths = new Set(dbAttachments.map((a) => a.filePath));
+      const dbSubmissions = await prisma.taskSubmission.findMany({
+        where: { videoDemo: { not: null } },
+        select: { videoDemo: true },
+      });
+      const dbFilePaths = new Set([
+        ...dbAttachments.map((a) => a.filePath),
+        ...dbSubmissions
+          .map((submission) => submission.videoDemo)
+          .filter((url): url is string => !!url)
+          .map((url) => storageService.getPathFromPublicUrl(bucket, url))
+          .filter((path): path is string => path !== null),
+      ]);
       const storageFiles = await storageService.listAllFiles(bucket);
 
       const orphaned = storageFiles.filter(
@@ -258,18 +269,27 @@ async function processCleanupJob(_job: Job<StorageCleanupJobData>) {
       console.error("[StorageCleanupWorker] Error cleaning orphaned submission files:", err);
     }
 
-    // 6.3. Report Attachments bucket (Includes ReportAttachment and ExportHistory)
+    // 6.3. Report attachments, uploaded demo videos, and export PDFs
     try {
-      const bucket = supabaseConfig.storageReportBucket;
+      const bucket = storageConfig.namespaces.reports;
       const dbAttachments = await prisma.reportAttachment.findMany({
         select: { filePath: true },
       });
       const dbExports = await prisma.exportHistory.findMany({
         select: { storagePath: true },
       });
+      const dbReports = await prisma.dailyReport.findMany({
+        where: { videoDemo: { not: null } },
+        select: { videoDemo: true },
+      });
       const dbFilePaths = new Set([
         ...dbAttachments.map((a) => a.filePath),
         ...dbExports.map((e) => e.storagePath),
+        ...dbReports
+          .map((report) => report.videoDemo)
+          .filter((url): url is string => !!url)
+          .map((url) => storageService.getPathFromPublicUrl(bucket, url))
+          .filter((path): path is string => path !== null),
       ]);
       const storageFiles = await storageService.listAllFiles(bucket);
 
@@ -294,17 +314,17 @@ async function processCleanupJob(_job: Job<StorageCleanupJobData>) {
 
     // 6.4. User Avatars bucket
     try {
-      const bucket = supabaseConfig.storageAvatarBucket;
+      const bucket = storageConfig.namespaces.avatars;
       const dbUsers = await prisma.user.findMany({
         where: { avatarUrl: { not: null } },
         select: { avatarUrl: true },
       });
-      const prefix = `${supabaseConfig.url}/storage/v1/object/public/${bucket}/`;
       const dbFilePaths = new Set(
         dbUsers
           .map((u) => u.avatarUrl)
-          .filter((url): url is string => !!url && url.startsWith(prefix))
-          .map((url) => url.replace(prefix, ""))
+          .filter((url): url is string => !!url)
+          .map((url) => storageService.getPathFromPublicUrl(bucket, url))
+          .filter((path): path is string => path !== null)
       );
       const storageFiles = await storageService.listAllFiles(bucket);
 
@@ -329,7 +349,7 @@ async function processCleanupJob(_job: Job<StorageCleanupJobData>) {
 
     // 6.5. Application Attachments bucket
     try {
-      const bucket = "application-attachments";
+      const bucket = storageConfig.namespaces.applications;
       const dbAttachments = await prisma.applicationAttachment.findMany({
         select: { filePath: true },
       });
