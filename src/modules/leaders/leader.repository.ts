@@ -27,6 +27,7 @@ export class LeaderRepository {
     const {
       fullName,
       departmentId,
+      department,
       isActive,
       sortBy = "createdAt",
       order = "desc",
@@ -46,6 +47,13 @@ export class LeaderRepository {
           }
         : {}),
       ...(departmentId ? { departmentId } : {}),
+      ...(department
+        ? {
+            department: {
+              name: { contains: department, mode: "insensitive" },
+            },
+          }
+        : {}),
       ...(isActive !== undefined ? { user: { isActive } } : {}),
     };
 

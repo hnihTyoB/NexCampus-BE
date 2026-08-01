@@ -4,6 +4,7 @@ import { VIETNAMESE_PHONE_REGEX } from "../../common/helpers/phone.helper";
 export const findAllLeaderSchema = z.object({
   fullName: z.string().optional(),
   departmentId: z.string().uuid().optional(),
+  department: z.string().optional(),
   isActive: z
     .enum(["true", "false"])
     .transform((v) => v === "true")

@@ -3978,6 +3978,7 @@ export const swaggerSpec = {
         parameters: [
           { in: "query", name: "fullName", schema: { type: "string" }, description: "Tìm theo tên" },
           { in: "query", name: "departmentId", schema: { type: "string", format: "uuid" }, description: "Lọc theo phòng ban" },
+          { in: "query", name: "department", schema: { type: "string" }, description: "Tìm theo tên phòng ban" },
           { in: "query", name: "sortBy", schema: { type: "string", enum: ["createdAt", "fullName"] } },
           { $ref: "#/components/parameters/OrderParam" },
           { $ref: "#/components/parameters/PageParam" },

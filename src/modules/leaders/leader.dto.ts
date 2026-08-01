@@ -1,6 +1,7 @@
 export interface LeaderQueryDto {
   fullName?: string;
   departmentId?: string;
+  department?: string;
   isActive?: boolean;
   sortBy?: "createdAt" | "fullName";
   order?: "asc" | "desc";
