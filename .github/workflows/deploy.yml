@@ -55,6 +55,19 @@ jobs:
             set -e
             cd /var/www/nexcampus/NexCampus-BE
 
+            echo "Checking required Cloudflare R2 configuration..."
+            missing_r2_env=0
+            for env_name in R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET_NAME R2_PUBLIC_URL R2_MAX_FILE_SIZE_MB; do
+              if ! grep -Eq "^${env_name}=.+" .env; then
+                echo "Missing required environment variable: ${env_name}"
+                missing_r2_env=1
+              fi
+            done
+            if [ "${missing_r2_env}" -ne 0 ]; then
+              echo "Deployment stopped before changing the running backend."
+              exit 1
+            fi
+
             echo "Pulling compose file changes..."
             git pull origin production
 
