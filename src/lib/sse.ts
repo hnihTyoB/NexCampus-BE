@@ -1,6 +1,9 @@
 import { Response } from "express";
 import crypto from "crypto";
-import { NotificationEventType, NOTIFICATION_EVENT } from "../common/constants/notification-event.constant";
+import {
+  NotificationEventType,
+  NOTIFICATION_EVENT,
+} from "../common/constants/notification-event.constant";
 
 // Map quản lý các connection stream: userId -> Response[]
 const activeClients = new Map<string, Response[]>();
@@ -54,8 +57,10 @@ export function validateOneTimeTicket(ticketId: string): string | null {
 
 export function subscribeNotificationStream(userId: string, res: Response) {
   res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
+  // Prevent Nginx and compatible reverse proxies from buffering heartbeats.
+  res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders?.();
 
   // Thêm connection vào map
@@ -83,7 +88,7 @@ export function subscribeNotificationStream(userId: string, res: Response) {
 
 export function emitNotificationEventToUser(
   userId: string,
-  event: { type: NotificationEventType; payload?: unknown }
+  event: { type: NotificationEventType; payload?: unknown },
 ) {
   const responses = activeClients.get(userId);
   if (!responses) return;

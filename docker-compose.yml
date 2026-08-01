@@ -28,7 +28,7 @@ services:
       retries: 5
 
   backend:
-    image: ghcr.io/hnihtyob/nexcampus-backend:latest
+    image: ${BACKEND_IMAGE:-ghcr.io/hnihtyob/nexcampus-backend:latest}
     container_name: nexcampus_be
     restart: always
     ports:
@@ -46,6 +46,18 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8888/api/v1/health').then((response) => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
 
   frontend:
     image: ghcr.io/tradethuong/nexcampus-frontend:latest
