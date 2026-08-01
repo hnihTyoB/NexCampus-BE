@@ -111,21 +111,31 @@ export const TEMPLATE_DEFAULTS: Record<string, TemplateDefault> = {
   MEETING_CREATED: {
     titleTemplate: "New Meeting: {{meetingTitle}}",
     contentTemplate: "{{creatorName}} scheduled a meeting at {{startTime}}.",
+    emailSubjectTemplate: null,
+    emailContentTemplate: null,
   },
   MEETING_INVITATION: {
     titleTemplate: "Meeting Invitation: {{meetingTitle}}",
     contentTemplate: "{{creatorName}} invited you to a meeting at {{startTime}}.",
+    emailSubjectTemplate: null,
+    emailContentTemplate: null,
   },
   MEETING_CANCELLED: {
     titleTemplate: "Meeting Cancelled: {{meetingTitle}}",
     contentTemplate: "The meeting {{meetingTitle}} at {{startTime}} has been cancelled.",
+    emailSubjectTemplate: null,
+    emailContentTemplate: null,
   },
   ABSENCE_SUBMITTED: {
     titleTemplate: "Leave Request: {{meetingTitle}}",
     contentTemplate: "{{userName}} submitted a leave request. Reason: {{reason}}",
+    emailSubjectTemplate: null,
+    emailContentTemplate: null,
   },
   ABSENCE_REVIEWED: {
     titleTemplate: "Leave Request {{status}}: {{meetingTitle}}",
     contentTemplate: "Your leave request for {{meetingTitle}} has been {{status}}.",
+    emailSubjectTemplate: null,
+    emailContentTemplate: null,
   },
 };
