@@ -27,3 +27,11 @@ export const updateLeaderSchema = z.object({
   position: z.string().max(100).nullable().optional(),
   phone: z.string().regex(VIETNAMESE_PHONE_REGEX, "Số điện thoại không đúng định dạng Việt Nam").optional(),
 });
+
+export const updateMeLeaderSchema = z.object({
+  phone: z
+    .string()
+    .regex(VIETNAMESE_PHONE_REGEX, "Số điện thoại không đúng định dạng Việt Nam")
+    .nullable()
+    .optional(),
+});

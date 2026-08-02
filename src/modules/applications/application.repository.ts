@@ -15,6 +15,8 @@ const defaultSelect = {
   fullName: true,
   email: true,
   phone: true,
+  preferredDepartment: true,
+  preferredPosition: true,
   department: { select: { id: true, name: true } },
   position: { select: { id: true, name: true } },
   startDate: true,
@@ -118,8 +120,8 @@ export class ApplicationRepository {
     fullName: string;
     email: string;
     phone: string;
-    departmentId: string;
-    positionId: string;
+    preferredDepartment: string;
+    preferredPosition: string;
     startDate: Date;
     duration: number;
     regulationId: string;
@@ -138,6 +140,18 @@ export class ApplicationRepository {
         approvedBy: approverId,
         approvedAt: new Date(),
       },
+      select: defaultSelect,
+    });
+  }
+
+  assign(
+    id: string,
+    departmentId: string | null,
+    positionId: string | null,
+  ) {
+    return prisma.application.update({
+      where: { id },
+      data: { departmentId, positionId },
       select: defaultSelect,
     });
   }
@@ -194,12 +208,24 @@ export class ApplicationRepository {
             fullName: true,
             email: true,
             phone: true,
+            preferredDepartment: true,
+            preferredPosition: true,
             department: { select: { id: true, name: true } },
             position: { select: { id: true, name: true } },
             status: true,
             startDate: true,
             duration: true,
             createdAt: true,
+            attachments: {
+              select: {
+                id: true,
+                fileName: true,
+                fileUrl: true,
+                fileSize: true,
+                mimeType: true,
+                createdAt: true,
+              },
+            },
           },
         },
         creator: {
@@ -312,6 +338,8 @@ export class ApplicationRepository {
             select: {
               id: true,
               fullName: true,
+              preferredDepartment: true,
+              preferredPosition: true,
               department: { select: { id: true, name: true } },
               position: { select: { id: true, name: true } },
               status: true,

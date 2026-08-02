@@ -1,6 +1,11 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../database/prisma.client";
-import { LeaderQueryDto, CreateLeaderDto, UpdateLeaderDto } from "./leader.dto";
+import {
+  LeaderQueryDto,
+  CreateLeaderDto,
+  UpdateLeaderDto,
+  UpdateMeLeaderDto,
+} from "./leader.dto";
 
 const userSelect = {
   id: true,
@@ -129,14 +134,16 @@ export class LeaderRepository {
     });
   }
 
-  update(id: string, data: UpdateLeaderDto) {
+  update(id: string, data: UpdateLeaderDto | UpdateMeLeaderDto) {
     return prisma.leader.update({
       where: { id },
       data: {
-        ...(data.departmentId !== undefined
+        ...("departmentId" in data && data.departmentId !== undefined
           ? { departmentId: data.departmentId }
           : {}),
-        ...(data.position !== undefined ? { position: data.position } : {}),
+        ...("position" in data && data.position !== undefined
+          ? { position: data.position }
+          : {}),
         ...(data.phone !== undefined ? { phone: data.phone } : {}),
       },
       select: defaultSelect,

@@ -17,8 +17,8 @@ export interface CreateApplicationDto {
   fullName: string;
   email: string;
   phone: string;
-  departmentId: string;
-  positionId: string;
+  preferredDepartment: string;
+  preferredPosition: string;
   startDate: string;
   duration: number;
   token: string;
@@ -30,11 +30,18 @@ export interface ReviewApplicationDto {
   status: "APPROVED" | "REJECTED";
 }
 
+export interface AssignApplicationDto {
+  departmentId: string | null;
+  positionId: string | null;
+}
+
 export interface ApplicationResponseDto {
   id: string;
   fullName: string;
   email: string;
   phone: string;
+  preferredDepartment: string | null;
+  preferredPosition: string | null;
   department: string;
   position: string;
   startDate: Date;
