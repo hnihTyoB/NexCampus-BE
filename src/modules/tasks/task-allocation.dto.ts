@@ -140,6 +140,8 @@ export interface GroupAiRecommendationResponseDto {
     totalAllocated: number;
     unallocatableTasks: number;
     internsEvaluatedCount: number;
+    membersUsedCount: number;
+    totalMemberCount: number;
   };
 }
 
@@ -150,4 +152,3 @@ export interface ConfirmGroupAllocationPayloadDto {
     supportId?: string | null;
   }[];
 }
-

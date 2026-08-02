@@ -10,6 +10,7 @@ interface TaskInfo {
   estDays: number;
   description: string;
   deadline: Date;
+  maxWorkloadDays: number;
 }
 
 export class TaskAllocationAiService {
@@ -22,7 +23,7 @@ export class TaskAllocationAiService {
         (c, i) => `
 [${i + 1}] ${c.fullName} — Vai trò đề xuất: ${c.suggestedRole}
   - Vị trí: ${c.position?.name ?? "Chưa xác định"}
-  - Workload hiện tại: ${c.activeTaskDays} ngày (còn ${Math.max(0, 10 - c.activeTaskDays)} ngày trống)
+  - Workload hiện tại: ${c.activeTaskDays} ngày (còn ${Math.max(0, task.maxWorkloadDays - c.activeTaskDays)} ngày trống)
   - Coding score (tuần gần nhất): ${c.latestCodingScore ?? "Chưa có"}/10
   - Learning score: ${c.latestLearningScore ?? "Chưa có"}/10
   - Module đã hoàn thành: ${c.completedModules.length > 0 ? c.completedModules.join(", ") : "Chưa có"}
@@ -47,7 +48,7 @@ Backend đã tính toán điểm số. Nhiệm vụ của bạn:
 4. Trả về JSON đúng schema — KHÔNG giải thích thêm ngoài JSON.
 
 Ưu tiên:
-- Không làm quá tải intern (workload > 8 ngày → HIGH risk).
+- Không làm quá tải intern (workload từ 80% giới hạn của Task Group → HIGH risk).
 - Cân bằng giữa hiệu suất và cơ hội phát triển.
 - Intern giỏi có thể làm Support/Mentor để intern khác có cơ hội học.
 

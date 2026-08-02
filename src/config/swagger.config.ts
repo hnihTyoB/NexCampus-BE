@@ -286,9 +286,21 @@ export const swaggerSpec = {
               department: {
                 type: "object",
                 nullable: true,
+                deprecated: true,
                 properties: {
                   id: { type: "string", format: "uuid" },
                   name: { type: "string", example: "Engineering" },
+                },
+              },
+              departments: {
+                type: "array",
+                maxItems: 3,
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string", format: "uuid" },
+                    name: { type: "string", example: "Engineering" },
+                  },
                 },
               },
               position: { type: "string", nullable: true, example: "Engineering Manager" },
@@ -638,7 +650,7 @@ export const swaggerSpec = {
         properties: {
           id: { type: "string", format: "uuid" },
           userId: { type: "string", format: "uuid" },
-          departmentId: { type: "string", format: "uuid", nullable: true },
+          departmentId: { type: "string", format: "uuid", nullable: true, deprecated: true },
           position: { type: "string", nullable: true, example: "Engineering Manager" },
           phone: { type: "string", nullable: true, example: "0912345678" },
           createdAt: { type: "string", format: "date-time" },
@@ -656,9 +668,21 @@ export const swaggerSpec = {
           department: {
             type: "object",
             nullable: true,
+            deprecated: true,
             properties: {
               id: { type: "string", format: "uuid" },
               name: { type: "string", example: "Engineering" },
+            },
+          },
+          departments: {
+            type: "array",
+            maxItems: 3,
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                name: { type: "string", example: "Engineering" },
+              },
             },
           },
         },
@@ -668,7 +692,13 @@ export const swaggerSpec = {
         required: ["userId"],
         properties: {
           userId: { type: "string", format: "uuid" },
-          departmentId: { type: "string", format: "uuid" },
+          departmentIds: {
+            type: "array",
+            maxItems: 3,
+            uniqueItems: true,
+            items: { type: "string", format: "uuid" },
+          },
+          departmentId: { type: "string", format: "uuid", deprecated: true },
           position: { type: "string", example: "Engineering Manager" },
           phone: { type: "string", example: "0912345678" },
         },
@@ -676,7 +706,14 @@ export const swaggerSpec = {
       UpdateLeaderBody: {
         type: "object",
         properties: {
-          departmentId: { type: "string", format: "uuid", nullable: true },
+          departmentIds: {
+            type: "array",
+            maxItems: 3,
+            uniqueItems: true,
+            items: { type: "string", format: "uuid" },
+            description: "Danh sÃ¡ch phÃ²ng ban leader quáº£n lÃ½; máº£ng rá»—ng Ä‘á»ƒ bá» gáº¯n táº¥t cáº£.",
+          },
+          departmentId: { type: "string", format: "uuid", nullable: true, deprecated: true },
           position: { type: "string", nullable: true },
           phone: { type: "string" },
         },
@@ -699,6 +736,9 @@ export const swaggerSpec = {
           name: { type: "string", example: "Backend Crawl Project" },
           description: { type: "string", nullable: true, example: "Dự án cào dữ liệu Backend" },
           departmentId: { type: "string", format: "uuid", nullable: true },
+          maxWorkloadDays: { type: "number", format: "float", example: 10 },
+          maxActiveTasks: { type: "integer", nullable: true, example: 5 },
+          requireAllMembers: { type: "boolean", example: true },
           department: {
             type: "object",
             nullable: true,
@@ -707,14 +747,75 @@ export const swaggerSpec = {
               name: { type: "string", example: "Backend Development" },
             },
           },
+          members: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                internId: { type: "string", format: "uuid" },
+                intern: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string", format: "uuid" },
+                    leaderId: { type: "string", format: "uuid", nullable: true },
+                    fullName: { type: "string", example: "Nguyễn Văn A" },
+                    status: { type: "string", enum: ["ACTIVE", "COMPLETED", "DROPPED"] },
+                    user: {
+                      type: "object",
+                      properties: { email: { type: "string", format: "email" } },
+                    },
+                    department: { type: "object", nullable: true },
+                    position: { type: "object", nullable: true },
+                  },
+                },
+              },
+            },
+          },
           _count: {
             type: "object",
             properties: {
               tasks: { type: "integer", example: 5 },
+              members: { type: "integer", example: 5 },
             },
           },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
+        },
+      },
+      GroupAiRecommendation: {
+        type: "object",
+        properties: {
+          taskGroupId: { type: "string", format: "uuid" },
+          taskGroupName: { type: "string" },
+          department: { type: "object", nullable: true },
+          tasks: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                taskId: { type: "string", format: "uuid" },
+                taskTitle: { type: "string" },
+                taskCode: { type: "string", nullable: true },
+                priority: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"] },
+                estDays: { type: "number", nullable: true },
+                deadline: { type: "string", format: "date-time" },
+                suggestedOwner: { type: "object", nullable: true },
+                suggestedSupport: { type: "object", nullable: true },
+                reason: { type: "string" },
+              },
+            },
+          },
+          summary: {
+            type: "object",
+            properties: {
+              totalUnassignedTasks: { type: "integer" },
+              totalAllocated: { type: "integer" },
+              unallocatableTasks: { type: "integer" },
+              internsEvaluatedCount: { type: "integer" },
+              membersUsedCount: { type: "integer" },
+              totalMemberCount: { type: "integer" },
+            },
+          },
         },
       },
       Task: {
@@ -1429,6 +1530,14 @@ export const swaggerSpec = {
       },
       BadRequest: {
         description: "Yêu cầu không hợp lệ",
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/ErrorResponse" },
+          },
+        },
+      },
+      Conflict: {
+        description: "Dữ liệu đã thay đổi hoặc tài nguyên đã tồn tại",
         content: {
           "application/json": {
             schema: { $ref: "#/components/schemas/ErrorResponse" },
@@ -3220,7 +3329,7 @@ export const swaggerSpec = {
       get: {
         tags: ["TaskGroups"],
         summary: "Danh sách nhóm công việc",
-        description: "Public endpoint. Trả về tất cả nhóm công việc kèm số lượng task trong mỗi nhóm.",
+        description: "Yêu cầu đăng nhập. Trả về nhóm công việc, đội thành viên và cấu hình capacity.",
         responses: {
           200: {
             description: "Danh sách nhóm công việc",
@@ -3260,6 +3369,15 @@ export const swaggerSpec = {
                   name: { type: "string", example: "Backend Crawl Project" },
                   description: { type: "string", example: "Dự án cào dữ liệu Backend" },
                   departmentId: { type: "string", format: "uuid", nullable: true },
+                  memberIds: {
+                    type: "array",
+                    maxItems: 100,
+                    items: { type: "string", format: "uuid" },
+                    description: "TTS active thuộc đúng leader và department",
+                  },
+                  maxWorkloadDays: { type: "number", minimum: 0, maximum: 365, example: 10 },
+                  maxActiveTasks: { type: "integer", minimum: 1, maximum: 100, nullable: true },
+                  requireAllMembers: { type: "boolean", default: false },
                 },
               },
             },
@@ -3347,6 +3465,14 @@ export const swaggerSpec = {
                   name: { type: "string", example: "Backend Crawl Project v2" },
                   description: { type: "string", nullable: true, example: "Mô tả cập nhật" },
                   departmentId: { type: "string", format: "uuid", nullable: true },
+                  memberIds: {
+                    type: "array",
+                    maxItems: 100,
+                    items: { type: "string", format: "uuid" },
+                  },
+                  maxWorkloadDays: { type: "number", minimum: 0, maximum: 365 },
+                  maxActiveTasks: { type: "integer", minimum: 1, maximum: 100, nullable: true },
+                  requireAllMembers: { type: "boolean" },
                 },
               },
             },
@@ -3416,7 +3542,8 @@ export const swaggerSpec = {
     "/task-groups/{id}/ai-recommendation": {
       post: {
         tags: ["TaskGroups"],
-        summary: "Xem trước phân công AI cho toàn bộ Task trong nhóm công việc",
+        summary: "Xem trước phân công cho các task chưa giao bằng đội của Task Group",
+        description: "Chỉ đánh giá thành viên active thuộc Task Group và đúng quyền leader/department. Áp dụng giới hạn workload/task; Support được tính 50% estDays.",
         security: [{ BearerAuth: [] }],
         parameters: [
           {
@@ -3429,12 +3556,27 @@ export const swaggerSpec = {
         ],
         responses: {
           200: {
-            description: "Đề xuất phân công AI cho nhóm công việc",
+            description: "Đề xuất phân công cho nhóm công việc",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/GroupAiRecommendation" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
           },
           400: { $ref: "#/components/responses/BadRequest" },
           401: { $ref: "#/components/responses/Unauthorized" },
           404: { $ref: "#/components/responses/NotFound" },
-          422: { $ref: "#/components/responses/ValidationError" },
+          422: { $ref: "#/components/responses/Validation" },
         },
       },
     },
@@ -3461,6 +3603,8 @@ export const swaggerSpec = {
                 properties: {
                   assignments: {
                     type: "array",
+                    minItems: 1,
+                    maxItems: 1000,
                     items: {
                       type: "object",
                       required: ["taskId", "internId"],
@@ -3482,7 +3626,10 @@ export const swaggerSpec = {
           },
           400: { $ref: "#/components/responses/BadRequest" },
           401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
           404: { $ref: "#/components/responses/NotFound" },
+          409: { $ref: "#/components/responses/Conflict" },
+          422: { $ref: "#/components/responses/Validation" },
         },
       },
     },

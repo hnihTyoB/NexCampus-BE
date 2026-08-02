@@ -58,8 +58,8 @@ export const directCreateInternSchema = createInternSchema
 export const updateInternSchema = z.object({
   fullName: z.string().min(1).max(100).optional(),
   phone: z.string().regex(VIETNAMESE_PHONE_REGEX, "Số điện thoại không đúng định dạng Việt Nam").optional(),
-  departmentId: z.string().uuid().optional(),
-  positionId: z.string().uuid().optional(),
+  departmentId: z.string().uuid().nullable().optional(),
+  positionId: z.string().uuid().nullable().optional(),
   leaderId: z.string().uuid().nullable().optional(),
   startDate: z
     .string()
