@@ -7,17 +7,20 @@ import {
   CreatePositionDto,
   UpdatePositionDto,
 } from "./department.dto";
+import { ActivityLogService } from "../activity-logs/activity-log.service";
+import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
 
 export class DepartmentService {
   private readonly repository = new DepartmentRepository();
+  private readonly activityLogService = new ActivityLogService();
 
   async findAll(user?: { id: string; role: string }, filters?: { name?: string; leader?: string }) {
     if (user?.role === "LEADER") {
-      const departmentId = await this.repository.findDepartmentIdByLeaderUserId(user.id);
-      if (!departmentId) {
+      const departmentIds = await this.repository.findDepartmentIdsByLeaderUserId(user.id);
+      if (departmentIds.length === 0) {
         return [];
       }
-      return this.repository.findAll(departmentId, filters);
+      return this.repository.findAll(departmentIds, filters);
     }
     return this.repository.findAll(undefined, filters);
   }
@@ -30,17 +33,37 @@ export class DepartmentService {
     return dept;
   }
 
-  async create(data: CreateDepartmentDto) {
-    return this.repository.create(data);
+  async create(data: CreateDepartmentDto, actorId: string) {
+    const result = await this.repository.create(data);
+
+    await this.activityLogService.log(
+      actorId,
+      ACTIVITY_ACTIONS.CREATE_DEPARTMENT,
+      `Đã tạo phòng ban mới: ${result.name}`,
+      result.id,
+      "Department"
+    );
+
+    return result;
   }
 
-  async update(id: string, data: UpdateDepartmentDto) {
+  async update(id: string, data: UpdateDepartmentDto, actorId: string) {
     await this.findById(id);
-    return this.repository.update(id, data);
+    const result = await this.repository.update(id, data);
+
+    await this.activityLogService.log(
+      actorId,
+      ACTIVITY_ACTIONS.UPDATE_DEPARTMENT,
+      `Đã cập nhật phòng ban: ${result.name}`,
+      result.id,
+      "Department"
+    );
+
+    return result;
   }
 
-  async delete(id: string) {
-    await this.findById(id);
+  async delete(id: string, actorId: string) {
+    const dept = await this.findById(id);
     const hasLinked = await this.repository.hasAssociations(id);
     if (hasLinked) {
       throw new AppError(
@@ -49,7 +72,17 @@ export class DepartmentService {
         ERROR_CODE.DEPENDENCY_ERROR
       );
     }
-    return this.repository.delete(id);
+    const result = await this.repository.delete(id);
+
+    await this.activityLogService.log(
+      actorId,
+      ACTIVITY_ACTIONS.DELETE_DEPARTMENT,
+      `Đã xóa phòng ban: ${dept.name}`,
+      id,
+      "Department"
+    );
+
+    return result;
   }
 
   // ─── Positions ───────────────────────────────────────────────────
@@ -59,12 +92,22 @@ export class DepartmentService {
     return this.repository.findPositionsByDepartment(departmentId);
   }
 
-  async createPosition(data: CreatePositionDto) {
+  async createPosition(data: CreatePositionDto, actorId: string) {
     await this.findById(data.departmentId);
-    return this.repository.createPosition(data);
+    const result = await this.repository.createPosition(data);
+
+    await this.activityLogService.log(
+      actorId,
+      ACTIVITY_ACTIONS.CREATE_POSITION,
+      `Đã tạo vị trí mới: ${result.name}`,
+      result.id,
+      "Position"
+    );
+
+    return result;
   }
 
-  async updatePosition(id: string, data: UpdatePositionDto) {
+  async updatePosition(id: string, data: UpdatePositionDto, actorId: string) {
     const pos = await this.repository.findPositionById(id);
     if (!pos) {
       throw new AppError("Position not found", 404, ERROR_CODE.NOT_FOUND);
@@ -72,10 +115,20 @@ export class DepartmentService {
     if (data.departmentId) {
       await this.findById(data.departmentId);
     }
-    return this.repository.updatePosition(id, data);
+    const result = await this.repository.updatePosition(id, data);
+
+    await this.activityLogService.log(
+      actorId,
+      ACTIVITY_ACTIONS.UPDATE_POSITION,
+      `Đã cập nhật vị trí: ${result.name}`,
+      result.id,
+      "Position"
+    );
+
+    return result;
   }
 
-  async deletePosition(id: string) {
+  async deletePosition(id: string, actorId: string) {
     const pos = await this.repository.findPositionById(id);
     if (!pos) {
       throw new AppError("Position not found", 404, ERROR_CODE.NOT_FOUND);
@@ -88,6 +141,16 @@ export class DepartmentService {
         ERROR_CODE.DEPENDENCY_ERROR
       );
     }
-    return this.repository.deletePosition(id);
+    const result = await this.repository.deletePosition(id);
+
+    await this.activityLogService.log(
+      actorId,
+      ACTIVITY_ACTIONS.DELETE_POSITION,
+      `Đã xóa vị trí: ${pos.name}`,
+      id,
+      "Position"
+    );
+
+    return result;
   }
 }

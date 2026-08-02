@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../database/prisma.client";
 import { CreateDepartmentDto, UpdateDepartmentDto, CreatePositionDto, UpdatePositionDto } from "./department.dto";
 
@@ -7,26 +8,42 @@ const departmentWithPositions = {
   id: true,
   name: true,
   positions: { select: { id: true, name: true } },
-  leaders: {
+  leaderAssignments: {
     select: {
-      id: true,
-      user: {
+      leader: {
         select: {
-          fullName: true,
-          email: true,
+          id: true,
+          user: {
+            select: {
+              fullName: true,
+              email: true,
+            },
+          },
         },
       },
     },
   },
-};
+} satisfies Prisma.DepartmentSelect;
+
+type DepartmentRecord = Prisma.DepartmentGetPayload<{
+  select: typeof departmentWithPositions;
+}>;
+
+function serializeDepartment(department: DepartmentRecord) {
+  const { leaderAssignments, ...data } = department;
+  return {
+    ...data,
+    leaders: leaderAssignments.map((assignment) => assignment.leader),
+  };
+}
 
 export class DepartmentRepository {
   // ─── Departments ─────────────────────────────────────────────────
 
-  findAll(departmentId?: string, filters?: { name?: string; leader?: string }) {
-    const where: any = {};
-    if (departmentId) {
-      where.id = departmentId;
+  async findAll(departmentIds?: string[], filters?: { name?: string; leader?: string }) {
+    const where: Prisma.DepartmentWhereInput = {};
+    if (departmentIds) {
+      where.id = { in: departmentIds };
     }
     if (filters?.name) {
       where.name = {
@@ -35,43 +52,47 @@ export class DepartmentRepository {
       };
     }
     if (filters?.leader) {
-      where.leaders = {
+      where.leaderAssignments = {
         some: {
-          user: {
-            OR: [
-              { fullName: { contains: filters.leader, mode: "insensitive" } },
-              { email: { contains: filters.leader, mode: "insensitive" } },
-            ],
+          leader: {
+            user: {
+              OR: [
+                { fullName: { contains: filters.leader, mode: "insensitive" } },
+                { email: { contains: filters.leader, mode: "insensitive" } },
+              ],
+            },
           },
         },
       };
     }
 
-    return prisma.department.findMany({
+    const departments = await prisma.department.findMany({
       where,
       select: departmentWithPositions,
       orderBy: { name: "asc" },
     });
+    return departments.map(serializeDepartment);
   }
 
-  async findDepartmentIdByLeaderUserId(userId: string): Promise<string | null> {
+  async findDepartmentIdsByLeaderUserId(userId: string): Promise<string[]> {
     const leader = await prisma.leader.findFirst({
       where: { userId },
-      select: { departmentId: true },
+      select: { departments: { select: { departmentId: true } } },
     });
-    return leader?.departmentId || null;
+    return leader?.departments.map((item) => item.departmentId) ?? [];
   }
 
-  findById(id: string) {
-    return prisma.department.findUnique({
+  async findById(id: string) {
+    const department = await prisma.department.findUnique({
       where: { id },
       select: departmentWithPositions,
     });
+    return department ? serializeDepartment(department) : null;
   }
 
-  create(data: CreateDepartmentDto) {
+  async create(data: CreateDepartmentDto) {
     const hasPositions = data.positions && data.positions.length > 0;
-    return prisma.department.create({
+    const department = await prisma.department.create({
       data: {
         name: data.name,
         positions: hasPositions
@@ -82,20 +103,22 @@ export class DepartmentRepository {
       },
       select: departmentWithPositions,
     });
+    return serializeDepartment(department);
   }
 
-  update(id: string, data: UpdateDepartmentDto) {
-    return prisma.department.update({
+  async update(id: string, data: UpdateDepartmentDto) {
+    const department = await prisma.department.update({
       where: { id },
       data,
       select: departmentWithPositions,
     });
+    return serializeDepartment(department);
   }
 
   async hasAssociations(id: string): Promise<boolean> {
     const [intern, leader, app] = await Promise.all([
       prisma.intern.findFirst({ where: { departmentId: id } }),
-      prisma.leader.findFirst({ where: { departmentId: id } }),
+      prisma.leaderDepartment.findFirst({ where: { departmentId: id } }),
       prisma.application.findFirst({ where: { departmentId: id } }),
     ]);
     return !!(intern || leader || app);

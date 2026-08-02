@@ -31,7 +31,8 @@ export class DepartmentController {
 
   create = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const data = await this.service.create(req.body as CreateDepartmentDto);
+      const actorId = req.user.id;
+      const data = await this.service.create(req.body as CreateDepartmentDto, actorId);
       res.status(201).json({ success: true, data });
     } catch (error) {
       next(error);
@@ -40,7 +41,8 @@ export class DepartmentController {
 
   update = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const data = await this.service.update(req.params.id, req.body as UpdateDepartmentDto);
+      const actorId = req.user.id;
+      const data = await this.service.update(req.params.id, req.body as UpdateDepartmentDto, actorId);
       res.json({ success: true, data });
     } catch (error) {
       next(error);
@@ -49,7 +51,8 @@ export class DepartmentController {
 
   delete = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await this.service.delete(req.params.id);
+      const actorId = req.user.id;
+      await this.service.delete(req.params.id, actorId);
       res.json({ success: true, message: "Department deleted successfully" });
     } catch (error) {
       next(error);
@@ -69,7 +72,8 @@ export class DepartmentController {
 
   createPosition = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const data = await this.service.createPosition(req.body as CreatePositionDto);
+      const actorId = req.user.id;
+      const data = await this.service.createPosition(req.body as CreatePositionDto, actorId);
       res.status(201).json({ success: true, data });
     } catch (error) {
       next(error);
@@ -78,7 +82,8 @@ export class DepartmentController {
 
   updatePosition = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const data = await this.service.updatePosition(req.params.id, req.body as UpdatePositionDto);
+      const actorId = req.user.id;
+      const data = await this.service.updatePosition(req.params.id, req.body as UpdatePositionDto, actorId);
       res.json({ success: true, data });
     } catch (error) {
       next(error);
@@ -87,7 +92,8 @@ export class DepartmentController {
 
   deletePosition = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await this.service.deletePosition(req.params.id);
+      const actorId = req.user.id;
+      await this.service.deletePosition(req.params.id, actorId);
       res.json({ success: true, message: "Position deleted successfully" });
     } catch (error) {
       next(error);

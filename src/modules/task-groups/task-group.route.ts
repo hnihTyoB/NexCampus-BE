@@ -3,7 +3,11 @@ import { TaskGroupController } from "./task-group.controller";
 import { authMiddleware } from "../../middlewares/auth.middleware";
 import { requireRole } from "../../middlewares/role.middleware";
 import { validate } from "../../middlewares/validate.middleware";
-import { createTaskGroupSchema, updateTaskGroupSchema } from "./task-group.validation";
+import {
+  confirmGroupAllocationSchema,
+  createTaskGroupSchema,
+  updateTaskGroupSchema,
+} from "./task-group.validation";
 import { ROLES } from "../../common/constants/role.constant";
 
 const router = Router();
@@ -47,6 +51,7 @@ router.post(
   "/:id/ai-allocation/confirm",
   authMiddleware,
   requireRole(ROLES.ADMIN, ROLES.LEADER),
+  validate(confirmGroupAllocationSchema),
   controller.confirmAiAllocation,
 );
 
