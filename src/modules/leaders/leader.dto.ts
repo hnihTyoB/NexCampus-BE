@@ -21,3 +21,7 @@ export interface UpdateLeaderDto {
   position?: string | null;
   phone?: string;
 }
+
+export interface UpdateMeLeaderDto {
+  phone?: string | null;
+}

@@ -9,6 +9,7 @@ import {
   ApplicationQueryDto,
   CreateApplicationDto,
   ReviewApplicationDto,
+  AssignApplicationDto,
   CreateInviteDto,
   GetApplicationInvitesQuery,
 } from "./application.dto";
@@ -222,6 +223,40 @@ export class ApplicationService {
       );
     }
 
+    const phoneAlreadyInApplication = await prisma.application.findFirst({
+      where: {
+        phone: data.phone,
+        status: { in: [APPLICATION_STATUS.PENDING, APPLICATION_STATUS.APPROVED] },
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+
+    if (phoneAlreadyInApplication) {
+      throw new AppError(
+        "This phone number is already in use. Please check it and try again.",
+        409,
+        ERROR_CODE.DUPLICATE_ENTRY,
+      );
+    }
+
+    try {
+      await validatePhoneUniqueness(data.phone);
+    } catch (error) {
+      if (
+        error instanceof AppError &&
+        error.code === ERROR_CODE.DUPLICATE_ENTRY
+      ) {
+        throw new AppError(
+          "This phone number is already in use. Please check it and try again.",
+          409,
+          ERROR_CODE.DUPLICATE_ENTRY,
+        );
+      }
+
+      throw error;
+    }
+
     // Verify regulation exists and is active
     const regulation = await prisma.regulation.findFirst({
       where: { id: data.regulationId, isActive: true },
@@ -289,8 +324,8 @@ export class ApplicationService {
             fullName: data.fullName,
             email: data.email,
             phone: data.phone,
-            departmentId: data.departmentId,
-            positionId: data.positionId,
+            preferredDepartment: data.preferredDepartment,
+            preferredPosition: data.preferredPosition,
             startDate: new Date(data.startDate),
             duration: data.duration,
             regulationId: data.regulationId,
@@ -352,6 +387,14 @@ export class ApplicationService {
     }
 
     if (dto.status === APPLICATION_STATUS.APPROVED) {
+      if (!application.department?.id || !application.position?.id) {
+        throw new AppError(
+          "Assign a department and position before approving this application",
+          409,
+          ERROR_CODE.CONFLICT,
+        );
+      }
+
       const normalizedEmail = application.email.toLowerCase().trim();
 
       // Double check: if user already exists
@@ -472,6 +515,67 @@ export class ApplicationService {
     }
 
     return this.repository.review(id, dto.status, approverId);
+  }
+
+  async assign(id: string, dto: AssignApplicationDto) {
+    const application = await this.findById(id);
+
+    if (application.status !== APPLICATION_STATUS.PENDING) {
+      throw new AppError(
+        "Only pending applications can be assigned",
+        409,
+        ERROR_CODE.CONFLICT,
+      );
+    }
+
+    const usedInvite = await prisma.applicationInvite.findFirst({
+      where: {
+        applicationId: id,
+        status: APPLICATION_INVITE_STATUS.USED,
+      },
+      select: { id: true },
+    });
+
+    if (!usedInvite) {
+      throw new AppError(
+        "The application invite must be used before assignment",
+        409,
+        ERROR_CODE.CONFLICT,
+      );
+    }
+
+    if (!dto.departmentId) {
+      return this.repository.assign(id, null, null);
+    }
+
+    const department = await prisma.department.findUnique({
+      where: { id: dto.departmentId },
+      select: { id: true },
+    });
+
+    if (!department) {
+      throw new AppError("Department not found", 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    if (dto.positionId) {
+      const position = await prisma.position.findFirst({
+        where: {
+          id: dto.positionId,
+          departmentId: dto.departmentId,
+        },
+        select: { id: true },
+      });
+
+      if (!position) {
+        throw new AppError(
+          "Position does not belong to the selected department",
+          400,
+          ERROR_CODE.VALIDATION_ERROR,
+        );
+      }
+    }
+
+    return this.repository.assign(id, dto.departmentId, dto.positionId);
   }
 
   async delete(id: string) {
