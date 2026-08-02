@@ -28,7 +28,7 @@ export class TaskGroupController {
 
   create = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const data = await this.service.create(req.body as CreateTaskGroupDto);
+      const data = await this.service.create(req.body as CreateTaskGroupDto, req.user);
       res.status(201).json({ success: true, data });
     } catch (error) {
       next(error);
@@ -40,6 +40,7 @@ export class TaskGroupController {
       const data = await this.service.update(
         req.params.id,
         req.body as UpdateTaskGroupDto,
+        req.user,
       );
       res.json({ success: true, data });
     } catch (error) {

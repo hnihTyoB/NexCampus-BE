@@ -7,7 +7,27 @@ const defaultSelect = {
   description: true,
   departmentId: true,
   department: { select: { id: true, name: true } },
-  _count: { select: { tasks: true } },
+  maxWorkloadDays: true,
+  maxActiveTasks: true,
+  requireAllMembers: true,
+  members: {
+    orderBy: { intern: { fullName: "asc" as const } },
+    select: {
+      internId: true,
+      intern: {
+        select: {
+          id: true,
+          leaderId: true,
+          fullName: true,
+          status: true,
+          user: { select: { email: true } },
+          department: { select: { id: true, name: true } },
+          position: { select: { id: true, name: true } },
+        },
+      },
+    },
+  },
+  _count: { select: { tasks: true, members: true } },
   createdAt: true,
   updatedAt: true,
 };
@@ -33,6 +53,16 @@ export class TaskGroupRepository {
         name: data.name,
         description: data.description,
         departmentId: data.departmentId || null,
+        maxWorkloadDays: data.maxWorkloadDays ?? 10,
+        maxActiveTasks: data.maxActiveTasks ?? null,
+        requireAllMembers: data.requireAllMembers ?? false,
+        ...(data.memberIds && data.memberIds.length > 0
+          ? {
+              members: {
+                create: data.memberIds.map((internId) => ({ internId })),
+              },
+            }
+          : {}),
       },
       select: defaultSelect,
     });
@@ -45,6 +75,23 @@ export class TaskGroupRepository {
         ...(data.name !== undefined ? { name: data.name } : {}),
         ...(data.description !== undefined ? { description: data.description } : {}),
         ...(data.departmentId !== undefined ? { departmentId: data.departmentId } : {}),
+        ...(data.maxWorkloadDays !== undefined
+          ? { maxWorkloadDays: data.maxWorkloadDays }
+          : {}),
+        ...(data.maxActiveTasks !== undefined
+          ? { maxActiveTasks: data.maxActiveTasks }
+          : {}),
+        ...(data.requireAllMembers !== undefined
+          ? { requireAllMembers: data.requireAllMembers }
+          : {}),
+        ...(data.memberIds !== undefined
+          ? {
+              members: {
+                deleteMany: {},
+                create: data.memberIds.map((internId) => ({ internId })),
+              },
+            }
+          : {}),
       },
       select: defaultSelect,
     });

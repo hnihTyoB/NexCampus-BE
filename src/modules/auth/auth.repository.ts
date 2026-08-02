@@ -52,7 +52,12 @@ const fullSelect = {
   leader: {
     select: {
       id: true,
-      department: { select: { id: true, name: true } },
+      departments: {
+        select: {
+          department: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: "asc" as const },
+      },
       position: true,
       phone: true,
     },

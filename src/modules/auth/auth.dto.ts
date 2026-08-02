@@ -38,6 +38,8 @@ export interface MeNotificationSettingDto {
 
 export interface MeLeaderDto {
   id: string;
+  departments: { id: string; name: string }[];
+  /** @deprecated Use departments. */
   department: { id: string; name: string } | null;
   position: string | null;
   phone: string | null;
@@ -83,4 +85,3 @@ export interface ChangePasswordDto {
   newPassword?: string;
   confirmPassword?: string;
 }
-
