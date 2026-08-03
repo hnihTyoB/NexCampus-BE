@@ -194,7 +194,10 @@ export class StatsRepository {
       prisma.leader.findMany({
         include: {
           user: { select: { id: true, fullName: true, email: true } },
-          department: { select: { name: true } },
+          departments: {
+            select: { department: { select: { name: true } } },
+            orderBy: { createdAt: "asc" },
+          },
         },
       }),
 
@@ -281,7 +284,9 @@ export class StatsRepository {
         leaderId: l.id,
         leaderName: l.user?.fullName ?? "N/A",
         leaderEmail: l.user?.email ?? "",
-        departmentName: l.department?.name ?? "Chưa xếp phòng",
+        departmentName:
+          l.departments.map((item) => item.department.name).join(", ") ||
+          "Chưa xếp phòng",
         totalInterns: internCount,
         totalAssignments: assignments.length,
         assignments: {

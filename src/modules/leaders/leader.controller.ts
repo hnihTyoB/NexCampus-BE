@@ -1,9 +1,33 @@
 import { Request, Response, NextFunction } from "express";
 import { LeaderService } from "./leader.service";
-import { LeaderQueryDto, CreateLeaderDto, UpdateLeaderDto } from "./leader.dto";
+import {
+  LeaderQueryDto,
+  CreateLeaderDto,
+  UpdateLeaderDto,
+  UpdateMeLeaderDto,
+} from "./leader.dto";
 
 export class LeaderController {
   private readonly service = new LeaderService();
+
+  getMe = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.service.getMe(req.user.id);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  updateMe = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = req.body as UpdateMeLeaderDto;
+      const result = await this.service.updateMe(req.user.id, body);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
 
   findAll = async (req: Request, res: Response, next: NextFunction) => {
     try {

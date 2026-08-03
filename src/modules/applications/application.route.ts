@@ -7,6 +7,7 @@ import {
   createApplicationSchema,
   findAllApplicationSchema,
   reviewApplicationSchema,
+  assignApplicationSchema,
   createInviteSchema,
   getApplicationInvitesSchema,
 } from "./application.validation";
@@ -57,6 +58,13 @@ router.get(
   authMiddleware,
   requireRole(ROLES.ADMIN, ROLES.LEADER),
   controller.findById,
+);
+router.patch(
+  "/:id/assignment",
+  authMiddleware,
+  requireRole(ROLES.ADMIN),
+  validate(assignApplicationSchema),
+  controller.assign,
 );
 router.patch(
   "/:id/review",

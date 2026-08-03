@@ -22,6 +22,17 @@ interface Actor {
   role: string;
 }
 
+function formatMeetingStartTime(date: Date) {
+  return new Intl.DateTimeFormat("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 export class MeetingService {
   private readonly repository = new MeetingRepository();
   private readonly activityLogService = new ActivityLogService();
@@ -109,7 +120,7 @@ export class MeetingService {
           NotificationDispatcher.dispatch(u.id, NOTIFICATION_TYPE.MEETING_INVITATION, {
             meetingTitle: result.title,
             creatorName: result.creator?.fullName || result.creator?.email || "Someone",
-            startTime: new Date(result.startTime).toLocaleString(),
+            startTime: formatMeetingStartTime(result.startTime),
           }).catch(() => {});
         }
       }
@@ -120,7 +131,7 @@ export class MeetingService {
           NotificationDispatcher.dispatch(p.userId, NOTIFICATION_TYPE.MEETING_INVITATION, {
             meetingTitle: result.title,
             creatorName: result.creator?.fullName || result.creator?.email || "Someone",
-            startTime: new Date(result.startTime).toLocaleString(),
+            startTime: formatMeetingStartTime(result.startTime),
           }).catch(() => {});
         }
       }

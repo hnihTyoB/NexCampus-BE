@@ -4,6 +4,7 @@ import {
   ApplicationQueryDto,
   CreateApplicationDto,
   ReviewApplicationDto,
+  AssignApplicationDto,
   CreateInviteDto,
   GetApplicationInvitesQuery,
 } from "./application.dto";
@@ -49,6 +50,17 @@ export class ApplicationController {
       const approverId = req.user.id;
       const body = req.body as ReviewApplicationDto;
       const result = await this.service.review(req.params.id, body, approverId);
+
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  assign = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = req.body as AssignApplicationDto;
+      const result = await this.service.assign(req.params.id, body);
 
       res.json({ success: true, data: result });
     } catch (error) {

@@ -7,11 +7,27 @@ import {
   findAllLeaderSchema,
   createLeaderSchema,
   updateLeaderSchema,
+  updateMeLeaderSchema,
 } from "./leader.validation";
 import { ROLES } from "../../common/constants/role.constant";
 
 const router = Router();
 const controller = new LeaderController();
+
+// Leader self-service routes (must come before /:id)
+router.get(
+  "/me",
+  authMiddleware,
+  requireRole(ROLES.LEADER),
+  controller.getMe,
+);
+router.put(
+  "/me",
+  authMiddleware,
+  requireRole(ROLES.LEADER),
+  validate(updateMeLeaderSchema),
+  controller.updateMe,
+);
 
 router.get(
   "/",

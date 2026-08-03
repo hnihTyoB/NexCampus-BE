@@ -1,6 +1,11 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../database/prisma.client";
-import { LeaderQueryDto, CreateLeaderDto, UpdateLeaderDto } from "./leader.dto";
+import {
+  LeaderQueryDto,
+  CreateLeaderDto,
+  UpdateLeaderDto,
+  UpdateMeLeaderDto,
+} from "./leader.dto";
 
 const userSelect = {
   id: true,
@@ -13,14 +18,34 @@ const userSelect = {
 const defaultSelect = {
   id: true,
   userId: true,
-  departmentId: true,
   position: true,
   phone: true,
   createdAt: true,
   updatedAt: true,
   user: { select: userSelect },
-  department: { select: { id: true, name: true } as const },
-};
+  departments: {
+    select: {
+      department: { select: { id: true, name: true } },
+    },
+    orderBy: { createdAt: "asc" as const },
+  },
+} satisfies Prisma.LeaderSelect;
+
+type LeaderRecord = Prisma.LeaderGetPayload<{ select: typeof defaultSelect }>;
+
+function serializeLeader(leader: LeaderRecord) {
+  const departments = leader.departments.map(
+    (membership) => membership.department,
+  );
+
+  return {
+    ...leader,
+    departments,
+    // Keep the first department fields during the API transition.
+    departmentId: departments[0]?.id ?? null,
+    department: departments[0] ?? null,
+  };
+}
 
 export class LeaderRepository {
   async findAll(query: LeaderQueryDto) {
@@ -46,11 +71,17 @@ export class LeaderRepository {
             },
           }
         : {}),
-      ...(departmentId ? { departmentId } : {}),
+      ...(departmentId
+        ? { departments: { some: { departmentId } } }
+        : {}),
       ...(department
         ? {
-            department: {
-              name: { contains: department, mode: "insensitive" },
+            departments: {
+              some: {
+                department: {
+                  name: { contains: department, mode: "insensitive" },
+                },
+              },
             },
           }
         : {}),
@@ -84,9 +115,9 @@ export class LeaderRepository {
       internCounts.map((c) => [c.leaderId, c._count.id]),
     );
 
-    const dataWithCount = data.map((l) => ({
-      ...l,
-      internCount: countMap.get(l.userId) ?? 0,
+    const dataWithCount = data.map((leader) => ({
+      ...serializeLeader(leader),
+      internCount: countMap.get(leader.userId) ?? 0,
     }));
 
     return {
@@ -107,40 +138,82 @@ export class LeaderRepository {
       where: { leaderId: leader.userId, deletedAt: null },
     });
 
-    return { ...leader, internCount: count };
+    return { ...serializeLeader(leader), internCount: count };
   }
 
-  findByUserId(userId: string) {
-    return prisma.leader.findUnique({
+  async findByUserId(userId: string) {
+    const leader = await prisma.leader.findUnique({
       where: { userId },
       select: defaultSelect,
     });
+
+    return leader ? serializeLeader(leader) : null;
   }
 
-  create(data: CreateLeaderDto) {
-    return prisma.leader.create({
-      data: {
-        userId: data.userId,
-        departmentId: data.departmentId,
-        position: data.position,
-        phone: data.phone,
-      },
-      select: defaultSelect,
+  async create(data: CreateLeaderDto, departmentIds: string[]) {
+    const leader = await prisma.$transaction(async (tx) => {
+      if (departmentIds.length > 0) {
+        await tx.leaderDepartment.deleteMany({
+          where: {
+            departmentId: { in: departmentIds },
+          },
+        });
+      }
+
+      return tx.leader.create({
+        data: {
+          userId: data.userId,
+          position: data.position,
+          phone: data.phone,
+          departments: departmentIds.length
+            ? {
+                create: departmentIds.map((departmentId) => ({ departmentId })),
+              }
+            : undefined,
+        },
+        select: defaultSelect,
+      });
     });
+
+    return serializeLeader(leader);
   }
 
-  update(id: string, data: UpdateLeaderDto) {
-    return prisma.leader.update({
-      where: { id },
-      data: {
-        ...(data.departmentId !== undefined
-          ? { departmentId: data.departmentId }
-          : {}),
-        ...(data.position !== undefined ? { position: data.position } : {}),
-        ...(data.phone !== undefined ? { phone: data.phone } : {}),
-      },
-      select: defaultSelect,
+  async update(
+    id: string,
+    data: UpdateLeaderDto | UpdateMeLeaderDto,
+    departmentIds?: string[],
+  ) {
+    const leader = await prisma.$transaction(async (tx) => {
+      if (departmentIds !== undefined && departmentIds.length > 0) {
+        await tx.leaderDepartment.deleteMany({
+          where: {
+            departmentId: { in: departmentIds },
+            leaderId: { not: id },
+          },
+        });
+      }
+
+      return tx.leader.update({
+        where: { id },
+        data: {
+          ...("position" in data && data.position !== undefined
+            ? { position: data.position }
+            : {}),
+          ...(data.phone !== undefined ? { phone: data.phone } : {}),
+          ...(departmentIds !== undefined
+            ? {
+                departments: {
+                  deleteMany: {},
+                  create: departmentIds.map((departmentId) => ({ departmentId })),
+                },
+              }
+            : {}),
+        },
+        select: defaultSelect,
+      });
     });
+
+    return serializeLeader(leader);
   }
 
   delete(id: string) {

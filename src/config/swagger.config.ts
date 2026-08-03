@@ -286,9 +286,21 @@ export const swaggerSpec = {
               department: {
                 type: "object",
                 nullable: true,
+                deprecated: true,
                 properties: {
                   id: { type: "string", format: "uuid" },
                   name: { type: "string", example: "Engineering" },
+                },
+              },
+              departments: {
+                type: "array",
+                maxItems: 3,
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string", format: "uuid" },
+                    name: { type: "string", example: "Engineering" },
+                  },
                 },
               },
               position: { type: "string", nullable: true, example: "Engineering Manager" },
@@ -315,8 +327,37 @@ export const swaggerSpec = {
           fullName: { type: "string", example: "Nguyễn Văn A" },
           email: { type: "string", format: "email" },
           phone: { type: "string", example: "0912345678" },
-          departmentId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440000" },
-          positionId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440001" },
+          preferredDepartment: {
+            type: "string",
+            nullable: true,
+            enum: ["Engineering", "Design", "Marketing", "Data", "QA", "HR", "Product"],
+            example: "Engineering",
+            description: "Nguyện vọng phòng ban do ứng viên chọn khi nộp đơn",
+          },
+          preferredPosition: {
+            type: "string",
+            nullable: true,
+            example: "Backend Intern",
+            description: "Nguyện vọng vị trí do ứng viên chọn khi nộp đơn",
+          },
+          department: {
+            type: "object",
+            nullable: true,
+            description: "Phòng ban nội bộ do Admin phân công",
+            properties: {
+              id: { type: "string", format: "uuid" },
+              name: { type: "string", example: "Engineering" },
+            },
+          },
+          position: {
+            type: "object",
+            nullable: true,
+            description: "Vị trí nội bộ do Admin phân công",
+            properties: {
+              id: { type: "string", format: "uuid" },
+              name: { type: "string", example: "Backend Intern" },
+            },
+          },
           startDate: { type: "string", format: "date-time" },
           duration: {
             type: "integer",
@@ -326,7 +367,8 @@ export const swaggerSpec = {
           status: { type: "string", enum: ["PENDING", "APPROVED", "REJECTED"] },
           approvedBy: { type: "string", format: "uuid", nullable: true },
           approvedAt: { type: "string", format: "date-time", nullable: true },
-          deletedAt: { type: "string", format: "date-time", nullable: true },
+          regulationId: { type: "string", format: "uuid", nullable: true },
+          acceptedAt: { type: "string", format: "date-time", nullable: true },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
           approver: {
@@ -364,8 +406,8 @@ export const swaggerSpec = {
           "fullName",
           "email",
           "phone",
-          "departmentId",
-          "positionId",
+          "preferredDepartment",
+          "preferredPosition",
           "startDate",
           "duration",
           "token",
@@ -376,9 +418,35 @@ export const swaggerSpec = {
           fullName: { type: "string", example: "Nguyễn Văn A" },
           email: { type: "string", format: "email", example: "vana@gmail.com" },
           phone: { type: "string", example: "0912345678" },
-          departmentId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440000" },
-          positionId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440001" },
-          startDate: { type: "string", format: "date", example: "2025-08-01" },
+          preferredDepartment: {
+            type: "string",
+            enum: ["Engineering", "Design", "Marketing", "Data", "QA", "HR", "Product"],
+            example: "Engineering",
+          },
+          preferredPosition: {
+            type: "string",
+            enum: [
+              "Backend Intern",
+              "Frontend Intern",
+              "Mobile Intern",
+              "DevOps Intern",
+              "UI/UX Intern",
+              "Graphic Intern",
+              "Marketing Intern",
+              "Data Intern",
+              "QA Intern",
+              "HR Intern",
+              "Product Intern",
+            ],
+            example: "Backend Intern",
+            description: "Phải thuộc danh sách vị trí của preferredDepartment đã chọn",
+          },
+          startDate: {
+            type: "string",
+            format: "date",
+            example: "2026-08-03",
+            description: "Ngày bắt đầu theo YYYY-MM-DD, không ở quá khứ và không rơi vào thứ Bảy/Chủ nhật (Asia/Ho_Chi_Minh)",
+          },
           duration: {
             type: "integer",
             example: 3,
@@ -398,6 +466,24 @@ export const swaggerSpec = {
         required: ["status"],
         properties: {
           status: { type: "string", enum: ["APPROVED", "REJECTED"] },
+        },
+      },
+      AssignApplicationBody: {
+        type: "object",
+        required: ["departmentId", "positionId"],
+        properties: {
+          departmentId: {
+            type: "string",
+            format: "uuid",
+            nullable: true,
+            description: "Đặt null để gỡ cả phòng ban và vị trí đã phân công",
+          },
+          positionId: {
+            type: "string",
+            format: "uuid",
+            nullable: true,
+            description: "Nếu có giá trị, vị trí phải thuộc departmentId đã chọn",
+          },
         },
       },
       CreateInviteBody: {
@@ -564,7 +650,7 @@ export const swaggerSpec = {
         properties: {
           id: { type: "string", format: "uuid" },
           userId: { type: "string", format: "uuid" },
-          departmentId: { type: "string", format: "uuid", nullable: true },
+          departmentId: { type: "string", format: "uuid", nullable: true, deprecated: true },
           position: { type: "string", nullable: true, example: "Engineering Manager" },
           phone: { type: "string", nullable: true, example: "0912345678" },
           createdAt: { type: "string", format: "date-time" },
@@ -582,9 +668,21 @@ export const swaggerSpec = {
           department: {
             type: "object",
             nullable: true,
+            deprecated: true,
             properties: {
               id: { type: "string", format: "uuid" },
               name: { type: "string", example: "Engineering" },
+            },
+          },
+          departments: {
+            type: "array",
+            maxItems: 3,
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                name: { type: "string", example: "Engineering" },
+              },
             },
           },
         },
@@ -594,7 +692,13 @@ export const swaggerSpec = {
         required: ["userId"],
         properties: {
           userId: { type: "string", format: "uuid" },
-          departmentId: { type: "string", format: "uuid" },
+          departmentIds: {
+            type: "array",
+            maxItems: 3,
+            uniqueItems: true,
+            items: { type: "string", format: "uuid" },
+          },
+          departmentId: { type: "string", format: "uuid", deprecated: true },
           position: { type: "string", example: "Engineering Manager" },
           phone: { type: "string", example: "0912345678" },
         },
@@ -602,9 +706,27 @@ export const swaggerSpec = {
       UpdateLeaderBody: {
         type: "object",
         properties: {
-          departmentId: { type: "string", format: "uuid", nullable: true },
+          departmentIds: {
+            type: "array",
+            maxItems: 3,
+            uniqueItems: true,
+            items: { type: "string", format: "uuid" },
+            description: "Danh sÃ¡ch phÃ²ng ban leader quáº£n lÃ½; máº£ng rá»—ng Ä‘á»ƒ bá» gáº¯n táº¥t cáº£.",
+          },
+          departmentId: { type: "string", format: "uuid", nullable: true, deprecated: true },
           position: { type: "string", nullable: true },
           phone: { type: "string" },
+        },
+      },
+      UpdateMeLeaderBody: {
+        type: "object",
+        properties: {
+          phone: {
+            type: "string",
+            nullable: true,
+            example: "0912345678",
+            description: "Số điện thoại Việt Nam; đặt null để xóa",
+          },
         },
       },
       TaskGroup: {
@@ -614,6 +736,9 @@ export const swaggerSpec = {
           name: { type: "string", example: "Backend Crawl Project" },
           description: { type: "string", nullable: true, example: "Dự án cào dữ liệu Backend" },
           departmentId: { type: "string", format: "uuid", nullable: true },
+          maxWorkloadDays: { type: "number", format: "float", example: 10 },
+          maxActiveTasks: { type: "integer", nullable: true, example: 5 },
+          requireAllMembers: { type: "boolean", example: true },
           department: {
             type: "object",
             nullable: true,
@@ -622,14 +747,75 @@ export const swaggerSpec = {
               name: { type: "string", example: "Backend Development" },
             },
           },
+          members: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                internId: { type: "string", format: "uuid" },
+                intern: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string", format: "uuid" },
+                    leaderId: { type: "string", format: "uuid", nullable: true },
+                    fullName: { type: "string", example: "Nguyễn Văn A" },
+                    status: { type: "string", enum: ["ACTIVE", "COMPLETED", "DROPPED"] },
+                    user: {
+                      type: "object",
+                      properties: { email: { type: "string", format: "email" } },
+                    },
+                    department: { type: "object", nullable: true },
+                    position: { type: "object", nullable: true },
+                  },
+                },
+              },
+            },
+          },
           _count: {
             type: "object",
             properties: {
               tasks: { type: "integer", example: 5 },
+              members: { type: "integer", example: 5 },
             },
           },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
+        },
+      },
+      GroupAiRecommendation: {
+        type: "object",
+        properties: {
+          taskGroupId: { type: "string", format: "uuid" },
+          taskGroupName: { type: "string" },
+          department: { type: "object", nullable: true },
+          tasks: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                taskId: { type: "string", format: "uuid" },
+                taskTitle: { type: "string" },
+                taskCode: { type: "string", nullable: true },
+                priority: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"] },
+                estDays: { type: "number", nullable: true },
+                deadline: { type: "string", format: "date-time" },
+                suggestedOwner: { type: "object", nullable: true },
+                suggestedSupport: { type: "object", nullable: true },
+                reason: { type: "string" },
+              },
+            },
+          },
+          summary: {
+            type: "object",
+            properties: {
+              totalUnassignedTasks: { type: "integer" },
+              totalAllocated: { type: "integer" },
+              unallocatableTasks: { type: "integer" },
+              internsEvaluatedCount: { type: "integer" },
+              membersUsedCount: { type: "integer" },
+              totalMemberCount: { type: "integer" },
+            },
+          },
         },
       },
       Task: {
@@ -1344,6 +1530,14 @@ export const swaggerSpec = {
       },
       BadRequest: {
         description: "Yêu cầu không hợp lệ",
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/ErrorResponse" },
+          },
+        },
+      },
+      Conflict: {
+        description: "Dữ liệu đã thay đổi hoặc tài nguyên đã tồn tại",
         content: {
           "application/json": {
             schema: { $ref: "#/components/schemas/ErrorResponse" },
@@ -2135,8 +2329,8 @@ export const swaggerSpec = {
           { in: "query", name: "email", schema: { type: "string" }, description: "Tìm kiếm theo email" },
           { in: "query", name: "inviteStatus", schema: { type: "string", enum: ["ACTIVE", "USED", "EXPIRED", "REVOKED"] }, description: "Lọc trạng thái invite" },
           { in: "query", name: "applicationStatus", schema: { type: "string", enum: ["PENDING", "APPROVED", "REJECTED"] }, description: "Lọc trạng thái application" },
-          { in: "query", name: "department", schema: { type: "string" }, description: "Tìm kiếm phòng ban" },
-          { in: "query", name: "position", schema: { type: "string" }, description: "Tìm kiếm vị trí" },
+          { in: "query", name: "departmentId", schema: { type: "string", format: "uuid" }, description: "Lọc theo phòng ban nội bộ đã phân công" },
+          { in: "query", name: "positionId", schema: { type: "string", format: "uuid" }, description: "Lọc theo vị trí nội bộ đã phân công" },
           { in: "query", name: "createdFrom", schema: { type: "string", format: "date-time" }, description: "Lọc từ ngày tạo" },
           { in: "query", name: "createdTo", schema: { type: "string", format: "date-time" }, description: "Lọc đến ngày tạo" },
           { in: "query", name: "sortBy", schema: { type: "string", enum: ["createdAt", "expiresAt", "email"] }, description: "Sắp xếp theo" },
@@ -2171,8 +2365,24 @@ export const swaggerSpec = {
                                 properties: {
                                   id: { type: "string", format: "uuid" },
                                   fullName: { type: "string" },
-                                  department: { type: "string" },
-                                  position: { type: "string" },
+                                  preferredDepartment: { type: "string", nullable: true },
+                                  preferredPosition: { type: "string", nullable: true },
+                                  department: {
+                                    type: "object",
+                                    nullable: true,
+                                    properties: {
+                                      id: { type: "string", format: "uuid" },
+                                      name: { type: "string" },
+                                    },
+                                  },
+                                  position: {
+                                    type: "object",
+                                    nullable: true,
+                                    properties: {
+                                      id: { type: "string", format: "uuid" },
+                                      name: { type: "string" },
+                                    },
+                                  },
                                   status: { type: "string", enum: ["PENDING", "APPROVED", "REJECTED"] },
                                   startDate: { type: "string", format: "date-time" },
                                   duration: { type: "integer" },
@@ -2272,8 +2482,8 @@ export const swaggerSpec = {
                   "fullName",
                   "email",
                   "phone",
-                  "departmentId",
-                  "positionId",
+                  "preferredDepartment",
+                  "preferredPosition",
                   "startDate",
                   "duration",
                   "token",
@@ -2284,9 +2494,35 @@ export const swaggerSpec = {
                   fullName: { type: "string", example: "Nguyễn Văn A" },
                   email: { type: "string", format: "email", example: "vana@gmail.com" },
                   phone: { type: "string", example: "0912345678" },
-                  departmentId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440000" },
-                  positionId: { type: "string", format: "uuid", example: "550e8400-e29b-41d4-a716-446655440001" },
-                  startDate: { type: "string", format: "date", example: "2025-08-01" },
+                  preferredDepartment: {
+                    type: "string",
+                    enum: ["Engineering", "Design", "Marketing", "Data", "QA", "HR", "Product"],
+                    example: "Engineering",
+                  },
+                  preferredPosition: {
+                    type: "string",
+                    enum: [
+                      "Backend Intern",
+                      "Frontend Intern",
+                      "Mobile Intern",
+                      "DevOps Intern",
+                      "UI/UX Intern",
+                      "Graphic Intern",
+                      "Marketing Intern",
+                      "Data Intern",
+                      "QA Intern",
+                      "HR Intern",
+                      "Product Intern",
+                    ],
+                    example: "Backend Intern",
+                    description: "Phải thuộc danh sách vị trí của preferredDepartment đã chọn",
+                  },
+                  startDate: {
+                    type: "string",
+                    format: "date",
+                    example: "2026-08-03",
+                    description: "Không ở quá khứ và không rơi vào thứ Bảy/Chủ nhật (Asia/Ho_Chi_Minh)",
+                  },
                   duration: { type: "integer", example: 3 },
                   token: { type: "string", example: "39bdf11f..." },
                   regulationId: { type: "string", format: "uuid" },
@@ -2325,7 +2561,7 @@ export const swaggerSpec = {
             },
           },
           409: {
-            description: "Email đã tồn tại trong hệ thống hoặc đã có đơn đăng ký khác đang xử lý/phê duyệt",
+            description: "Email hoặc số điện thoại đã tồn tại trong hệ thống, hoặc đã có đơn khác đang xử lý/phê duyệt",
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/ErrorResponse" },
@@ -2350,15 +2586,15 @@ export const swaggerSpec = {
           },
           {
             in: "query",
-            name: "department",
-            schema: { type: "string" },
-            description: "Lọc bộ phận (contains)",
+            name: "departmentId",
+            schema: { type: "string", format: "uuid" },
+            description: "Lọc theo phòng ban nội bộ đã phân công",
           },
           {
             in: "query",
-            name: "position",
-            schema: { type: "string" },
-            description: "Lọc vị trí (contains)",
+            name: "positionId",
+            schema: { type: "string", format: "uuid" },
+            description: "Lọc theo vị trí nội bộ đã phân công",
           },
           {
             in: "query",
@@ -2499,6 +2735,70 @@ export const swaggerSpec = {
         },
       },
     },
+    "/applications/{id}/assignment": {
+      patch: {
+        tags: ["Applications"],
+        summary: "Phân công phòng ban và vị trí nội bộ cho đơn (Admin only)",
+        description: "Chỉ phân công được đơn PENDING có lời mời ở trạng thái USED. Gửi cả hai trường với giá trị null để gỡ phân công.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/AssignApplicationBody" },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Đã cập nhật phân công nội bộ",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/Application" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          400: {
+            description: "Vị trí không thuộc phòng ban đã chọn",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+          409: {
+            description: "Đơn không còn PENDING hoặc lời mời chưa được sử dụng",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          422: { $ref: "#/components/responses/Validation" },
+        },
+      },
+    },
     "/applications/{id}/review": {
       patch: {
         tags: ["Applications"],
@@ -2543,7 +2843,7 @@ export const swaggerSpec = {
           403: { $ref: "#/components/responses/Forbidden" },
           404: { $ref: "#/components/responses/NotFound" },
           409: {
-            description: "Đơn không còn ở trạng thái PENDING hoặc email của ứng viên đã được đăng ký tài khoản trước đó",
+            description: "Đơn không còn PENDING, chưa được phân công đủ phòng ban/vị trí, hoặc email/số điện thoại đã tồn tại",
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/ErrorResponse" },
@@ -3029,7 +3329,7 @@ export const swaggerSpec = {
       get: {
         tags: ["TaskGroups"],
         summary: "Danh sách nhóm công việc",
-        description: "Public endpoint. Trả về tất cả nhóm công việc kèm số lượng task trong mỗi nhóm.",
+        description: "Yêu cầu đăng nhập. Trả về nhóm công việc, đội thành viên và cấu hình capacity.",
         responses: {
           200: {
             description: "Danh sách nhóm công việc",
@@ -3069,6 +3369,15 @@ export const swaggerSpec = {
                   name: { type: "string", example: "Backend Crawl Project" },
                   description: { type: "string", example: "Dự án cào dữ liệu Backend" },
                   departmentId: { type: "string", format: "uuid", nullable: true },
+                  memberIds: {
+                    type: "array",
+                    maxItems: 100,
+                    items: { type: "string", format: "uuid" },
+                    description: "TTS active thuộc đúng leader và department",
+                  },
+                  maxWorkloadDays: { type: "number", minimum: 0, maximum: 365, example: 10 },
+                  maxActiveTasks: { type: "integer", minimum: 1, maximum: 100, nullable: true },
+                  requireAllMembers: { type: "boolean", default: false },
                 },
               },
             },
@@ -3156,6 +3465,14 @@ export const swaggerSpec = {
                   name: { type: "string", example: "Backend Crawl Project v2" },
                   description: { type: "string", nullable: true, example: "Mô tả cập nhật" },
                   departmentId: { type: "string", format: "uuid", nullable: true },
+                  memberIds: {
+                    type: "array",
+                    maxItems: 100,
+                    items: { type: "string", format: "uuid" },
+                  },
+                  maxWorkloadDays: { type: "number", minimum: 0, maximum: 365 },
+                  maxActiveTasks: { type: "integer", minimum: 1, maximum: 100, nullable: true },
+                  requireAllMembers: { type: "boolean" },
                 },
               },
             },
@@ -3225,7 +3542,8 @@ export const swaggerSpec = {
     "/task-groups/{id}/ai-recommendation": {
       post: {
         tags: ["TaskGroups"],
-        summary: "Xem trước phân công AI cho toàn bộ Task trong nhóm công việc",
+        summary: "Xem trước phân công cho các task chưa giao bằng đội của Task Group",
+        description: "Chỉ đánh giá thành viên active thuộc Task Group và đúng quyền leader/department. Áp dụng giới hạn workload/task; Support được tính 50% estDays.",
         security: [{ BearerAuth: [] }],
         parameters: [
           {
@@ -3238,12 +3556,27 @@ export const swaggerSpec = {
         ],
         responses: {
           200: {
-            description: "Đề xuất phân công AI cho nhóm công việc",
+            description: "Đề xuất phân công cho nhóm công việc",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/GroupAiRecommendation" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
           },
           400: { $ref: "#/components/responses/BadRequest" },
           401: { $ref: "#/components/responses/Unauthorized" },
           404: { $ref: "#/components/responses/NotFound" },
-          422: { $ref: "#/components/responses/ValidationError" },
+          422: { $ref: "#/components/responses/Validation" },
         },
       },
     },
@@ -3270,6 +3603,8 @@ export const swaggerSpec = {
                 properties: {
                   assignments: {
                     type: "array",
+                    minItems: 1,
+                    maxItems: 1000,
                     items: {
                       type: "object",
                       required: ["taskId", "internId"],
@@ -3291,7 +3626,10 @@ export const swaggerSpec = {
           },
           400: { $ref: "#/components/responses/BadRequest" },
           401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
           404: { $ref: "#/components/responses/NotFound" },
+          409: { $ref: "#/components/responses/Conflict" },
+          422: { $ref: "#/components/responses/Validation" },
         },
       },
     },
@@ -3979,6 +4317,7 @@ export const swaggerSpec = {
           { in: "query", name: "fullName", schema: { type: "string" }, description: "Tìm theo tên" },
           { in: "query", name: "departmentId", schema: { type: "string", format: "uuid" }, description: "Lọc theo phòng ban" },
           { in: "query", name: "department", schema: { type: "string" }, description: "Tìm theo tên phòng ban" },
+          { in: "query", name: "isActive", schema: { type: "boolean" }, description: "Lọc theo trạng thái tài khoản" },
           { in: "query", name: "sortBy", schema: { type: "string", enum: ["createdAt", "fullName"] } },
           { $ref: "#/components/parameters/OrderParam" },
           { $ref: "#/components/parameters/PageParam" },
@@ -4018,6 +4357,82 @@ export const swaggerSpec = {
           201: { description: "Leader created" },
           401: { $ref: "#/components/responses/Unauthorized" },
           403: { $ref: "#/components/responses/Forbidden" },
+        },
+      },
+    },
+    "/leaders/me": {
+      get: {
+        tags: ["Leaders"],
+        summary: "Lấy hồ sơ Leader đang đăng nhập",
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: {
+            description: "Hồ sơ Leader hiện tại",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/Leader" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+        },
+      },
+      put: {
+        tags: ["Leaders"],
+        summary: "Cập nhật hồ sơ Leader đang đăng nhập",
+        description: "Leader chỉ được tự cập nhật số điện thoại.",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UpdateMeLeaderBody" },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Đã cập nhật hồ sơ Leader",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/Leader" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+          409: {
+            description: "Số điện thoại đã được sử dụng",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          422: { $ref: "#/components/responses/Validation" },
         },
       },
     },

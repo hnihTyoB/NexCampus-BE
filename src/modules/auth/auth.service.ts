@@ -266,7 +266,10 @@ export class AuthService {
       leader: user.leader
         ? {
             id: user.leader.id,
-            department: user.leader.department,
+            departments: user.leader.departments.map(
+              (membership) => membership.department,
+            ),
+            department: user.leader.departments[0]?.department ?? null,
             position: user.leader.position,
             phone: user.leader.phone,
           }
@@ -334,7 +337,10 @@ export class AuthService {
       leader: updatedUser.leader
         ? {
             id: updatedUser.leader.id,
-            department: updatedUser.leader.department,
+            departments: updatedUser.leader.departments.map(
+              (membership) => membership.department,
+            ),
+            department: updatedUser.leader.departments[0]?.department ?? null,
             position: updatedUser.leader.position,
             phone: updatedUser.leader.phone,
           }
