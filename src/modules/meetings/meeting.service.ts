@@ -55,7 +55,7 @@ export class MeetingService {
       const isParticipant = meeting.participants.some(
         (p) => p.userId === actor.id,
       );
-      if (!isParticipant) {
+      if (!isParticipant && meeting.visibility !== "TEAM") {
         throw new AppError("Forbidden", 403, ERROR_CODE.FORBIDDEN);
       }
     }
