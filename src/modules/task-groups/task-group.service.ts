@@ -14,7 +14,17 @@ interface UserPayload {
 export class TaskGroupService {
   private readonly repository = new TaskGroupRepository();
 
-  async findAll() {
+  async findAll(user: UserPayload) {
+    // LEADER: chỉ thấy Task Groups thuộc phòng ban mình quản lý (hoặc không có phòng ban)
+    if (user.role === ROLES.LEADER) {
+      const leader = await prisma.leader.findFirst({
+        where: { userId: user.id },
+        select: { departments: { select: { departmentId: true } } },
+      });
+      const departmentIds = leader?.departments.map((d) => d.departmentId) ?? [];
+      return this.repository.findAll(departmentIds);
+    }
+    // ADMIN: trả về tất cả
     return this.repository.findAll();
   }
 
