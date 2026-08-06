@@ -33,8 +33,18 @@ const defaultSelect = {
 };
 
 export class TaskGroupRepository {
-  findAll() {
+  findAll(departmentIds?: string[]) {
     return prisma.taskGroup.findMany({
+      ...(departmentIds !== undefined
+        ? {
+            where: {
+              OR: [
+                { departmentId: { in: departmentIds } },
+                { departmentId: null },
+              ],
+            },
+          }
+        : {}),
       select: defaultSelect,
       orderBy: { name: "asc" },
     });

@@ -8,9 +8,9 @@ export class TaskGroupController {
   private readonly service = new TaskGroupService();
   private readonly allocationService = new TaskAllocationService();
 
-  findAll = async (_req: Request, res: Response, next: NextFunction) => {
+  findAll = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const data = await this.service.findAll();
+      const data = await this.service.findAll(req.user);
       res.json({ success: true, data });
     } catch (error) {
       next(error);
