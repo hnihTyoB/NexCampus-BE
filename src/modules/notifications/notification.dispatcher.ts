@@ -8,6 +8,7 @@ import { notificationQueue } from "../../queues/notification.queue";
 
 import { TEMPLATE_DEFAULTS } from "../../common/constants/notification-template.constant";
 import { TemplateCacheHelper } from "../../common/helpers/template-cache.helper";
+import { emitNotificationToUser } from "../../lib/sse";
 
 const interpolate = (template: string, variables: Record<string, any>) => {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
@@ -84,6 +85,8 @@ export class NotificationDispatcher {
             status: NOTIFICATION_LOG_STATUS.SUCCESS,
           },
         });
+
+        emitNotificationToUser(userId, notification);
       }
 
       // 6. EMAIL and DISCORD — asynchronous via BullMQ queue
