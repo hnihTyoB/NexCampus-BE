@@ -250,8 +250,26 @@ export class TaskAssignmentService {
       );
     }
 
-    // Only Admin or the direct Leader of the intern is allowed to update
-    if (actorRole !== ROLES.ADMIN && assignment.intern.leaderId !== actorId) {
+    if (actorRole === ROLES.INTERN) {
+      const canStartOwnAssignment =
+        assignment.intern.userId === actorId &&
+        data.internId === undefined &&
+        data.status === AssignmentStatus.IN_PROGRESS &&
+        (assignment.status === AssignmentStatus.TODO ||
+          assignment.status === AssignmentStatus.BLOCKED);
+
+      if (!canStartOwnAssignment) {
+        throw new AppError(
+          "Intern can only start their own TODO or BLOCKED assignment",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
+      }
+    } else if (
+      actorRole !== ROLES.ADMIN &&
+      assignment.intern.leaderId !== actorId
+    ) {
+      // Leaders can only update assignments belonging to their direct interns.
       throw new AppError(
         "Bạn không có quyền cập nhật phân công này",
         403,
@@ -308,7 +326,9 @@ export class TaskAssignmentService {
       await this.activityLogService.log(
         actorId,
         ACTIVITY_ACTIONS.UPDATE_ASSIGNMENT,
-        `Leader đã cập nhật phân công công việc "${assignment.task.title}": ${changes.join(", ")}`,
+        actorRole === ROLES.INTERN
+          ? `Intern "${assignment.intern.fullName}" đã bắt đầu công việc "${assignment.task.title}"`
+          : `Leader đã cập nhật phân công công việc "${assignment.task.title}": ${changes.join(", ")}`,
         result.id,
         "TaskAssignment",
       );
