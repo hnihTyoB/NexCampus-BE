@@ -18,6 +18,12 @@ export class TaskController {
   findAll = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const query = req.query as unknown as TaskQueryDto;
+
+      // LEADER chỉ được xem task do chính họ tạo ra
+      if (req.user.role === "LEADER") {
+        query.createdBy = req.user.id;
+      }
+
       const result = await this.service.findAll(query);
 
       res.json({ success: true, ...result });
