@@ -29,7 +29,13 @@ const MIME_TYPES = {
     "application/vnd.rar",
     "application/x-7z-compressed",
   ],
-  videos: ["video/mp4", "video/webm"],
+  videos: [
+    "video/mp4",
+    "video/webm",
+    "video/quicktime",
+    "video/x-matroska",
+    "video/x-msvideo",
+  ],
   spreadsheets: [
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/vnd.ms-excel",
@@ -160,9 +166,16 @@ function hasExpectedSignature(file: Express.Multer.File): boolean {
     case "application/x-7z-compressed":
       return startsWithBytes(buffer, [0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c]);
     case "video/mp4":
+    case "video/quicktime":
       return buffer.subarray(4, 8).toString("ascii") === "ftyp";
     case "video/webm":
+    case "video/x-matroska":
       return startsWithBytes(buffer, [0x1a, 0x45, 0xdf, 0xa3]);
+    case "video/x-msvideo":
+      return (
+        buffer.subarray(0, 4).toString("ascii") === "RIFF" &&
+        buffer.subarray(8, 12).toString("ascii") === "AVI "
+      );
     default:
       return false;
   }
