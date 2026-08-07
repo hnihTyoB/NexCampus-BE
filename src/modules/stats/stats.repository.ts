@@ -1,6 +1,7 @@
 import { prisma } from "../../database/prisma.client";
 import {
   APPLICATION_STATUS,
+  APPLICATION_INVITE_STATUS,
   INTERN_STATUS,
   TASK_PRIORITY,
   ASSIGNMENT_STATUS,
@@ -119,7 +120,13 @@ export class StatsRepository {
       // ─── Applications ─────────────────────────────────────────────────────────
       prisma.application.count({ where: { deletedAt: null } }),
       prisma.application.count({
-        where: { deletedAt: null, status: APPLICATION_STATUS.PENDING },
+        where: {
+          deletedAt: null,
+          status: APPLICATION_STATUS.PENDING,
+          applicationInvites: {
+            some: { status: APPLICATION_INVITE_STATUS.USED },
+          },
+        },
       }),
       prisma.application.count({
         where: { deletedAt: null, status: APPLICATION_STATUS.APPROVED },

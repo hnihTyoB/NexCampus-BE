@@ -107,11 +107,18 @@ export class TaskAssignmentRepository {
 
     const skip = (page - 1) * limit;
 
+    const orderByList = sortBy === "assignedAt"
+      ? [
+          { assignedAt: order },
+          { task: { createdAt: order } }
+        ]
+      : [{ [sortBy]: order }];
+
     const [data, total] = await prisma.$transaction([
       prisma.taskAssignment.findMany({
         where,
         select: defaultSelect,
-        orderBy: { [sortBy]: order },
+        orderBy: orderByList,
         skip,
         take: limit,
       }),
