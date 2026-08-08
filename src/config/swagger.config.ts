@@ -1051,6 +1051,22 @@ export const swaggerSpec = {
           blockedReason: { type: "string", nullable: true },
           assignedAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
+          task: {
+            type: "object",
+            description:
+              "Thông tin công việc dùng để hiển thị và xác định quá hạn",
+            properties: {
+              id: { type: "string", format: "uuid" },
+              code: { type: "string", nullable: true },
+              title: { type: "string" },
+              description: { type: "string", nullable: true },
+              deadline: { type: "string", format: "date-time" },
+              estDays: { type: "number", nullable: true },
+              priority: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"] },
+              createdAt: { type: "string", format: "date-time" },
+              updatedAt: { type: "string", format: "date-time" },
+            },
+          },
         },
       },
       CreateTaskAssignmentBody: {
@@ -5173,6 +5189,8 @@ export const swaggerSpec = {
       get: {
         tags: ["TaskAssignments"],
         summary: "Danh sách phân công công việc",
+        description:
+          "Intern chỉ nhận các assignment của chính mình. Mỗi phần tử có `status` và `task.deadline`; một công việc được xem là quá hạn khi deadline đã qua và status khác `DONE`.",
         security: [{ BearerAuth: [] }],
         parameters: [
           {
@@ -5685,6 +5703,8 @@ export const swaggerSpec = {
       post: {
         tags: ["TaskSubmissions"],
         summary: "Nộp bài (Intern only)",
+        description:
+          "Intern chỉ được nộp hoặc nộp lại khi assignment đang ở trạng thái `IN_PROGRESS`. Assignment `TODO` phải được bắt đầu trước khi nộp.",
         security: [{ BearerAuth: [] }],
         requestBody: {
           required: true,
@@ -5715,6 +5735,19 @@ export const swaggerSpec = {
           },
           401: { $ref: "#/components/responses/Unauthorized" },
           403: { $ref: "#/components/responses/Forbidden" },
+          409: {
+            description: "Assignment chưa được bắt đầu hoặc không còn ở trạng thái IN_PROGRESS",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+                example: {
+                  success: false,
+                  message: "Task must be in progress before submitting",
+                  code: "TASK_NOT_IN_PROGRESS",
+                },
+              },
+            },
+          },
         },
       },
     },
@@ -5900,7 +5933,7 @@ export const swaggerSpec = {
         tags: ["TaskSubmissions"],
         summary: "Upload trực tiếp file video demo cho bài nộp (Intern only)",
         description:
-          "Tải lên video demo dạng `.mp4` hoặc `.webm`, tối đa 50 MB (có thể giảm trong System Settings, tối thiểu 5 MB). Sau khi tải lên thành công, hệ thống tự động cập nhật trường `videoDemo` của TaskSubmission.",
+          "Gửi file bằng multipart field `video`. Hỗ trợ MP4, WEBM, MOV, MKV và AVI. Giới hạn dung lượng lấy từ `SUBMISSION_MAX_FILE_SIZE_MB` trong System Settings (5–50 MB). Sau khi tải lên thành công, hệ thống tự động cập nhật trường `videoDemo` của TaskSubmission.",
         security: [{ BearerAuth: [] }],
         parameters: [
           {
@@ -5922,7 +5955,8 @@ export const swaggerSpec = {
                   video: {
                     type: "string",
                     format: "binary",
-                    description: "File video demo (.mp4, .webm)",
+                    description:
+                      "File video demo (.mp4, .webm, .mov, .mkv hoặc .avi); dung lượng không vượt quá giới hạn submission hiện tại",
                   },
                 },
               },
@@ -5950,10 +5984,30 @@ export const swaggerSpec = {
           },
           400: {
             description:
-              "File video không hợp lệ hoặc bài nộp đã được APPROVED",
+              "Thiếu file, sai multipart field, sai loại/nội dung file, vượt giới hạn dung lượng hoặc bài nộp đã được APPROVED",
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/ErrorResponse" },
+                examples: {
+                  uploadError: {
+                    summary: "Multer từ chối file upload",
+                    value: {
+                      success: false,
+                      message:
+                        "Lỗi tải lên tệp: File too large (Mã lỗi: LIMIT_FILE_SIZE)",
+                      code: "FILE_UPLOAD_ERROR",
+                    },
+                  },
+                  invalidType: {
+                    summary: "Loại file không được hỗ trợ",
+                    value: {
+                      success: false,
+                      message:
+                        'Invalid file type "application/pdf" for submissionVideo',
+                      code: "VALIDATION_ERROR",
+                    },
+                  },
+                },
               },
             },
           },
@@ -6011,7 +6065,7 @@ export const swaggerSpec = {
         tags: ["SubmissionAttachments"],
         summary: "Upload file đính kèm cho bài nộp (Admin / Leader / Intern)",
         description:
-          "Tải lên tài liệu đính kèm dạng hình ảnh, PDF, DOCX, hoặc ZIP/RAR. Thực tập sinh chỉ được tải lên cho bài nộp của chính mình và khi bài nộp chưa được APPROVED.",
+          "Tải lên tối đa 5 tài liệu cho mỗi bài nộp, không tính video demo; mỗi request gửi một file qua multipart field `file`. Hỗ trợ hình ảnh, PDF, DOC/DOCX, ZIP, RAR và 7z; mỗi file tối đa 25 MB. Thực tập sinh chỉ được tải lên cho bài nộp của chính mình và khi bài nộp chưa được APPROVED.",
         security: [{ BearerAuth: [] }],
         parameters: [
           {
@@ -6064,7 +6118,7 @@ export const swaggerSpec = {
           },
           400: {
             description:
-              "File không hợp lệ hoặc bài nộp đã được duyệt APPROVED",
+              "File không hợp lệ, bài nộp đã có đủ 5 file hoặc bài nộp đã được duyệt APPROVED",
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/ErrorResponse" },
@@ -6357,7 +6411,7 @@ export const swaggerSpec = {
         summary:
           "Upload trực tiếp file video demo cho báo cáo hàng ngày (Intern only)",
         description:
-          "Tải lên video demo dạng `.mp4` hoặc `.webm` cho báo cáo ngày, tối đa 50 MB. Sau khi tải lên thành công, hệ thống tự động cập nhật trường `videoDemo` của DailyReport.",
+          "Tải lên một video demo riêng với tối đa 5 tài liệu đính kèm của báo cáo ngày. Hỗ trợ MP4, WEBM, MOV, MKV và AVI, tối đa 50 MB. Sau khi tải lên thành công, hệ thống tự động cập nhật trường `videoDemo` của DailyReport.",
         security: [{ BearerAuth: [] }],
         parameters: [
           {
@@ -6379,7 +6433,8 @@ export const swaggerSpec = {
                   video: {
                     type: "string",
                     format: "binary",
-                    description: "File video demo (.mp4, .webm)",
+                    description:
+                      "Một file video demo (.mp4, .webm, .mov, .mkv hoặc .avi), tối đa 50 MB; không tính vào giới hạn tài liệu đính kèm",
                   },
                 },
               },
@@ -6469,7 +6524,7 @@ export const swaggerSpec = {
         summary:
           "Upload file đính kèm cho báo cáo ngày (Admin / Leader / Intern)",
         description:
-          "Tải lên hình ảnh chụp màn hình, PDF báo cáo hoặc tài liệu nén. Thực tập sinh chỉ được đính kèm vào báo cáo của chính mình.",
+          "Tải lên tối đa 5 tài liệu cho mỗi báo cáo ngày; giới hạn này không tính video demo. Hỗ trợ ảnh, PDF, DOC/DOCX, ZIP, RAR và 7z, tối đa 10 MB mỗi file. Thực tập sinh chỉ được đính kèm vào báo cáo của chính mình.",
         security: [{ BearerAuth: [] }],
         parameters: [
           {
@@ -6518,7 +6573,8 @@ export const swaggerSpec = {
             },
           },
           400: {
-            description: "File không hợp lệ hoặc dữ liệu sai",
+            description:
+              "File không hợp lệ, báo cáo đã có đủ 5 tài liệu hoặc dữ liệu sai",
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/ErrorResponse" },
@@ -7828,6 +7884,81 @@ export const swaggerSpec = {
         },
       },
     },
+    "/stats/me": {
+      get: {
+        tags: ["Stats"],
+        summary: "Thống kê dashboard cá nhân (Intern only)",
+        description:
+          "Trả về tiến độ công việc, báo cáo ngày và điểm đánh giá của Intern đang đăng nhập. `tasksOverdue` đếm các assignment đã qua deadline và chưa ở trạng thái `DONE`.",
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: {
+            description: "Dữ liệu thống kê dashboard cá nhân",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "object",
+                          required: [
+                            "internName",
+                            "tasksInProgress",
+                            "tasksCompleted",
+                            "tasksOverdue",
+                            "totalTasks",
+                            "completionRate",
+                            "dailyReportTodaySubmitted",
+                            "lastWeekScore",
+                            "avgScore",
+                            "todaysTasks",
+                          ],
+                          properties: {
+                            internName: { type: "string", example: "Nguyễn Văn An" },
+                            tasksInProgress: { type: "integer", minimum: 0, example: 3 },
+                            tasksCompleted: { type: "integer", minimum: 0, example: 8 },
+                            tasksOverdue: {
+                              type: "integer",
+                              minimum: 0,
+                              example: 1,
+                              description:
+                                "Số assignment đã qua deadline và chưa hoàn thành",
+                            },
+                            totalTasks: { type: "integer", minimum: 0, example: 12 },
+                            completionRate: {
+                              type: "integer",
+                              minimum: 0,
+                              maximum: 100,
+                              example: 67,
+                            },
+                            dailyReportTodaySubmitted: { type: "boolean", example: true },
+                            lastWeekScore: {
+                              type: "number",
+                              nullable: true,
+                              example: 8.5,
+                            },
+                            avgScore: { type: "number", example: 8.2 },
+                            todaysTasks: {
+                              type: "array",
+                              items: { type: "object" },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+        },
+      },
+    },
     "/activity-logs": {
       get: {
         tags: ["ActivityLogs"],
@@ -8357,7 +8488,14 @@ export const swaggerSpec = {
                         REPORT_MAX_FILE_SIZE_MB: { type: "integer", example: 10 },
                         REPORT_VIDEO_MAX_FILE_SIZE_MB: { type: "integer", example: 50 },
                         SUBMISSION_ATTACHMENT_MAX_FILE_SIZE_MB: { type: "integer", example: 25 },
-                        SUBMISSION_MAX_FILE_SIZE_MB: { type: "integer", example: 50 },
+                        SUBMISSION_MAX_FILE_SIZE_MB: {
+                          type: "integer",
+                          minimum: 5,
+                          maximum: 50,
+                          example: 50,
+                          description:
+                            "Giới hạn dung lượng (MB) áp dụng cho video upload trực tiếp của TaskSubmission",
+                        },
                         TASK_ATTACHMENT_MAX_FILE_SIZE_MB: { type: "integer", example: 25 },
                         APPLICATION_MAX_FILE_SIZE_MB: { type: "integer", example: 10 },
                         TASK_IMPORT_MAX_FILE_SIZE_MB: { type: "integer", example: 10 }

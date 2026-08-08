@@ -624,6 +624,7 @@ export class StatsRepository {
         internName: "Thực Tập Sinh",
         tasksInProgress: 0,
         tasksCompleted: 0,
+        tasksOverdue: 0,
         totalTasks: 0,
         completionRate: 0,
         dailyReportTodaySubmitted: false,
@@ -657,6 +658,12 @@ export class StatsRepository {
     const tasksCompleted = assignments.filter(
       (a) => a.status === ASSIGNMENT_STATUS.DONE
     ).length;
+    const tasksOverdue = assignments.filter(
+      (a) =>
+        a.task?.deadline &&
+        new Date(a.task.deadline) < now &&
+        a.status !== ASSIGNMENT_STATUS.DONE
+    ).length;
     const totalTasks = assignments.length;
     const completionRate = totalTasks > 0 ? Math.round((tasksCompleted / totalTasks) * 100) : 0;
 
@@ -670,6 +677,7 @@ export class StatsRepository {
       internName: intern.fullName ?? intern.user?.fullName ?? "Thực Tập Sinh",
       tasksInProgress,
       tasksCompleted,
+      tasksOverdue,
       totalTasks,
       completionRate,
       dailyReportTodaySubmitted: Boolean(dailyReportToday),
