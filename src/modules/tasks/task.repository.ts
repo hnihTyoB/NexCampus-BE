@@ -36,6 +36,7 @@ const defaultSelect = {
       internId: true,
       assignedBy: true,
       status: true,
+      blockedReason: true,
       assignedAt: true,
       updatedAt: true,
       intern: { select: { id: true, fullName: true } },
@@ -119,8 +120,8 @@ export class TaskRepository {
       ...(phase ? { phase: { contains: phase, mode: "insensitive" } } : {}),
       ...(module ? { module: { contains: module, mode: "insensitive" } } : {}),
       ...(taskGroupId ? { taskGroupId } : {}),
-      ...(status ? { assignment: { status: status as any } } : {}),
-      ...(statusNot ? { NOT: { assignment: { status: statusNot as any } } } : {}),
+      ...(status ? { assignment: { status } } : {}),
+      ...(statusNot ? { NOT: { assignment: { status: statusNot } } } : {}),
       ...(deadlineFrom || deadlineTo
         ? {
             deadline: {

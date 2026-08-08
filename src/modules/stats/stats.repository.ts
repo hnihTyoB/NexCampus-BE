@@ -430,7 +430,11 @@ export class StatsRepository {
       }),
       prisma.taskAssignment.groupBy({
         by: ["status"],
-        where: { assignedBy: leaderId },
+        where: {
+          assignedBy: leaderId,
+          task: { deletedAt: null },
+          intern: { deletedAt: null },
+        },
         _count: true,
       }),
       prisma.taskSubmission.count({
@@ -460,7 +464,11 @@ export class StatsRepository {
         where: { leaderId },
       }),
       prisma.taskAssignment.findMany({
-        where: { assignedBy: leaderId },
+        where: {
+          assignedBy: leaderId,
+          task: { deletedAt: null },
+          intern: { deletedAt: null },
+        },
         take: 100,
         orderBy: { updatedAt: "desc" },
         include: {
@@ -472,6 +480,7 @@ export class StatsRepository {
       prisma.taskAssignment.findMany({
         where: {
           assignedBy: leaderId,
+          intern: { deletedAt: null },
           status: { not: ASSIGNMENT_STATUS.DONE },
           task: {
             deletedAt: null,

@@ -1,4 +1,5 @@
 import { SwaggerUiOptions } from "swagger-ui-express";
+import { envConfig } from "./env.config";
 
 export const swaggerOptions: SwaggerUiOptions = {
   customCss: `
@@ -1047,6 +1048,7 @@ export const swaggerSpec = {
             type: "string",
             enum: ["PENDING_APPROVAL", "TODO", "IN_PROGRESS", "REVIEW", "DONE", "BLOCKED"],
           },
+          blockedReason: { type: "string", nullable: true },
           assignedAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
         },
@@ -1082,6 +1084,11 @@ export const swaggerSpec = {
           status: {
             type: "string",
             enum: ["TODO", "IN_PROGRESS", "REVIEW", "DONE", "BLOCKED"],
+          },
+          blockedReason: {
+            type: "string",
+            maxLength: 2000,
+            description: "Bắt buộc khi chuyển trạng thái sang BLOCKED",
           },
           internId: { type: "string", format: "uuid" },
           internEmail: {
@@ -1227,6 +1234,38 @@ export const swaggerSpec = {
           createdAt: { type: "string", format: "date-time" },
         },
       },
+      EvaluationRatings: {
+        type: "object",
+        required: [
+          "ruleCompliance",
+          "workAttitude",
+          "learningCapacity",
+          "resilience",
+          "communication",
+          "knowledge",
+          "practicalSkills",
+          "foreignLanguage",
+          "teamwork",
+          "creativity",
+          "contentQuality",
+          "progressDelivery",
+        ],
+        additionalProperties: false,
+        properties: {
+          ruleCompliance: { type: "string", enum: ["TOT", "KHA", "TB", "TBY", "YEU"] },
+          workAttitude: { type: "string", enum: ["TOT", "KHA", "TB", "TBY", "YEU"] },
+          learningCapacity: { type: "string", enum: ["TOT", "KHA", "TB", "TBY", "YEU"] },
+          resilience: { type: "string", enum: ["TOT", "KHA", "TB", "TBY", "YEU"] },
+          communication: { type: "string", enum: ["TOT", "KHA", "TB", "TBY", "YEU"] },
+          knowledge: { type: "string", enum: ["TOT", "KHA", "TB", "TBY", "YEU"] },
+          practicalSkills: { type: "string", enum: ["TOT", "KHA", "TB", "TBY", "YEU"] },
+          foreignLanguage: { type: "string", enum: ["TOT", "KHA", "TB", "TBY", "YEU"] },
+          teamwork: { type: "string", enum: ["TOT", "KHA", "TB", "TBY", "YEU"] },
+          creativity: { type: "string", enum: ["TOT", "KHA", "TB", "TBY", "YEU"] },
+          contentQuality: { type: "string", enum: ["TOT", "KHA", "TB", "TBY", "YEU"] },
+          progressDelivery: { type: "string", enum: ["TOT", "KHA", "TB", "TBY", "YEU"] },
+        },
+      },
       WeeklyEvaluation: {
         type: "object",
         properties: {
@@ -1314,6 +1353,8 @@ export const swaggerSpec = {
           learning: { type: "number", minimum: 0, maximum: 10 },
           coding: { type: "number", minimum: 0, maximum: 10 },
           comment: { type: "string" },
+          ratings: { $ref: "#/components/schemas/EvaluationRatings" },
+          aiRatings: { $ref: "#/components/schemas/EvaluationRatings" },
           aiCommunication: { type: "number", minimum: 0, maximum: 10 },
           aiAttitude: { type: "number", minimum: 0, maximum: 10 },
           aiLearning: { type: "number", minimum: 0, maximum: 10 },
@@ -1329,6 +1370,7 @@ export const swaggerSpec = {
           learning: { type: "number", minimum: 0, maximum: 10 },
           coding: { type: "number", minimum: 0, maximum: 10 },
           comment: { type: "string", nullable: true },
+          ratings: { $ref: "#/components/schemas/EvaluationRatings" },
         },
       },
       AiSuggestionRequestBody: {
@@ -1516,6 +1558,38 @@ export const swaggerSpec = {
         schema: { type: "string", enum: ["asc", "desc"], default: "desc" },
       },
     },
+    headers: {
+      AiCacheStatus: {
+        description:
+          `Nguồn phản hồi AI: MISS = request mới, HIT = cache ${envConfig.aiGuard.cacheTtlMs / 1000} giây, SHARED = dùng chung request đang chạy.`,
+        schema: {
+          type: "string",
+          enum: ["MISS", "HIT", "SHARED"],
+        },
+      },
+      AiMinuteLimit: {
+        description: "Giới hạn request AI mới của user trong một phút.",
+        schema: {
+          type: "integer",
+          example: envConfig.aiGuard.requestsPerMinute,
+        },
+      },
+      AiMinuteRemaining: {
+        description: "Số request AI mới còn lại trong cửa sổ hiện tại.",
+        schema: { type: "integer", minimum: 0, example: 59 },
+      },
+      AiDailyLimit: {
+        description: "Hạn mức AI theo ngày của user hiện tại.",
+        schema: {
+          type: "integer",
+          example: envConfig.aiGuard.leaderDailyLimit,
+        },
+      },
+      AiDailyRemaining: {
+        description: "Số request AI mới còn lại trong ngày UTC hiện tại.",
+        schema: { type: "integer", minimum: 0, example: 999 },
+      },
+    },
     // ─── Reusable responses ───────────────────────────────────────────────────
     responses: {
       Unauthorized: {
@@ -1563,6 +1637,41 @@ export const swaggerSpec = {
         content: {
           "application/json": {
             schema: { $ref: "#/components/schemas/ErrorResponse" },
+          },
+        },
+      },
+      AiRateLimit: {
+        description:
+          `Vượt giới hạn ${envConfig.aiGuard.requestsPerMinute} request AI mới/phút hoặc hạn mức AI theo ngày. Request cache và request dùng chung không bị tính thêm.`,
+        headers: {
+          "Retry-After": {
+            description: "Số giây tối thiểu trước khi có thể thử lại.",
+            schema: { type: "integer", minimum: 1 },
+          },
+        },
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/ErrorResponse" },
+            examples: {
+              minuteLimit: {
+                summary: "Vượt burst limit",
+                value: {
+                  success: false,
+                  message:
+                    "Bạn đã gửi quá nhiều yêu cầu AI trong thời gian ngắn. Vui lòng thử lại sau.",
+                  code: "AI_RATE_LIMIT_EXCEEDED",
+                },
+              },
+              dailyLimit: {
+                summary: "Vượt hạn mức ngày",
+                value: {
+                  success: false,
+                  message:
+                    "Bạn đã đạt hạn mức AI hôm nay. Vui lòng liên hệ quản trị viên nếu cần tăng hạn mức.",
+                  code: "AI_DAILY_LIMIT_EXCEEDED",
+                },
+              },
+            },
           },
         },
       },
@@ -3579,6 +3688,13 @@ export const swaggerSpec = {
         responses: {
           200: {
             description: "Đề xuất phân công cho nhóm công việc",
+            headers: {
+              "X-AI-Cache": { $ref: "#/components/headers/AiCacheStatus" },
+              "X-AI-RateLimit-Limit": { $ref: "#/components/headers/AiMinuteLimit" },
+              "X-AI-RateLimit-Remaining": { $ref: "#/components/headers/AiMinuteRemaining" },
+              "X-AI-DailyLimit-Limit": { $ref: "#/components/headers/AiDailyLimit" },
+              "X-AI-DailyLimit-Remaining": { $ref: "#/components/headers/AiDailyRemaining" },
+            },
             content: {
               "application/json": {
                 schema: {
@@ -3597,8 +3713,10 @@ export const swaggerSpec = {
           },
           400: { $ref: "#/components/responses/BadRequest" },
           401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
           404: { $ref: "#/components/responses/NotFound" },
           422: { $ref: "#/components/responses/Validation" },
+          429: { $ref: "#/components/responses/AiRateLimit" },
         },
       },
     },
@@ -4681,6 +4799,13 @@ export const swaggerSpec = {
         responses: {
           200: {
             description: "Đề xuất phân bổ task thành công",
+            headers: {
+              "X-AI-Cache": { $ref: "#/components/headers/AiCacheStatus" },
+              "X-AI-RateLimit-Limit": { $ref: "#/components/headers/AiMinuteLimit" },
+              "X-AI-RateLimit-Remaining": { $ref: "#/components/headers/AiMinuteRemaining" },
+              "X-AI-DailyLimit-Limit": { $ref: "#/components/headers/AiDailyLimit" },
+              "X-AI-DailyLimit-Remaining": { $ref: "#/components/headers/AiDailyRemaining" },
+            },
             content: {
               "application/json": {
                 schema: {
@@ -4726,6 +4851,7 @@ export const swaggerSpec = {
               },
             },
           },
+          429: { $ref: "#/components/responses/AiRateLimit" },
         },
       },
     },
@@ -5304,7 +5430,9 @@ export const swaggerSpec = {
       },
       put: {
         tags: ["TaskAssignments"],
-        summary: "Cập nhật phân công công việc (Admin / Leader)",
+        summary: "Cập nhật phân công hoặc trạng thái công việc",
+        description:
+          "Admin/Leader có thể cập nhật assignment. Intern chỉ có thể bắt đầu task TODO của mình hoặc báo task IN_PROGRESS bị chặn kèm blockedReason.",
         security: [{ BearerAuth: [] }],
         parameters: [
           {
@@ -6472,6 +6600,13 @@ export const swaggerSpec = {
         responses: {
           200: {
             description: "AI gợi ý thành công",
+            headers: {
+              "X-AI-Cache": { $ref: "#/components/headers/AiCacheStatus" },
+              "X-AI-RateLimit-Limit": { $ref: "#/components/headers/AiMinuteLimit" },
+              "X-AI-RateLimit-Remaining": { $ref: "#/components/headers/AiMinuteRemaining" },
+              "X-AI-DailyLimit-Limit": { $ref: "#/components/headers/AiDailyLimit" },
+              "X-AI-DailyLimit-Remaining": { $ref: "#/components/headers/AiDailyRemaining" },
+            },
             content: {
               "application/json": {
                 schema: {
@@ -6493,6 +6628,7 @@ export const swaggerSpec = {
           401: { $ref: "#/components/responses/Unauthorized" },
           403: { $ref: "#/components/responses/Forbidden" },
           404: { $ref: "#/components/responses/NotFound" },
+          429: { $ref: "#/components/responses/AiRateLimit" },
         },
       },
     },

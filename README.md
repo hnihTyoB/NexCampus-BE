@@ -121,6 +121,26 @@ The production cleanup worker keeps using `STORAGE_CLEANUP_CRON` (default
 expired database records and scans each logical R2 prefix for objects that have
 been orphaned for at least two hours.
 
+### AI request protection
+
+AI endpoints use per-user burst and daily limits, queue excess concurrent work,
+share identical in-flight requests, and cache successful responses briefly.
+The defaults are suitable for leaders who need to evaluate or allocate many
+items in one session:
+
+```env
+AI_REQUESTS_PER_MINUTE=60
+AI_LEADER_DAILY_LIMIT=1000
+AI_ADMIN_DAILY_LIMIT=2000
+AI_MAX_CONCURRENT_PER_USER=3
+AI_CACHE_TTL_MS=30000
+```
+
+These values are optional. Increase the daily limits only after checking the AI
+provider quota and budget. The current guard state is stored in backend memory;
+deployments with multiple backend replicas should move it to a shared store such
+as Redis.
+
 Existing Supabase object URLs remain readable as legacy external URLs, but the
 backend no longer deletes those objects. Before disabling Supabase Storage,
 copy existing objects into the matching R2 prefixes and update persisted

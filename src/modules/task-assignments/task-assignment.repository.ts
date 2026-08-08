@@ -13,6 +13,7 @@ const defaultSelect = {
   assignedBy: true,
   supportId: true,
   status: true,
+  blockedReason: true,
   assignedAt: true,
   updatedAt: true,
   task: {
@@ -169,6 +170,11 @@ export class TaskAssignmentRepository {
       where: { id },
       data: {
         ...(data.status !== undefined ? { status: data.status } : {}),
+        ...(data.status === AssignmentStatus.BLOCKED
+          ? { blockedReason: data.blockedReason }
+          : data.status !== undefined
+            ? { blockedReason: null }
+            : {}),
         ...(data.internId !== undefined ? { internId: data.internId } : {}),
       },
       select: defaultSelect,

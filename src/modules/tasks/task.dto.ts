@@ -1,4 +1,4 @@
-import { TaskPriority } from "@prisma/client";
+import { AssignmentStatus, TaskPriority } from "@prisma/client";
 
 // ─── Query / CRUD DTOs ───────────────────────────────────────────────────────
 
@@ -13,8 +13,8 @@ export interface TaskQueryDto {
   deadlineFrom?: string;
   deadlineTo?: string;
   taskGroupId?: string;
-  status?: string;
-  statusNot?: string;
+  status?: AssignmentStatus;
+  statusNot?: AssignmentStatus;
   sortBy?: "createdAt" | "title" | "deadline" | "priority";
   order?: "asc" | "desc";
   page?: number;

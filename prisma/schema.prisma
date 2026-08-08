@@ -342,6 +342,7 @@ model TaskAssignment {
   supportId  String?          @map("support_id") @db.Uuid
   assignedBy String           @map("assigned_by") @db.Uuid
   status     AssignmentStatus @default(TODO)
+  blockedReason String?        @map("blocked_reason") @db.Text
   assignedAt DateTime         @default(now()) @map("assigned_at")
   updatedAt  DateTime         @updatedAt @map("updated_at")
 

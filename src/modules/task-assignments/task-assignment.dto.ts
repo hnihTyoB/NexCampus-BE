@@ -22,6 +22,7 @@ export type AssignTaskDto = Omit<CreateTaskAssignmentDto, "taskId">;
 
 export interface UpdateTaskAssignmentDto {
   status?: AssignmentStatus;
+  blockedReason?: string;
   internId?: string;
   internEmail?: string;
 }

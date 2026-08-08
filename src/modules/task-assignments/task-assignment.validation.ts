@@ -41,10 +41,29 @@ export const updateAssignmentSchema = z
         ASSIGNMENT_STATUS.BLOCKED,
       ])
       .optional(),
+    blockedReason: z.string().trim().min(1).max(2000).optional(),
     internId: z.string().uuid().optional(),
     internEmail: z.string().trim().email("Invalid intern email").max(255).optional(),
   })
   .refine((data) => data.status !== undefined || data.internId !== undefined, {
     message:
       "At least one field (status or internId) must be provided for update",
-  });
+  })
+  .refine(
+    (data) =>
+      data.status !== ASSIGNMENT_STATUS.BLOCKED ||
+      data.blockedReason !== undefined,
+    {
+      message: "blockedReason is required when status is BLOCKED",
+      path: ["blockedReason"],
+    },
+  )
+  .refine(
+    (data) =>
+      data.blockedReason === undefined ||
+      data.status === ASSIGNMENT_STATUS.BLOCKED,
+    {
+      message: "blockedReason can only be provided when status is BLOCKED",
+      path: ["blockedReason"],
+    },
+  );
