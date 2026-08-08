@@ -1,10 +1,12 @@
 import {
+  CopyObjectCommand,
   DeleteObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
   type ListObjectsV2CommandOutput,
 } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { storageConfig } from "../../config/storage.config";
 import { AppError } from "../errors/app-error";
 import { ERROR_CODE } from "../errors/error-code";
@@ -65,6 +67,11 @@ export class StorageService {
     return `${storageConfig.publicUrl}/${encodedKey}`;
   }
 
+  /** Tính public URL từ namespace + path (không cần ký) */
+  getPublicUrlFromPath(namespace: string, path: string): string {
+    return this.getPublicUrl(this.getObjectKey(namespace, path));
+  }
+
   getPathFromPublicUrl(namespace: string, fileUrl: string): string | null {
     const normalizedNamespace = namespace.replace(/^\/+|\/+$/g, "");
     const namespacePrefix = `${storageConfig.publicUrl}/${normalizedNamespace}/`;
@@ -122,6 +129,77 @@ export class StorageService {
         ERROR_CODE.INTERNAL_SERVER_ERROR,
       );
     }
+  }
+
+  async copyFile(
+    namespace: string,
+    sourcePath: string,
+    destinationPath: string,
+  ): Promise<string> {
+    const sourceKey = this.getObjectKey(namespace, sourcePath);
+    const destinationKey = this.getObjectKey(namespace, destinationPath);
+
+    try {
+      const copySource = encodeURI(
+        `${storageConfig.bucketName}/${sourceKey}`,
+      );
+
+      await this.client.send(
+        new CopyObjectCommand({
+          Bucket: storageConfig.bucketName,
+          CopySource: copySource,
+          Key: destinationKey,
+        }),
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new AppError(
+        `Failed to copy file in Cloudflare R2: ${message}`,
+        500,
+        ERROR_CODE.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    return this.getPublicUrl(destinationKey);
+  }
+
+  /**
+   * Tạo Presigned PUT URL để client upload trực tiếp lên R2.
+   * Trả về URL upload tạm thời, path lưu trữ (để confirm sau) và URL public của file.
+   */
+  async getPresignedPutUrl(
+    namespace: string,
+    path: string,
+    mimeType: string,
+    expiresInSeconds = 300,
+  ): Promise<{ uploadUrl: string; filePath: string; publicUrl: string }> {
+    const objectKey = this.getObjectKey(namespace, path);
+
+    const command = new PutObjectCommand({
+      Bucket: storageConfig.bucketName,
+      Key: objectKey,
+      ContentType: mimeType,
+    });
+
+    let uploadUrl: string;
+    try {
+      uploadUrl = await getSignedUrl(this.client, command, {
+        expiresIn: expiresInSeconds,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new AppError(
+        `Failed to generate presigned URL: ${message}`,
+        500,
+        ERROR_CODE.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    return {
+      uploadUrl,
+      filePath: path,
+      publicUrl: this.getPublicUrl(objectKey),
+    };
   }
 
   /**

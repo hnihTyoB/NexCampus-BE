@@ -57,6 +57,19 @@ router.post(
   uploadSingle("video", "submissionVideo"),
   controller.uploadVideo,
 );
+// Presigned URL routes (browser uploads directly to R2)
+router.get(
+  "/:id/video/upload-url",
+  authMiddleware,
+  requireRole(ROLES.INTERN),
+  controller.getVideoPutUrl,
+);
+router.post(
+  "/:id/video/confirm",
+  authMiddleware,
+  requireRole(ROLES.INTERN),
+  controller.confirmVideoUpload,
+);
 router.delete(
   "/:id",
   authMiddleware,

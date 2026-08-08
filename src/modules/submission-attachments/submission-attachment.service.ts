@@ -146,4 +146,113 @@ export class SubmissionAttachmentService {
   async findBySubmissionId(submissionId: string) {
     return this.attachmentRepo.findBySubmissionId(submissionId);
   }
+
+  async getPutUrl(
+    submissionId: string,
+    fileName: string,
+    mimeType: string,
+    fileSize: number,
+    uploadedBy: string,
+    userRole: string,
+  ): Promise<{ uploadUrl: string; filePath: string; publicUrl: string }> {
+    // 1. Kiểm tra submission tồn tại
+    const submission = await this.submissionRepo.findById(submissionId);
+    if (!submission) {
+      throw new AppError("Task submission not found", 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    // 2. Kiểm tra quyền
+    if (
+      userRole === ROLES.INTERN &&
+      (!submission.assignment ||
+        !submission.assignment.intern ||
+        submission.assignment.intern.userId !== uploadedBy)
+    ) {
+      throw new AppError(
+        "You are not authorized to upload for this submission",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
+    }
+
+    // 3. Kiểm tra giới hạn 5 file
+    const existing = await this.attachmentRepo.findBySubmissionId(submissionId);
+    if (existing.length >= 5) {
+      throw new AppError(
+        "Maximum 5 attachments allowed per submission",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    // 4. Không cho phép upload nếu đã APPROVED
+    if (submission.reviewStatus === REVIEW_STATUS.APPROVED) {
+      throw new AppError(
+        "Cannot upload attachments for an approved submission",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    // 5. Tạo path duy nhất
+    const { randomUUID } = await import("crypto");
+    const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const filePath = `${submissionId}/${randomUUID()}_${safeFileName}`;
+
+    return this.storageService.getPresignedPutUrl(
+      this.bucket,
+      filePath,
+      mimeType,
+      300,
+    );
+  }
+
+  async confirmUpload(
+    submissionId: string,
+    filePath: string,
+    fileName: string,
+    mimeType: string,
+    fileSize: number,
+    uploadedBy: string,
+    userRole: string,
+  ) {
+    // Kiểm tra quyền và trạng thái lại trước khi ghi DB
+    const submission = await this.submissionRepo.findById(submissionId);
+    if (!submission) {
+      throw new AppError("Task submission not found", 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    if (
+      userRole === ROLES.INTERN &&
+      (!submission.assignment ||
+        !submission.assignment.intern ||
+        submission.assignment.intern.userId !== uploadedBy)
+    ) {
+      throw new AppError(
+        "You are not authorized to confirm upload for this submission",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
+    }
+
+    if (submission.reviewStatus === REVIEW_STATUS.APPROVED) {
+      throw new AppError(
+        "Cannot add attachments for an approved submission",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    const fileUrl = this.storageService.getPublicUrlFromPath(this.bucket, filePath);
+
+    return this.attachmentRepo.create({
+      submissionId,
+      fileName,
+      fileUrl,
+      filePath,
+      mimeType,
+      fileSize,
+      uploadedBy,
+    });
+  }
 }
