@@ -1,5 +1,15 @@
 import { z } from "zod";
 
+export const getBusyUsersSchema = z.object({
+  startTime: z.string().refine((v) => !isNaN(Date.parse(v)), {
+    message: "Invalid startTime",
+  }),
+  endTime: z.string().refine((v) => !isNaN(Date.parse(v)), {
+    message: "Invalid endTime",
+  }),
+  userIds: z.string().optional(),
+});
+
 export const findAllMeetingSchema = z.object({
   title: z.string().optional(),
   status: z.enum(["DRAFT", "SCHEDULED", "ONGOING", "COMPLETED", "CANCELLED"]).optional(),

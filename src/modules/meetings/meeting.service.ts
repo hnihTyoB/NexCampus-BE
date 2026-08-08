@@ -193,6 +193,10 @@ export class MeetingService {
 
     const result = await this.repository.update(id, data);
 
+    if (data.status === "CANCELLED") {
+      await this.notifyMeetingCancelled(result, actor.id);
+    }
+
     await this.activityLogService.log(
       actor.id,
       data.status === "CANCELLED"
@@ -217,6 +221,10 @@ export class MeetingService {
       throw new AppError("Forbidden", 403, ERROR_CODE.FORBIDDEN);
     }
 
+    if (meeting.status !== "DRAFT" && meeting.status !== "CANCELLED") {
+      await this.notifyMeetingCancelled(meeting, actor.id);
+    }
+
     const result = await this.repository.softDelete(id);
 
     await this.activityLogService.log(
@@ -228,6 +236,37 @@ export class MeetingService {
     );
 
     return result;
+  }
+
+  private async notifyMeetingCancelled(meeting: any, actorId: string) {
+    if (meeting.status === "DRAFT") {
+      return;
+    }
+
+    if (meeting.visibility === "TEAM") {
+      const allUsers = await prisma.user.findMany({
+        where: { deletedAt: null, isActive: true, role: { name: { in: ["LEADER", "INTERN"] } } },
+        select: { id: true },
+      });
+      for (const u of allUsers) {
+        if (u.id !== actorId) {
+          NotificationDispatcher.dispatch(u.id, NOTIFICATION_TYPE.MEETING_CANCELLED, {
+            meetingTitle: meeting.title,
+            startTime: formatMeetingStartTime(meeting.startTime),
+          }).catch(() => {});
+        }
+      }
+    } else {
+      const participants = meeting.participants || [];
+      for (const p of participants) {
+        if (p.userId !== actorId) {
+          NotificationDispatcher.dispatch(p.userId, NOTIFICATION_TYPE.MEETING_CANCELLED, {
+            meetingTitle: meeting.title,
+            startTime: formatMeetingStartTime(meeting.startTime),
+          }).catch(() => {});
+        }
+      }
+    }
   }
 
   // ── Participants ──────────────────────────────────────────────────────
@@ -559,5 +598,71 @@ export class MeetingService {
 
   async getAllAbsences() {
     return this.repository.findAllAbsences();
+  }
+
+  async getBusyUsers(startTime: string, endTime: string, userIdsStr?: string) {
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+
+    if (start >= end) {
+      throw new AppError(
+        "startTime must be before endTime",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    let userIds: string[] = [];
+    if (userIdsStr) {
+      userIds = userIdsStr
+        .split(",")
+        .map((id) => id.trim())
+        .filter((id) => id !== "");
+    }
+
+    if (userIds.length === 0) {
+      return { data: [] };
+    }
+
+    // Find users who are hosting overlapping meetings
+    const hostedConflicts = await prisma.meeting.findMany({
+      where: {
+        hostId: { in: userIds },
+        deletedAt: null,
+        status: { notIn: ["CANCELLED", "COMPLETED"] },
+        startTime: { lt: end },
+        endTime: { gt: start },
+      },
+      select: {
+        hostId: true,
+      },
+    });
+
+    // Find users who are accepted/pending participants of overlapping meetings
+    const participantConflicts = await prisma.meetingParticipant.findMany({
+      where: {
+        userId: { in: userIds },
+        invitationStatus: { in: ["ACCEPTED", "PENDING"] },
+        meeting: {
+          deletedAt: null,
+          status: { notIn: ["CANCELLED", "COMPLETED"] },
+          startTime: { lt: end },
+          endTime: { gt: start },
+        },
+      },
+      select: {
+        userId: true,
+      },
+    });
+
+    const busyUserIds = new Set<string>();
+    for (const m of hostedConflicts) {
+      busyUserIds.add(m.hostId);
+    }
+    for (const p of participantConflicts) {
+      busyUserIds.add(p.userId);
+    }
+
+    return { data: Array.from(busyUserIds) };
   }
 }
