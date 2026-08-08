@@ -6,6 +6,7 @@ import { ERROR_CODE } from "../../common/errors/error-code";
 import {
   TaskAssignmentQueryDto,
   CreateTaskAssignmentDto,
+  AssignTaskDto,
   UpdateTaskAssignmentDto,
 } from "./task-assignment.dto";
 import { ROLES } from "../../common/constants/role.constant";
@@ -13,6 +14,17 @@ import { NotificationDispatcher } from "../notifications/notification.dispatcher
 import { ActivityLogService } from "../activity-logs/activity-log.service";
 import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
 import { AssignmentStatus } from "@prisma/client";
+import { prisma } from "../../database/prisma.client";
+
+const ACTIVE_CAPACITY_STATUSES: AssignmentStatus[] = [
+  AssignmentStatus.PENDING_APPROVAL,
+  AssignmentStatus.TODO,
+  AssignmentStatus.IN_PROGRESS,
+  AssignmentStatus.REVIEW,
+];
+const DEFAULT_MAX_WORKLOAD_DAYS = 10;
+const DEFAULT_TASK_DAYS = 3;
+const SUPPORT_WORKLOAD_FACTOR = 0.5;
 
 interface UserPayload {
   id: string;
@@ -25,6 +37,76 @@ export class TaskAssignmentService {
   private readonly taskRepository = new TaskRepository();
   private readonly internRepository = new InternRepository();
   private readonly activityLogService = new ActivityLogService();
+
+  private ensureAssignmentEditable(status: AssignmentStatus) {
+    if (status === AssignmentStatus.DONE) {
+      throw new AppError(
+        "Completed tasks cannot be edited",
+        409,
+        ERROR_CODE.TASK_ALREADY_COMPLETED,
+      );
+    }
+  }
+
+  private async ensureInternCapacity(
+    internId: string,
+    task: { id: string; title: string; estDays: number | null },
+    excludeAssignmentId?: string,
+  ) {
+    const [taskWithLimits, activeAssignments] = await Promise.all([
+      prisma.task.findFirst({
+        where: { id: task.id, deletedAt: null },
+        select: {
+          taskGroup: {
+            select: { maxWorkloadDays: true, maxActiveTasks: true },
+          },
+        },
+      }),
+      prisma.taskAssignment.findMany({
+        where: {
+          ...(excludeAssignmentId ? { id: { not: excludeAssignmentId } } : {}),
+          status: { in: ACTIVE_CAPACITY_STATUSES },
+          task: { deletedAt: null },
+          OR: [{ internId }, { supportId: internId }],
+        },
+        select: {
+          internId: true,
+          supportId: true,
+          task: { select: { estDays: true } },
+        },
+      }),
+    ]);
+
+    const maxWorkloadDays =
+      taskWithLimits?.taskGroup?.maxWorkloadDays ?? DEFAULT_MAX_WORKLOAD_DAYS;
+    const maxActiveTasks = taskWithLimits?.taskGroup?.maxActiveTasks ?? null;
+    const currentWorkloadDays = activeAssignments.reduce((total, assignment) => {
+      const days = assignment.task.estDays ?? DEFAULT_TASK_DAYS;
+      return total +
+        (assignment.internId === internId
+          ? days
+          : days * SUPPORT_WORKLOAD_FACTOR);
+    }, 0);
+    const taskDays = task.estDays ?? DEFAULT_TASK_DAYS;
+    const nextWorkloadDays = currentWorkloadDays + taskDays;
+    const nextActiveTaskCount = activeAssignments.length + 1;
+
+    if (nextWorkloadDays > maxWorkloadDays) {
+      throw new AppError(
+        `Không thể giao task "${task.title}": TTS sẽ vượt giới hạn workload (${currentWorkloadDays}/${maxWorkloadDays} ngày hiện tại, task cần ${taskDays} ngày)`,
+        409,
+        ERROR_CODE.CONFLICT,
+      );
+    }
+
+    if (maxActiveTasks !== null && nextActiveTaskCount > maxActiveTasks) {
+      throw new AppError(
+        `Không thể giao task "${task.title}": TTS đã đạt tối đa ${maxActiveTasks} task active`,
+        409,
+        ERROR_CODE.CONFLICT,
+      );
+    }
+  }
 
   async findAll(query: TaskAssignmentQueryDto, user: UserPayload) {
     if (user.role === ROLES.INTERN) {
@@ -79,6 +161,25 @@ export class TaskAssignmentService {
       throw new AppError("Intern profile not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
+    if (intern.status !== "ACTIVE" || !intern.user.isActive) {
+      throw new AppError(
+        "Chỉ có thể giao việc cho thực tập sinh đang active",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    if (actorRole === ROLES.LEADER && intern.leaderId !== assignedBy) {
+      const confirmedEmail = data.internEmail?.toLowerCase().trim();
+      if (!confirmedEmail || confirmedEmail !== intern.user.email.toLowerCase()) {
+        throw new AppError(
+          "Email thực tập sinh là bắt buộc khi giao việc cho team khác",
+          400,
+          ERROR_CODE.VALIDATION_ERROR,
+        );
+      }
+    }
+
     // 3b. Check Department matching
     if (task.taskGroup && task.taskGroup.departmentId) {
       if (intern.department?.id !== task.taskGroup.departmentId) {
@@ -99,6 +200,8 @@ export class TaskAssignmentService {
         ERROR_CODE.DUPLICATE_ENTRY,
       );
     }
+
+    await this.ensureInternCapacity(data.internId, task);
 
     // 5. Determine approval workflow status
     let status: AssignmentStatus = AssignmentStatus.TODO;
@@ -129,6 +232,33 @@ export class TaskAssignmentService {
     return result;
   }
 
+  async assignTask(
+    taskId: string,
+    data: AssignTaskDto,
+    actorId: string,
+    actorRole: string,
+  ) {
+    const existing = await this.repository.findByTaskId(taskId);
+    if (existing) {
+      return this.update(existing.id, data, actorId, actorRole);
+    }
+
+    return this.create({ taskId, ...data }, actorId, actorRole);
+  }
+
+  async unassignTask(taskId: string, actorId: string, actorRole: string) {
+    const assignment = await this.repository.findByTaskId(taskId);
+    if (!assignment) {
+      throw new AppError(
+        "Task assignment not found",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
+
+    return this.delete(assignment.id, actorId, actorRole);
+  }
+
   async approve(id: string, actorId: string, actorRole: string) {
     const assignment = await this.findById(id);
 
@@ -156,6 +286,12 @@ export class TaskAssignmentService {
         ERROR_CODE.FORBIDDEN,
       );
     }
+
+    await this.ensureInternCapacity(
+      assignment.intern.id,
+      assignment.task,
+      assignment.id,
+    );
 
     const result = await this.repository.update(id, {
       status: AssignmentStatus.TODO,
@@ -242,7 +378,7 @@ export class TaskAssignmentService {
   ) {
     const assignment = await this.findById(id);
 
-    if (!assignment.intern) {
+    if (!assignment.intern && data.internId === undefined) {
       throw new AppError(
         "Intern profile associated with this assignment was not found",
         404,
@@ -252,7 +388,7 @@ export class TaskAssignmentService {
 
     if (actorRole === ROLES.INTERN) {
       const canStartOwnAssignment =
-        assignment.intern.userId === actorId &&
+        assignment.intern?.userId === actorId &&
         data.internId === undefined &&
         data.status === AssignmentStatus.IN_PROGRESS &&
         (assignment.status === AssignmentStatus.TODO ||
@@ -267,7 +403,9 @@ export class TaskAssignmentService {
       }
     } else if (
       actorRole !== ROLES.ADMIN &&
-      assignment.intern.leaderId !== actorId
+      (assignment.intern
+        ? assignment.intern.leaderId !== actorId
+        : assignment.assignedBy !== actorId)
     ) {
       // Leaders can only update assignments belonging to their direct interns.
       throw new AppError(
@@ -276,6 +414,8 @@ export class TaskAssignmentService {
         ERROR_CODE.FORBIDDEN,
       );
     }
+
+    this.ensureAssignmentEditable(assignment.status);
 
     if (data.internId !== undefined) {
       // Check if updated Intern exists and is not soft-deleted
@@ -286,6 +426,29 @@ export class TaskAssignmentService {
           404,
           ERROR_CODE.NOT_FOUND,
         );
+      }
+
+
+      if (intern.status !== "ACTIVE" || !intern.user.isActive) {
+        throw new AppError(
+          "Chỉ có thể giao việc cho thực tập sinh đang active",
+          400,
+          ERROR_CODE.VALIDATION_ERROR,
+        );
+      }
+
+      if (actorRole === ROLES.LEADER && intern.leaderId !== actorId) {
+        const confirmedEmail = data.internEmail?.toLowerCase().trim();
+        if (!confirmedEmail || confirmedEmail !== intern.user.email.toLowerCase()) {
+          throw new AppError(
+            "Email thực tập sinh là bắt buộc khi giao việc cho team khác",
+            400,
+            ERROR_CODE.VALIDATION_ERROR,
+          );
+        }
+        data.status = AssignmentStatus.PENDING_APPROVAL;
+      } else if (actorRole !== ROLES.INTERN) {
+        data.status = AssignmentStatus.TODO;
       }
 
       // Check Task Department Match
@@ -305,6 +468,14 @@ export class TaskAssignmentService {
           "Task past deadline cannot be reassigned",
           400,
           ERROR_CODE.VALIDATION_ERROR,
+        );
+      }
+
+      if (data.internId !== assignment.internId) {
+        await this.ensureInternCapacity(
+          data.internId,
+          assignment.task,
+          assignment.id,
         );
       }
     }
@@ -327,7 +498,7 @@ export class TaskAssignmentService {
         actorId,
         ACTIVITY_ACTIONS.UPDATE_ASSIGNMENT,
         actorRole === ROLES.INTERN
-          ? `Intern "${assignment.intern.fullName}" đã bắt đầu công việc "${assignment.task.title}"`
+          ? `Intern "${assignment.intern?.fullName ?? assignment.internId}" đã bắt đầu công việc "${assignment.task.title}"`
           : `Leader đã cập nhật phân công công việc "${assignment.task.title}": ${changes.join(", ")}`,
         result.id,
         "TaskAssignment",
@@ -335,7 +506,11 @@ export class TaskAssignmentService {
     }
 
     // If reassigned to a different intern, notify the new intern
-    if (data.internId !== undefined && data.internId !== assignment.internId) {
+    if (
+      data.internId !== undefined &&
+      data.internId !== assignment.internId &&
+      result.status === AssignmentStatus.TODO
+    ) {
       const newIntern = await this.internRepository.findById(data.internId);
       if (newIntern) {
         await NotificationDispatcher.dispatch(
@@ -355,16 +530,13 @@ export class TaskAssignmentService {
   async delete(id: string, actorId: string, actorRole: string) {
     const assignment = await this.findById(id);
 
-    if (!assignment.intern) {
-      throw new AppError(
-        "Intern profile associated with this assignment was not found",
-        404,
-        ERROR_CODE.NOT_FOUND,
-      );
-    }
-
-    // Only Admin or the direct Leader of the intern is allowed to delete
-    if (actorRole !== ROLES.ADMIN && assignment.intern.leaderId !== actorId) {
+    const isDirectLeader = assignment.intern?.leaderId === actorId;
+    const isAssignmentRequester = assignment.assignedBy === actorId;
+    if (
+      actorRole !== ROLES.ADMIN &&
+      !isDirectLeader &&
+      !isAssignmentRequester
+    ) {
       throw new AppError(
         "Bạn không có quyền hủy phân công này",
         403,
@@ -372,12 +544,14 @@ export class TaskAssignmentService {
       );
     }
 
+    this.ensureAssignmentEditable(assignment.status);
+
     const result = await this.repository.delete(id);
 
     await this.activityLogService.log(
       actorId,
       ACTIVITY_ACTIONS.DELETE_ASSIGNMENT,
-      `Leader đã hủy phân công công việc "${assignment.task.title}" của Intern "${assignment.intern.fullName}"`,
+      `Leader đã hủy phân công công việc "${assignment.task.title}" của Intern "${assignment.intern?.fullName ?? assignment.internId ?? "không xác định"}"`,
       id,
       "TaskAssignment",
     );

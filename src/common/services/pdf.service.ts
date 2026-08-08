@@ -177,7 +177,11 @@ export class PdfService {
     const namespace = storageConfig.namespaces.reports;
 
     const fileUrl = await this.storageService.uploadFile(
-      namespace, storagePath, pdfBuffer, "application/pdf",
+      namespace,
+      storagePath,
+      pdfBuffer,
+      "application/pdf",
+      { contentDisposition: `attachment; filename="${fileName}"` },
     );
 
     const expiresAt = new Date();

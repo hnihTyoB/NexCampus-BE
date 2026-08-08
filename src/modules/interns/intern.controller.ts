@@ -32,6 +32,21 @@ export class InternController {
     }
   };
 
+  lookupForAssignment = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const { email } = req.query as { email: string };
+      const result = await this.service.lookupForAssignment(email, req.user.id);
+
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   create = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = req.body as CreateInternDto;

@@ -161,6 +161,14 @@ export class UserService {
   }
 
   async delete(id: string, actorId: string) {
+    if (id === actorId) {
+      throw new AppError(
+        "You cannot delete your own admin account",
+        400,
+        ERROR_CODE.BAD_REQUEST,
+      );
+    }
+
     const targetUser = await this.findById(id);
 
     // 1. Tìm đơn ứng tuyển có cùng email đã được duyệt (APPROVED)

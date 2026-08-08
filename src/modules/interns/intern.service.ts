@@ -44,6 +44,28 @@ export class InternService {
     return profile;
   }
 
+  async lookupForAssignment(email: string, actorId: string) {
+    await this.repository.completeExpiredInterns();
+    const intern = await this.repository.findActiveByEmail(
+      email.toLowerCase().trim(),
+    );
+
+    if (!intern || !intern.leader || intern.leaderId === actorId) {
+      throw new AppError(
+        "Không tìm thấy thực tập sinh active thuộc team khác với email này",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
+
+    return {
+      id: intern.id,
+      fullName: intern.fullName,
+      email: intern.user.email,
+      leader: intern.leader,
+    };
+  }
+
   async create(data: CreateInternDto) {
     const existing = await this.repository.findByUserId(data.userId);
 

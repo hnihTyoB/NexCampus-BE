@@ -500,6 +500,12 @@ export class TaskImportService {
 
             const rowWithStatus = row as ImportTaskRowDto & { _status?: string };
             const mappedStatus = rowWithStatus._status;
+            // An unassigned task cannot meaningfully be in progress, under review,
+            // completed, or blocked. Keep it ready for assignment regardless of the
+            // status supplied by Excel.
+            const importedStatus = ownerInternId
+              ? mappedStatus ?? ASSIGNMENT_STATUS.TODO
+              : ASSIGNMENT_STATUS.TODO;
 
             if (existingAssignment) {
               await tx.taskAssignment.update({
@@ -507,23 +513,22 @@ export class TaskImportService {
                 data: {
                   internId: ownerInternId,
                   supportId: supportInternId,
-                  ...(mappedStatus ? { status: mappedStatus as any } : {}),
+                  status: importedStatus as any,
                 },
               });
             } else {
-              const defaultStatus = mappedStatus ?? ASSIGNMENT_STATUS.TODO;
               await tx.taskAssignment.create({
                 data: {
                   taskId,
                   internId: ownerInternId,
                   supportId: supportInternId,
                   assignedBy: createdBy,
-                  status: defaultStatus as any,
+                  status: importedStatus as any,
                 },
               });
               importedAssignments++;
 
-              if (ownerInternId && row.ownerEmail && defaultStatus === ASSIGNMENT_STATUS.TODO) {
+              if (ownerInternId && row.ownerEmail && importedStatus === ASSIGNMENT_STATUS.TODO) {
                 const ownerIntern = internsByEmailMap.get(row.ownerEmail.toLowerCase());
                 if (ownerIntern) {
                   notificationsToDispatch.push({

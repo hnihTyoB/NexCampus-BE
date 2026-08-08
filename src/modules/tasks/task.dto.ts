@@ -25,11 +25,11 @@ export interface CreateTaskDto {
   title: string;
   description?: string;
   deadline: string;
+  estDays: number;
   priority?: TaskPriority;
   // Extended fields
   code?: string;
   startDate?: string;
-  estDays?: number;
   phase?: string;
   module?: string;
   acceptanceCriteria?: string;
