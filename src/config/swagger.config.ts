@@ -6017,6 +6017,133 @@ export const swaggerSpec = {
         },
       },
     },
+    "/task-submissions/{id}/video/upload-url": {
+      get: {
+        tags: ["TaskSubmissions"],
+        summary: "Lấy Presigned PUT URL để tải trực tiếp video demo lên Cloudflare R2 (Intern only)",
+        description: "Trả về một đường dẫn upload tạm thời (hiệu lực trong 5 phút), tệp tin sẽ được upload trực tiếp từ trình duyệt lên Cloudflare R2 sử dụng phương thức PUT.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "ID của TaskSubmission",
+          },
+          {
+            in: "query",
+            name: "mimeType",
+            required: true,
+            schema: { type: "string", example: "video/mp4" },
+            description: "MIME type của video cần upload (ví dụ: video/mp4, video/webm)",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Lấy Presigned URL thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "object",
+                          properties: {
+                            uploadUrl: { type: "string", format: "uri", description: "Presigned URL để thực hiện PUT request từ client" },
+                            filePath: { type: "string", description: "Đường dẫn lưu trữ của file trong R2 bucket" },
+                            publicUrl: { type: "string", format: "uri", description: "Public URL của video demo sau khi upload" },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          400: {
+            description: "Thiếu tham số, bài nộp đã được duyệt APPROVED",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
+    "/task-submissions/{id}/video/confirm": {
+      post: {
+        tags: ["TaskSubmissions"],
+        summary: "Xác nhận đã tải lên thành công file video demo và cập nhật database (Intern only)",
+        description: "Gọi API này sau khi client đã thực hiện PUT file thành công lên Cloudflare R2 để lưu thông tin video vào database.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "ID của TaskSubmission",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["filePath"],
+                properties: {
+                  filePath: {
+                    type: "string",
+                    description: "Đường dẫn lưu trữ (filePath) nhận được từ API sinh upload-url",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Cập nhật video demo của bài nộp thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/TaskSubmission" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          400: {
+            description: "Tham số không hợp lệ hoặc bài nộp đã được duyệt APPROVED",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
     "/task-submissions/{submissionId}/attachments": {
       get: {
         tags: ["SubmissionAttachments"],
@@ -6119,6 +6246,147 @@ export const swaggerSpec = {
           400: {
             description:
               "File không hợp lệ, bài nộp đã có đủ 5 file hoặc bài nộp đã được duyệt APPROVED",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
+    "/task-submissions/{submissionId}/attachments/upload-url": {
+      get: {
+        tags: ["SubmissionAttachments"],
+        summary: "Lấy Presigned PUT URL để tải trực tiếp file đính kèm lên Cloudflare R2 (Intern only)",
+        description: "Trả về đường dẫn upload tạm thời (hiệu lực trong 5 phút) để client đẩy trực tiếp file lên R2 bằng phương thức PUT.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "submissionId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "ID của TaskSubmission",
+          },
+          {
+            in: "query",
+            name: "fileName",
+            required: true,
+            schema: { type: "string", example: "tai_lieu.pdf" },
+            description: "Tên gốc của file",
+          },
+          {
+            in: "query",
+            name: "mimeType",
+            required: true,
+            schema: { type: "string", example: "application/pdf" },
+            description: "MIME type của file",
+          },
+          {
+            in: "query",
+            name: "fileSize",
+            required: true,
+            schema: { type: "integer", example: 1048576 },
+            description: "Kích thước của file tính bằng bytes",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Lấy Presigned URL thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "object",
+                          properties: {
+                            uploadUrl: { type: "string", format: "uri", description: "Presigned URL dùng để PUT file lên R2" },
+                            filePath: { type: "string", description: "Đường dẫn của file trong R2 bucket" },
+                            publicUrl: { type: "string", format: "uri", description: "Public URL của file sau khi upload" },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          400: {
+            description: "Thiếu tham số, bài nộp có quá 5 file đính kèm hoặc bài nộp đã được duyệt APPROVED",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
+    "/task-submissions/{submissionId}/attachments/confirm": {
+      post: {
+        tags: ["SubmissionAttachments"],
+        summary: "Xác nhận tải file đính kèm thành công và tạo bản ghi lưu database (Intern only)",
+        description: "Gọi API này sau khi client đã thực hiện PUT file thành công lên Cloudflare R2 để lưu thông tin file đính kèm vào database.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "submissionId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "ID của TaskSubmission",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["filePath", "fileName", "mimeType", "fileSize"],
+                properties: {
+                  filePath: { type: "string", description: "filePath nhận được từ API upload-url" },
+                  fileName: { type: "string", description: "Tên của file" },
+                  mimeType: { type: "string", description: "MIME type của file" },
+                  fileSize: { type: "integer", description: "Kích thước file tính bằng bytes" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Lưu tệp đính kèm thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/SubmissionAttachment" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          400: {
+            description: "Tham số không hợp lệ, vượt giới hạn 5 file hoặc bài nộp đã được duyệt APPROVED",
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/ErrorResponse" },

@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { TaskSubmissionRepository } from "./task-submission.repository";
 import { TaskAssignmentRepository } from "../task-assignments/task-assignment.repository";
 import { InternRepository } from "../interns/intern.repository";
+import { SubmissionAttachmentRepository } from "../submission-attachments/submission-attachment.repository";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import {
@@ -28,6 +29,7 @@ export class TaskSubmissionService {
   private readonly repository = new TaskSubmissionRepository();
   private readonly assignmentRepository = new TaskAssignmentRepository();
   private readonly internRepository = new InternRepository();
+  private readonly attachmentRepository = new SubmissionAttachmentRepository();
   private readonly activityLogService = new ActivityLogService();
 
   async findAll(query: TaskSubmissionQueryDto, user: UserPayload) {
@@ -238,6 +240,51 @@ export class TaskSubmissionService {
         count + 1,
       );
 
+      const bucket = storageConfig.namespaces.submissions;
+      const storageService = new StorageService();
+
+      // Clone video demo file in storage if it exists in our bucket
+      if (result.videoDemo) {
+        const oldVideoPath = storageService.getPathFromPublicUrl(bucket, result.videoDemo);
+        if (oldVideoPath) {
+          const urlParts = result.videoDemo.split("/");
+          const originalFileName = urlParts[urlParts.length - 1];
+          const newVideoPath = `${result.id}/${originalFileName}`;
+          try {
+            const newVideoUrl = await storageService.copyFile(bucket, oldVideoPath, newVideoPath);
+            await this.repository.update(result.id, { videoDemo: newVideoUrl });
+          } catch (err) {
+            console.error(`[TaskSubmissionService] Failed to copy video demo file:`, err);
+          }
+        }
+      }
+
+      // Clone attachments in storage and database if they exist on the previous submission
+      if (submission.attachments && submission.attachments.length > 0) {
+        for (const attachment of submission.attachments) {
+          const safeFileName = attachment.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+          const newAttachmentPath = `${result.id}/${randomUUID()}_${safeFileName}`;
+          try {
+            const newAttachmentUrl = await storageService.copyFile(
+              bucket,
+              attachment.filePath,
+              newAttachmentPath,
+            );
+            await this.attachmentRepository.create({
+              submissionId: result.id,
+              fileName: attachment.fileName,
+              fileUrl: newAttachmentUrl,
+              filePath: newAttachmentPath,
+              mimeType: attachment.mimeType,
+              fileSize: attachment.fileSize,
+              uploadedBy: attachment.uploadedBy,
+            });
+          } catch (err) {
+            console.error(`[TaskSubmissionService] Failed to copy attachment ${attachment.fileName}:`, err);
+          }
+        }
+      }
+
       await this.activityLogService.log(
         user.id,
         ACTIVITY_ACTIONS.UPDATE_SUBMISSION,
@@ -246,7 +293,7 @@ export class TaskSubmissionService {
         "TaskSubmission",
       );
 
-      return result;
+      return this.findById(result.id);
     } else {
       // Leader/Admin can review submission
       const reviewData: UpdateTaskSubmissionDto = {
@@ -446,5 +493,104 @@ export class TaskSubmissionService {
     );
 
     return result;
+  }
+
+  async getVideoPutUrl(
+    id: string,
+    mimeType: string,
+    user: UserPayload,
+  ): Promise<{ uploadUrl: string; filePath: string; publicUrl: string }> {
+    const submission = await this.findById(id);
+
+    if (!submission.assignment || !submission.assignment.intern) {
+      throw new AppError(
+        "Intern profile associated with this submission was not found",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
+
+    if (
+      user.role === ROLES.INTERN &&
+      submission.assignment.intern.userId !== user.id
+    ) {
+      throw new AppError(
+        "You are not authorized to upload for this submission",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
+    }
+
+    if (submission.reviewStatus === REVIEW_STATUS.APPROVED) {
+      throw new AppError(
+        "Cannot upload video demo for an approved submission",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    const ext = mimeType.split("/")[1]?.split(";")[0] ?? "mp4";
+    const filePath = `${id}/video_${randomUUID()}.${ext}`;
+    const bucket = storageConfig.namespaces.submissions;
+    const storageService = new StorageService();
+
+    return storageService.getPresignedPutUrl(bucket, filePath, mimeType, 300);
+  }
+
+  async confirmVideoUpload(
+    id: string,
+    filePath: string,
+    user: UserPayload,
+  ) {
+    const submission = await this.findById(id);
+
+    if (!submission.assignment || !submission.assignment.intern) {
+      throw new AppError(
+        "Intern profile associated with this submission was not found",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
+
+    if (
+      user.role === ROLES.INTERN &&
+      submission.assignment.intern.userId !== user.id
+    ) {
+      throw new AppError(
+        "You are not authorized to confirm upload for this submission",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
+    }
+
+    if (submission.reviewStatus === REVIEW_STATUS.APPROVED) {
+      throw new AppError(
+        "Cannot update video demo for an approved submission",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    const bucket = storageConfig.namespaces.submissions;
+    const storageService = new StorageService();
+
+    // Xóa video cũ trên R2 (nếu có)
+    if (submission.videoDemo) {
+      const oldVideoPath = storageService.getPathFromPublicUrl(
+        bucket,
+        submission.videoDemo,
+      );
+      if (oldVideoPath) {
+        await storageService.deleteFile(bucket, oldVideoPath).catch((err) => {
+          console.error(
+            `[TaskSubmissionService] Failed to delete old video demo ${oldVideoPath}:`,
+            err,
+          );
+        });
+      }
+    }
+
+    const publicUrl = storageService.getPublicUrlFromPath(bucket, filePath);
+    return this.repository.update(id, { videoDemo: publicUrl });
   }
 }
