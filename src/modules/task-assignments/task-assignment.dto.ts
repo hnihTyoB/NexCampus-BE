@@ -15,9 +15,13 @@ export interface TaskAssignmentQueryDto {
 export interface CreateTaskAssignmentDto {
   taskId: string;
   internId: string;
+  internEmail?: string;
 }
+
+export type AssignTaskDto = Omit<CreateTaskAssignmentDto, "taskId">;
 
 export interface UpdateTaskAssignmentDto {
   status?: AssignmentStatus;
   internId?: string;
+  internEmail?: string;
 }

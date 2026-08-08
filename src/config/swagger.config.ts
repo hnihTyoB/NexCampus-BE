@@ -891,7 +891,7 @@ export const swaggerSpec = {
       },
       CreateTaskBody: {
         type: "object",
-        required: ["title", "deadline"],
+        required: ["title", "deadline", "estDays"],
         properties: {
           title: { type: "string", example: "Lập trình tính năng đăng nhập" },
           description: { type: "string", example: "Sử dụng JWT và bcrypt" },
@@ -907,7 +907,7 @@ export const swaggerSpec = {
           },
           code: { type: "string", example: "BE1-01" },
           startDate: { type: "string", format: "date-time", example: "2025-08-01T08:00:00.000Z" },
-          estDays: { type: "number", format: "float", example: 2.5 },
+          estDays: { type: "number", format: "float", minimum: 0.1, maximum: 365, example: 2.5 },
           phase: { type: "string", example: "Phase 1 - Foundation" },
           module: { type: "string", example: "Auth" },
           acceptanceCriteria: { type: "string", example: "Source chạy được pnpm dev/build" },
@@ -924,7 +924,7 @@ export const swaggerSpec = {
           priority: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"] },
           code: { type: "string", nullable: true },
           startDate: { type: "string", format: "date-time", nullable: true },
-          estDays: { type: "number", format: "float", nullable: true },
+          estDays: { type: "number", format: "float", minimum: 0.1, maximum: 365, nullable: true },
           phase: { type: "string", nullable: true },
           module: { type: "string", nullable: true },
           acceptanceCriteria: { type: "string", nullable: true },
@@ -1057,6 +1057,23 @@ export const swaggerSpec = {
         properties: {
           taskId: { type: "string", format: "uuid" },
           internId: { type: "string", format: "uuid" },
+          internEmail: {
+            type: "string",
+            format: "email",
+            description: "Bắt buộc khi Leader giao việc cho Intern thuộc team khác",
+          },
+        },
+      },
+      AssignTaskBody: {
+        type: "object",
+        required: ["internId"],
+        properties: {
+          internId: { type: "string", format: "uuid" },
+          internEmail: {
+            type: "string",
+            format: "email",
+            description: "Bắt buộc khi Leader giao việc cho Intern thuộc team khác",
+          },
         },
       },
       UpdateTaskAssignmentBody: {
@@ -1067,6 +1084,11 @@ export const swaggerSpec = {
             enum: ["TODO", "IN_PROGRESS", "REVIEW", "DONE", "BLOCKED"],
           },
           internId: { type: "string", format: "uuid" },
+          internEmail: {
+            type: "string",
+            format: "email",
+            description: "Bắt buộc khi Leader chuyển việc cho Intern thuộc team khác",
+          },
         },
       },
       TaskSubmission: {
@@ -3825,6 +3847,62 @@ export const swaggerSpec = {
         },
       },
     },
+    "/interns/assignment-lookup": {
+      get: {
+        tags: ["Interns"],
+        summary: "Tra cứu Intern team khác theo email để giao việc (Leader only)",
+        description:
+          "Chỉ trả về Intern active khớp chính xác email và tên Leader trực tiếp. Không trả về thành viên thuộc team của Leader đang đăng nhập.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "query",
+            name: "email",
+            required: true,
+            schema: { type: "string", format: "email" },
+          },
+        ],
+        responses: {
+          200: {
+            description: "Intern team khác khớp email",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "object",
+                          properties: {
+                            id: { type: "string", format: "uuid" },
+                            fullName: { type: "string" },
+                            email: { type: "string", format: "email" },
+                            leader: {
+                              type: "object",
+                              properties: {
+                                id: { type: "string", format: "uuid" },
+                                fullName: { type: "string", nullable: true },
+                                email: { type: "string", format: "email" },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+          422: { $ref: "#/components/responses/Validation" },
+        },
+      },
+    },
     "/interns/{id}": {
       get: {
         tags: ["Interns"],
@@ -4730,6 +4808,14 @@ export const swaggerSpec = {
           401: { $ref: "#/components/responses/Unauthorized" },
           403: { $ref: "#/components/responses/Forbidden" },
           404: { $ref: "#/components/responses/NotFound" },
+          409: {
+            description: "Task đã hoàn thành và không thể chỉnh sửa",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
           422: { $ref: "#/components/responses/Validation" },
         },
       },
@@ -4885,6 +4971,14 @@ export const swaggerSpec = {
           401: { $ref: "#/components/responses/Unauthorized" },
           403: { $ref: "#/components/responses/Forbidden" },
           404: { $ref: "#/components/responses/NotFound" },
+          409: {
+            description: "Task đã hoàn thành và không thể thêm file đính kèm",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
         },
       },
     },
@@ -4936,6 +5030,14 @@ export const swaggerSpec = {
           401: { $ref: "#/components/responses/Unauthorized" },
           403: { $ref: "#/components/responses/Forbidden" },
           404: { $ref: "#/components/responses/NotFound" },
+          409: {
+            description: "Task đã hoàn thành và không thể xoá file đính kèm",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
         },
       },
     },
@@ -5064,6 +5166,105 @@ export const swaggerSpec = {
         },
       },
     },
+    "/task-assignments/task/{taskId}": {
+      put: {
+        tags: ["TaskAssignments"],
+        summary: "Giao hoặc chuyển người nhận theo Task ID (Admin / Leader)",
+        description:
+          "Tạo assignment nếu task chưa được giao, hoặc cập nhật assignment hiện tại. Server kiểm tra email xuyên team và giới hạn workload/số task active.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "taskId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/AssignTaskBody" },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Đã giao hoặc chuyển người nhận",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/TaskAssignment" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          400: { $ref: "#/components/responses/Validation" },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+          409: {
+            description: "Intern vượt giới hạn workload/số task active, hoặc task đã hoàn thành",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+      delete: {
+        tags: ["TaskAssignments"],
+        summary: "Hủy giao việc theo Task ID (Admin / Leader / người đã giao)",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "taskId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          200: {
+            description: "Đã hủy giao việc",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: { message: { type: "string" } },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+          409: {
+            description: "Task đã hoàn thành và không thể huỷ phân công",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
     "/task-assignments/{id}": {
       get: {
         tags: ["TaskAssignments"],
@@ -5143,6 +5344,14 @@ export const swaggerSpec = {
           401: { $ref: "#/components/responses/Unauthorized" },
           403: { $ref: "#/components/responses/Forbidden" },
           404: { $ref: "#/components/responses/NotFound" },
+          409: {
+            description: "Task đã hoàn thành và không thể cập nhật phân công",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
         },
       },
       delete: {
@@ -5177,6 +5386,14 @@ export const swaggerSpec = {
           401: { $ref: "#/components/responses/Unauthorized" },
           403: { $ref: "#/components/responses/Forbidden" },
           404: { $ref: "#/components/responses/NotFound" },
+          409: {
+            description: "Task đã hoàn thành và không thể xoá phân công",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
         },
       },
     },

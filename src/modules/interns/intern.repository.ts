@@ -140,6 +140,33 @@ export class InternRepository {
     });
   }
 
+  findActiveByEmail(email: string) {
+    return prisma.intern.findFirst({
+      where: {
+        deletedAt: null,
+        status: INTERN_STATUS.ACTIVE,
+        user: {
+          email: { equals: email, mode: "insensitive" },
+          isActive: true,
+          deletedAt: null,
+        },
+      },
+      select: {
+        id: true,
+        leaderId: true,
+        fullName: true,
+        user: { select: { email: true } },
+        leader: {
+          select: {
+            id: true,
+            email: true,
+            fullName: true,
+          },
+        },
+      },
+    });
+  }
+
   // Lazy auto-complete: chuyển ACTIVE → COMPLETED nếu đã hết thời gian
   async completeExpiredInterns() {
     const expiredInterns = await prisma.intern.findMany({

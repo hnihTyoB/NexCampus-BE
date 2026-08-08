@@ -6,6 +6,7 @@ import { validate } from "../../middlewares/validate.middleware";
 import {
   findAllAssignmentSchema,
   createAssignmentSchema,
+  assignTaskSchema,
   updateAssignmentSchema,
 } from "./task-assignment.validation";
 import { ROLES } from "../../common/constants/role.constant";
@@ -32,6 +33,19 @@ router.post(
   requireRole(ROLES.ADMIN, ROLES.LEADER),
   validate(createAssignmentSchema),
   controller.create,
+);
+router.put(
+  "/task/:taskId",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER),
+  validate(assignTaskSchema),
+  controller.assignTask,
+);
+router.delete(
+  "/task/:taskId",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER),
+  controller.unassignTask,
 );
 router.put(
   "/:id",

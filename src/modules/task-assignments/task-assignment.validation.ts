@@ -25,7 +25,10 @@ export const findAllAssignmentSchema = z.object({
 export const createAssignmentSchema = z.object({
   taskId: z.string().uuid(),
   internId: z.string().uuid(),
+  internEmail: z.string().trim().email("Invalid intern email").max(255).optional(),
 });
+
+export const assignTaskSchema = createAssignmentSchema.omit({ taskId: true });
 
 export const updateAssignmentSchema = z
   .object({
@@ -39,6 +42,7 @@ export const updateAssignmentSchema = z
       ])
       .optional(),
     internId: z.string().uuid().optional(),
+    internEmail: z.string().trim().email("Invalid intern email").max(255).optional(),
   })
   .refine((data) => data.status !== undefined || data.internId !== undefined, {
     message:

@@ -84,6 +84,7 @@ export class StorageService {
     path: string,
     buffer: Buffer,
     mimeType: string,
+    options?: { contentDisposition?: string },
   ): Promise<string> {
     const objectKey = this.getObjectKey(namespace, path);
 
@@ -93,6 +94,7 @@ export class StorageService {
         Key: objectKey,
         Body: buffer,
         ContentType: mimeType,
+        ContentDisposition: options?.contentDisposition,
       }));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
