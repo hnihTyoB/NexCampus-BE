@@ -156,4 +156,18 @@ export class MeetingController {
       next(error);
     }
   };
+
+  getBusyUsers = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { startTime, endTime, userIds } = req.query as {
+        startTime: string;
+        endTime: string;
+        userIds?: string;
+      };
+      const result = await this.service.getBusyUsers(startTime, endTime, userIds);
+      res.json({ success: true, ...result });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

@@ -11,6 +11,7 @@ import {
   rsvpSchema,
   submitAbsenceSchema,
   reviewAbsenceSchema,
+  getBusyUsersSchema,
 } from "./meeting.validation";
 import { ROLES } from "../../common/constants/role.constant";
 
@@ -23,6 +24,14 @@ router.get(
   requireRole(ROLES.ADMIN, ROLES.LEADER, ROLES.INTERN),
   validate(findAllMeetingSchema, "query"),
   controller.findAll,
+);
+
+router.get(
+  "/busy-users",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER),
+  validate(getBusyUsersSchema, "query"),
+  controller.getBusyUsers,
 );
 
 router.get(
