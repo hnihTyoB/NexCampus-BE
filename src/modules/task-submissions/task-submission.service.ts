@@ -131,7 +131,16 @@ export class TaskSubmissionService {
       );
     }
 
-    // 3. Count attempts
+    // 3. A task must be started before the intern can submit or resubmit it.
+    if (assignment.status !== ASSIGNMENT_STATUS.IN_PROGRESS) {
+      throw new AppError(
+        "Task must be in progress before submitting",
+        409,
+        ERROR_CODE.TASK_NOT_IN_PROGRESS,
+      );
+    }
+
+    // 4. Count attempts
     const count = await this.repository.countAttempts(data.assignmentId);
     const attempt = count + 1;
 
