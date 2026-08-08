@@ -106,52 +106,18 @@ export class GeminiService implements IAiProvider {
       }
     }
 
-    // ── FALLBACK CUỐI CÙNG: Nếu tất cả API keys đều thất bại ─────────────────────
+    // Để module nghiệp vụ tự tạo fallback phù hợp với đúng response contract.
     const finalMessage =
       lastError instanceof Error ? lastError.message : String(lastError);
     console.error(
-      "[GeminiService] All API keys in the pool failed. Fallback to mock generator. Error:",
+      "[GeminiService] All API keys in the pool failed:",
       finalMessage,
     );
-
-    // Tạo mock data thực tế dựa trên thông tin prompt
-    const mockResponse = {
-      ratings: {
-        ruleCompliance: "KHA",
-        workAttitude: "TOT",
-        learningCapacity: "KHA",
-        resilience: "KHA",
-        communication: "TOT",
-        knowledge: "KHA",
-        practicalSkills: "KHA",
-        foreignLanguage: "TB",
-        teamwork: "TOT",
-        creativity: "TB",
-        contentQuality: "KHA",
-        progressDelivery: "KHA",
-      },
-      communication: 8.5,
-      attitude: 9.0,
-      learning: 8.0,
-      coding: 7.5,
-      comment:
-        `[CHẾ ĐỘ MOCK - Lỗi API Key: ${finalMessage}] Thực tập sinh đã thể hiện tinh thần làm việc rất tốt trong tuần qua. Chủ động viết báo cáo hàng ngày đầy đủ chi tiết, nêu rõ tiến độ và khó khăn gặp phải. Bài nộp code có tiến bộ rõ rệt qua các lần chỉnh sửa theo góp ý của Leader.`,
-      strengths: [
-        "Báo cáo daily đầy đủ chi tiết, nêu rõ tiến độ và bài học rút ra",
-        "Chủ động nghiên cứu và tiếp thu nhanh các góp ý về security (refresh token invalidation)",
-        "Thái độ tích cực, chủ động trao đổi với Leader khi gặp vướng mắc",
-      ],
-      weaknesses: [
-        "Lần submit đầu tiên còn thiếu sót các case kiểm tra Token Expired",
-        "Số lần submit task còn hơi nhiều (3 lần) trước khi được duyệt",
-      ],
-      suggestions: [
-        "Nên test kỹ các case biên (edge cases) và security trước khi tạo Pull Request đầu tiên",
-        "Tiếp tục phát huy tính chủ động học hỏi các công nghệ mới",
-      ],
-    };
-
-    return mockResponse as unknown as T;
+    throw new AppError(
+      "Dịch vụ AI hiện không khả dụng. Hệ thống sẽ dùng kết quả dự phòng.",
+      503,
+      ERROR_CODE.DEPENDENCY_ERROR,
+    );
   }
 }
 

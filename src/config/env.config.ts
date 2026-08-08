@@ -38,6 +38,20 @@ function parseRetentionDays(raw: string | undefined): number {
   return value;
 }
 
+function parsePositiveInteger(
+  name: string,
+  raw: string | undefined,
+  fallback: number,
+): number {
+  const value = parseInt(raw ?? String(fallback), 10);
+
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`[env] ${name} must be a positive integer, got "${raw}".`);
+  }
+
+  return value;
+}
+
 export const envConfig = {
   nodeEnv: process.env.NODE_ENV || "development",
   port: parseInt(process.env.PORT || "8888", 10),
@@ -47,11 +61,12 @@ export const envConfig = {
     // false  = không có proxy, dùng socket.remoteAddress (an toàn nhất cho dev).
     // 1      = 1 lớp proxy (phổ biến nhất với Nginx).
     // true   = NGUY HIỂM: client có thể giả mạo X-Forwarded-For.
-    trustProxy: process.env.TRUST_PROXY === "true"
-      ? true
-      : process.env.TRUST_PROXY === "false" || !process.env.TRUST_PROXY
-        ? false
-        : parseInt(process.env.TRUST_PROXY, 10),
+    trustProxy:
+      process.env.TRUST_PROXY === "true"
+        ? true
+        : process.env.TRUST_PROXY === "false" || !process.env.TRUST_PROXY
+          ? false
+          : parseInt(process.env.TRUST_PROXY, 10),
   },
 
   database: {
@@ -113,8 +128,38 @@ export const envConfig = {
       .filter(Boolean),
   },
   aiProvider: process.env.AI_PROVIDER || "gemini",
+  aiGuard: {
+    requestsPerMinute: parsePositiveInteger(
+      "AI_REQUESTS_PER_MINUTE",
+      process.env.AI_REQUESTS_PER_MINUTE,
+      60,
+    ),
+    leaderDailyLimit: parsePositiveInteger(
+      "AI_LEADER_DAILY_LIMIT",
+      process.env.AI_LEADER_DAILY_LIMIT,
+      1000,
+    ),
+    adminDailyLimit: parsePositiveInteger(
+      "AI_ADMIN_DAILY_LIMIT",
+      process.env.AI_ADMIN_DAILY_LIMIT,
+      2000,
+    ),
+    maxConcurrentPerUser: parsePositiveInteger(
+      "AI_MAX_CONCURRENT_PER_USER",
+      process.env.AI_MAX_CONCURRENT_PER_USER,
+      3,
+    ),
+    cacheTtlMs: parsePositiveInteger(
+      "AI_CACHE_TTL_MS",
+      process.env.AI_CACHE_TTL_MS,
+      30_000,
+    ),
+  },
   reminders: {
     cronExpression: process.env.REMINDER_CRON || "0 8 * * *",
-    thresholdHours: parseInt(process.env.REMINDER_TASK_THRESHOLD_HOURS || "24", 10),
+    thresholdHours: parseInt(
+      process.env.REMINDER_TASK_THRESHOLD_HOURS || "24",
+      10,
+    ),
   },
 };
