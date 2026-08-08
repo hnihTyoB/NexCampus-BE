@@ -2424,6 +2424,110 @@ export const swaggerSpec = {
         },
       },
     },
+    "/users/avatar/upload-url": {
+      get: {
+        tags: ["Users"],
+        summary: "Lấy Presigned PUT URL để tải trực tiếp avatar lên Cloudflare R2",
+        description: "Trả về đường dẫn upload tạm thời (hiệu lực trong 5 phút) để client tải trực tiếp avatar lên R2 bằng phương thức PUT.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "query",
+            name: "mimeType",
+            required: true,
+            schema: { type: "string", example: "image/jpeg" },
+            description: "MIME type của ảnh cần upload (ví dụ: image/jpeg, image/png)",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Lấy Presigned URL thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "object",
+                          properties: {
+                            uploadUrl: { type: "string", format: "uri", description: "Presigned URL để PUT file lên R2" },
+                            filePath: { type: "string", description: "Đường dẫn file trong R2" },
+                            publicUrl: { type: "string", format: "uri", description: "Public URL của file sau khi upload" },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          400: {
+            description: "Thiếu tham số",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/users/avatar/confirm": {
+      post: {
+        tags: ["Users"],
+        summary: "Xác nhận đã tải lên thành công avatar và cập nhật hồ sơ người dùng",
+        description: "Gọi API này sau khi client đã thực hiện PUT file thành công lên R2 để lưu avatarUrl vào database.",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["filePath"],
+                properties: {
+                  filePath: { type: "string", description: "filePath nhận được từ API sinh upload-url" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Cập nhật avatar thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/User" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          400: {
+            description: "Tham số không hợp lệ",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
 
     "/applications/invites": {
       post: {
@@ -2615,6 +2719,78 @@ export const swaggerSpec = {
         },
       },
     },
+    "/applications/attachments/upload-url": {
+      get: {
+        tags: ["Applications"],
+        summary: "Lấy Presigned PUT URL để tải trực tiếp CV / tài liệu ứng tuyển lên Cloudflare R2 (Public)",
+        description: "Trả về đường dẫn upload tạm thời (hiệu lực trong 5 phút) để ứng viên tải trực tiếp tài liệu lên R2 bằng phương thức PUT. Cần đính kèm token lời mời nộp đơn để xác thực.",
+        parameters: [
+          {
+            in: "query",
+            name: "token",
+            required: true,
+            schema: { type: "string" },
+            description: "Token lời mời nộp đơn (ApplicationInvite token)",
+          },
+          {
+            in: "query",
+            name: "fileName",
+            required: true,
+            schema: { type: "string", example: "my_cv.pdf" },
+            description: "Tên gốc của file",
+          },
+          {
+            in: "query",
+            name: "mimeType",
+            required: true,
+            schema: { type: "string", example: "application/pdf" },
+            description: "MIME type của file",
+          },
+          {
+            in: "query",
+            name: "fileSize",
+            required: true,
+            schema: { type: "integer", example: 1048576 },
+            description: "Kích thước của file tính bằng bytes",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Lấy Presigned URL thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "object",
+                          properties: {
+                            uploadUrl: { type: "string", format: "uri", description: "Presigned URL dùng để PUT file lên R2" },
+                            filePath: { type: "string", description: "Đường dẫn file trong R2" },
+                            publicUrl: { type: "string", format: "uri", description: "Public URL của file sau khi upload" },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          400: {
+            description: "Token không hợp lệ, hết hạn, hoặc thiếu tham số",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
     "/applications": {
       post: {
         tags: ["Applications"],
@@ -2622,7 +2798,7 @@ export const swaggerSpec = {
         requestBody: {
           required: true,
           content: {
-            "multipart/form-data": {
+            "application/json": {
               schema: {
                 type: "object",
                 required: [
@@ -2674,14 +2850,19 @@ export const swaggerSpec = {
                   token: { type: "string", example: "39bdf11f..." },
                   regulationId: { type: "string", format: "uuid" },
                   acceptedRegulations: { type: "boolean", example: true },
-                  files: {
+                  uploadedFiles: {
                     type: "array",
-                    maxItems: 5,
+                    description: "Danh sách tệp tin đính kèm đã được tải trực tiếp lên Cloudflare R2 qua presigned URL.",
                     items: {
-                      type: "string",
-                      format: "binary",
+                      type: "object",
+                      required: ["fileName", "filePath", "mimeType", "fileSize"],
+                      properties: {
+                        fileName: { type: "string" },
+                        filePath: { type: "string" },
+                        mimeType: { type: "string" },
+                        fileSize: { type: "integer" },
+                      },
                     },
-                    description: "Đính kèm tài liệu ứng tuyển (CV, bảng điểm, giấy giới thiệu...). Tối đa 5 file, mỗi file tối đa 10MB.",
                   },
                 },
               },
@@ -5124,6 +5305,147 @@ export const swaggerSpec = {
         },
       },
     },
+    "/tasks/{taskId}/attachments/upload-url": {
+      get: {
+        tags: ["TaskAttachments"],
+        summary: "Lấy Presigned PUT URL để tải trực tiếp file đính kèm cho task lên Cloudflare R2 (Admin / Leader)",
+        description: "Trả về đường dẫn upload tạm thời (hiệu lực trong 5 phút) để client tải trực tiếp file đính kèm lên R2 bằng phương thức PUT.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "taskId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "ID của Task",
+          },
+          {
+            in: "query",
+            name: "fileName",
+            required: true,
+            schema: { type: "string", example: "file_dinh_kem.pdf" },
+            description: "Tên gốc của file",
+          },
+          {
+            in: "query",
+            name: "mimeType",
+            required: true,
+            schema: { type: "string", example: "application/pdf" },
+            description: "MIME type của file",
+          },
+          {
+            in: "query",
+            name: "fileSize",
+            required: true,
+            schema: { type: "integer", example: 1048576 },
+            description: "Kích thước của file tính bằng bytes",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Lấy Presigned URL thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "object",
+                          properties: {
+                            uploadUrl: { type: "string", format: "uri", description: "Presigned URL dùng để PUT file lên R2" },
+                            filePath: { type: "string", description: "Đường dẫn file trong R2" },
+                            publicUrl: { type: "string", format: "uri", description: "Public URL của file sau khi upload" },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          400: {
+            description: "Thiếu tham số hoặc task có quá 10 file đính kèm",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
+    "/tasks/{taskId}/attachments/confirm": {
+      post: {
+        tags: ["TaskAttachments"],
+        summary: "Xác nhận tải file đính kèm thành công và tạo bản ghi lưu database (Admin / Leader)",
+        description: "Gọi API này sau khi client đã thực hiện PUT file thành công lên Cloudflare R2 để lưu thông tin file đính kèm vào database.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "taskId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "ID của Task",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["filePath", "fileName", "mimeType", "fileSize"],
+                properties: {
+                  filePath: { type: "string", description: "filePath nhận được từ API upload-url" },
+                  fileName: { type: "string", description: "Tên của file" },
+                  mimeType: { type: "string", description: "MIME type của file" },
+                  fileSize: { type: "integer", description: "Kích thước file tính bằng bytes" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Lưu tệp đính kèm thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/TaskAttachment" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          400: {
+            description: "Tham số không hợp lệ",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
     "/tasks/{taskId}/attachments/{attachmentId}": {
       delete: {
         tags: ["TaskAttachments"],
@@ -6743,6 +7065,133 @@ export const swaggerSpec = {
         },
       },
     },
+    "/daily-reports/{id}/video/upload-url": {
+      get: {
+        tags: ["DailyReports"],
+        summary: "Lấy Presigned PUT URL để tải trực tiếp video demo cho báo cáo ngày lên Cloudflare R2 (Intern only)",
+        description: "Trả về một đường dẫn upload tạm thời (hiệu lực trong 5 phút), tệp tin sẽ được upload trực tiếp từ trình duyệt lên Cloudflare R2 sử dụng phương thức PUT.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "ID của DailyReport",
+          },
+          {
+            in: "query",
+            name: "mimeType",
+            required: true,
+            schema: { type: "string", example: "video/mp4" },
+            description: "MIME type của video cần upload (ví dụ: video/mp4, video/webm)",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Lấy Presigned URL thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "object",
+                          properties: {
+                            uploadUrl: { type: "string", format: "uri", description: "Presigned URL để thực hiện PUT request từ client" },
+                            filePath: { type: "string", description: "Đường dẫn lưu trữ của file trong R2 bucket" },
+                            publicUrl: { type: "string", format: "uri", description: "Public URL của video demo sau khi upload" },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          400: {
+            description: "Thiếu tham số hoặc lỗi xác thực",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
+    "/daily-reports/{id}/video/confirm": {
+      post: {
+        tags: ["DailyReports"],
+        summary: "Xác nhận đã tải lên thành công file video demo cho báo cáo ngày và cập nhật database (Intern only)",
+        description: "Gọi API này sau khi client đã thực hiện PUT file thành công lên Cloudflare R2 để lưu thông tin video vào database.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "ID của DailyReport",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["filePath"],
+                properties: {
+                  filePath: {
+                    type: "string",
+                    description: "Đường dẫn lưu trữ (filePath) nhận được từ API sinh upload-url",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Cập nhật video demo của báo cáo ngày thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/DailyReport" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          400: {
+            description: "Tham số không hợp lệ",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
     "/daily-reports/{reportId}/attachments": {
       get: {
         tags: ["ReportAttachments"],
@@ -6843,6 +7292,147 @@ export const swaggerSpec = {
           400: {
             description:
               "File không hợp lệ, báo cáo đã có đủ 5 tài liệu hoặc dữ liệu sai",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
+    "/daily-reports/{reportId}/attachments/upload-url": {
+      get: {
+        tags: ["ReportAttachments"],
+        summary: "Lấy Presigned PUT URL để tải trực tiếp file đính kèm cho báo cáo ngày lên Cloudflare R2 (Intern only)",
+        description: "Trả về đường dẫn upload tạm thời (hiệu lực trong 5 phút) để client tải trực tiếp file đính kèm lên R2 bằng phương thức PUT.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "reportId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "ID của DailyReport",
+          },
+          {
+            in: "query",
+            name: "fileName",
+            required: true,
+            schema: { type: "string", example: "file_dinh_kem.pdf" },
+            description: "Tên gốc của file",
+          },
+          {
+            in: "query",
+            name: "mimeType",
+            required: true,
+            schema: { type: "string", example: "application/pdf" },
+            description: "MIME type của file",
+          },
+          {
+            in: "query",
+            name: "fileSize",
+            required: true,
+            schema: { type: "integer", example: 1048576 },
+            description: "Kích thước của file tính bằng bytes",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Lấy Presigned URL thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "object",
+                          properties: {
+                            uploadUrl: { type: "string", format: "uri", description: "Presigned URL dùng để PUT file lên R2" },
+                            filePath: { type: "string", description: "Đường dẫn file trong R2" },
+                            publicUrl: { type: "string", format: "uri", description: "Public URL của file sau khi upload" },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          400: {
+            description: "Thiếu tham số hoặc báo cáo có quá 5 file đính kèm",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          401: { $ref: "#/components/responses/Unauthorized" },
+          403: { $ref: "#/components/responses/Forbidden" },
+          404: { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
+    "/daily-reports/{reportId}/attachments/confirm": {
+      post: {
+        tags: ["ReportAttachments"],
+        summary: "Xác nhận tải file đính kèm thành công và tạo bản ghi lưu database (Intern only)",
+        description: "Gọi API này sau khi client đã thực hiện PUT file thành công lên Cloudflare R2 để lưu thông tin file đính kèm vào database.",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "reportId",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "ID của DailyReport",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["filePath", "fileName", "mimeType", "fileSize"],
+                properties: {
+                  filePath: { type: "string", description: "filePath nhận được từ API upload-url" },
+                  fileName: { type: "string", description: "Tên của file" },
+                  mimeType: { type: "string", description: "MIME type của file" },
+                  fileSize: { type: "integer", description: "Kích thước file tính bằng bytes" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Lưu tệp đính kèm thành công",
+            content: {
+              "application/json": {
+                schema: {
+                  allOf: [
+                    { $ref: "#/components/schemas/SuccessResponse" },
+                    {
+                      type: "object",
+                      properties: {
+                        data: { $ref: "#/components/schemas/ReportAttachment" },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          400: {
+            description: "Tham số không hợp lệ hoặc vượt giới hạn 5 file",
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/ErrorResponse" },

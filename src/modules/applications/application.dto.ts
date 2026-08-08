@@ -24,6 +24,12 @@ export interface CreateApplicationDto {
   token: string;
   regulationId: string;
   acceptedRegulations: boolean;
+  uploadedFiles?: Array<{
+    fileName: string;
+    filePath: string;
+    mimeType: string;
+    fileSize: number;
+  }>;
 }
 
 export interface ReviewApplicationDto {

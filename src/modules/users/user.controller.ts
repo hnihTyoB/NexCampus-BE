@@ -83,6 +83,34 @@ export class UserController {
     }
   };
 
+  getAvatarPutUrl = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.user.id;
+      const { mimeType } = req.query as { mimeType?: string };
+      if (!mimeType) {
+        throw new AppError("mimeType query param is required", 400, ERROR_CODE.VALIDATION_ERROR);
+      }
+      const result = await this.service.getAvatarPutUrl(userId, mimeType);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  confirmAvatarUpload = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.user.id;
+      const { filePath } = req.body as { filePath?: string };
+      if (!filePath) {
+        throw new AppError("filePath is required", 400, ERROR_CODE.VALIDATION_ERROR);
+      }
+      const result = await this.service.confirmAvatarUpload(userId, filePath);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   delete = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const actorId = req.user.id;

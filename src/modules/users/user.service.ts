@@ -160,6 +160,49 @@ export class UserService {
     return updatedUser;
   }
 
+  async getAvatarPutUrl(
+    id: string,
+    mimeType: string,
+  ): Promise<{ uploadUrl: string; filePath: string; publicUrl: string }> {
+    await this.findById(id);
+
+    const ext = mimeType.split("/")[1]?.split(";")[0] ?? "jpg";
+    const filePath = `${id}/avatar_${crypto.randomUUID()}.${ext}`;
+    const bucket = storageConfig.namespaces.avatars;
+    const storageService = new StorageService();
+
+    return storageService.getPresignedPutUrl(bucket, filePath, mimeType, 300);
+  }
+
+  async confirmAvatarUpload(
+    id: string,
+    filePath: string,
+  ) {
+    const user = await this.findById(id);
+
+    const bucket = storageConfig.namespaces.avatars;
+    const storageService = new StorageService();
+
+    // Xóa avatar cũ trên R2 (nếu có)
+    if (user.avatarUrl) {
+      const oldAvatarPath = storageService.getPathFromPublicUrl(
+        bucket,
+        user.avatarUrl,
+      );
+      if (oldAvatarPath) {
+        await storageService.deleteFile(bucket, oldAvatarPath).catch((err) => {
+          console.error(
+            `[UserService] Failed to delete old avatar ${oldAvatarPath}:`,
+            err,
+          );
+        });
+      }
+    }
+
+    const publicUrl = storageService.getPublicUrlFromPath(bucket, filePath);
+    return this.repository.update(id, { avatarUrl: publicUrl });
+  }
+
   async delete(id: string, actorId: string) {
     if (id === actorId) {
       throw new AppError(

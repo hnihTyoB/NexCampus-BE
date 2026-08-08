@@ -135,4 +135,57 @@ export class TaskAttachmentService {
       uploadedBy,
     });
   }
+
+  async getPutUrl(
+    taskId: string,
+    fileName: string,
+    mimeType: string,
+    fileSize: number,
+    uploadedBy: string,
+  ): Promise<{ uploadUrl: string; filePath: string; publicUrl: string }> {
+    await this.findEditableTask(taskId);
+
+    // Kiểm tra giới hạn số lượng file đính kèm của task (ví dụ: tối đa 10 file)
+    const existing = await this.attachmentRepo.findByTaskId(taskId);
+    if (existing.length >= 10) {
+      throw new AppError(
+        "Maximum 10 attachments allowed per task",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const filePath = `${taskId}/${randomUUID()}_${safeFileName}`;
+
+    return this.storageService.getPresignedPutUrl(
+      this.bucket,
+      filePath,
+      mimeType,
+      300,
+    );
+  }
+
+  async confirmUpload(
+    taskId: string,
+    filePath: string,
+    fileName: string,
+    mimeType: string,
+    fileSize: number,
+    uploadedBy: string,
+  ) {
+    await this.findEditableTask(taskId);
+
+    const fileUrl = this.storageService.getPublicUrlFromPath(this.bucket, filePath);
+
+    return this.attachmentRepo.create({
+      taskId,
+      fileName,
+      fileUrl,
+      filePath,
+      mimeType,
+      fileSize,
+      uploadedBy,
+    });
+  }
 }

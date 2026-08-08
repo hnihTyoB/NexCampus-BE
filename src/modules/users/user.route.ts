@@ -40,6 +40,16 @@ router.post(
   uploadSingle("avatar", "avatar"),
   controller.uploadAvatar,
 );
+router.get(
+  "/avatar/upload-url",
+  authMiddleware,
+  controller.getAvatarPutUrl,
+);
+router.post(
+  "/avatar/confirm",
+  authMiddleware,
+  controller.confirmAvatarUpload,
+);
 router.put(
   "/:id",
   authMiddleware,

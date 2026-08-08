@@ -87,4 +87,32 @@ export class DailyReportController {
       next(error);
     }
   };
+
+  getVideoPutUrl = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const { mimeType } = req.query as { mimeType?: string };
+      if (!mimeType) {
+        throw new AppError("mimeType query param is required", 400, ERROR_CODE.VALIDATION_ERROR);
+      }
+      const result = await this.service.getVideoPutUrl(id, mimeType, req.user);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  confirmVideoUpload = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const { filePath } = req.body as { filePath?: string };
+      if (!filePath) {
+        throw new AppError("filePath is required", 400, ERROR_CODE.VALIDATION_ERROR);
+      }
+      const result = await this.service.confirmVideoUpload(id, filePath, req.user);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

@@ -278,11 +278,22 @@ export class ApplicationService {
       fileSize: number;
     }> = [];
 
-    // 3. Upload files to Cloudflare R2 first if provided
-    if (files && files.length > 0) {
-      const storageService = new StorageService();
-      const bucket = storageConfig.namespaces.applications;
+    // 3. Handle files (support both presigned URL flow and legacy multipart)
+    const storageService = new StorageService();
+    const bucket = storageConfig.namespaces.applications;
 
+    if (data.uploadedFiles && data.uploadedFiles.length > 0) {
+      for (const file of data.uploadedFiles) {
+        const fileUrl = storageService.getPublicUrlFromPath(bucket, file.filePath);
+        attachmentsToCreate.push({
+          fileName: file.fileName,
+          fileUrl,
+          filePath: file.filePath,
+          mimeType: file.mimeType,
+          fileSize: file.fileSize,
+        });
+      }
+    } else if (files && files.length > 0) {
       for (const file of files) {
         const safeFileName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
         const filePath = `${applicationId}/${crypto.randomUUID()}_${safeFileName}`;
@@ -644,5 +655,30 @@ export class ApplicationService {
     }
 
     return invite;
+  }
+
+  async getApplicationAttachmentPutUrl(
+    token: string,
+    fileName: string,
+    mimeType: string,
+    fileSize: number,
+  ): Promise<{ uploadUrl: string; filePath: string; publicUrl: string }> {
+    const invite = await this.repository.findInviteByToken(token);
+    if (!invite) {
+      throw new AppError("Invalid invitation token", 400, ERROR_CODE.TOKEN_INVALID);
+    }
+    if (invite.status !== APPLICATION_INVITE_STATUS.ACTIVE) {
+      throw new AppError("This invitation link is not active", 400, ERROR_CODE.TOKEN_INVALID);
+    }
+    if (invite.expiresAt < new Date()) {
+      throw new AppError("This invitation link has expired", 400, ERROR_CODE.TOKEN_EXPIRED);
+    }
+
+    const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const filePath = `${token}/${crypto.randomUUID()}_${safeFileName}`;
+    const bucket = storageConfig.namespaces.applications;
+    const storageService = new StorageService();
+
+    return storageService.getPresignedPutUrl(bucket, filePath, mimeType, 300);
   }
 }

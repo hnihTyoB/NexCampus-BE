@@ -121,4 +121,86 @@ export class ReportAttachmentService {
   async findByReportId(reportId: string) {
     return this.attachmentRepo.findByReportId(reportId);
   }
+
+  async getPutUrl(
+    reportId: string,
+    fileName: string,
+    mimeType: string,
+    fileSize: number,
+    uploadedBy: string,
+    userRole: string,
+  ): Promise<{ uploadUrl: string; filePath: string; publicUrl: string }> {
+    const report = await this.reportRepo.findById(reportId);
+    if (!report) {
+      throw new AppError("Daily report not found", 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    if (userRole === ROLES.INTERN) {
+      const intern = await this.internRepository.findByUserId(uploadedBy);
+      if (!intern || report.internId !== intern.id) {
+        throw new AppError(
+          "You are not authorized to upload for this report",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
+      }
+    }
+
+    const existing = await this.attachmentRepo.findByReportId(reportId);
+    if (existing.length >= 5) {
+      throw new AppError(
+        "Maximum 5 attachments allowed per daily report",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const filePath = `${reportId}/${randomUUID()}_${safeFileName}`;
+
+    return this.storageService.getPresignedPutUrl(
+      this.bucket,
+      filePath,
+      mimeType,
+      300,
+    );
+  }
+
+  async confirmUpload(
+    reportId: string,
+    filePath: string,
+    fileName: string,
+    mimeType: string,
+    fileSize: number,
+    uploadedBy: string,
+    userRole: string,
+  ) {
+    const report = await this.reportRepo.findById(reportId);
+    if (!report) {
+      throw new AppError("Daily report not found", 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    if (userRole === ROLES.INTERN) {
+      const intern = await this.internRepository.findByUserId(uploadedBy);
+      if (!intern || report.internId !== intern.id) {
+        throw new AppError(
+          "You are not authorized to confirm upload for this report",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
+      }
+    }
+
+    const fileUrl = this.storageService.getPublicUrlFromPath(this.bucket, filePath);
+
+    return this.attachmentRepo.create({
+      reportId,
+      fileName,
+      fileUrl,
+      filePath,
+      mimeType,
+      fileSize,
+      uploadedBy,
+    });
+  }
 }

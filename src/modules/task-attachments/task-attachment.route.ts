@@ -33,5 +33,17 @@ router.delete(
   requireRole(ROLES.ADMIN, ROLES.LEADER),
   controller.delete,
 );
+router.get(
+  "/upload-url",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER),
+  controller.getPutUrl,
+);
+router.post(
+  "/confirm",
+  authMiddleware,
+  requireRole(ROLES.ADMIN, ROLES.LEADER),
+  controller.confirmUpload,
+);
 
 export default router;

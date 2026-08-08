@@ -211,4 +211,71 @@ export class DailyReportService {
 
     return this.repository.delete(id);
   }
+
+  async getVideoPutUrl(
+    id: string,
+    mimeType: string,
+    user: UserPayload,
+  ): Promise<{ uploadUrl: string; filePath: string; publicUrl: string }> {
+    const report = await this.findById(id);
+
+    if (user.role === ROLES.INTERN) {
+      const intern = await this.internRepository.findByUserId(user.id);
+      if (!intern || report.internId !== intern.id) {
+        throw new AppError(
+          "You are not authorized to upload for this report",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
+      }
+    }
+
+    const ext = mimeType.split("/")[1]?.split(";")[0] ?? "mp4";
+    const filePath = `${id}/video_${randomUUID()}.${ext}`;
+    const bucket = storageConfig.namespaces.reports;
+    const storageService = new StorageService();
+
+    return storageService.getPresignedPutUrl(bucket, filePath, mimeType, 300);
+  }
+
+  async confirmVideoUpload(
+    id: string,
+    filePath: string,
+    user: UserPayload,
+  ) {
+    const report = await this.findById(id);
+
+    if (user.role === ROLES.INTERN) {
+      const intern = await this.internRepository.findByUserId(user.id);
+      if (!intern || report.internId !== intern.id) {
+        throw new AppError(
+          "You are not authorized to confirm upload for this report",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
+      }
+    }
+
+    const bucket = storageConfig.namespaces.reports;
+    const storageService = new StorageService();
+
+    // Xóa video cũ trên R2 (nếu có)
+    if (report.videoDemo) {
+      const oldVideoPath = storageService.getPathFromPublicUrl(
+        bucket,
+        report.videoDemo,
+      );
+      if (oldVideoPath) {
+        await storageService.deleteFile(bucket, oldVideoPath).catch((err) => {
+          console.error(
+            `[DailyReportService] Failed to delete old video demo ${oldVideoPath}:`,
+            err,
+          );
+        });
+      }
+    }
+
+    const publicUrl = storageService.getPublicUrlFromPath(bucket, filePath);
+    return this.repository.update(id, { videoDemo: publicUrl });
+  }
 }
