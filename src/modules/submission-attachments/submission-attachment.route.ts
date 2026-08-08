@@ -27,5 +27,18 @@ router.delete(
   requireRole(ROLES.ADMIN, ROLES.LEADER, ROLES.INTERN),
   controller.delete,
 );
+// Presigned URL routes (browser uploads directly to R2)
+router.get(
+  "/upload-url",
+  authMiddleware,
+  requireRole(ROLES.INTERN),
+  controller.getPutUrl,
+);
+router.post(
+  "/confirm",
+  authMiddleware,
+  requireRole(ROLES.INTERN),
+  controller.confirmUpload,
+);
 
 export default router;
