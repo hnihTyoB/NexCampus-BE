@@ -60,6 +60,8 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
+          timeout: 60s
+          command_timeout: 30m
           script: |
             set -e
             cd /var/www/nexcampus/NexCampus-BE
@@ -100,7 +102,10 @@ jobs:
             echo "Authenticating Docker with GHCR..."
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u hnihtyob --password-stdin
 
-            echo "Pulling backend image ${deploy_image} from GHCR..."
+            echo "Pulling backend image ${deploy_image} from GHCR (quiet mode)..."
+            docker pull -q "${deploy_image}"
+
+            echo "Updating compose files to use the pulled image..."
             BACKEND_IMAGE="${deploy_image}" docker-compose pull backend
 
             previous_image_id="$(docker inspect --format '{{.Image}}' nexcampus_be 2>/dev/null || true)"
