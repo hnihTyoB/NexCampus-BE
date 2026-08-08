@@ -22,6 +22,7 @@ const defaultSelect = {
       title: true,
       description: true,
       deadline: true,
+      estDays: true,
       priority: true,
       createdBy: true,
       createdAt: true,
@@ -136,7 +137,6 @@ export class TaskAssignmentRepository {
       where: {
         id,
         task: { deletedAt: null },
-        intern: { deletedAt: null },
       },
       select: defaultSelect,
     });
@@ -147,7 +147,6 @@ export class TaskAssignmentRepository {
       where: {
         taskId,
         task: { deletedAt: null },
-        intern: { deletedAt: null },
       },
       select: defaultSelect,
     });

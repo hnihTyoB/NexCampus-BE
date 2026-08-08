@@ -5,6 +5,7 @@ import { requireRole } from "../../middlewares/role.middleware";
 import { validate } from "../../middlewares/validate.middleware";
 import {
   findAllInternSchema,
+  lookupAssignmentInternSchema,
   createInternSchema,
   directCreateInternSchema,
   updateInternSchema,
@@ -44,6 +45,13 @@ router.post(
   requireRole(ROLES.ADMIN),
   validate(directCreateInternSchema),
   controller.directCreate,
+);
+router.get(
+  "/assignment-lookup",
+  authMiddleware,
+  requireRole(ROLES.LEADER),
+  validate(lookupAssignmentInternSchema, "query"),
+  controller.lookupForAssignment,
 );
 router.get(
   "/:id",

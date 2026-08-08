@@ -3,6 +3,7 @@ import { TaskAssignmentService } from "./task-assignment.service";
 import {
   TaskAssignmentQueryDto,
   CreateTaskAssignmentDto,
+  AssignTaskDto,
   UpdateTaskAssignmentDto,
 } from "./task-assignment.dto";
 
@@ -37,6 +38,36 @@ export class TaskAssignmentController {
       const result = await this.service.create(body, assignedBy, req.user.role);
 
       res.status(201).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  assignTask = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = req.body as AssignTaskDto;
+      const result = await this.service.assignTask(
+        req.params.taskId,
+        body,
+        req.user.id,
+        req.user.role,
+      );
+
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  unassignTask = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await this.service.unassignTask(
+        req.params.taskId,
+        req.user.id,
+        req.user.role,
+      );
+
+      res.json({ success: true, message: "Hủy giao việc thành công" });
     } catch (error) {
       next(error);
     }

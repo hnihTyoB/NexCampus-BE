@@ -4,10 +4,26 @@ import { ERROR_CODE } from "../../common/errors/error-code";
 import { TaskQueryDto, CreateTaskDto, UpdateTaskDto } from "./task.dto";
 import { ActivityLogService } from "../activity-logs/activity-log.service";
 import { ACTIVITY_ACTIONS } from "../../common/constants/activity-log.constant";
+import { ASSIGNMENT_STATUS } from "../../common/constants/status.constant";
 
 export class TaskService {
   private readonly repository = new TaskRepository();
   private readonly activityLogService = new ActivityLogService();
+
+  private validateSchedule(
+    startDate: string | Date | null | undefined,
+    deadline: string | Date,
+  ) {
+    if (!startDate) return;
+
+    if (new Date(startDate).getTime() > new Date(deadline).getTime()) {
+      throw new AppError(
+        "Start date must be on or before deadline",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+  }
 
   async findAll(query: TaskQueryDto) {
     return this.repository.findAll(query);
@@ -24,6 +40,7 @@ export class TaskService {
   }
 
   async create(data: CreateTaskDto, createdBy: string) {
+    this.validateSchedule(data.startDate, data.deadline);
     const result = await this.repository.create(data, createdBy);
 
     await this.activityLogService.log(
@@ -39,6 +56,18 @@ export class TaskService {
 
   async update(id: string, data: UpdateTaskDto, actorId: string) {
     const current = await this.findById(id);
+
+    if (current.assignment?.status === ASSIGNMENT_STATUS.DONE) {
+      throw new AppError(
+        "Completed tasks cannot be edited",
+        409,
+        ERROR_CODE.TASK_ALREADY_COMPLETED,
+      );
+    }
+
+    const nextStartDate = data.startDate === undefined ? current.startDate : data.startDate;
+    const nextDeadline = data.deadline === undefined ? current.deadline : data.deadline;
+    this.validateSchedule(nextStartDate, nextDeadline);
 
     const keys = [
       "title",

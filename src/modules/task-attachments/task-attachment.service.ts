@@ -6,6 +6,7 @@ import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import { storageConfig } from "../../config/storage.config";
 import { prisma } from "../../database/prisma.client";
+import { ASSIGNMENT_STATUS } from "../../common/constants/status.constant";
 
 export class TaskAttachmentService {
   private readonly attachmentRepo = new TaskAttachmentRepository();
@@ -16,16 +17,29 @@ export class TaskAttachmentService {
     return storageConfig.namespaces.tasks;
   }
 
+  private async findEditableTask(taskId: string) {
+    const task = await this.taskRepo.findById(taskId);
+    if (!task) {
+      throw new AppError("Task not found", 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    if (task.assignment?.status === ASSIGNMENT_STATUS.DONE) {
+      throw new AppError(
+        "Completed tasks cannot be edited",
+        409,
+        ERROR_CODE.TASK_ALREADY_COMPLETED,
+      );
+    }
+
+    return task;
+  }
+
   async uploadAttachment(
     taskId: string,
     uploadedBy: string,
     file: Express.Multer.File,
   ) {
-    // Kiem tra task ton tai
-    const task = await this.taskRepo.findById(taskId);
-    if (!task) {
-      throw new AppError("Task not found", 404, ERROR_CODE.NOT_FOUND);
-    }
+    await this.findEditableTask(taskId);
 
     // Tao duong dan duy nhat trong bucket: {taskId}/{uuid}_{originalname}
     const safeFileName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -74,6 +88,8 @@ export class TaskAttachmentService {
       );
     }
 
+    await this.findEditableTask(attachment.taskId);
+
     // Delete the R2 object first (external links do not have managed objects).
     const isLink =
       attachment.filePath.startsWith("http://") ||
@@ -111,10 +127,7 @@ export class TaskAttachmentService {
     fileName: string,
     fileUrl: string,
   ) {
-    const task = await this.taskRepo.findById(taskId);
-    if (!task) {
-      throw new AppError("Task not found", 404, ERROR_CODE.NOT_FOUND);
-    }
+    await this.findEditableTask(taskId);
     return this.attachmentRepo.createLink({
       taskId,
       fileName,

@@ -38,7 +38,7 @@ export const createTaskSchema = z.object({
     .string()
     .refine((v) => !isNaN(Date.parse(v)), { message: "Invalid startDate" })
     .optional(),
-  estDays: z.number().positive().optional(),
+  estDays: z.number().positive().max(365),
   phase: z.string().max(100).optional(),
   module: z.string().max(100).optional(),
   acceptanceCriteria: z.string().optional(),
@@ -61,7 +61,7 @@ export const updateTaskSchema = z.object({
     .refine((v) => !isNaN(Date.parse(v)), { message: "Invalid startDate" })
     .nullable()
     .optional(),
-  estDays: z.number().positive().nullable().optional(),
+  estDays: z.number().positive().max(365).nullable().optional(),
   phase: z.string().max(100).nullable().optional(),
   module: z.string().max(100).nullable().optional(),
   acceptanceCriteria: z.string().nullable().optional(),

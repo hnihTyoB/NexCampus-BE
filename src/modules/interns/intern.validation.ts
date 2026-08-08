@@ -35,6 +35,10 @@ export const findAllInternSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional().default(20),
 });
 
+export const lookupAssignmentInternSchema = z.object({
+  email: z.string().trim().email("Invalid email").max(255),
+});
+
 export const createInternSchema = z.object({
   userId: z.string().uuid("Invalid userId"),
   leaderId: z.string().uuid("Invalid leaderId").optional(),
