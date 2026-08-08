@@ -5,12 +5,14 @@ import { requireRole } from "../../middlewares/role.middleware";
 import { validate } from "../../middlewares/validate.middleware";
 import {
   findAllTaskSchema,
+  taskAnalyticsQuerySchema,
   createTaskSchema,
   updateTaskSchema,
 } from "./task.validation";
 import { ROLES } from "../../common/constants/role.constant";
 import taskAttachmentRoute from "../task-attachments/task-attachment.route";
 import { uploadSingle } from "../../middlewares/upload.middleware";
+import { aiRequestGuardMiddleware } from "../../middlewares/ai-request-guard.middleware";
 
 const router = Router();
 const controller = new TaskController();
@@ -19,6 +21,7 @@ router.get(
   "/analytics",
   authMiddleware,
   requireRole(ROLES.ADMIN, ROLES.LEADER),
+  validate(taskAnalyticsQuerySchema, "query"),
   controller.getAnalytics,
 );
 
@@ -83,6 +86,7 @@ router.post(
   "/:taskId/ai-recommendation",
   authMiddleware,
   requireRole(ROLES.ADMIN, ROLES.LEADER),
+  aiRequestGuardMiddleware,
   controller.getAiRecommendation,
 );
 

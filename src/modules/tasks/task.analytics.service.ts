@@ -14,31 +14,39 @@ function buildDateFilter(dateFrom?: string, dateTo?: string) {
 }
 
 export class TaskAnalyticsService {
-  private async getOverview(taskGroupId?: string, dateFrom?: string, dateTo?: string) {
-    const createdAt = buildDateFilter(dateFrom, dateTo);
+  private async getOverview(
+    taskGroupId?: string,
+    dateFrom?: string,
+    dateTo?: string,
+    createdBy?: string,
+  ) {
+    const deadline = buildDateFilter(dateFrom, dateTo);
 
     const taskWhere: any = { deletedAt: null };
     if (taskGroupId) taskWhere.taskGroupId = taskGroupId;
-    if (createdAt) taskWhere.createdAt = createdAt;
+    if (deadline) taskWhere.deadline = deadline;
+    if (createdBy) taskWhere.createdBy = createdBy;
 
     const assignmentWhere: any = {
       task: { deletedAt: null },
-      intern: { deletedAt: null },
     };
     if (taskGroupId) {
       assignmentWhere.task = { deletedAt: null, taskGroupId: taskGroupId };
     }
-    if (createdAt) {
-      assignmentWhere.task = { ...assignmentWhere.task, createdAt };
+    if (deadline) {
+      assignmentWhere.task = { ...assignmentWhere.task, deadline };
+    }
+    if (createdBy) {
+      assignmentWhere.task = { ...assignmentWhere.task, createdBy };
     }
 
     // Overdue: deadline < now AND not done (assignment status != DONE)
     const overdueWhere: any = {
       deletedAt: null,
-      deadline: { lt: new Date() },
+      deadline: { ...deadline, lt: new Date() },
     };
     if (taskGroupId) overdueWhere.taskGroupId = taskGroupId;
-    if (createdAt) overdueWhere.createdAt = createdAt;
+    if (createdBy) overdueWhere.createdBy = createdBy;
     // Exclude tasks that are already done
     overdueWhere.NOT = { assignment: { status: "DONE" } };
 
@@ -78,6 +86,7 @@ export class TaskAnalyticsService {
     taskGroupId?: string,
     dateFrom?: string,
     dateTo?: string,
+    createdBy?: string,
   ) {
     let queryConditions = `t.deleted_at IS NULL AND i.deleted_at IS NULL`;
     const queryParams: any[] = [];
@@ -89,12 +98,17 @@ export class TaskAnalyticsService {
 
     if (dateFrom) {
       queryParams.push(new Date(dateFrom));
-      queryConditions += ` AND t.created_at >= $${queryParams.length}::timestamp`;
+      queryConditions += ` AND t.deadline >= $${queryParams.length}::timestamp`;
     }
 
     if (dateTo) {
       queryParams.push(new Date(dateTo));
-      queryConditions += ` AND t.created_at <= $${queryParams.length}::timestamp`;
+      queryConditions += ` AND t.deadline <= $${queryParams.length}::timestamp`;
+    }
+
+    if (createdBy) {
+      queryParams.push(createdBy);
+      queryConditions += ` AND t.created_by = $${queryParams.length}::uuid`;
     }
 
     const rows = await prisma.$queryRawUnsafe<any[]>(
@@ -159,6 +173,7 @@ export class TaskAnalyticsService {
     taskGroupId?: string,
     dateFrom?: string,
     dateTo?: string,
+    createdBy?: string,
   ) {
     let queryConditions = `t.deleted_at IS NULL AND t.phase IS NOT NULL`;
     const queryParams: any[] = [];
@@ -170,12 +185,17 @@ export class TaskAnalyticsService {
 
     if (dateFrom) {
       queryParams.push(new Date(dateFrom));
-      queryConditions += ` AND t.created_at >= $${queryParams.length}::timestamp`;
+      queryConditions += ` AND t.deadline >= $${queryParams.length}::timestamp`;
     }
 
     if (dateTo) {
       queryParams.push(new Date(dateTo));
-      queryConditions += ` AND t.created_at <= $${queryParams.length}::timestamp`;
+      queryConditions += ` AND t.deadline <= $${queryParams.length}::timestamp`;
+    }
+
+    if (createdBy) {
+      queryParams.push(createdBy);
+      queryConditions += ` AND t.created_by = $${queryParams.length}::uuid`;
     }
 
     const rows = await prisma.$queryRawUnsafe<any[]>(
@@ -208,11 +228,12 @@ export class TaskAnalyticsService {
     taskGroupId?: string,
     dateFrom?: string,
     dateTo?: string,
+    createdBy?: string,
   ): Promise<TaskAnalyticsDto> {
     const [overview, workloadByIntern, progressByPhase] = await Promise.all([
-      this.getOverview(taskGroupId, dateFrom, dateTo),
-      this.getWorkloadByIntern(taskGroupId, dateFrom, dateTo),
-      this.getProgressByPhase(taskGroupId, dateFrom, dateTo),
+      this.getOverview(taskGroupId, dateFrom, dateTo, createdBy),
+      this.getWorkloadByIntern(taskGroupId, dateFrom, dateTo, createdBy),
+      this.getProgressByPhase(taskGroupId, dateFrom, dateTo, createdBy),
     ]);
 
     return { overview, workloadByIntern, progressByPhase };

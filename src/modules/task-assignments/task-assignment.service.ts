@@ -348,6 +348,7 @@ export class TaskAssignmentService {
 
     const result = await this.repository.update(id, {
       status: AssignmentStatus.BLOCKED,
+      blockedReason: "Yêu cầu giao việc xuyên team đã bị Leader từ chối.",
     });
 
     await NotificationDispatcher.dispatch(
@@ -387,16 +388,24 @@ export class TaskAssignmentService {
     }
 
     if (actorRole === ROLES.INTERN) {
-      const canStartOwnAssignment =
+      const isOwnStatusOnlyUpdate =
         assignment.intern?.userId === actorId &&
         data.internId === undefined &&
+        data.internEmail === undefined;
+      const canStartOwnAssignment =
+        isOwnStatusOnlyUpdate &&
         data.status === AssignmentStatus.IN_PROGRESS &&
-        (assignment.status === AssignmentStatus.TODO ||
-          assignment.status === AssignmentStatus.BLOCKED);
+        assignment.status === AssignmentStatus.TODO &&
+        data.blockedReason === undefined;
+      const canBlockOwnAssignment =
+        isOwnStatusOnlyUpdate &&
+        data.status === AssignmentStatus.BLOCKED &&
+        assignment.status === AssignmentStatus.IN_PROGRESS &&
+        data.blockedReason !== undefined;
 
-      if (!canStartOwnAssignment) {
+      if (!canStartOwnAssignment && !canBlockOwnAssignment) {
         throw new AppError(
-          "Intern can only start their own TODO or BLOCKED assignment",
+          "Intern can only start their own TODO assignment or block their own IN_PROGRESS assignment",
           403,
           ERROR_CODE.FORBIDDEN,
         );
@@ -492,13 +501,18 @@ export class TaskAssignmentService {
     if (data.status !== undefined && data.status !== assignment.status) {
       changes.push(`cập nhật trạng thái thành ${data.status}`);
     }
+    if (data.status === AssignmentStatus.BLOCKED && data.blockedReason) {
+      changes.push(`lý do bị chặn: ${data.blockedReason}`);
+    }
 
     if (changes.length > 0) {
       await this.activityLogService.log(
         actorId,
         ACTIVITY_ACTIONS.UPDATE_ASSIGNMENT,
         actorRole === ROLES.INTERN
-          ? `Intern "${assignment.intern?.fullName ?? assignment.internId}" đã bắt đầu công việc "${assignment.task.title}"`
+          ? data.status === AssignmentStatus.BLOCKED
+            ? `Intern "${assignment.intern?.fullName ?? assignment.internId}" đã báo công việc "${assignment.task.title}" bị chặn: ${data.blockedReason}`
+            : `Intern "${assignment.intern?.fullName ?? assignment.internId}" đã bắt đầu công việc "${assignment.task.title}"`
           : `Leader đã cập nhật phân công công việc "${assignment.task.title}": ${changes.join(", ")}`,
         result.id,
         "TaskAssignment",

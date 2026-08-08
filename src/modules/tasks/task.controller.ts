@@ -8,6 +8,7 @@ import { TaskAllocationService } from "./task-allocation.service";
 import { TaskQueryDto, CreateTaskDto, UpdateTaskDto } from "./task.dto";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
+import { ROLES } from "../../common/constants/role.constant";
 
 export class TaskController {
   private readonly service = new TaskService();
@@ -20,7 +21,7 @@ export class TaskController {
       const query = req.query as unknown as TaskQueryDto;
 
       // LEADER chỉ được xem task do chính họ tạo ra
-      if (req.user.role === "LEADER") {
+      if (req.user.role === ROLES.LEADER) {
         query.createdBy = req.user.id;
       }
 
@@ -156,7 +157,13 @@ export class TaskController {
       const taskGroupId = (req.query.taskGroupId || req.body.taskGroupId) as string | undefined;
       const dateFrom = req.query.dateFrom as string | undefined;
       const dateTo = req.query.dateTo as string | undefined;
-      const result = await this.analyticsService.getAll(taskGroupId, dateFrom, dateTo);
+      const createdBy = req.user.role === ROLES.LEADER ? req.user.id : undefined;
+      const result = await this.analyticsService.getAll(
+        taskGroupId,
+        dateFrom,
+        dateTo,
+        createdBy,
+      );
       res.json({ success: true, data: result });
     } catch (error) {
       next(error);

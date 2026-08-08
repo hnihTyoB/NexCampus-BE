@@ -9,8 +9,12 @@ export const findAllTaskSchema = z.object({
   phase: z.string().optional(),
   module: z.string().optional(),
   taskGroupId: z.string().uuid().optional(),
-  status: z.string().optional(),
-  statusNot: z.string().optional(),
+  status: z
+    .enum(["PENDING_APPROVAL", "TODO", "IN_PROGRESS", "REVIEW", "DONE", "BLOCKED"])
+    .optional(),
+  statusNot: z
+    .enum(["PENDING_APPROVAL", "TODO", "IN_PROGRESS", "REVIEW", "DONE", "BLOCKED"])
+    .optional(),
   deadlineFrom: z
     .string()
     .refine((v) => !isNaN(Date.parse(v)), { message: "Invalid deadlineFrom" })
@@ -23,6 +27,18 @@ export const findAllTaskSchema = z.object({
   order: z.enum(["asc", "desc"]).optional(),
   page: z.coerce.number().int().positive().optional().default(1),
   limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+});
+
+export const taskAnalyticsQuerySchema = z.object({
+  taskGroupId: z.string().uuid().optional(),
+  dateFrom: z
+    .string()
+    .refine((v) => !isNaN(Date.parse(v)), { message: "Invalid dateFrom" })
+    .optional(),
+  dateTo: z
+    .string()
+    .refine((v) => !isNaN(Date.parse(v)), { message: "Invalid dateTo" })
+    .optional(),
 });
 
 export const createTaskSchema = z.object({

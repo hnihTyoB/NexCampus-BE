@@ -10,6 +10,7 @@ import {
   aiSuggestionSchema,
 } from "./weekly-evaluation.validation";
 import { ROLES } from "../../common/constants/role.constant";
+import { aiRequestGuardMiddleware } from "../../middlewares/ai-request-guard.middleware";
 
 const router = Router();
 const controller = new WeeklyEvaluationController();
@@ -20,6 +21,7 @@ router.post(
   authMiddleware,
   requireRole(ROLES.ADMIN, ROLES.LEADER),
   validate(aiSuggestionSchema),
+  aiRequestGuardMiddleware,
   controller.getAiSuggestion,
 );
 

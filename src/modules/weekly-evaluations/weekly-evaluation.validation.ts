@@ -1,5 +1,22 @@
 import { z } from "zod";
 
+const ratingLevelSchema = z.enum(["TOT", "KHA", "TB", "TBY", "YEU"]);
+
+const evaluationRatingsSchema = z.object({
+  ruleCompliance: ratingLevelSchema,
+  workAttitude: ratingLevelSchema,
+  learningCapacity: ratingLevelSchema,
+  resilience: ratingLevelSchema,
+  communication: ratingLevelSchema,
+  knowledge: ratingLevelSchema,
+  practicalSkills: ratingLevelSchema,
+  foreignLanguage: ratingLevelSchema,
+  teamwork: ratingLevelSchema,
+  creativity: ratingLevelSchema,
+  contentQuality: ratingLevelSchema,
+  progressDelivery: ratingLevelSchema,
+});
+
 export const findAllWeeklyEvaluationSchema = z.object({
   internId: z.string().uuid().optional(),
   leaderId: z.string().uuid().optional(),
@@ -18,8 +35,10 @@ export const createWeeklyEvaluationSchema = z.object({
   learning: z.number().min(0).max(10),
   coding: z.number().min(0).max(10),
   comment: z.string().max(2000).optional(),
+  ratings: evaluationRatingsSchema.optional(),
 
   // AI fields tuỳ chọn — gửi kèm khi Leader lưu sau khi xem AI gợi ý
+  aiRatings: evaluationRatingsSchema.optional(),
   aiCommunication: z.number().min(0).max(10).optional(),
   aiAttitude: z.number().min(0).max(10).optional(),
   aiLearning: z.number().min(0).max(10).optional(),
@@ -33,6 +52,7 @@ export const updateWeeklyEvaluationSchema = z.object({
   learning: z.number().min(0).max(10).optional(),
   coding: z.number().min(0).max(10).optional(),
   comment: z.string().max(2000).nullable().optional(),
+  ratings: evaluationRatingsSchema.optional(),
 });
 
 // ─── AI Suggestion ──────────────────────────────────────────────────────────

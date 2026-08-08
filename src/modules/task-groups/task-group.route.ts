@@ -9,6 +9,7 @@ import {
   updateTaskGroupSchema,
 } from "./task-group.validation";
 import { ROLES } from "../../common/constants/role.constant";
+import { aiRequestGuardMiddleware } from "../../middlewares/ai-request-guard.middleware";
 
 const router = Router();
 const controller = new TaskGroupController();
@@ -44,6 +45,7 @@ router.post(
   "/:id/ai-recommendation",
   authMiddleware,
   requireRole(ROLES.ADMIN, ROLES.LEADER),
+  aiRequestGuardMiddleware,
   controller.getAiRecommendation,
 );
 
