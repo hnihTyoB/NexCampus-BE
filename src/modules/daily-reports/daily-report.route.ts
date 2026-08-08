@@ -49,6 +49,18 @@ router.post(
   uploadSingle("video", "reportVideo"),
   controller.uploadVideo,
 );
+router.get(
+  "/:id/video/upload-url",
+  authMiddleware,
+  requireRole(ROLES.INTERN),
+  controller.getVideoPutUrl,
+);
+router.post(
+  "/:id/video/confirm",
+  authMiddleware,
+  requireRole(ROLES.INTERN),
+  controller.confirmVideoUpload,
+);
 router.delete(
   "/:id",
   authMiddleware,

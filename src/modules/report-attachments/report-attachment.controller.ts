@@ -60,4 +60,64 @@ export class ReportAttachmentController {
       next(error);
     }
   };
+
+  getPutUrl = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { reportId } = req.params;
+      const { fileName, mimeType, fileSize } = req.query as {
+        fileName?: string;
+        mimeType?: string;
+        fileSize?: string;
+      };
+      if (!fileName || !mimeType || !fileSize) {
+        throw new AppError(
+          "fileName, mimeType, fileSize query params are required",
+          400,
+          ERROR_CODE.VALIDATION_ERROR,
+        );
+      }
+      const result = await this.service.getPutUrl(
+        reportId,
+        fileName,
+        mimeType,
+        parseInt(fileSize, 10),
+        req.user.id,
+        req.user.role,
+      );
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  confirmUpload = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { reportId } = req.params;
+      const { filePath, fileName, mimeType, fileSize } = req.body as {
+        filePath?: string;
+        fileName?: string;
+        mimeType?: string;
+        fileSize?: number;
+      };
+      if (!filePath || !fileName || !mimeType || fileSize === undefined) {
+        throw new AppError(
+          "filePath, fileName, mimeType, fileSize are required",
+          400,
+          ERROR_CODE.VALIDATION_ERROR,
+        );
+      }
+      const result = await this.service.confirmUpload(
+        reportId,
+        filePath,
+        fileName,
+        mimeType,
+        fileSize,
+        req.user.id,
+        req.user.role,
+      );
+      res.status(201).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

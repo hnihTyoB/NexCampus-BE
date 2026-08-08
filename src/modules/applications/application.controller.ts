@@ -8,6 +8,8 @@ import {
   CreateInviteDto,
   GetApplicationInvitesQuery,
 } from "./application.dto";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODE } from "../../common/errors/error-code";
 
 export class ApplicationController {
   private readonly service = new ApplicationService();
@@ -140,6 +142,33 @@ export class ApplicationController {
     try {
       const result = await this.service.getInviteById(req.params.id);
 
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getAttachmentPutUrl = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { token, fileName, mimeType, fileSize } = req.query as {
+        token?: string;
+        fileName?: string;
+        mimeType?: string;
+        fileSize?: string;
+      };
+      if (!token || !fileName || !mimeType || !fileSize) {
+        throw new AppError(
+          "token, fileName, mimeType, fileSize query params are required",
+          400,
+          ERROR_CODE.VALIDATION_ERROR,
+        );
+      }
+      const result = await this.service.getApplicationAttachmentPutUrl(
+        token,
+        fileName,
+        mimeType,
+        parseInt(fileSize, 10),
+      );
       res.json({ success: true, data: result });
     } catch (error) {
       next(error);

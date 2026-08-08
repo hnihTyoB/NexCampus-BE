@@ -45,7 +45,15 @@ router.patch(
   controller.revokeInvite,
 );
 
-router.post("/", uploadMultiple("files", 5, "application"), validate(createApplicationSchema), controller.create);
+router.get(
+  "/attachments/upload-url",
+  controller.getAttachmentPutUrl,
+);
+router.post(
+  "/",
+  validate(createApplicationSchema),
+  controller.create,
+);
 router.get(
   "/",
   authMiddleware,

@@ -97,6 +97,16 @@ export const createApplicationSchema = z.object({
       message: "You must accept the regulations to submit the application",
     })
   ),
+  uploadedFiles: z
+    .array(
+      z.object({
+        fileName: z.string().min(1),
+        filePath: z.string().min(1),
+        mimeType: z.string().min(1),
+        fileSize: z.number().int().positive(),
+      })
+    )
+    .optional(),
 }).superRefine((data, ctx) => {
   if (!isValidApplicationPreference(data.preferredDepartment, data.preferredPosition)) {
     ctx.addIssue({
