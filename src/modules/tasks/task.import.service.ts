@@ -507,28 +507,30 @@ export class TaskImportService {
               ? mappedStatus ?? ASSIGNMENT_STATUS.TODO
               : ASSIGNMENT_STATUS.TODO;
 
-            if (existingAssignment) {
-              await tx.taskAssignment.update({
-                where: { id: existingAssignment.id },
-                data: {
-                  internId: ownerInternId,
-                  supportId: supportInternId,
-                  status: importedStatus as any,
-                },
-              });
-            } else {
-              await tx.taskAssignment.create({
-                data: {
-                  taskId,
-                  internId: ownerInternId,
-                  supportId: supportInternId,
-                  assignedBy: createdBy,
-                  status: importedStatus as any,
-                },
-              });
-              importedAssignments++;
+            if (ownerInternId) {
+              if (existingAssignment) {
+                await tx.taskAssignment.update({
+                  where: { id: existingAssignment.id },
+                  data: {
+                    internId: ownerInternId,
+                    supportId: supportInternId,
+                    status: importedStatus as any,
+                  },
+                });
+              } else {
+                await tx.taskAssignment.create({
+                  data: {
+                    taskId,
+                    internId: ownerInternId,
+                    supportId: supportInternId,
+                    assignedBy: createdBy,
+                    status: importedStatus as any,
+                  },
+                });
+                importedAssignments++;
+              }
 
-              if (ownerInternId && row.ownerEmail && importedStatus === ASSIGNMENT_STATUS.TODO) {
+              if (row.ownerEmail && importedStatus === ASSIGNMENT_STATUS.TODO) {
                 const ownerIntern = internsByEmailMap.get(row.ownerEmail.toLowerCase());
                 if (ownerIntern) {
                   notificationsToDispatch.push({
@@ -537,6 +539,12 @@ export class TaskImportService {
                     deadline: new Date(row.deadline).toLocaleDateString("vi-VN"),
                   });
                 }
+              }
+            } else {
+              if (existingAssignment) {
+                await tx.taskAssignment.delete({
+                  where: { id: existingAssignment.id },
+                });
               }
             }
           } catch (err) {
