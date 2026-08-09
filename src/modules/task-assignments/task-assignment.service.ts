@@ -123,7 +123,7 @@ export class TaskAssignmentService {
     return this.repository.findAll(query);
   }
 
-  async findById(id: string) {
+  async findById(id: string, user?: UserPayload) {
     const assignment = await this.repository.findById(id);
 
     if (!assignment) {
@@ -132,6 +132,31 @@ export class TaskAssignmentService {
         404,
         ERROR_CODE.NOT_FOUND,
       );
+    }
+
+    if (user && user.role !== ROLES.ADMIN) {
+      if (user.role === ROLES.INTERN) {
+        const intern = await this.internRepository.findByUserId(user.id);
+        const isOwner = intern && assignment.internId === intern.id;
+        const isSupport = intern && assignment.supportId === intern.id;
+        if (!isOwner && !isSupport) {
+          throw new AppError(
+            "You are not authorized to view this assignment",
+            403,
+            ERROR_CODE.FORBIDDEN,
+          );
+        }
+      } else if (user.role === ROLES.LEADER) {
+        const isAssigner = assignment.assignedBy === user.id;
+        const isLeader = assignment.intern?.leaderId === user.id;
+        if (!isAssigner && !isLeader) {
+          throw new AppError(
+            "You are not authorized to view this assignment",
+            403,
+            ERROR_CODE.FORBIDDEN,
+          );
+        }
+      }
     }
 
     return assignment;

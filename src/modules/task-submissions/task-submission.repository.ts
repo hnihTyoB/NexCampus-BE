@@ -25,6 +25,7 @@ const defaultSelect = {
       id: true,
       taskId: true,
       internId: true,
+      supportId: true,
       assignedBy: true,
       status: true,
       assignedAt: true,

@@ -1,6 +1,7 @@
 import { WeeklyEvaluationRepository } from "./weekly-evaluation.repository";
 import { WeeklyEvaluationAiService } from "./weekly-evaluation.ai.service";
 import { InternRepository } from "../interns/intern.repository";
+import { prisma } from "../../database/prisma.client";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import {
@@ -118,7 +119,7 @@ export class WeeklyEvaluationService {
     return this.repository.findAll(query);
   }
 
-  async findById(id: string) {
+  async findById(id: string, user?: UserPayload) {
     const evaluation = await this.repository.findById(id);
 
     if (!evaluation) {
@@ -127,6 +128,36 @@ export class WeeklyEvaluationService {
         404,
         ERROR_CODE.NOT_FOUND,
       );
+    }
+
+    if (user && user.role !== ROLES.ADMIN) {
+      if (user.role === ROLES.INTERN) {
+        const intern = await this.internRepository.findByUserId(user.id);
+        if (!intern || evaluation.internId !== intern.id) {
+          throw new AppError(
+            "You are not authorized to view this evaluation",
+            403,
+            ERROR_CODE.FORBIDDEN,
+          );
+        }
+      } else if (user.role === ROLES.LEADER) {
+        const isDirectLeader = evaluation.intern.leaderId === user.id || evaluation.leaderId === user.id;
+        const leaderProfile = await prisma.leader.findUnique({
+          where: { userId: user.id },
+          include: { departments: true },
+        });
+        const inLeaderDepartment = leaderProfile?.departments.some(
+          (d) => d.departmentId === evaluation.intern.department?.id,
+        );
+
+        if (!isDirectLeader && !inLeaderDepartment) {
+          throw new AppError(
+            "You are not authorized to view this evaluation",
+            403,
+            ERROR_CODE.FORBIDDEN,
+          );
+        }
+      }
     }
 
     return evaluation;
