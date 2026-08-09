@@ -51,6 +51,7 @@ export class TaskAssignmentService {
   private async ensureInternCapacity(
     internId: string,
     task: { id: string; title: string; estDays: number | null },
+    role: "OWNER" | "SUPPORT" = "OWNER",
     excludeAssignmentId?: string,
   ) {
     const [taskWithLimits, activeAssignments] = await Promise.all([
@@ -87,7 +88,8 @@ export class TaskAssignmentService {
           ? days
           : days * SUPPORT_WORKLOAD_FACTOR);
     }, 0);
-    const taskDays = task.estDays ?? DEFAULT_TASK_DAYS;
+    const factor = role === "OWNER" ? 1 : SUPPORT_WORKLOAD_FACTOR;
+    const taskDays = (task.estDays ?? DEFAULT_TASK_DAYS) * factor;
     const nextWorkloadDays = currentWorkloadDays + taskDays;
     const nextActiveTaskCount = activeAssignments.length + 1;
 
@@ -226,7 +228,27 @@ export class TaskAssignmentService {
       );
     }
 
-    await this.ensureInternCapacity(data.internId, task);
+    await this.ensureInternCapacity(data.internId, task, "OWNER");
+
+    if (data.supportId) {
+      const supportIntern = await this.internRepository.findById(data.supportId);
+      if (!supportIntern) {
+        throw new AppError("Support Intern profile not found", 404, ERROR_CODE.NOT_FOUND);
+      }
+      if (supportIntern.status !== "ACTIVE" || !supportIntern.user.isActive) {
+        throw new AppError("Support Intern is not active", 400, ERROR_CODE.VALIDATION_ERROR);
+      }
+      if (task.taskGroup && task.taskGroup.departmentId) {
+        if (supportIntern.department?.id !== task.taskGroup.departmentId) {
+          throw new AppError(
+            "Support Intern must belong to the same department as the task group",
+            400,
+            ERROR_CODE.VALIDATION_ERROR,
+          );
+        }
+      }
+      await this.ensureInternCapacity(data.supportId, task, "SUPPORT");
+    }
 
     // 5. Determine approval workflow status
     let status: AssignmentStatus = AssignmentStatus.TODO;
@@ -315,6 +337,7 @@ export class TaskAssignmentService {
     await this.ensureInternCapacity(
       assignment.intern.id,
       assignment.task,
+      "OWNER",
       assignment.id,
     );
 
@@ -509,8 +532,45 @@ export class TaskAssignmentService {
         await this.ensureInternCapacity(
           data.internId,
           assignment.task,
+          "OWNER",
           assignment.id,
         );
+      }
+    }
+
+    if (data.supportId !== undefined) {
+      if (data.supportId) {
+        const supportIntern = await this.internRepository.findById(data.supportId);
+        if (!supportIntern) {
+          throw new AppError("Support Intern profile not found", 404, ERROR_CODE.NOT_FOUND);
+        }
+        if (supportIntern.status !== "ACTIVE" || !supportIntern.user.isActive) {
+          throw new AppError("Support Intern is not active", 400, ERROR_CODE.VALIDATION_ERROR);
+        }
+        if (assignment.task.taskGroup && assignment.task.taskGroup.departmentId) {
+          if (supportIntern.department?.id !== assignment.task.taskGroup.departmentId) {
+            throw new AppError(
+              "Support Intern must belong to the same department as the task group",
+              400,
+              ERROR_CODE.VALIDATION_ERROR,
+            );
+          }
+        }
+        if (new Date(assignment.task.deadline) < new Date()) {
+          throw new AppError(
+            "Task past deadline cannot be reassigned",
+            400,
+            ERROR_CODE.VALIDATION_ERROR,
+          );
+        }
+        if (data.supportId !== assignment.supportId) {
+          await this.ensureInternCapacity(
+            data.supportId,
+            assignment.task,
+            "SUPPORT",
+            assignment.id,
+          );
+        }
       }
     }
 

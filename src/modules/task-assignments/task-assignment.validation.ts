@@ -26,6 +26,7 @@ export const createAssignmentSchema = z.object({
   taskId: z.string().uuid(),
   internId: z.string().uuid(),
   internEmail: z.string().trim().email("Invalid intern email").max(255).optional(),
+  supportId: z.string().uuid().nullable().optional(),
 });
 
 export const assignTaskSchema = createAssignmentSchema.omit({ taskId: true });
@@ -44,6 +45,7 @@ export const updateAssignmentSchema = z
     blockedReason: z.string().trim().min(1).max(2000).optional(),
     internId: z.string().uuid().optional(),
     internEmail: z.string().trim().email("Invalid intern email").max(255).optional(),
+    supportId: z.string().uuid().nullable().optional(),
   })
   .refine((data) => data.status !== undefined || data.internId !== undefined, {
     message:

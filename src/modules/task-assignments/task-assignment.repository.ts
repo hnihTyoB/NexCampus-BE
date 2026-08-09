@@ -158,6 +158,7 @@ export class TaskAssignmentRepository {
       data: {
         taskId: data.taskId,
         internId: data.internId,
+        supportId: data.supportId || null,
         assignedBy,
         ...(status ? { status } : {}),
       },
@@ -176,6 +177,7 @@ export class TaskAssignmentRepository {
             ? { blockedReason: null }
             : {}),
         ...(data.internId !== undefined ? { internId: data.internId } : {}),
+        ...(data.supportId !== undefined ? { supportId: data.supportId } : {}),
       },
       select: defaultSelect,
     });
