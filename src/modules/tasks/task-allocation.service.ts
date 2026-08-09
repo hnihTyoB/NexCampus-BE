@@ -326,19 +326,31 @@ export class TaskAllocationService {
       },
     });
 
-    // Thêm completed assignments từ internId
-    const completedAssignmentsByIntern = await Promise.all(
-      rawInterns.map((intern) =>
-        prisma.taskAssignment.findMany({
-          where: {
-            internId: intern.id,
-            status: "DONE",
-            task: { deletedAt: null },
-          },
-          select: { task: { select: { module: true, phase: true } } },
-        }),
-      ),
-    );
+    // Thêm completed assignments từ internId bằng một câu truy vấn duy nhất để tránh N+1 Query
+    const completedAssignments = await prisma.taskAssignment.findMany({
+      where: {
+        internId: { in: rawInterns.map((intern) => intern.id) },
+        status: "DONE",
+        task: { deletedAt: null },
+      },
+      select: {
+        internId: true,
+        task: { select: { module: true, phase: true } },
+      },
+    });
+
+    const completedMap = new Map<string, Array<{ task: { module: string | null; phase: string | null } }>>();
+    for (const assignment of completedAssignments) {
+      if (!assignment.internId) continue;
+      let list = completedMap.get(assignment.internId);
+      if (!list) {
+        list = [];
+        completedMap.set(assignment.internId, list);
+      }
+      list.push(assignment);
+    }
+
+    const completedAssignmentsByIntern = rawInterns.map((intern) => completedMap.get(intern.id) ?? []);
 
     if (rawInterns.length === 0) {
       throw new AppError(
@@ -685,19 +697,31 @@ export class TaskAllocationService {
       throw new AppError(msg, 422, ERROR_CODE.VALIDATION_ERROR);
     }
 
-    // 4. Completed assignments
-    const completedAssignmentsByIntern = await Promise.all(
-      rawInterns.map((intern) =>
-        prisma.taskAssignment.findMany({
-          where: {
-            internId: intern.id,
-            status: "DONE",
-            task: { deletedAt: null },
-          },
-          select: { task: { select: { module: true, phase: true } } },
-        }),
-      ),
-    );
+    // Thêm completed assignments từ internId bằng một câu truy vấn duy nhất để tránh N+1 Query
+    const completedAssignments = await prisma.taskAssignment.findMany({
+      where: {
+        internId: { in: rawInterns.map((intern) => intern.id) },
+        status: "DONE",
+        task: { deletedAt: null },
+      },
+      select: {
+        internId: true,
+        task: { select: { module: true, phase: true } },
+      },
+    });
+
+    const completedMap = new Map<string, Array<{ task: { module: string | null; phase: string | null } }>>();
+    for (const assignment of completedAssignments) {
+      if (!assignment.internId) continue;
+      let list = completedMap.get(assignment.internId);
+      if (!list) {
+        list = [];
+        completedMap.set(assignment.internId, list);
+      }
+      list.push(assignment);
+    }
+
+    const completedAssignmentsByIntern = rawInterns.map((intern) => completedMap.get(intern.id) ?? []);
 
     // 5. Enrich base candidates
     const baseCandidates: InternCandidateRaw[] = rawInterns.map((intern, idx) => {

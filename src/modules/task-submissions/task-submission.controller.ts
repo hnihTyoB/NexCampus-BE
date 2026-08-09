@@ -24,7 +24,7 @@ export class TaskSubmissionController {
 
   findById = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const result = await this.service.findById(req.params.id);
+      const result = await this.service.findById(req.params.id, req.user);
 
       res.json({ success: true, data: result });
     } catch (error) {

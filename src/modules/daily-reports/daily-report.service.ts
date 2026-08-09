@@ -6,6 +6,7 @@ import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import { StorageService } from "../../common/services/storage.service";
 import { storageConfig } from "../../config/storage.config";
+import { prisma } from "../../database/prisma.client";
 import {
   DailyReportQueryDto,
   CreateDailyReportDto,
@@ -42,11 +43,41 @@ export class DailyReportService {
     return this.repository.findAll(query);
   }
 
-  async findById(id: string) {
+  async findById(id: string, user?: UserPayload) {
     const report = await this.repository.findById(id);
 
     if (!report) {
       throw new AppError("Daily report not found", 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    if (user && user.role !== ROLES.ADMIN) {
+      if (user.role === ROLES.INTERN) {
+        const intern = await this.internRepository.findByUserId(user.id);
+        if (!intern || report.internId !== intern.id) {
+          throw new AppError(
+            "You are not authorized to view this report",
+            403,
+            ERROR_CODE.FORBIDDEN,
+          );
+        }
+      } else if (user.role === ROLES.LEADER) {
+        const isDirectLeader = report.intern.leaderId === user.id;
+        const leaderProfile = await prisma.leader.findUnique({
+          where: { userId: user.id },
+          include: { departments: true },
+        });
+        const inLeaderDepartment = leaderProfile?.departments.some(
+          (d) => d.departmentId === report.intern.department?.id,
+        );
+
+        if (!isDirectLeader && !inLeaderDepartment) {
+          throw new AppError(
+            "You are not authorized to view this report",
+            403,
+            ERROR_CODE.FORBIDDEN,
+          );
+        }
+      }
     }
 
     return report;
