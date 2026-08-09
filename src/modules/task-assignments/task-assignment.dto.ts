@@ -16,6 +16,7 @@ export interface CreateTaskAssignmentDto {
   taskId: string;
   internId: string;
   internEmail?: string;
+  supportId?: string;
 }
 
 export type AssignTaskDto = Omit<CreateTaskAssignmentDto, "taskId">;
@@ -25,4 +26,5 @@ export interface UpdateTaskAssignmentDto {
   blockedReason?: string;
   internId?: string;
   internEmail?: string;
+  supportId?: string | null;
 }
