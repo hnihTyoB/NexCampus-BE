@@ -41,7 +41,7 @@ export async function scheduleStorageCleanupJob() {
     "cleanup",
     {},
     {
-      repeat: { pattern: cronExpression },
+      repeat: { pattern: cronExpression, tz: cronConfig.timezone },
     },
   );
 
