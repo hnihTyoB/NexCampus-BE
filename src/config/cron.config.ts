@@ -1,6 +1,7 @@
 import { envConfig } from "./env.config";
 
 export const cronConfig = {
+  timezone: process.env.CRON_TZ || "Asia/Ho_Chi_Minh",
   storageCleanup: {
     retentionDays: envConfig.storageCleanup.retentionDays,
     cronExpression: envConfig.storageCleanup.cronExpression,
@@ -12,3 +13,4 @@ export const cronConfig = {
 };
 
 export default cronConfig;
+

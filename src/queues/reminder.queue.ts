@@ -39,7 +39,7 @@ export async function scheduleReminderJob() {
     "send-reminders",
     {},
     {
-      repeat: { pattern: cronExpression },
+      repeat: { pattern: cronExpression, tz: cronConfig.timezone },
     },
   );
 
