@@ -208,13 +208,16 @@ export class TaskAssignmentService {
     }
 
     // 3b. Check Department matching
-    if (task.taskGroup && task.taskGroup.departmentId) {
-      if (intern.department?.id !== task.taskGroup.departmentId) {
-        throw new AppError(
-          "Intern must belong to the same department as the task group",
-          400,
-          ERROR_CODE.VALIDATION_ERROR,
-        );
+    const isCrossTeam = intern.leaderId !== assignedBy;
+    if (!isCrossTeam) {
+      if (task.taskGroup && task.taskGroup.departmentId) {
+        if (intern.department?.id !== task.taskGroup.departmentId) {
+          throw new AppError(
+            "Intern must belong to the same department as the task group",
+            400,
+            ERROR_CODE.VALIDATION_ERROR,
+          );
+        }
       }
     }
 
@@ -238,13 +241,16 @@ export class TaskAssignmentService {
       if (supportIntern.status !== "ACTIVE" || !supportIntern.user.isActive) {
         throw new AppError("Support Intern is not active", 400, ERROR_CODE.VALIDATION_ERROR);
       }
-      if (task.taskGroup && task.taskGroup.departmentId) {
-        if (supportIntern.department?.id !== task.taskGroup.departmentId) {
-          throw new AppError(
-            "Support Intern must belong to the same department as the task group",
-            400,
-            ERROR_CODE.VALIDATION_ERROR,
-          );
+      const isSupportCrossTeam = supportIntern.leaderId !== assignedBy;
+      if (!isSupportCrossTeam) {
+        if (task.taskGroup && task.taskGroup.departmentId) {
+          if (supportIntern.department?.id !== task.taskGroup.departmentId) {
+            throw new AppError(
+              "Support Intern must belong to the same department as the task group",
+              400,
+              ERROR_CODE.VALIDATION_ERROR,
+            );
+          }
         }
       }
       await this.ensureInternCapacity(data.supportId, task, "SUPPORT");
@@ -509,13 +515,16 @@ export class TaskAssignmentService {
       }
 
       // Check Task Department Match
-      if (assignment.task.taskGroup && assignment.task.taskGroup.departmentId) {
-        if (intern.department?.id !== assignment.task.taskGroup.departmentId) {
-          throw new AppError(
-            "Intern must belong to the same department as the task group",
-            400,
-            ERROR_CODE.VALIDATION_ERROR,
-          );
+      const isCrossTeam = intern.leaderId !== actorId;
+      if (!isCrossTeam) {
+        if (assignment.task.taskGroup && assignment.task.taskGroup.departmentId) {
+          if (intern.department?.id !== assignment.task.taskGroup.departmentId) {
+            throw new AppError(
+              "Intern must belong to the same department as the task group",
+              400,
+              ERROR_CODE.VALIDATION_ERROR,
+            );
+          }
         }
       }
 
@@ -547,13 +556,16 @@ export class TaskAssignmentService {
         if (supportIntern.status !== "ACTIVE" || !supportIntern.user.isActive) {
           throw new AppError("Support Intern is not active", 400, ERROR_CODE.VALIDATION_ERROR);
         }
-        if (assignment.task.taskGroup && assignment.task.taskGroup.departmentId) {
-          if (supportIntern.department?.id !== assignment.task.taskGroup.departmentId) {
-            throw new AppError(
-              "Support Intern must belong to the same department as the task group",
-              400,
-              ERROR_CODE.VALIDATION_ERROR,
-            );
+        const isSupportCrossTeam = supportIntern.leaderId !== actorId;
+        if (!isSupportCrossTeam) {
+          if (assignment.task.taskGroup && assignment.task.taskGroup.departmentId) {
+            if (supportIntern.department?.id !== assignment.task.taskGroup.departmentId) {
+              throw new AppError(
+                "Support Intern must belong to the same department as the task group",
+                400,
+                ERROR_CODE.VALIDATION_ERROR,
+              );
+            }
           }
         }
         if (new Date(assignment.task.deadline) < new Date()) {
