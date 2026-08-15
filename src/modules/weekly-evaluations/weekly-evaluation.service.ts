@@ -170,14 +170,30 @@ export class WeeklyEvaluationService {
       throw new AppError("Intern profile not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
-    // Validate week number against intern's timeline
-    const start = new Date(intern.startDate);
-    start.setHours(0, 0, 0, 0);
+    const tzOffset = 7 * 60 * 60 * 1000; // Asia/Ho_Chi_Minh is UTC+7
 
+    // Parse start date and calculate midnight in local Vietnam timezone
+    const startLocal = new Date(new Date(intern.startDate).getTime() + tzOffset);
+    const startMidnight = new Date(Date.UTC(
+      startLocal.getUTCFullYear(),
+      startLocal.getUTCMonth(),
+      startLocal.getUTCDate(),
+      0, 0, 0, 0
+    ));
+
+    // Calculate today and midnight in local Vietnam timezone
     const today = new Date();
-    const todayMidnight = new Date(today);
-    todayMidnight.setHours(0, 0, 0, 0);
-    const elapsedWeeks = Math.ceil((todayMidnight.getTime() - start.getTime()) / (7 * 24 * 3600 * 1000));
+    const todayLocal = new Date(today.getTime() + tzOffset);
+    const todayMidnight = new Date(Date.UTC(
+      todayLocal.getUTCFullYear(),
+      todayLocal.getUTCMonth(),
+      todayLocal.getUTCDate(),
+      0, 0, 0, 0
+    ));
+
+    const diffMs = todayMidnight.getTime() - startMidnight.getTime();
+    const diffDays = Math.floor(diffMs / (24 * 3600 * 1000));
+    const elapsedWeeks = Math.floor(diffDays / 7) + 1;
     const maxAllowedWeek = Math.max(1, elapsedWeeks);
 
     if (data.week < 1 || data.week > maxAllowedWeek) {
@@ -189,8 +205,8 @@ export class WeeklyEvaluationService {
     }
 
     if (data.week === maxAllowedWeek) {
-      const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 5 = Friday, 6 = Saturday
-      const hours = today.getHours();
+      const dayOfWeek = todayLocal.getUTCDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+      const hours = todayLocal.getUTCHours();
       const isSaturdayAllowed = dayOfWeek === 6 && hours >= 11;
       const isSundayAllowed = dayOfWeek === 0;
 
@@ -351,13 +367,30 @@ export class WeeklyEvaluationService {
       throw new AppError("Intern profile not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
-    const start = new Date(intern.startDate);
-    start.setHours(0, 0, 0, 0);
+    const tzOffset = 7 * 60 * 60 * 1000; // Asia/Ho_Chi_Minh is UTC+7
 
+    // Parse start date and calculate midnight in local Vietnam timezone
+    const startLocal = new Date(new Date(intern.startDate).getTime() + tzOffset);
+    const startMidnight = new Date(Date.UTC(
+      startLocal.getUTCFullYear(),
+      startLocal.getUTCMonth(),
+      startLocal.getUTCDate(),
+      0, 0, 0, 0
+    ));
+
+    // Calculate today and midnight in local Vietnam timezone
     const today = new Date();
-    const todayMidnight = new Date(today);
-    todayMidnight.setHours(0, 0, 0, 0);
-    const elapsedWeeks = Math.ceil((todayMidnight.getTime() - start.getTime()) / (7 * 24 * 3600 * 1000));
+    const todayLocal = new Date(today.getTime() + tzOffset);
+    const todayMidnight = new Date(Date.UTC(
+      todayLocal.getUTCFullYear(),
+      todayLocal.getUTCMonth(),
+      todayLocal.getUTCDate(),
+      0, 0, 0, 0
+    ));
+
+    const diffMs = todayMidnight.getTime() - startMidnight.getTime();
+    const diffDays = Math.floor(diffMs / (24 * 3600 * 1000));
+    const elapsedWeeks = Math.floor(diffDays / 7) + 1;
     const maxAllowedWeek = Math.max(1, elapsedWeeks);
 
     if (data.week < 1 || data.week > maxAllowedWeek) {
@@ -369,8 +402,8 @@ export class WeeklyEvaluationService {
     }
 
     if (data.week === maxAllowedWeek) {
-      const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 5 = Friday, 6 = Saturday
-      const hours = today.getHours();
+      const dayOfWeek = todayLocal.getUTCDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+      const hours = todayLocal.getUTCHours();
       const isSaturdayAllowed = dayOfWeek === 6 && hours >= 11;
       const isSundayAllowed = dayOfWeek === 0;
 
