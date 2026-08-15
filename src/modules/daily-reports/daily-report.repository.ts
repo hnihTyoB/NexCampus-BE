@@ -58,6 +58,27 @@ const defaultSelect = {
 };
 
 export class DailyReportRepository {
+  private parseLocalDate(dateStr: string, isEnd: boolean): Date {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      const parts = dateStr.split("-").map(Number);
+      if (isEnd) {
+        // End of the day is 23:59:59.999 in Asia/Ho_Chi_Minh timezone,
+        // which corresponds to start of next day (YYYY-MM-(DD+1) 00:00:00 local time),
+        // which is 17:00:00 UTC of current day (YYYY-MM-DD 17:00:00 UTC).
+        return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 17, 0, 0, 0));
+      } else {
+        // Start of the day is 00:00:00 in Asia/Ho_Chi_Minh timezone,
+        // which is 17:00:00 UTC of the previous day (YYYY-MM-(DD-1) 17:00:00 UTC).
+        return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] - 1, 17, 0, 0, 0));
+      }
+    }
+    const date = new Date(dateStr);
+    if (isEnd) {
+      return new Date(date.getTime() + 24 * 60 * 60 * 1000);
+    }
+    return date;
+  }
+
   async findAll(query: DailyReportQueryDto) {
     const {
       internId,
@@ -75,14 +96,8 @@ export class DailyReportRepository {
       ...(createdAtFrom || createdAtTo
         ? {
             createdAt: {
-              ...(createdAtFrom ? { gte: new Date(createdAtFrom) } : {}),
-              ...(createdAtTo
-                ? {
-                    lt: new Date(
-                      new Date(createdAtTo).getTime() + 24 * 60 * 60 * 1000,
-                    ),
-                  }
-                : {}),
+              ...(createdAtFrom ? { gte: this.parseLocalDate(createdAtFrom, false) } : {}),
+              ...(createdAtTo ? { lt: this.parseLocalDate(createdAtTo, true) } : {}),
             },
           }
         : {}),
