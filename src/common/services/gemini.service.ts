@@ -61,7 +61,9 @@ export class GeminiService implements IAiProvider {
           },
         });
 
-        const result = await model.generateContent(prompt);
+        const result = await model.generateContent(prompt, {
+          timeout: 8000, // 8 seconds timeout to fail-fast and allow rotation or fallback
+        });
         const text = result.response.text().trim();
         const cleaned = text
           .replace(/^```(?:json)?\n?/i, "")

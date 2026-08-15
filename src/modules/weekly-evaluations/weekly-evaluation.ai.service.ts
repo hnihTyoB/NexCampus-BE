@@ -32,14 +32,26 @@ export class WeeklyEvaluationAiService {
     startDate: Date,
     week: number,
   ): { from: Date; to: Date } {
-    const dayOffset = (week - 1) * 7;
-    const from = new Date(startDate);
-    from.setDate(from.getDate() + dayOffset);
-    from.setHours(0, 0, 0, 0);
+    const tzOffset = 7 * 60 * 60 * 1000; // Asia/Ho_Chi_Minh is UTC+7
 
-    const to = new Date(from);
-    to.setDate(to.getDate() + 6);
-    to.setHours(23, 59, 59, 999);
+    // Convert startDate to Vietnam local time first
+    const startLocal = new Date(new Date(startDate).getTime() + tzOffset);
+    // Find midnight local Vietnam time for the start date
+    const startMidnightLocal = new Date(Date.UTC(
+      startLocal.getUTCFullYear(),
+      startLocal.getUTCMonth(),
+      startLocal.getUTCDate(),
+      0, 0, 0, 0
+    ));
+
+    // Calculate start of the requested week in Vietnam local time
+    const dayOffset = (week - 1) * 7;
+    const fromLocal = new Date(startMidnightLocal.getTime() + dayOffset * 24 * 3600 * 1000);
+    // Convert back to UTC representation by subtracting offset
+    const from = new Date(fromLocal.getTime() - tzOffset);
+
+    // End of the week is fromLocal + 7 days - 1 ms
+    const to = new Date(from.getTime() + 7 * 24 * 3600 * 1000 - 1);
 
     return { from, to };
   }
