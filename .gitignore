@@ -1,0 +1,61 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build & Compilation outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# AI Agent & Local workspace files
+.agents/local.md
+.agents/scratch/
+scratch/
+
+# Runtime, Storage & Uploads
+storage/exports/*
+!storage/exports/.gitkeep
+storage/uploads/*
+!storage/uploads/.gitkeep
+storage/receipts/*
+!storage/receipts/.gitkeep
+temp/
+tmp/
+*.pid
+*.seed
+*.pid.lock
+
+# Testing & Coverage
+coverage/
+.nyc_output/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.bak
+*.tmp
+
+# IDE & Editor files
+.vscode/
+.claude/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.swo

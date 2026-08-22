@@ -1,0 +1,18 @@
+export const AUDIT_ACTION = {
+  CREATE_ROLE: 'CREATE_ROLE',
+  UPDATE_ROLE: 'UPDATE_ROLE',
+  DELETE_ROLE: 'DELETE_ROLE',
+  SYNC_ROLE_PERMISSIONS: 'SYNC_ROLE_PERMISSIONS',
+  REMOVE_ROLE_PERMISSION: 'REMOVE_ROLE_PERMISSION',
+  ASSIGN_USER_ROLE: 'ASSIGN_USER_ROLE',
+} as const;
+
+export type AuditAction = keyof typeof AUDIT_ACTION;
+
+export const AUDIT_TARGET_TYPE = {
+  ROLE: 'ROLE',
+  USER: 'USER',
+  PERMISSION: 'PERMISSION',
+} as const;
+
+export type AuditTargetType = keyof typeof AUDIT_TARGET_TYPE;

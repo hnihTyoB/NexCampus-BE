@@ -1,0 +1,36 @@
+version: "3.8"
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: app_redis
+    ports:
+      - "${REDIS_PORT:-6381}:6379"
+    restart: unless-stopped
+
+  # app:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: app_server
+  #   restart: unless-stopped
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     NODE_ENV: "${NODE_ENV:-development}"
+  #     PORT: "${PORT:-9999}"
+  #     DATABASE_URL: "${DATABASE_URL}"
+  #     REDIS_HOST: redis
+  #     REDIS_PORT: "6379"
+  #     JWT_ACCESS_SECRET: "${JWT_ACCESS_SECRET:-default_access_secret}"
+  #     JWT_REFRESH_SECRET: "${JWT_REFRESH_SECRET:-default_refresh_secret}"
+  #     JWT_ACCESS_EXPIRES_IN: "${JWT_ACCESS_EXPIRES_IN:-15m}"
+  #     JWT_REFRESH_EXPIRES_IN: "${JWT_REFRESH_EXPIRES_IN:-7d}"
+  #   volumes:
+  #     - ./:/usr/src/app
+  #     - /usr/src/app/node_modules
+  #   ports:
+  #     - "${PORT:-9999}:${PORT:-9999}"
+  #   depends_on:
+  #     - redis
+  #   command: sh -c "corepack enable && pnpm install && pnpm dev"
