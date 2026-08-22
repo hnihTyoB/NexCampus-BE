@@ -17,11 +17,15 @@ export function errorMiddleware(
   next: NextFunction,
 ): void {
   if (error instanceof AppError) {
-    res.status(error.statusCode).json({
+    const payload: Record<string, any> = {
       success: false,
       message: error.message,
       code: error.code,
-    });
+    };
+    if (error.data !== undefined) {
+      payload.data = error.data;
+    }
+    res.status(error.statusCode).json(payload);
     return;
   }
 

@@ -27,6 +27,11 @@ const SYSTEM_PERMISSIONS = [
 
   // Audit Logs
   { name: 'AUDIT_LOG_READ', resource: 'AUDIT_LOG', action: 'READ', description: 'Xem nhật ký kiểm toán hệ thống' },
+
+  // System Maintenance
+  { name: 'MAINTENANCE_READ', resource: 'MAINTENANCE', action: 'READ', description: 'Xem trạng thái và cấu hình bảo trì hệ thống' },
+  { name: 'MAINTENANCE_MANAGE', resource: 'MAINTENANCE', action: 'MANAGE', description: 'Bật/tắt và quản lý lịch bảo trì hệ thống' },
+  { name: 'MAINTENANCE_BYPASS', resource: 'MAINTENANCE', action: 'BYPASS', description: 'Truy cập hệ thống khi đang bật chế độ bảo trì' },
 ];
 
 const USER_BASE_PERMISSIONS: string[] = [
@@ -40,6 +45,7 @@ const MANAGER_PERMISSIONS: string[] = [
   'NOTIFICATION_READ',
   'NOTIFICATION_CREATE',
   'NOTIFICATION_UPDATE',
+  'MAINTENANCE_READ',
   'AUDIT_LOG_READ',
 ];
 
@@ -184,6 +190,22 @@ async function main() {
       isActive: true,
     },
   });
+
+  // 5. Seed Default Maintenance Configuration
+  await prisma.maintenanceConfig.upsert({
+    where: { key: 'DEFAULT' },
+    update: {},
+    create: {
+      key: 'DEFAULT',
+      enabled: false,
+      status: 'ONLINE',
+      title: 'Hệ thống đang bảo trì',
+      message: 'Hệ thống đang được bảo trì để nâng cấp dịch vụ. Vui lòng quay lại sau.',
+      bypassPermissions: ['MAINTENANCE_MANAGE', 'MAINTENANCE_BYPASS'],
+      bypassRoles: ['ADMIN'],
+    },
+  });
+  console.log('MaintenanceConfig default seeded');
 
   console.log('Seed completed successfully');
 }

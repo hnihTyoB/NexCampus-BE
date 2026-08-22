@@ -22,6 +22,11 @@ export const PERMISSIONS = {
 
   // Audit Logs
   AUDIT_LOG_READ: 'AUDIT_LOG_READ',
+
+  // System Maintenance
+  MAINTENANCE_READ: 'MAINTENANCE_READ',
+  MAINTENANCE_MANAGE: 'MAINTENANCE_MANAGE',
+  MAINTENANCE_BYPASS: 'MAINTENANCE_BYPASS',
 } as const;
 
 export type PermissionKey = keyof typeof PERMISSIONS;

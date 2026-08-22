@@ -8,28 +8,28 @@ datasource db {
 }
 
 model User {
-  id          String   @id @default(uuid()) @db.Uuid
-  email       String?  @unique
+  id          String    @id @default(uuid()) @db.Uuid
+  email       String?   @unique
   password    String?
-  fullName    String?  @map("full_name")
-  avatarUrl   String?  @map("avatar_url")
-  phoneNumber String?  @unique @map("phone_number")
+  fullName    String?   @map("full_name")
+  avatarUrl   String?   @map("avatar_url")
+  phoneNumber String?   @unique @map("phone_number")
   isActive    Boolean   @default(false) @map("is_active")
   deletedAt   DateTime? @map("deleted_at")
   deletedBy   String?   @map("deleted_by") @db.Uuid
   roleId      String    @map("role_id") @db.Uuid
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  role               Role                @relation(fields: [roleId], references: [id], onDelete: Restrict)
-  refreshTokens      RefreshToken[]
-  socialAccounts     UserSocial[]
-  verificationTokens VerificationToken[]
+  role                Role                 @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  refreshTokens       RefreshToken[]
+  socialAccounts      UserSocial[]
+  verificationTokens  VerificationToken[]
   passwordResetTokens PasswordResetToken[]
-  devices            UserDevice[]
-  notifications      Notification[]
-  emailNotifications EmailNotification[]
+  devices             UserDevice[]
+  notifications       Notification[]
+  emailNotifications  EmailNotification[]
 
   @@index([roleId])
   @@index([deletedAt])
@@ -64,10 +64,10 @@ model Permission {
 }
 
 model RolePermission {
-  id           String     @id @default(uuid()) @db.Uuid
-  roleId       String     @map("role_id") @db.Uuid
-  permissionId String     @map("permission_id") @db.Uuid
-  createdAt    DateTime   @default(now()) @map("created_at")
+  id           String   @id @default(uuid()) @db.Uuid
+  roleId       String   @map("role_id") @db.Uuid
+  permissionId String   @map("permission_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
 
   role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
   permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
@@ -114,7 +114,7 @@ model RefreshToken {
 model UserSocial {
   id             String   @id @default(uuid()) @db.Uuid
   userId         String   @map("user_id") @db.Uuid
-  provider       String   // "ZALO", "GOOGLE", etc.
+  provider       String // "ZALO", "GOOGLE", etc.
   providerUserId String   @map("provider_user_id")
   createdAt      DateTime @default(now()) @map("created_at")
 
@@ -159,12 +159,11 @@ model UserDevice {
   createdAt   DateTime @default(now()) @map("created_at")
   lastLoginAt DateTime @default(now()) @map("last_login_at")
 
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, deviceHash])
   @@map("user_devices")
 }
-
 
 // ─────────────────────────────────────────────
 // Notification Module
@@ -174,7 +173,7 @@ model UserDevice {
 model Notification {
   id        String    @id @default(uuid()) @db.Uuid
   userId    String    @map("user_id") @db.Uuid
-  type      String    // SYSTEM | ALERT | INFO | SUCCESS | WARNING
+  type      String // SYSTEM | ALERT | INFO | SUCCESS | WARNING
   priority  String    @default("NORMAL") // LOW | NORMAL | HIGH
   title     String
   content   String
@@ -199,7 +198,7 @@ model EmailNotification {
   subject      String
   templateKey  String    @map("template_key") // VERIFY_EMAIL | RESET_PASSWORD | ...
   templateData Json      @map("template_data") // data động cho template
-  status       String    @default("PENDING")   // PENDING | SENT | FAILED
+  status       String    @default("PENDING") // PENDING | SENT | FAILED
   attempts     Int       @default(0)
   lastError    String?   @map("last_error")
   sentAt       DateTime? @map("sent_at")
@@ -211,4 +210,22 @@ model EmailNotification {
   @@index([status, attempts])
   @@index([userId])
   @@map("email_notifications")
+}
+
+model MaintenanceConfig {
+  id                String    @id @default(uuid()) @db.Uuid
+  key               String    @unique @default("DEFAULT")
+  enabled           Boolean   @default(false)
+  status            String    @default("ONLINE") // ONLINE | MAINTENANCE | READ_ONLY
+  title             String    @default("Hệ thống đang bảo trì")
+  message           String    @default("Hệ thống đang được bảo trì để nâng cấp dịch vụ. Vui lòng quay lại sau.")
+  startAt           DateTime? @map("start_at")
+  estimatedEndAt    DateTime? @map("estimated_end_at")
+  bypassPermissions Json      @default("[\"MAINTENANCE_MANAGE\", \"MAINTENANCE_BYPASS\"]") @map("bypass_permissions")
+  bypassRoles       Json      @default("[\"ADMIN\"]") @map("bypass_roles")
+  metadata          Json?
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@map("maintenance_configs")
 }

@@ -1276,5 +1276,166 @@ export const swaggerSpec = {
         },
       },
     },
+    '/maintenance/public': {
+      get: {
+        tags: ['Maintenance'],
+        summary: 'Kiểm tra trạng thái bảo trì hệ thống (Public - không cần đăng nhập)',
+        responses: {
+          200: {
+            description: 'Thông tin trạng thái bảo trì',
+            content: {
+              'application/json': {
+                schema: {
+                  allOf: [
+                    { $ref: '#/components/schemas/SuccessResponse' },
+                    {
+                      type: 'object',
+                      properties: {
+                        data: {
+                          type: 'object',
+                          properties: {
+                            enabled: { type: 'boolean', example: false },
+                            status: { type: 'string', enum: ['ONLINE', 'MAINTENANCE', 'READ_ONLY'], example: 'ONLINE' },
+                            title: { type: 'string', example: 'Hệ thống đang bảo trì' },
+                            message: { type: 'string', example: 'Hệ thống đang được bảo trì để nâng cấp dịch vụ.' },
+                            startAt: { type: 'string', format: 'date-time', nullable: true },
+                            estimatedEndAt: { type: 'string', format: 'date-time', nullable: true },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/maintenance/status': {
+      get: {
+        tags: ['Maintenance'],
+        summary: 'Xem chi tiết cấu hình bảo trì hệ thống (Yêu cầu quyền MAINTENANCE_READ hoặc MAINTENANCE_MANAGE)',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Chi tiết cấu hình bảo trì',
+            content: {
+              'application/json': {
+                schema: {
+                  allOf: [
+                    { $ref: '#/components/schemas/SuccessResponse' },
+                    {
+                      type: 'object',
+                      properties: {
+                        data: {
+                          type: 'object',
+                          properties: {
+                            id: { type: 'string', format: 'uuid' },
+                            key: { type: 'string', example: 'DEFAULT' },
+                            enabled: { type: 'boolean', example: false },
+                            status: { type: 'string', enum: ['ONLINE', 'MAINTENANCE', 'READ_ONLY'] },
+                            title: { type: 'string' },
+                            message: { type: 'string' },
+                            startAt: { type: 'string', format: 'date-time', nullable: true },
+                            estimatedEndAt: { type: 'string', format: 'date-time', nullable: true },
+                            bypassPermissions: { type: 'array', items: { type: 'string' } },
+                            bypassRoles: { type: 'array', items: { type: 'string' } },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+        },
+      },
+    },
+    '/maintenance/enable': {
+      post: {
+        tags: ['Maintenance'],
+        summary: 'Bật chế độ bảo trì hệ thống (Yêu cầu quyền MAINTENANCE_MANAGE)',
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  title: { type: 'string', example: 'Hệ thống đang bảo trì' },
+                  message: { type: 'string', example: 'Bảo trì nâng cấp hạ tầng cơ sở dữ liệu' },
+                  startAt: { type: 'string', format: 'date-time' },
+                  estimatedEndAt: { type: 'string', format: 'date-time' },
+                  status: { type: 'string', enum: ['MAINTENANCE', 'READ_ONLY'], default: 'MAINTENANCE' },
+                  bypassPermissions: { type: 'array', items: { type: 'string' }, example: ['MAINTENANCE_MANAGE', 'MAINTENANCE_BYPASS'] },
+                  bypassRoles: { type: 'array', items: { type: 'string' }, example: ['ADMIN'] },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Đã bật chế độ bảo trì thành công',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/SuccessResponse' } } },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+        },
+      },
+    },
+    '/maintenance/config': {
+      put: {
+        tags: ['Maintenance'],
+        summary: 'Cập nhật cấu hình bảo trì hệ thống (Yêu cầu quyền MAINTENANCE_MANAGE)',
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  enabled: { type: 'boolean' },
+                  status: { type: 'string', enum: ['ONLINE', 'MAINTENANCE', 'READ_ONLY'] },
+                  title: { type: 'string' },
+                  message: { type: 'string' },
+                  startAt: { type: 'string', format: 'date-time', nullable: true },
+                  estimatedEndAt: { type: 'string', format: 'date-time', nullable: true },
+                  bypassPermissions: { type: 'array', items: { type: 'string' } },
+                  bypassRoles: { type: 'array', items: { type: 'string' } },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Đã cập nhật cấu hình bảo trì thành công',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/SuccessResponse' } } },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+        },
+      },
+    },
+    '/maintenance/disable': {
+      post: {
+        tags: ['Maintenance'],
+        summary: 'Tắt chế độ bảo trì hệ thống (Yêu cầu quyền MAINTENANCE_MANAGE)',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Đã tắt chế độ bảo trì thành công',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/SuccessResponse' } } },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+        },
+      },
+    },
   },
 };
