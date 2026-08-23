@@ -1,4 +1,3 @@
-// Loại thông báo — project có thể mở rộng thêm
 export const NOTIFICATION_TYPE = {
   SYSTEM: 'SYSTEM',
   ALERT: 'ALERT',
@@ -9,7 +8,6 @@ export const NOTIFICATION_TYPE = {
 
 export type NotificationType = keyof typeof NOTIFICATION_TYPE;
 
-// Mức độ ưu tiên
 export const NOTIFICATION_PRIORITY = {
   LOW: 'LOW',
   NORMAL: 'NORMAL',
@@ -18,7 +16,6 @@ export const NOTIFICATION_PRIORITY = {
 
 export type NotificationPriority = keyof typeof NOTIFICATION_PRIORITY;
 
-// Kênh gửi thông báo
 export const NOTIFICATION_CHANNEL = {
   WEB: 'WEB',
   EMAIL: 'EMAIL',
@@ -26,7 +23,18 @@ export const NOTIFICATION_CHANNEL = {
 
 export type NotificationChannel = keyof typeof NOTIFICATION_CHANNEL;
 
-// Template key cho email — project thêm key tuỳ nghiệp vụ
+export const NOTIFICATION_TEMPLATE_CODE = {
+  VERIFY_EMAIL: 'VERIFY_EMAIL',
+  RESET_PASSWORD: 'RESET_PASSWORD',
+  NEW_DEVICE_ALERT: 'NEW_DEVICE_ALERT',
+  WELCOME: 'WELCOME',
+  PASSWORD_CHANGED: 'PASSWORD_CHANGED',
+  ROLE_ASSIGNED: 'ROLE_ASSIGNED',
+  CUSTOM: 'CUSTOM',
+} as const;
+
+export type NotificationTemplateCode = keyof typeof NOTIFICATION_TEMPLATE_CODE;
+
 export const EMAIL_TEMPLATE_KEY = {
   VERIFY_EMAIL: 'VERIFY_EMAIL',
   RESET_PASSWORD: 'RESET_PASSWORD',
@@ -36,7 +44,6 @@ export const EMAIL_TEMPLATE_KEY = {
 
 export type EmailTemplateKey = keyof typeof EMAIL_TEMPLATE_KEY;
 
-// Trạng thái gửi email
 export const EMAIL_STATUS = {
   PENDING: 'PENDING',
   PROCESSING: 'PROCESSING',
@@ -46,5 +53,4 @@ export const EMAIL_STATUS = {
 
 export type EmailStatus = keyof typeof EMAIL_STATUS;
 
-// Số lần retry tối đa cho email thất bại
 export const EMAIL_MAX_ATTEMPTS = 3;

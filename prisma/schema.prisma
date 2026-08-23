@@ -165,16 +165,11 @@ model UserDevice {
   @@map("user_devices")
 }
 
-// ─────────────────────────────────────────────
-// Notification Module
-// ─────────────────────────────────────────────
-
-/// Web Notification — thông báo hiển thị trong UI
 model Notification {
   id        String    @id @default(uuid()) @db.Uuid
   userId    String    @map("user_id") @db.Uuid
-  type      String // SYSTEM | ALERT | INFO | SUCCESS | WARNING
-  priority  String    @default("NORMAL") // LOW | NORMAL | HIGH
+  type      String
+  priority  String    @default("NORMAL")
   title     String
   content   String
   actionUrl String?   @map("action_url")
@@ -190,15 +185,14 @@ model Notification {
   @@map("notifications")
 }
 
-/// Email Notification — hàng đợi email với retry
 model EmailNotification {
   id           String    @id @default(uuid()) @db.Uuid
   userId       String?   @map("user_id") @db.Uuid
   toEmail      String    @map("to_email")
   subject      String
-  templateKey  String    @map("template_key") // VERIFY_EMAIL | RESET_PASSWORD | ...
-  templateData Json      @map("template_data") // data động cho template
-  status       String    @default("PENDING") // PENDING | SENT | FAILED
+  templateKey  String    @map("template_key")
+  templateData Json      @map("template_data")
+  status       String    @default("PENDING")
   attempts     Int       @default(0)
   lastError    String?   @map("last_error")
   sentAt       DateTime? @map("sent_at")
@@ -212,11 +206,29 @@ model EmailNotification {
   @@map("email_notifications")
 }
 
+model NotificationTemplate {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique
+  name        String
+  description String?
+  channels    Json
+  subject     String?
+  title       String?
+  content     String
+  variables   Json
+  isSystem    Boolean  @default(false) @map("is_system")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("notification_templates")
+}
+
 model MaintenanceConfig {
   id                String    @id @default(uuid()) @db.Uuid
   key               String    @unique @default("DEFAULT")
   enabled           Boolean   @default(false)
-  status            String    @default("ONLINE") // ONLINE | MAINTENANCE | READ_ONLY
+  status            String    @default("ONLINE")
   title             String    @default("Hệ thống đang bảo trì")
   message           String    @default("Hệ thống đang được bảo trì để nâng cấp dịch vụ. Vui lòng quay lại sau.")
   startAt           DateTime? @map("start_at")

@@ -8,13 +8,30 @@ import {
   BroadcastNotificationDto,
   ListEmailsDto,
   ListEmailsResponseDto,
+  CreateNotificationTemplateDto,
+  UpdateNotificationTemplateDto,
+  ListNotificationTemplatesDto,
+  ListNotificationTemplatesResponseDto,
+  PreviewNotificationTemplateDto,
+  PreviewNotificationTemplateResponseDto,
+  TestSendNotificationTemplateDto,
 } from './notification.dto';
 import { NotificationRepository } from './notification.repository';
 import { notificationDispatcher } from '../../common/services/notification-dispatcher.service';
-import { NOTIFICATION_CHANNEL, NOTIFICATION_TYPE, NOTIFICATION_PRIORITY, EMAIL_TEMPLATE_KEY } from '../../common/constants/notification.constant';
+import { EmailTemplateService } from '../../common/services/email-template.service';
+import { renderTemplateString } from '../../common/helpers/template.helper';
+import {
+  NOTIFICATION_CHANNEL,
+  NOTIFICATION_TYPE,
+  NOTIFICATION_PRIORITY,
+  EMAIL_TEMPLATE_KEY,
+  NotificationChannel,
+} from '../../common/constants/notification.constant';
+import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from '../../common/constants/audit-log.constant';
 
 export class NotificationService {
   private readonly repository = new NotificationRepository();
+  private readonly emailTemplateService = new EmailTemplateService();
 
   async list(userId: string, dto: ListNotificationsDto): Promise<ListNotificationsResponseDto> {
     const { page = 1, limit = 20 } = dto;
@@ -55,7 +72,18 @@ export class NotificationService {
   }
 
   async send(dto: SendNotificationDto): Promise<{ sentCount: number }> {
-    const { userIds, channels, title, content, type = NOTIFICATION_TYPE.SYSTEM, priority = NOTIFICATION_PRIORITY.NORMAL, actionUrl, metadata, templateKey = EMAIL_TEMPLATE_KEY.CUSTOM, templateData } = dto;
+    const {
+      userIds,
+      channels,
+      title,
+      content,
+      type = NOTIFICATION_TYPE.SYSTEM,
+      priority = NOTIFICATION_PRIORITY.NORMAL,
+      actionUrl,
+      metadata,
+      templateKey = EMAIL_TEMPLATE_KEY.CUSTOM,
+      templateData,
+    } = dto;
 
     if (channels.includes(NOTIFICATION_CHANNEL.WEB)) {
       const records = userIds.map((userId) => ({
@@ -142,5 +170,159 @@ export class NotificationService {
     }
 
     await this.repository.resetEmailForRetry(emailId);
+  }
+
+  // ─────────────────────────────────────────────
+  // Template Management Service Methods
+  // ─────────────────────────────────────────────
+
+  async listTemplates(dto: ListNotificationTemplatesDto): Promise<ListNotificationTemplatesResponseDto> {
+    const { page = 1, limit = 20 } = dto;
+    const [items, total] = await this.repository.findTemplates(dto);
+
+    return {
+      items: items.map((item) => ({
+        id: item.id,
+        code: item.code,
+        name: item.name,
+        description: item.description,
+        channels: item.channels,
+        subject: item.subject,
+        title: item.title,
+        content: item.content,
+        variables: item.variables,
+        isSystem: item.isSystem,
+        isActive: item.isActive,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getTemplateByCode(code: string) {
+    const template = await this.repository.findTemplateByCode(code);
+    if (!template) {
+      throw new AppError(`Template with code '${code}' not found`, 404, ERROR_CODE.NOT_FOUND);
+    }
+    return template;
+  }
+
+  async createTemplate(
+    data: CreateNotificationTemplateDto,
+    context?: { actorId?: string; ipAddress?: string; userAgent?: string },
+  ) {
+    const existing = await this.repository.findTemplateByCode(data.code);
+    if (existing) {
+      throw new AppError(`Template with code '${data.code}' already exists`, 409, ERROR_CODE.DUPLICATE_ENTRY);
+    }
+
+    const template = await this.repository.createTemplate(data);
+
+    await this.repository.createAuditLog({
+      actorId: context?.actorId,
+      action: AUDIT_ACTION.CREATE_NOTIFICATION_TEMPLATE,
+      targetType: AUDIT_TARGET_TYPE.NOTIFICATION_TEMPLATE,
+      targetId: template.id,
+      details: { code: template.code, name: template.name },
+      ipAddress: context?.ipAddress,
+      userAgent: context?.userAgent,
+    });
+
+    return template;
+  }
+
+  async updateTemplate(
+    id: string,
+    data: UpdateNotificationTemplateDto,
+    context?: { actorId?: string; ipAddress?: string; userAgent?: string },
+  ) {
+    const template = await this.repository.findTemplateById(id);
+    if (!template) {
+      throw new AppError('Template not found', 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    const updated = await this.repository.updateTemplate(id, data);
+
+    await this.repository.createAuditLog({
+      actorId: context?.actorId,
+      action: AUDIT_ACTION.UPDATE_NOTIFICATION_TEMPLATE,
+      targetType: AUDIT_TARGET_TYPE.NOTIFICATION_TEMPLATE,
+      targetId: template.id,
+      details: { code: template.code, updatedFields: Object.keys(data) },
+      ipAddress: context?.ipAddress,
+      userAgent: context?.userAgent,
+    });
+
+    return updated;
+  }
+
+  async deleteTemplate(
+    id: string,
+    context?: { actorId?: string; ipAddress?: string; userAgent?: string },
+  ): Promise<void> {
+    const template = await this.repository.findTemplateById(id);
+    if (!template) {
+      throw new AppError('Template not found', 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    if (template.isSystem) {
+      throw new AppError('System template cannot be deleted', 400, ERROR_CODE.VALIDATION_ERROR);
+    }
+
+    await this.repository.deleteTemplate(id);
+
+    await this.repository.createAuditLog({
+      actorId: context?.actorId,
+      action: AUDIT_ACTION.DELETE_NOTIFICATION_TEMPLATE,
+      targetType: AUDIT_TARGET_TYPE.NOTIFICATION_TEMPLATE,
+      targetId: template.id,
+      details: { code: template.code, name: template.name },
+      ipAddress: context?.ipAddress,
+      userAgent: context?.userAgent,
+    });
+  }
+
+  async previewTemplate(code: string, dto: PreviewNotificationTemplateDto): Promise<PreviewNotificationTemplateResponseDto> {
+    const template = await this.getTemplateByCode(code);
+
+    const subject = template.subject ? renderTemplateString(template.subject, dto.variables) : null;
+    const title = template.title ? renderTemplateString(template.title, dto.variables) : null;
+    const content = renderTemplateString(template.content, dto.variables);
+
+    const channels = (template.channels as string[]) || [];
+    let html: string | undefined;
+    if (channels.includes(NOTIFICATION_CHANNEL.EMAIL)) {
+      html = this.emailTemplateService.baseLayout(title || subject || template.name, content);
+    }
+
+    return {
+      code: template.code,
+      subject,
+      title,
+      content,
+      html,
+    };
+  }
+
+  async testSendTemplate(
+    code: string,
+    userId: string,
+    dto: TestSendNotificationTemplateDto,
+  ): Promise<{ message: string }> {
+    const template = await this.getTemplateByCode(code);
+
+    await notificationDispatcher.sendWithTemplate({
+      userId,
+      templateCode: template.code,
+      variables: dto.variables,
+      channels: dto.channels || (template.channels as NotificationChannel[]),
+      toEmail: dto.toEmail,
+    });
+
+    return { message: `Test notification sent successfully for template '${code}'` };
   }
 }

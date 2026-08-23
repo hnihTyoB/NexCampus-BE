@@ -1,8 +1,13 @@
 import { prisma } from '../../database/prisma.client';
-import { ListNotificationsDto, ListEmailsDto } from './notification.dto';
+import {
+  ListNotificationsDto,
+  ListEmailsDto,
+  ListNotificationTemplatesDto,
+  CreateNotificationTemplateDto,
+  UpdateNotificationTemplateDto,
+} from './notification.dto';
 
 export class NotificationRepository {
-
   findMany(userId: string, dto: ListNotificationsDto) {
     const { page = 1, limit = 20, isRead, type } = dto;
     const skip = (page - 1) * limit;
@@ -134,6 +139,103 @@ export class NotificationRepository {
         status: 'PENDING',
         attempts: 0,
         lastError: null,
+      },
+    });
+  }
+
+  // ─────────────────────────────────────────────
+  // Template Repository Methods
+  // ─────────────────────────────────────────────
+
+  findTemplates(dto: ListNotificationTemplatesDto) {
+    const { page = 1, limit = 20, isActive, search } = dto;
+    const skip = (page - 1) * limit;
+
+    const where: any = {
+      ...(isActive !== undefined && { isActive }),
+      ...(search && {
+        OR: [
+          { code: { contains: search, mode: 'insensitive' } },
+          { name: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+        ],
+      }),
+    };
+
+    return Promise.all([
+      prisma.notificationTemplate.findMany({
+        where,
+        orderBy: [{ isSystem: 'desc' }, { createdAt: 'desc' }],
+        skip,
+        take: limit,
+      }),
+      prisma.notificationTemplate.count({ where }),
+    ]);
+  }
+
+  findTemplateByCode(code: string) {
+    return prisma.notificationTemplate.findUnique({ where: { code } });
+  }
+
+  findTemplateById(id: string) {
+    return prisma.notificationTemplate.findUnique({ where: { id } });
+  }
+
+  createTemplate(data: CreateNotificationTemplateDto) {
+    return prisma.notificationTemplate.create({
+      data: {
+        code: data.code,
+        name: data.name,
+        description: data.description,
+        channels: data.channels as any,
+        subject: data.subject,
+        title: data.title,
+        content: data.content,
+        variables: data.variables as any,
+        isSystem: false,
+        isActive: data.isActive ?? true,
+      },
+    });
+  }
+
+  updateTemplate(id: string, data: UpdateNotificationTemplateDto) {
+    return prisma.notificationTemplate.update({
+      where: { id },
+      data: {
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.description !== undefined && { description: data.description }),
+        ...(data.channels !== undefined && { channels: data.channels as any }),
+        ...(data.subject !== undefined && { subject: data.subject }),
+        ...(data.title !== undefined && { title: data.title }),
+        ...(data.content !== undefined && { content: data.content }),
+        ...(data.variables !== undefined && { variables: data.variables as any }),
+        ...(data.isActive !== undefined && { isActive: data.isActive }),
+      },
+    });
+  }
+
+  deleteTemplate(id: string) {
+    return prisma.notificationTemplate.delete({ where: { id } });
+  }
+
+  createAuditLog(data: {
+    actorId?: string;
+    action: string;
+    targetType: string;
+    targetId?: string;
+    details?: any;
+    ipAddress?: string;
+    userAgent?: string;
+  }) {
+    return prisma.auditLog.create({
+      data: {
+        actorId: data.actorId,
+        action: data.action,
+        targetType: data.targetType,
+        targetId: data.targetId || 'SYSTEM',
+        details: data.details || null,
+        ipAddress: data.ipAddress,
+        userAgent: data.userAgent,
       },
     });
   }

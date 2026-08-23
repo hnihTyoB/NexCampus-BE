@@ -302,6 +302,72 @@ export const swaggerSpec = {
           metadata: { type: 'object' },
         },
       },
+      NotificationTemplate: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          code: { type: 'string', example: 'WELCOME' },
+          name: { type: 'string', example: 'Chào mừng thành viên mới' },
+          description: { type: 'string', nullable: true, example: 'Thông báo chào mừng người dùng mới' },
+          channels: { type: 'array', items: { type: 'string', enum: ['WEB', 'EMAIL'] }, example: ['WEB'] },
+          subject: { type: 'string', nullable: true, example: 'Chào mừng {{fullName}}' },
+          title: { type: 'string', nullable: true, example: 'Chào mừng bạn' },
+          content: { type: 'string', example: 'Chào mừng {{fullName}} đã gia nhập hệ thống!' },
+          variables: { type: 'array', items: { type: 'string' }, example: ['fullName'] },
+          isSystem: { type: 'boolean', example: false },
+          isActive: { type: 'boolean', example: true },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      CreateNotificationTemplateBody: {
+        type: 'object',
+        required: ['code', 'name', 'channels', 'content'],
+        properties: {
+          code: { type: 'string', example: 'PROMO_ALERT', description: 'Mã định danh duy nhất (chữ hoa, số, gạch dưới)' },
+          name: { type: 'string', example: 'Thông báo khuyến mãi' },
+          description: { type: 'string', example: 'Mẫu thông báo ưu đãi đặc biệt' },
+          channels: { type: 'array', items: { type: 'string', enum: ['WEB', 'EMAIL'] }, example: ['WEB', 'EMAIL'] },
+          subject: { type: 'string', example: 'Ưu đãi dành riêng cho {{fullName}}' },
+          title: { type: 'string', example: 'Ưu đãi khủng {{discount}}%' },
+          content: { type: 'string', example: 'Xin chào {{fullName}}, nhận ngay mã giảm giá {{discount}}% hôm nay!' },
+          variables: { type: 'array', items: { type: 'string' }, example: ['fullName', 'discount'] },
+          isActive: { type: 'boolean', default: true },
+        },
+      },
+      UpdateNotificationTemplateBody: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', example: 'Thông báo khuyến mãi cập nhật' },
+          description: { type: 'string' },
+          channels: { type: 'array', items: { type: 'string', enum: ['WEB', 'EMAIL'] } },
+          subject: { type: 'string' },
+          title: { type: 'string' },
+          content: { type: 'string' },
+          variables: { type: 'array', items: { type: 'string' } },
+          isActive: { type: 'boolean' },
+        },
+      },
+      PreviewNotificationTemplateBody: {
+        type: 'object',
+        properties: {
+          variables: {
+            type: 'object',
+            example: { fullName: 'Nguyễn Văn A', verificationUrl: 'https://example.com/verify?token=123' },
+          },
+        },
+      },
+      TestSendNotificationTemplateBody: {
+        type: 'object',
+        properties: {
+          toEmail: { type: 'string', format: 'email', example: 'test@example.com' },
+          channels: { type: 'array', items: { type: 'string', enum: ['WEB', 'EMAIL'] } },
+          variables: {
+            type: 'object',
+            example: { fullName: 'Admin Tester', verifyUrl: 'https://example.com' },
+          },
+        },
+      },
     },
     parameters: {
       PageParam: { in: 'query', name: 'page', schema: { type: 'integer', default: 1 } },
@@ -1273,6 +1339,201 @@ export const swaggerSpec = {
           },
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
+        },
+      },
+    },
+    '/notifications/templates': {
+      get: {
+        tags: ['Notifications'],
+        summary: 'Xem danh sách mẫu thông báo / email (Yêu cầu quyền NOTIFICATION_TEMPLATE_READ)',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { $ref: '#/components/parameters/PageParam' },
+          { $ref: '#/components/parameters/LimitParam' },
+          { in: 'query', name: 'channel', schema: { type: 'string', enum: ['WEB', 'EMAIL'] } },
+          { in: 'query', name: 'isActive', schema: { type: 'boolean' } },
+          { in: 'query', name: 'search', schema: { type: 'string' } },
+        ],
+        responses: {
+          200: {
+            description: 'Danh sách mẫu thông báo',
+            content: {
+              'application/json': {
+                schema: {
+                  allOf: [
+                    { $ref: '#/components/schemas/SuccessResponse' },
+                    { type: 'object', properties: { data: { type: 'array', items: { $ref: '#/components/schemas/NotificationTemplate' } }, meta: { $ref: '#/components/schemas/PaginationMeta' } } },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+        },
+      },
+      post: {
+        tags: ['Notifications'],
+        summary: 'Tạo mẫu thông báo / email mới (Yêu cầu quyền NOTIFICATION_TEMPLATE_MANAGE)',
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/CreateNotificationTemplateBody' } } },
+        },
+        responses: {
+          201: {
+            description: 'Tạo mẫu thành công',
+            content: {
+              'application/json': {
+                schema: {
+                  allOf: [
+                    { $ref: '#/components/schemas/SuccessResponse' },
+                    { type: 'object', properties: { data: { $ref: '#/components/schemas/NotificationTemplate' } } },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          409: { description: 'Mã code đã tồn tại', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+    },
+    '/notifications/templates/{code}': {
+      get: {
+        tags: ['Notifications'],
+        summary: 'Lấy chi tiết mẫu thông báo theo mã code (Yêu cầu quyền NOTIFICATION_TEMPLATE_READ)',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: 'path', name: 'code', required: true, schema: { type: 'string' } }],
+        responses: {
+          200: {
+            description: 'Chi tiết mẫu thông báo',
+            content: {
+              'application/json': {
+                schema: {
+                  allOf: [
+                    { $ref: '#/components/schemas/SuccessResponse' },
+                    { type: 'object', properties: { data: { $ref: '#/components/schemas/NotificationTemplate' } } },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+    '/notifications/templates/{id}': {
+      put: {
+        tags: ['Notifications'],
+        summary: 'Cập nhật nội dung mẫu thông báo theo ID (Yêu cầu quyền NOTIFICATION_TEMPLATE_MANAGE)',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string', format: 'uuid' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/UpdateNotificationTemplateBody' } } },
+        },
+        responses: {
+          200: {
+            description: 'Cập nhật mẫu thành công',
+            content: {
+              'application/json': {
+                schema: {
+                  allOf: [
+                    { $ref: '#/components/schemas/SuccessResponse' },
+                    { type: 'object', properties: { data: { $ref: '#/components/schemas/NotificationTemplate' } } },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+      delete: {
+        tags: ['Notifications'],
+        summary: 'Xóa mẫu thông báo tùy biến (Yêu cầu quyền NOTIFICATION_TEMPLATE_MANAGE, không thể xóa mẫu hệ thống)',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: {
+          200: {
+            description: 'Xóa mẫu thành công',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/SuccessResponse' } } },
+          },
+          400: { description: 'Không thể xóa mẫu hệ thống (isSystem=true)', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+    '/notifications/templates/{code}/preview': {
+      post: {
+        tags: ['Notifications'],
+        summary: 'Xem trước (preview) nội dung render mẫu thông báo với dữ liệu biến thử nghiệm (Yêu cầu quyền NOTIFICATION_TEMPLATE_READ)',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: 'path', name: 'code', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/PreviewNotificationTemplateBody' } } },
+        },
+        responses: {
+          200: {
+            description: 'Nội dung sau khi render biến',
+            content: {
+              'application/json': {
+                schema: {
+                  allOf: [
+                    { $ref: '#/components/schemas/SuccessResponse' },
+                    {
+                      type: 'object',
+                      properties: {
+                        data: {
+                          type: 'object',
+                          properties: {
+                            code: { type: 'string' },
+                            subject: { type: 'string', nullable: true },
+                            title: { type: 'string', nullable: true },
+                            content: { type: 'string' },
+                            html: { type: 'string' },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { $ref: '#/components/responses/NotFound' },
+        },
+      },
+    },
+    '/notifications/templates/{code}/test-send': {
+      post: {
+        tags: ['Notifications'],
+        summary: 'Gửi thử nghiệm mẫu thông báo đến người dùng hiện tại hoặc email chỉ định (Yêu cầu quyền NOTIFICATION_TEMPLATE_MANAGE)',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ in: 'path', name: 'code', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/TestSendNotificationTemplateBody' } } },
+        },
+        responses: {
+          200: {
+            description: 'Đã phát gửi thử nghiệm thành công',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/SuccessResponse' } } },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { $ref: '#/components/responses/NotFound' },
         },
       },
     },

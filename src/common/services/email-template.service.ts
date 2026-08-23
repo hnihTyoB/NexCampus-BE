@@ -1,5 +1,7 @@
 import { mailConfig } from '../../config/mail.config';
+import { prisma } from '../../database/prisma.client';
 import { EMAIL_TEMPLATE_KEY, EmailTemplateKey } from '../constants/notification.constant';
+import { renderTemplateString } from '../helpers/template.helper';
 
 export interface EmailTemplate {
   subject: string;
@@ -13,6 +15,32 @@ export class EmailTemplateService {
     this.appUrl = mailConfig.verificationUrl.replace('/api/v1/auth/verify-email', '');
   }
 
+  /**
+   * Render nội dung email: Ưu tiên lấy mẫu tùy biến từ Database theo templateKey/code,
+   * nếu không tìm thấy sẽ tự động fallback về layout mã nguồn mặc định.
+   */
+  async renderAsync(templateKey: string, data: Record<string, unknown>): Promise<EmailTemplate> {
+    try {
+      const dbTemplate = await prisma.notificationTemplate.findUnique({
+        where: { code: templateKey },
+      });
+
+      if (dbTemplate && dbTemplate.isActive) {
+        const subject = renderTemplateString(dbTemplate.subject || 'Thông báo từ hệ thống', data);
+        const bodyContent = renderTemplateString(dbTemplate.content, data);
+        const html = this.baseLayout(dbTemplate.title || subject, bodyContent);
+        return { subject, html };
+      }
+    } catch (error) {
+      console.warn(`[EmailTemplateService] Database template fetch failed for '${templateKey}', falling back to built-in layout:`, error);
+    }
+
+    return this.render(templateKey as EmailTemplateKey, data);
+  }
+
+  /**
+   * Fallback render đồng bộ cho các template cốt lõi.
+   */
   render(templateKey: EmailTemplateKey, data: Record<string, unknown>): EmailTemplate {
     switch (templateKey) {
       case EMAIL_TEMPLATE_KEY.VERIFY_EMAIL:
@@ -24,11 +52,14 @@ export class EmailTemplateService {
       case EMAIL_TEMPLATE_KEY.CUSTOM:
         return this.custom(data);
       default:
-        throw new Error(`Unknown email template key: ${templateKey}`);
+        return {
+          subject: (data['subject'] as string) || 'Thông báo từ hệ thống',
+          html: this.baseLayout((data['title'] as string) || 'Thông báo', renderTemplateString((data['content'] as string) || '', data)),
+        };
     }
   }
 
-  private baseLayout(title: string, bodyHtml: string): string {
+  baseLayout(title: string, bodyHtml: string): string {
     return `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff;">
         <h2 style="color: #4CAF50; text-align: center; margin-bottom: 24px;">${title}</h2>
