@@ -1,4 +1,4 @@
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { maintenanceGuard } from '../src/middlewares/maintenance.middleware';
 import { maintenanceCacheService } from '../src/common/services/maintenance-cache.service';
@@ -16,6 +16,10 @@ describe('System Maintenance Mode Module', () => {
   beforeEach(() => {
     maintenanceCacheService.clear();
     permissionCacheService.clear();
+  });
+
+  after(async () => {
+    await maintenanceCacheService.close();
   });
 
   it('1. Maintenance disabled -> normal user can access API', async () => {
@@ -443,5 +447,196 @@ describe('System Maintenance Mode Module', () => {
     assert.ok(nextError instanceof AppError);
     assert.equal(nextError.statusCode, 403);
     assert.equal(nextError.code, ERROR_CODE.FORBIDDEN);
+  });
+
+  it('12. Selective Auth Exemption: /register is blocked with 503 during maintenance while /login is allowed', async () => {
+    const mockConfig: any = {
+      id: 'conf-1',
+      key: 'DEFAULT',
+      enabled: true,
+      status: MAINTENANCE_STATUS.MAINTENANCE,
+      title: 'Bảo trì hệ thống',
+      message: 'Hệ thống đang bảo trì, tạm thời không nhận đăng ký mới.',
+      bypassPermissions: [PERMISSIONS.MAINTENANCE_MANAGE],
+      bypassRoles: [ROLES.ADMIN],
+    };
+    maintenanceCacheService.set(mockConfig);
+
+    const guard = maintenanceGuard();
+
+    // 1. /api/v1/auth/login should pass through
+    const reqLogin: any = { originalUrl: '/api/v1/auth/login', method: 'POST' };
+    let loginPassed = false;
+    await guard(reqLogin, {} as any, (err) => {
+      if (!err) loginPassed = true;
+    });
+    assert.equal(loginPassed, true);
+
+    // 2. /api/v1/auth/register should be blocked with 503 for normal visitors
+    const reqRegister: any = { originalUrl: '/api/v1/auth/register', method: 'POST' };
+    let registerError: any = null;
+    await guard(reqRegister, {} as any, (err) => {
+      registerError = err;
+    });
+    assert.ok(registerError instanceof AppError);
+    assert.equal(registerError.statusCode, 503);
+    assert.equal(registerError.code, ERROR_CODE.SYSTEM_MAINTENANCE);
+  });
+
+  it('13. Email Worker Interceptor: Worker skips batch processing when system is in MAINTENANCE mode', async () => {
+    const mockConfig: any = {
+      id: 'conf-1',
+      key: 'DEFAULT',
+      enabled: true,
+      status: MAINTENANCE_STATUS.MAINTENANCE,
+      title: 'Bảo trì',
+      message: 'Đang bảo trì.',
+    };
+    maintenanceCacheService.set(mockConfig);
+
+    const { emailWorker } = require('../src/common/workers/email-worker');
+    // Invoking process while in maintenance should terminate gracefully without errors
+    let errorOccurred = false;
+    try {
+      await (emailWorker as any).process();
+    } catch {
+      errorOccurred = true;
+    }
+    assert.equal(errorOccurred, false);
+  });
+
+  it('14. IP Whitelist Bypass: Whitelisted static IP can access domain APIs during maintenance', async () => {
+    const mockConfig: any = {
+      id: 'conf-1',
+      key: 'DEFAULT',
+      enabled: true,
+      status: MAINTENANCE_STATUS.MAINTENANCE,
+      title: 'Bảo trì hệ thống',
+      message: 'Hệ thống đang bảo trì.',
+      bypassPermissions: [PERMISSIONS.MAINTENANCE_MANAGE],
+      bypassRoles: [ROLES.ADMIN],
+      bypassIps: ['118.69.123.45', '::1'],
+    };
+    maintenanceCacheService.set(mockConfig);
+
+    const guard = maintenanceGuard();
+
+    // 1. Request from whitelisted IP '118.69.123.45' should pass through
+    const reqAllowed: any = {
+      originalUrl: '/api/v1/users',
+      method: 'GET',
+      ip: '118.69.123.45',
+    };
+    let passed = false;
+    await guard(reqAllowed, {} as any, (err) => {
+      if (!err) passed = true;
+    });
+    assert.equal(passed, true);
+
+    // 2. Request from non-whitelisted IP '203.113.130.1' should be blocked with 503
+    const reqBlocked: any = {
+      originalUrl: '/api/v1/users',
+      method: 'GET',
+      ip: '203.113.130.1',
+    };
+    let blockedError: any = null;
+    await guard(reqBlocked, {} as any, (err) => {
+      blockedError = err;
+    });
+    assert.ok(blockedError instanceof AppError);
+    assert.equal(blockedError.statusCode, 503);
+    assert.equal(blockedError.code, ERROR_CODE.SYSTEM_MAINTENANCE);
+  });
+
+  it('15. IP Whitelist Bypass: Supports IPv4 CIDR subnets (e.g., 10.0.0.0/24)', async () => {
+    const mockConfig: any = {
+      id: 'conf-1',
+      key: 'DEFAULT',
+      enabled: true,
+      status: MAINTENANCE_STATUS.MAINTENANCE,
+      title: 'Bảo trì hệ thống',
+      message: 'Hệ thống đang bảo trì.',
+      bypassPermissions: [PERMISSIONS.MAINTENANCE_MANAGE],
+      bypassRoles: [ROLES.ADMIN],
+      bypassIps: ['10.50.0.0/16', '192.168.1.0/24'],
+    };
+    maintenanceCacheService.set(mockConfig);
+
+    const guard = maintenanceGuard();
+
+    // 1. IP in 10.50.0.0/16 subnet (e.g. 10.50.4.12) should pass
+    const reqSubnet: any = {
+      originalUrl: '/api/v1/users',
+      method: 'GET',
+      ip: '10.50.4.12',
+    };
+    let subnetPassed = false;
+    await guard(reqSubnet, {} as any, (err) => {
+      if (!err) subnetPassed = true;
+    });
+    assert.equal(subnetPassed, true);
+
+    // 2. IP in 192.168.1.0/24 subnet (e.g. 192.168.1.100) should pass
+    const reqSubnet2: any = {
+      originalUrl: '/api/v1/notifications',
+      method: 'GET',
+      ip: '192.168.1.100',
+    };
+    let subnet2Passed = false;
+    await guard(reqSubnet2, {} as any, (err) => {
+      if (!err) subnet2Passed = true;
+    });
+    assert.equal(subnet2Passed, true);
+
+    // 3. IP outside subnets (e.g. 10.51.0.1) should be blocked with 503
+    const reqOutside: any = {
+      originalUrl: '/api/v1/users',
+      method: 'GET',
+      ip: '10.51.0.1',
+    };
+    let outsideError: any = null;
+    await guard(reqOutside, {} as any, (err) => {
+      outsideError = err;
+    });
+    assert.ok(outsideError instanceof AppError);
+    assert.equal(outsideError.statusCode, 503);
+  });
+
+  it('16. isIpInWhitelist helper correctly handles IPv4, IPv6, CIDR, and IPv4-mapped IPv6', () => {
+    const { isIpInWhitelist, isIpv4InCidr, normalizeIp } = require('../src/common/helpers/ip.helper');
+
+    assert.equal(normalizeIp('::ffff:127.0.0.1'), '127.0.0.1');
+    assert.equal(normalizeIp('  192.168.1.1  '), '192.168.1.1');
+
+    assert.equal(isIpv4InCidr('10.0.0.1', '10.0.0.0/8'), true);
+    assert.equal(isIpv4InCidr('10.255.255.255', '10.0.0.0/8'), true);
+    assert.equal(isIpv4InCidr('11.0.0.1', '10.0.0.0/8'), false);
+
+    assert.equal(isIpv4InCidr('192.168.1.55', '192.168.1.0/24'), true);
+    assert.equal(isIpv4InCidr('192.168.2.55', '192.168.1.0/24'), false);
+
+    const whitelist = ['127.0.0.1', '::1', '118.69.123.45', '10.0.0.0/8'];
+    assert.equal(isIpInWhitelist('127.0.0.1', whitelist), true);
+    assert.equal(isIpInWhitelist('::ffff:127.0.0.1', whitelist), true);
+    assert.equal(isIpInWhitelist('118.69.123.45', whitelist), true);
+    assert.equal(isIpInWhitelist('10.12.34.56', whitelist), true);
+    assert.equal(isIpInWhitelist('1.2.3.4', whitelist), false);
+    assert.equal(isIpInWhitelist('', whitelist), false);
+    assert.equal(isIpInWhitelist('127.0.0.1', []), false);
+  });
+
+  it('17. Redis Pub/Sub Invalidation: invalidate() clears local cache seamlessly without errors', () => {
+    const mockConfig: any = {
+      id: 'cfg-test',
+      key: 'DEFAULT',
+      enabled: true,
+      status: MAINTENANCE_STATUS.MAINTENANCE,
+    };
+    maintenanceCacheService.set(mockConfig);
+    assert.ok((maintenanceCacheService as any).cache !== null);
+
+    // Call invalidate
+    maintenanceCacheService.invalidate();
+    assert.equal((maintenanceCacheService as any).cache, null);
   });
 });

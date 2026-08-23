@@ -210,8 +210,16 @@ export class RbacService {
     context?: { actorId?: string; ipAddress?: string; userAgent?: string }
   ) {
     const targetRole = await this.findRoleById(newRoleId);
+    const currentUser = await this.repository.findUserById(userId);
+    if (!currentUser) {
+      throw new AppError('User not found', 404, ERROR_CODE.NOT_FOUND);
+    }
+    const oldRoleId = currentUser.roleId;
 
     const user = await this.repository.assignUserRole(userId, targetRole.id);
+    if (oldRoleId && oldRoleId !== targetRole.id) {
+      permissionCacheService.invalidateRole(oldRoleId);
+    }
     permissionCacheService.invalidateRole(user.roleId);
 
     await this.repository.createAuditLog({

@@ -28,6 +28,12 @@ export const swaggerSpec = {
         bearerFormat: 'JWT',
         description: 'Sử dụng header Authorization: Bearer <accessToken>',
       },
+      ApiKeyAuth: {
+        type: 'apiKey',
+        in: 'header',
+        name: 'x-api-key',
+        description: 'API Key xác thực dành cho hệ thống bên thứ ba (Third-Party Integration)',
+      },
     },
     schemas: {
       SuccessResponse: {
@@ -51,6 +57,23 @@ export const swaggerSpec = {
           success: { type: 'boolean', example: false },
           message: { type: 'string', example: 'Error message' },
           code: { type: 'string', example: 'NOT_FOUND' },
+        },
+      },
+      MaintenanceErrorResponse: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean', example: false },
+          message: { type: 'string', example: 'Hệ thống đang được bảo trì để nâng cấp dịch vụ. Vui lòng quay lại sau.' },
+          code: { type: 'string', example: 'SYSTEM_MAINTENANCE' },
+          data: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', example: 'Hệ thống đang bảo trì' },
+              message: { type: 'string', example: 'Hệ thống đang được bảo trì để nâng cấp dịch vụ. Vui lòng quay lại sau.' },
+              startAt: { type: 'string', format: 'date-time', nullable: true, example: '2026-08-23T00:00:00.000Z' },
+              estimatedEndAt: { type: 'string', format: 'date-time', nullable: true, example: '2026-08-23T04:00:00.000Z' },
+            },
+          },
         },
       },
       Role: {
@@ -149,7 +172,12 @@ export const swaggerSpec = {
         type: 'object',
         properties: {
           fullName: { type: 'string', example: 'Nguyen Van B' },
-          avatarUrl: { type: 'string', format: 'uri', example: 'https://example.com/avatar.jpg' },
+          avatarUrl: {
+            type: 'string',
+            format: 'uri',
+            example: 'https://example.com/avatar.jpg',
+            description: 'Public HTTPS URL. Hệ thống tích hợp cơ chế chống SSRF nâng cao: tự động resolve DNS và kiểm tra chuỗi HTTP redirect, chặn mọi domain/redirect trỏ về private IP (10.x, 172.16-31.x, 192.168.x, 169.254.x, ::1), localhost, hoặc các scheme không an toàn (file:, ftp:, javascript:…).',
+          },
           phoneNumber: { type: 'string', example: '0912345678' },
         },
       },
@@ -254,7 +282,12 @@ export const swaggerSpec = {
           priority: { type: 'string', example: 'NORMAL' },
           title: { type: 'string', example: 'Thông báo hệ thống' },
           content: { type: 'string', example: 'Nội dung chi tiết của thông báo' },
-          actionUrl: { type: 'string', nullable: true },
+          actionUrl: {
+            type: 'string',
+            format: 'uri',
+            nullable: true,
+            description: 'Public HTTPS URL dẫn đến hành động liên quan. Không chấp nhận private IP hay localhost.',
+          },
           metadata: { type: 'object', nullable: true },
           isRead: { type: 'boolean', example: false },
           readAt: { type: 'string', format: 'date-time', nullable: true },
@@ -286,7 +319,12 @@ export const swaggerSpec = {
           content: { type: 'string' },
           type: { type: 'string', example: 'SYSTEM' },
           priority: { type: 'string', enum: ['LOW', 'NORMAL', 'HIGH'], example: 'NORMAL' },
-          actionUrl: { type: 'string' },
+          actionUrl: {
+            type: 'string',
+            format: 'uri',
+            description: 'Public HTTPS URL dẫn đến hành động liên quan (tuỳ chọn). Tích hợp chống SSRF qua DNS resolution & redirect chaining, chặn private IP và localhost.',
+            example: 'https://example.com/action',
+          },
           metadata: { type: 'object' },
         },
       },
@@ -298,7 +336,12 @@ export const swaggerSpec = {
           content: { type: 'string' },
           type: { type: 'string', example: 'SYSTEM' },
           priority: { type: 'string', enum: ['LOW', 'NORMAL', 'HIGH'], example: 'NORMAL' },
-          actionUrl: { type: 'string' },
+          actionUrl: {
+            type: 'string',
+            format: 'uri',
+            description: 'Public HTTPS URL dẫn đến hành động liên quan (tuỳ chọn). Không chấp nhận private IP hay localhost.',
+            example: 'https://example.com/action',
+          },
           metadata: { type: 'object' },
         },
       },
@@ -380,6 +423,16 @@ export const swaggerSpec = {
       NotFound: { description: 'Không tìm thấy', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
       Validation: { description: 'Dữ liệu không hợp lệ', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
       Conflict: { description: 'Xung đột dữ liệu', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+      RateLimitExceeded: {
+        description: 'Vượt quá giới hạn số lượng request cho phép (Rate Limit Exceeded — 429)',
+        headers: {
+          'Retry-After': { schema: { type: 'integer' }, description: 'Số giây cần chờ trước khi thử lại' },
+          'X-RateLimit-Limit': { schema: { type: 'integer' }, description: 'Số request tối đa trong cửa sổ thời gian' },
+          'X-RateLimit-Remaining': { schema: { type: 'integer' }, description: 'Số request còn lại' },
+          'X-RateLimit-Reset': { schema: { type: 'integer' }, description: 'Thời điểm reset (Unix timestamp tính bằng giây)' },
+        },
+        content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
+      },
     },
   },
   tags: [
@@ -388,6 +441,8 @@ export const swaggerSpec = {
     { name: 'Users', description: 'User account management' },
     { name: 'RBAC', description: 'Dynamic Role-Based Access Control & Permissions' },
     { name: 'Notifications', description: 'Thông báo trong ứng dụng & Quản lý email hệ thống' },
+    { name: 'Maintenance', description: 'Quản trị chế độ bảo trì hệ thống' },
+    { name: 'Integrations', description: 'Quản lý API Keys, HMAC-signed Webhook Callbacks & Job Dispatcher' },
   ],
   paths: {
     '/health': {
@@ -433,6 +488,7 @@ export const swaggerSpec = {
           },
           400: { description: 'Email đã tồn tại', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
           422: { $ref: '#/components/responses/Validation' },
+          429: { $ref: '#/components/responses/RateLimitExceeded' },
         },
       },
     },
@@ -480,6 +536,7 @@ export const swaggerSpec = {
           },
           401: { $ref: '#/components/responses/Unauthorized' },
           422: { $ref: '#/components/responses/Validation' },
+          429: { $ref: '#/components/responses/RateLimitExceeded' },
         },
       },
     },
@@ -505,6 +562,7 @@ export const swaggerSpec = {
           400: { description: 'Tài khoản đã được xác thực trước đó', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
           404: { $ref: '#/components/responses/NotFound' },
           422: { $ref: '#/components/responses/Validation' },
+          429: { $ref: '#/components/responses/RateLimitExceeded' },
         },
       },
     },
@@ -529,6 +587,7 @@ export const swaggerSpec = {
           },
           404: { $ref: '#/components/responses/NotFound' },
           422: { $ref: '#/components/responses/Validation' },
+          429: { $ref: '#/components/responses/RateLimitExceeded' },
         },
       },
     },
@@ -553,6 +612,7 @@ export const swaggerSpec = {
           },
           400: { description: 'Token không hợp lệ hoặc đã hết hạn', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
           422: { $ref: '#/components/responses/Validation' },
+          429: { $ref: '#/components/responses/RateLimitExceeded' },
         },
       },
     },
@@ -1602,6 +1662,7 @@ export const swaggerSpec = {
                             estimatedEndAt: { type: 'string', format: 'date-time', nullable: true },
                             bypassPermissions: { type: 'array', items: { type: 'string' } },
                             bypassRoles: { type: 'array', items: { type: 'string' } },
+                            bypassIps: { type: 'array', items: { type: 'string' }, example: ['118.69.123.45', '10.0.0.0/24'] },
                           },
                         },
                       },
@@ -1634,6 +1695,7 @@ export const swaggerSpec = {
                   status: { type: 'string', enum: ['MAINTENANCE', 'READ_ONLY'], default: 'MAINTENANCE' },
                   bypassPermissions: { type: 'array', items: { type: 'string' }, example: ['MAINTENANCE_MANAGE', 'MAINTENANCE_BYPASS'] },
                   bypassRoles: { type: 'array', items: { type: 'string' }, example: ['ADMIN'] },
+                  bypassIps: { type: 'array', items: { type: 'string' }, example: ['118.69.123.45', '10.0.0.0/24'] },
                 },
               },
             },
@@ -1668,6 +1730,7 @@ export const swaggerSpec = {
                   estimatedEndAt: { type: 'string', format: 'date-time', nullable: true },
                   bypassPermissions: { type: 'array', items: { type: 'string' } },
                   bypassRoles: { type: 'array', items: { type: 'string' } },
+                  bypassIps: { type: 'array', items: { type: 'string' } },
                 },
               },
             },
@@ -1695,6 +1758,203 @@ export const swaggerSpec = {
           },
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
+        },
+      },
+    },
+    '/integrations/api-keys': {
+      post: {
+        tags: ['Integrations'],
+        summary: 'Tạo API Key mới (Yêu cầu quyền API_KEY_MANAGE)',
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['name'],
+                properties: {
+                  name: { type: 'string', example: 'Payment Microservice' },
+                  permissions: { type: 'array', items: { type: 'string' }, example: ['USER_READ'] },
+                  expiresAt: { type: 'string', format: 'date-time', nullable: true },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'API Key đã được tạo thành công (plaintext key chỉ hiển thị 1 lần duy nhất)',
+            content: {
+              'application/json': {
+                schema: {
+                  allOf: [
+                    { $ref: '#/components/schemas/SuccessResponse' },
+                    {
+                      type: 'object',
+                      properties: {
+                        data: {
+                          type: 'object',
+                          properties: {
+                            id: { type: 'string', format: 'uuid' },
+                            name: { type: 'string' },
+                            key: { type: 'string', example: 'ak_live_abc123...' },
+                            prefix: { type: 'string', example: 'ak_live_abc123...' },
+                            permissions: { type: 'array', items: { type: 'string' } },
+                            expiresAt: { type: 'string', format: 'date-time', nullable: true },
+                            createdAt: { type: 'string', format: 'date-time' },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          422: { $ref: '#/components/responses/Validation' },
+        },
+      },
+      get: {
+        tags: ['Integrations'],
+        summary: 'Lấy danh sách API Keys của người dùng hiện tại',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Danh sách API Keys',
+            content: {
+              'application/json': {
+                schema: {
+                  allOf: [
+                    { $ref: '#/components/schemas/SuccessResponse' },
+                    {
+                      type: 'object',
+                      properties: {
+                        data: {
+                          type: 'array',
+                          items: {
+                            type: 'object',
+                            properties: {
+                              id: { type: 'string', format: 'uuid' },
+                              name: { type: 'string' },
+                              prefix: { type: 'string' },
+                              permissions: { type: 'array', items: { type: 'string' } },
+                              isActive: { type: 'boolean' },
+                              lastUsedAt: { type: 'string', format: 'date-time', nullable: true },
+                              expiresAt: { type: 'string', format: 'date-time', nullable: true },
+                              createdAt: { type: 'string', format: 'date-time' },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+        },
+      },
+    },
+    '/integrations/webhooks': {
+      post: {
+        tags: ['Integrations'],
+        summary: 'Đăng ký Webhook Endpoint mới (Tự động mã hóa secret AES-256-GCM)',
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['url'],
+                properties: {
+                  url: { type: 'string', format: 'uri', example: 'https://example.com/webhook-receiver' },
+                  events: { type: 'array', items: { type: 'string' }, example: ['job.completed', 'job.failed'] },
+                  secret: { type: 'string', minLength: 16, description: 'Secret tùy chọn để ký HMAC (tự sinh ngẫu nhiên nếu để trống)' },
+                  description: { type: 'string', example: 'Core ERP Integration' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'Đăng ký Webhook thành công',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/SuccessResponse' } } },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          422: { $ref: '#/components/responses/Validation' },
+        },
+      },
+      get: {
+        tags: ['Integrations'],
+        summary: 'Lấy danh sách Webhook Endpoints đã đăng ký của người dùng',
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Danh sách Webhooks',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/SuccessResponse' } } },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+        },
+      },
+    },
+    '/integrations/jobs/trigger': {
+      post: {
+        tags: ['Integrations'],
+        summary: 'Khởi tạo Job bất đồng bộ từ bên thứ ba (Xác thực qua header X-API-Key)',
+        security: [{ ApiKeyAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['taskName'],
+                properties: {
+                  taskName: { type: 'string', example: 'export_daily_ledger' },
+                  data: { type: 'object', example: { date: '2026-08-23' } },
+                  simulateError: { type: 'boolean', example: false },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          202: {
+            description: 'Job được chấp nhận xử lý. Webhook callback có chữ ký HMAC sẽ tự động gửi tới endpoint của chủ sở hữu.',
+            content: {
+              'application/json': {
+                schema: {
+                  allOf: [
+                    { $ref: '#/components/schemas/SuccessResponse' },
+                    {
+                      type: 'object',
+                      properties: {
+                        data: {
+                          type: 'object',
+                          properties: {
+                            jobId: { type: 'string', example: 'job_123e4567...' },
+                            taskName: { type: 'string', example: 'export_daily_ledger' },
+                            status: { type: 'string', example: 'COMPLETED' },
+                            webhooksNotified: { type: 'integer', example: 1 },
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          422: { $ref: '#/components/responses/Validation' },
         },
       },
     },

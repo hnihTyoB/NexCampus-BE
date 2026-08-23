@@ -16,6 +16,7 @@ export interface EnableMaintenanceDto {
   estimatedEndAt?: string | null;
   bypassPermissions?: string[];
   bypassRoles?: string[];
+  bypassIps?: string[];
   status?: 'MAINTENANCE' | 'READ_ONLY';
 }
 
@@ -28,4 +29,5 @@ export interface UpdateMaintenanceDto {
   estimatedEndAt?: string | null;
   bypassPermissions?: string[];
   bypassRoles?: string[];
+  bypassIps?: string[];
 }

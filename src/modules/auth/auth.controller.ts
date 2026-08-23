@@ -131,8 +131,8 @@ export class AuthController {
 
   verifyEmail = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { token } = req.query;
-      await this.service.verifyEmail(token as string);
+      const { token } = req.query as { token: string };
+      await this.service.verifyEmail(token);
 
       res.json({
         success: true,

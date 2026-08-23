@@ -6,6 +6,7 @@ import {
   EmailTemplateKey,
   NOTIFICATION_TYPE,
   NOTIFICATION_PRIORITY,
+  DEFAULT_EMAIL_SUBJECTS,
 } from '../constants/notification.constant';
 import { renderTemplateString } from '../helpers/template.helper';
 
@@ -135,14 +136,11 @@ class NotificationDispatcher {
   }
 
   private async dispatchEmail(userId: string, payload: EmailNotificationPayload): Promise<void> {
-    const subjectMap: Record<string, string> = {
-      VERIFY_EMAIL: 'Xác thực tài khoản của bạn',
-      RESET_PASSWORD: 'Đặt lại mật khẩu',
-      NEW_DEVICE_ALERT: 'Phát hiện đăng nhập từ thiết bị mới',
-      CUSTOM: (payload.templateData['subject'] as string) ?? 'Thông báo từ hệ thống',
-    };
-
-    const subject = payload.subject || subjectMap[payload.templateKey] || 'Thông báo từ hệ thống';
+    const subject =
+      payload.subject ||
+      (payload.templateData['subject'] as string) ||
+      DEFAULT_EMAIL_SUBJECTS[payload.templateKey] ||
+      'Thông báo từ hệ thống';
 
     await prisma.emailNotification.create({
       data: {

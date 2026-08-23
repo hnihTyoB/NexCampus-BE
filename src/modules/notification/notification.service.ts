@@ -26,6 +26,7 @@ import {
   NOTIFICATION_PRIORITY,
   EMAIL_TEMPLATE_KEY,
   NotificationChannel,
+  DEFAULT_EMAIL_SUBJECTS,
 } from '../../common/constants/notification.constant';
 import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from '../../common/constants/audit-log.constant';
 
@@ -72,24 +73,13 @@ export class NotificationService {
   }
 
   async send(dto: SendNotificationDto): Promise<{ sentCount: number }> {
-    const {
-      userIds,
-      channels,
-      title,
-      content,
-      type = NOTIFICATION_TYPE.SYSTEM,
-      priority = NOTIFICATION_PRIORITY.NORMAL,
-      actionUrl,
-      metadata,
-      templateKey = EMAIL_TEMPLATE_KEY.CUSTOM,
-      templateData,
-    } = dto;
+    const { userIds, channels, title, content, type, priority, actionUrl, metadata, templateKey = EMAIL_TEMPLATE_KEY.CUSTOM, templateData } = dto;
 
     if (channels.includes(NOTIFICATION_CHANNEL.WEB)) {
       const records = userIds.map((userId) => ({
         userId,
-        type,
-        priority,
+        type: type || NOTIFICATION_TYPE.INFO,
+        priority: priority || NOTIFICATION_PRIORITY.NORMAL,
         title,
         content,
         actionUrl: actionUrl || null,
@@ -101,17 +91,12 @@ export class NotificationService {
     if (channels.includes(NOTIFICATION_CHANNEL.EMAIL)) {
       const targetUsers = await this.repository.findActiveUsersByIds(userIds);
 
-      const subjectMap: Record<string, string> = {
-        VERIFY_EMAIL: 'Xác thực tài khoản của bạn',
-        RESET_PASSWORD: 'Đặt lại mật khẩu',
-        NEW_DEVICE_ALERT: 'Phát hiện đăng nhập từ thiết bị mới',
-        CUSTOM: ((templateData?.subject as string) || title) ?? 'Thông báo từ hệ thống',
-      };
+      const subject = ((templateData?.subject as string) || DEFAULT_EMAIL_SUBJECTS[templateKey] || title) ?? 'Thông báo từ hệ thống';
 
       const emailRecords = targetUsers.map((u) => ({
         userId: u.id,
         toEmail: u.email!,
-        subject: subjectMap[templateKey] ?? title,
+        subject,
         templateKey,
         templateData: (templateData || { subject: title, html: content }) as any,
         status: 'PENDING',
@@ -141,7 +126,11 @@ export class NotificationService {
       metadata: dto.metadata || null,
     }));
 
-    await this.repository.createManyNotifications(records);
+    const BATCH_SIZE = 500;
+    for (let i = 0; i < records.length; i += BATCH_SIZE) {
+      const batch = records.slice(i, i + BATCH_SIZE);
+      await this.repository.createManyNotifications(batch);
+    }
 
     return { totalRecipients: activeUsers.length };
   }

@@ -83,12 +83,17 @@ export class AuthRepository {
   }
 
   async createVerificationToken(userId: string, token: string, expiresAt: Date) {
-    return prisma.verificationToken.create({
-      data: {
-        userId,
-        token,
-        expiresAt,
-      },
+    return prisma.$transaction(async (tx) => {
+      await tx.verificationToken.deleteMany({
+        where: { userId },
+      });
+      return tx.verificationToken.create({
+        data: {
+          userId,
+          token,
+          expiresAt,
+        },
+      });
     });
   }
 
@@ -173,12 +178,17 @@ export class AuthRepository {
   }
 
   async createPasswordResetToken(userId: string, token: string, expiresAt: Date) {
-    return prisma.passwordResetToken.create({
-      data: {
-        userId,
-        token,
-        expiresAt,
-      },
+    return prisma.$transaction(async (tx) => {
+      await tx.passwordResetToken.deleteMany({
+        where: { userId },
+      });
+      return tx.passwordResetToken.create({
+        data: {
+          userId,
+          token,
+          expiresAt,
+        },
+      });
     });
   }
 
@@ -225,10 +235,6 @@ export class AuthRepository {
         ipAddress: data.ipAddress,
       },
     });
-  }
-
-  async createUserDevice(data: { userId: string; deviceHash: string; deviceName: string; ipAddress?: string }) {
-    return this.upsertUserDevice(data);
   }
 
   async updateUserDeviceLastLogin(userId: string, deviceHash: string, ipAddress?: string) {

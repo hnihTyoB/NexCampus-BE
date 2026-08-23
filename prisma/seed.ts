@@ -34,6 +34,14 @@ const SYSTEM_PERMISSIONS = [
   { name: 'MAINTENANCE_READ', resource: 'MAINTENANCE', action: 'READ', description: 'Xem trạng thái và cấu hình bảo trì hệ thống' },
   { name: 'MAINTENANCE_MANAGE', resource: 'MAINTENANCE', action: 'MANAGE', description: 'Bật/tắt và quản lý lịch bảo trì hệ thống' },
   { name: 'MAINTENANCE_BYPASS', resource: 'MAINTENANCE', action: 'BYPASS', description: 'Truy cập hệ thống khi đang bật chế độ bảo trì' },
+
+  // API Keys & Integrations
+  { name: 'API_KEY_READ', resource: 'API_KEY', action: 'READ', description: 'Xem danh sách và chi tiết API Keys' },
+  { name: 'API_KEY_MANAGE', resource: 'API_KEY', action: 'MANAGE', description: 'Tạo, thu hồi và quản lý API Keys' },
+
+  // Webhooks
+  { name: 'WEBHOOK_READ', resource: 'WEBHOOK', action: 'READ', description: 'Xem danh sách Webhook Endpoints và lịch sử giao nhận' },
+  { name: 'WEBHOOK_MANAGE', resource: 'WEBHOOK', action: 'MANAGE', description: 'Đăng ký, cấu hình và kích hoạt retry Webhook deliveries' },
 ];
 
 const USER_BASE_PERMISSIONS: string[] = [
@@ -50,6 +58,8 @@ const MANAGER_PERMISSIONS: string[] = [
   'NOTIFICATION_TEMPLATE_READ',
   'MAINTENANCE_READ',
   'AUDIT_LOG_READ',
+  'API_KEY_READ',
+  'WEBHOOK_READ',
 ];
 
 async function main() {
@@ -206,6 +216,7 @@ async function main() {
       message: 'Hệ thống đang được bảo trì để nâng cấp dịch vụ. Vui lòng quay lại sau.',
       bypassPermissions: ['MAINTENANCE_MANAGE', 'MAINTENANCE_BYPASS'],
       bypassRoles: ['ADMIN'],
+      bypassIps: [],
     },
   });
   console.log('MaintenanceConfig default seeded');

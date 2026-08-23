@@ -7,6 +7,7 @@ interface CacheEntry {
 
 export class PermissionCacheService {
   private cache = new Map<string, CacheEntry>();
+  private inflight = new Map<string, Promise<Set<string>>>();
   private readonly TTL_MS = 10 * 60 * 1000; // 10 minutes
 
   constructor() {
@@ -27,31 +28,45 @@ export class PermissionCacheService {
       return cached.permissions;
     }
 
-    // Query database for role permissions
-    const roleWithPermissions = await prisma.role.findUnique({
-      where: { id: roleId },
-      include: {
-        permissions: {
-          include: {
-            permission: true,
-          },
-        },
-      },
-    });
-
-    const permissionSet = new Set<string>();
-    if (roleWithPermissions) {
-      for (const rp of roleWithPermissions.permissions) {
-        permissionSet.add(rp.permission.name);
-      }
+    const inflightPromise = this.inflight.get(roleId);
+    if (inflightPromise) {
+      return inflightPromise;
     }
 
-    this.cache.set(roleId, {
-      permissions: permissionSet,
-      expiresAt: Date.now() + this.TTL_MS,
-    });
+    const fetchPromise = (async () => {
+      try {
+        // Query database for role permissions
+        const roleWithPermissions = await prisma.role.findUnique({
+          where: { id: roleId },
+          include: {
+            permissions: {
+              include: {
+                permission: true,
+              },
+            },
+          },
+        });
 
-    return permissionSet;
+        const permissionSet = new Set<string>();
+        if (roleWithPermissions) {
+          for (const rp of roleWithPermissions.permissions) {
+            permissionSet.add(rp.permission.name);
+          }
+        }
+
+        this.cache.set(roleId, {
+          permissions: permissionSet,
+          expiresAt: Date.now() + this.TTL_MS,
+        });
+
+        return permissionSet;
+      } finally {
+        this.inflight.delete(roleId);
+      }
+    })();
+
+    this.inflight.set(roleId, fetchPromise);
+    return fetchPromise;
   }
 
   async getUserPermissions(userId: string): Promise<string[]> {

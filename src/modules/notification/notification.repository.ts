@@ -1,4 +1,5 @@
 import { prisma } from '../../database/prisma.client';
+import { SYSTEM_TARGET_ID } from '../../common/constants/audit-log.constant';
 import {
   ListNotificationsDto,
   ListEmailsDto,
@@ -148,11 +149,12 @@ export class NotificationRepository {
   // ─────────────────────────────────────────────
 
   findTemplates(dto: ListNotificationTemplatesDto) {
-    const { page = 1, limit = 20, isActive, search } = dto;
+    const { page = 1, limit = 20, isActive, search, channel } = dto;
     const skip = (page - 1) * limit;
 
     const where: any = {
       ...(isActive !== undefined && { isActive }),
+      ...(channel && { channels: { array_contains: [channel] } }),
       ...(search && {
         OR: [
           { code: { contains: search, mode: 'insensitive' } },
@@ -223,7 +225,7 @@ export class NotificationRepository {
     action: string;
     targetType: string;
     targetId?: string;
-    details?: any;
+    details?: Record<string, unknown> | null;
     ipAddress?: string;
     userAgent?: string;
   }) {
@@ -232,8 +234,8 @@ export class NotificationRepository {
         actorId: data.actorId,
         action: data.action,
         targetType: data.targetType,
-        targetId: data.targetId || 'SYSTEM',
-        details: data.details || null,
+        targetId: data.targetId || SYSTEM_TARGET_ID,
+        details: (data.details as any) || null,
         ipAddress: data.ipAddress,
         userAgent: data.userAgent,
       },

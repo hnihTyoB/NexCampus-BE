@@ -198,6 +198,13 @@ export class RbacRepository {
     });
   }
 
+  async findUserById(id: string) {
+    return prisma.user.findUnique({
+      where: { id },
+      select: { id: true, email: true, roleId: true },
+    });
+  }
+
   async assignUserRole(userId: string, roleId: string) {
     return prisma.user.update({
       where: { id: userId },
@@ -211,7 +218,7 @@ export class RbacRepository {
     action: string;
     targetType: string;
     targetId: string;
-    details?: any;
+    details?: Record<string, unknown> | null;
     ipAddress?: string;
     userAgent?: string;
   }) {
@@ -221,7 +228,7 @@ export class RbacRepository {
         action: data.action,
         targetType: data.targetType,
         targetId: data.targetId,
-        details: data.details,
+        details: (data.details as any) || null,
         ipAddress: data.ipAddress,
         userAgent: data.userAgent,
       },

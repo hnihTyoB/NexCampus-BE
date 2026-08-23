@@ -4,15 +4,19 @@ import { jwtConfig } from '../config/jwt.config';
 import { AppError } from '../common/errors/app-error';
 import { ERROR_CODE } from '../common/errors/error-code';
 
-export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
+export function extractTokenFromRequest(req: Request): string | undefined {
   let token = req.cookies?.accessToken;
-
   if (!token) {
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       token = authHeader.split(' ')[1];
     }
   }
+  return token;
+}
+
+export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
+  const token = extractTokenFromRequest(req);
 
   if (!token) {
     next(new AppError('Unauthorized', 401, ERROR_CODE.UNAUTHORIZED));
@@ -30,7 +34,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
     req.user = {
       id: payload.id,
       email: payload.email,
-      role: payload.role as any,
+      role: payload.role,
       roleId: payload.roleId,
     };
 

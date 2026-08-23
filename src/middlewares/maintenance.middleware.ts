@@ -6,6 +6,8 @@ import { jwtConfig } from '../config/jwt.config';
 import { AppError } from '../common/errors/app-error';
 import { ERROR_CODE } from '../common/errors/error-code';
 import { MAINTENANCE_STATUS } from '../common/constants/maintenance.constant';
+import { isIpInWhitelist } from '../common/helpers/ip.helper';
+import { extractTokenFromRequest } from './auth.middleware';
 
 export interface MaintenanceGuardOptions {
   exemptPaths?: (string | RegExp)[];
@@ -13,9 +15,10 @@ export interface MaintenanceGuardOptions {
 
 const DEFAULT_EXEMPT_PATHS: (string | RegExp)[] = [
   '/health',
+  /^\/api\/v1\/health/,
   /^\/api\/docs/,
   /^\/api\/v1\/maintenance/,
-  /^\/api\/v1\/auth/,
+  /^\/api\/v1\/auth\/(login|refresh|logout|me|sessions)/,
 ];
 
 export function maintenanceGuard(options?: MaintenanceGuardOptions) {
@@ -43,17 +46,21 @@ export function maintenanceGuard(options?: MaintenanceGuardOptions) {
         return next();
       }
 
+      // Check IP Whitelist Bypass (e.g. Developer VPN, QA office static IPs)
+      const clientIp = req.ip || req.socket?.remoteAddress || '';
+      const bypassIps = Array.isArray((config as any).bypassIps)
+        ? ((config as any).bypassIps as string[])
+        : [];
+
+      if (bypassIps.length > 0 && isIpInWhitelist(clientIp, bypassIps)) {
+        return next();
+      }
+
       // Extract user if already populated or from token
       let user = req.user;
 
       if (!user) {
-        let token = req.cookies?.accessToken;
-        if (!token) {
-          const authHeader = req.headers?.authorization;
-          if (authHeader && authHeader.startsWith('Bearer ')) {
-            token = authHeader.split(' ')[1];
-          }
-        }
+        const token = extractTokenFromRequest(req);
 
         if (token) {
           try {

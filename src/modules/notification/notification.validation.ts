@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isPublicHttpUrl } from '../../common/helpers/url.helper';
 
 export const listNotificationsSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -33,7 +34,13 @@ export const sendNotificationSchema = z.object({
   content: z.string().min(1, 'Content is required'),
   type: z.enum(['SYSTEM', 'ALERT', 'INFO', 'SUCCESS', 'WARNING']).optional(),
   priority: z.enum(['LOW', 'NORMAL', 'HIGH']).optional(),
-  actionUrl: z.string().optional(),
+  actionUrl: z
+    .string()
+    .refine(
+      (url) => isPublicHttpUrl(url),
+      'actionUrl must be a valid public HTTPS URL (private IP and localhost are not allowed in production)',
+    )
+    .optional(),
   metadata: z.record(z.unknown()).optional(),
   templateKey: z.string().optional(),
   templateData: z.record(z.unknown()).optional(),
@@ -44,7 +51,13 @@ export const broadcastNotificationSchema = z.object({
   content: z.string().min(1, 'Content is required'),
   type: z.enum(['SYSTEM', 'ALERT', 'INFO', 'SUCCESS', 'WARNING']).optional(),
   priority: z.enum(['LOW', 'NORMAL', 'HIGH']).optional(),
-  actionUrl: z.string().optional(),
+  actionUrl: z
+    .string()
+    .refine(
+      (url) => isPublicHttpUrl(url),
+      'actionUrl must be a valid public HTTPS URL (private IP and localhost are not allowed in production)',
+    )
+    .optional(),
   metadata: z.record(z.unknown()).optional(),
 });
 
@@ -54,10 +67,6 @@ export const listEmailsSchema = z.object({
   status: z.enum(['PENDING', 'PROCESSING', 'SENT', 'FAILED']).optional(),
   toEmail: z.string().optional(),
 });
-
-// ─────────────────────────────────────────────
-// Notification Template Validation Schemas
-// ─────────────────────────────────────────────
 
 export const createNotificationTemplateSchema = z.object({
   code: z
