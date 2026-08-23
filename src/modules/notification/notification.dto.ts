@@ -32,6 +32,10 @@ export interface UnreadCountResponseDto {
   unreadCount: number;
 }
 
+// ─────────────────────────────────────────────
+// Admin Notification DTOs
+// ─────────────────────────────────────────────
+
 export interface SendNotificationDto {
   userIds: string[];
   channels: NotificationChannel[];
@@ -82,4 +86,77 @@ export interface ListEmailsResponseDto {
   page: number;
   limit: number;
   totalPages: number;
+}
+
+export interface CreateNotificationTemplateDto {
+  code: string;
+  name: string;
+  description?: string;
+  channels: NotificationChannel[];
+  subject?: string;
+  title?: string;
+  content: string;
+  variables: string[];
+  isActive?: boolean;
+}
+
+export interface UpdateNotificationTemplateDto {
+  name?: string;
+  description?: string;
+  channels?: NotificationChannel[];
+  subject?: string;
+  title?: string;
+  content?: string;
+  variables?: string[];
+  isActive?: boolean;
+}
+
+export interface ListNotificationTemplatesDto {
+  page?: number;
+  limit?: number;
+  channel?: string;
+  isActive?: boolean;
+  search?: string;
+}
+
+export interface NotificationTemplateItemDto {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  channels: unknown;
+  subject: string | null;
+  title: string | null;
+  content: string;
+  variables: unknown;
+  isSystem: boolean;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ListNotificationTemplatesResponseDto {
+  items: NotificationTemplateItemDto[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface PreviewNotificationTemplateDto {
+  variables: Record<string, unknown>;
+}
+
+export interface PreviewNotificationTemplateResponseDto {
+  code: string;
+  subject: string | null;
+  title: string | null;
+  content: string;
+  html?: string;
+}
+
+export interface TestSendNotificationTemplateDto {
+  toEmail?: string;
+  variables: Record<string, unknown>;
+  channels?: NotificationChannel[];
 }

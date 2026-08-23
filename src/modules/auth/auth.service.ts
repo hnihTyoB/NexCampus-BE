@@ -88,7 +88,6 @@ export class AuthService {
           });
         }
 
-        // Tạo thông báo trong ứng dụng cho thiết bị lạ
         notificationDispatcher.notify(
           user.id,
           NOTIFICATION_TYPE.ALERT,
@@ -238,7 +237,6 @@ export class AuthService {
 
     await this.repository.activateUserAndDeleteToken(verificationToken.userId, verificationToken.id);
 
-    // Thông báo chào mừng kích hoạt tài khoản thành công
     notificationDispatcher.notify(
       verificationToken.userId,
       NOTIFICATION_TYPE.SUCCESS,

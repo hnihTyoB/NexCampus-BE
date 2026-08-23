@@ -88,12 +88,12 @@ export class EmailWorker {
     attempts: number;
   }): Promise<void> {
     try {
-      const { html } = this.templateService.render(
-        record.templateKey as EmailTemplateKey,
+      const { html, subject } = await this.templateService.renderAsync(
+        record.templateKey,
         record.templateData as Record<string, unknown>,
       );
 
-      await this.mailService.sendRaw(record.toEmail, record.subject, html);
+      await this.mailService.sendRaw(record.toEmail, subject || record.subject, html);
 
       await prisma.emailNotification.update({
         where: { id: record.id },

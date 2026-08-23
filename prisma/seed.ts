@@ -24,6 +24,8 @@ const SYSTEM_PERMISSIONS = [
   { name: 'NOTIFICATION_CREATE', resource: 'NOTIFICATION', action: 'CREATE', description: 'Tạo và bắn thông báo tới người dùng / toàn hệ thống' },
   { name: 'NOTIFICATION_UPDATE', resource: 'NOTIFICATION', action: 'UPDATE', description: 'Kích hoạt retry gửi lại email bị lỗi' },
   { name: 'NOTIFICATION_DELETE', resource: 'NOTIFICATION', action: 'DELETE', description: 'Xóa thông báo và nhật ký email' },
+  { name: 'NOTIFICATION_TEMPLATE_READ', resource: 'NOTIFICATION_TEMPLATE', action: 'READ', description: 'Xem danh sách và chi tiết mẫu thông báo/email' },
+  { name: 'NOTIFICATION_TEMPLATE_MANAGE', resource: 'NOTIFICATION_TEMPLATE', action: 'MANAGE', description: 'Quản lý, tạo mới, cập nhật và test mẫu thông báo' },
 
   // Audit Logs
   { name: 'AUDIT_LOG_READ', resource: 'AUDIT_LOG', action: 'READ', description: 'Xem nhật ký kiểm toán hệ thống' },
@@ -45,6 +47,7 @@ const MANAGER_PERMISSIONS: string[] = [
   'NOTIFICATION_READ',
   'NOTIFICATION_CREATE',
   'NOTIFICATION_UPDATE',
+  'NOTIFICATION_TEMPLATE_READ',
   'MAINTENANCE_READ',
   'AUDIT_LOG_READ',
 ];
@@ -206,6 +209,112 @@ async function main() {
     },
   });
   console.log('MaintenanceConfig default seeded');
+
+  // 6. Seed Default System Notification Templates
+  const DEFAULT_TEMPLATES = [
+    {
+      code: 'VERIFY_EMAIL',
+      name: 'Xác thực tài khoản',
+      description: 'Email gửi kèm link xác thực khi người dùng đăng ký tài khoản mới',
+      channels: ['EMAIL'],
+      subject: 'Xác thực tài khoản của bạn',
+      title: 'Xác thực tài khoản',
+      content: '<p>Chào <strong>{{fullName}}</strong>,</p><p>Cảm ơn bạn đã đăng ký tài khoản. Vui lòng click vào nút bên dưới để xác thực email của bạn:</p><div style="text-align: center; margin: 32px 0;"><a href="{{verificationUrl}}" style="background-color: #4CAF50; color: white; padding: 14px 28px; text-decoration: none; border-radius: 5px; font-weight: bold;">Xác thực tài khoản</a></div><p style="color: #666; font-size: 13px;">Link có hiệu lực trong 24 giờ. Nếu bạn không đăng ký, vui lòng bỏ qua email này.</p>',
+      variables: ['fullName', 'verificationUrl', 'token'],
+      isSystem: true,
+      isActive: true,
+    },
+    {
+      code: 'RESET_PASSWORD',
+      name: 'Đặt lại mật khẩu',
+      description: 'Email gửi kèm link khôi phục mật khẩu khi người dùng yêu cầu',
+      channels: ['EMAIL'],
+      subject: 'Đặt lại mật khẩu tài khoản',
+      title: 'Đặt lại mật khẩu',
+      content: '<p>Chào <strong>{{fullName}}</strong>,</p><p>Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn.</p><div style="text-align: center; margin: 32px 0;"><a href="{{resetUrl}}" style="background-color: #FF5722; color: white; padding: 14px 28px; text-decoration: none; border-radius: 5px; font-weight: bold;">Đặt lại mật khẩu</a></div><p style="color: #666; font-size: 13px;">Link có hiệu lực trong 1 giờ. Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email này.</p>',
+      variables: ['fullName', 'resetUrl', 'token'],
+      isSystem: true,
+      isActive: true,
+    },
+    {
+      code: 'NEW_DEVICE_ALERT',
+      name: 'Cảnh báo đăng nhập thiết bị mới',
+      description: 'Thông báo & Email khi phát hiện đăng nhập từ thiết bị lạ',
+      channels: ['WEB', 'EMAIL'],
+      subject: '⚠️ Cảnh báo: Phát hiện đăng nhập từ thiết bị mới',
+      title: 'Phát hiện đăng nhập từ thiết bị mới',
+      content: 'Tài khoản của bạn vừa được đăng nhập từ thiết bị: {{deviceName}} (IP: {{ipAddress}}) vào lúc {{loginTime}}.',
+      variables: ['fullName', 'deviceName', 'ipAddress', 'loginTime'],
+      isSystem: true,
+      isActive: true,
+    },
+    {
+      code: 'WELCOME',
+      name: 'Chào mừng thành viên mới',
+      description: 'Thông báo in-app chào mừng sau khi tài khoản được kích hoạt thành công',
+      channels: ['WEB'],
+      subject: 'Chào mừng bạn đến với hệ thống',
+      title: 'Xác thực tài khoản thành công',
+      content: 'Chào mừng {{fullName}} đến với hệ thống! Tài khoản của bạn đã được kích hoạt thành công.',
+      variables: ['fullName'],
+      isSystem: true,
+      isActive: true,
+    },
+    {
+      code: 'PASSWORD_CHANGED',
+      name: 'Đổi mật khẩu thành công',
+      description: 'Thông báo cảnh báo bảo mật khi mật khẩu tài khoản thay đổi',
+      channels: ['WEB', 'EMAIL'],
+      subject: 'Mật khẩu tài khoản đã được thay đổi',
+      title: 'Đổi mật khẩu thành công',
+      content: 'Mật khẩu tài khoản của bạn vừa được thay đổi thành công. Nếu không phải bạn thực hiện, vui lòng liên hệ quản trị viên ngay lập tức.',
+      variables: ['fullName'],
+      isSystem: true,
+      isActive: true,
+    },
+    {
+      code: 'ROLE_ASSIGNED',
+      name: 'Cập nhật vai trò tài khoản',
+      description: 'Thông báo khi người dùng được gán vai trò mới',
+      channels: ['WEB'],
+      subject: 'Cập nhật vai trò tài khoản',
+      title: 'Cập nhật vai trò tài khoản',
+      content: 'Vai trò tài khoản của bạn đã được cập nhật thành: {{roleName}}.',
+      variables: ['fullName', 'roleName'],
+      isSystem: true,
+      isActive: true,
+    },
+  ];
+
+  for (const tpl of DEFAULT_TEMPLATES) {
+    await prisma.notificationTemplate.upsert({
+      where: { code: tpl.code },
+      update: {
+        name: tpl.name,
+        description: tpl.description,
+        channels: tpl.channels,
+        subject: tpl.subject,
+        title: tpl.title,
+        content: tpl.content,
+        variables: tpl.variables,
+        isSystem: tpl.isSystem,
+        isActive: tpl.isActive,
+      },
+      create: {
+        code: tpl.code,
+        name: tpl.name,
+        description: tpl.description,
+        channels: tpl.channels,
+        subject: tpl.subject,
+        title: tpl.title,
+        content: tpl.content,
+        variables: tpl.variables,
+        isSystem: tpl.isSystem,
+        isActive: tpl.isActive,
+      },
+    });
+  }
+  console.log('NotificationTemplates default seeded (6 templates)');
 
   console.log('Seed completed successfully');
 }
