@@ -29,7 +29,7 @@ export class AuthService {
     }
 
     if (!user.isActive) {
-      throw new AppError('Account is inactive', 403, ERROR_CODE.USER_INACTIVE);
+      throw new AppError('Tài khoản chưa được kích hoạt hoặc đã bị vô hiệu hóa. Vui lòng xác thực email hoặc liên hệ quản trị viên.', 403, ERROR_CODE.USER_INACTIVE);
     }
 
     if (!user.password) {
@@ -45,13 +45,13 @@ export class AuthService {
     const payload = { id: user.id, email: user.email, role: user.role.name, roleId: user.roleId };
 
     const accessToken = jwt.sign(payload, jwtConfig.accessSecret, {
-      expiresIn: jwtConfig.accessExpiresIn as any,
+      expiresIn: jwtConfig.accessExpiresIn as jwt.SignOptions['expiresIn'],
     });
 
     const refreshToken = jwt.sign(
       { ...payload, jti: crypto.randomUUID() },
       jwtConfig.refreshSecret,
-      { expiresIn: jwtConfig.refreshExpiresIn as any }
+      { expiresIn: jwtConfig.refreshExpiresIn as jwt.SignOptions['expiresIn'] }
     );
 
     const decoded = jwt.decode(refreshToken) as { exp: number };
@@ -145,13 +145,13 @@ export class AuthService {
     const newPayload = { id: user.id, email: user.email, role: user.role.name, roleId: user.roleId };
 
     const newAccessToken = jwt.sign(newPayload, jwtConfig.accessSecret, {
-      expiresIn: jwtConfig.accessExpiresIn as any,
+      expiresIn: jwtConfig.accessExpiresIn as jwt.SignOptions['expiresIn'],
     });
 
     const newRefreshToken = jwt.sign(
       { ...newPayload, jti: crypto.randomUUID() },
       jwtConfig.refreshSecret,
-      { expiresIn: jwtConfig.refreshExpiresIn as any }
+      { expiresIn: jwtConfig.refreshExpiresIn as jwt.SignOptions['expiresIn'] }
     );
 
     const decoded = jwt.decode(newRefreshToken) as { exp: number };

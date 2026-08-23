@@ -9,18 +9,19 @@ export class MaintenanceRepository {
     });
   }
 
-  async getOrCreateDefaultConfig() {
+  async getOrCreateDefaultConfig(key = 'DEFAULT') {
     return prisma.maintenanceConfig.upsert({
-      where: { key: 'DEFAULT' },
+      where: { key },
       update: {},
       create: {
-        key: DEFAULT_MAINTENANCE_CONFIG.key,
+        key,
         enabled: DEFAULT_MAINTENANCE_CONFIG.enabled,
         status: DEFAULT_MAINTENANCE_CONFIG.status,
         title: DEFAULT_MAINTENANCE_CONFIG.title,
         message: DEFAULT_MAINTENANCE_CONFIG.message,
         bypassPermissions: DEFAULT_MAINTENANCE_CONFIG.bypassPermissions as any,
         bypassRoles: DEFAULT_MAINTENANCE_CONFIG.bypassRoles as any,
+        bypassIps: DEFAULT_MAINTENANCE_CONFIG.bypassIps as any,
       },
     });
   }
@@ -37,7 +38,7 @@ export class MaintenanceRepository {
     action: string;
     targetType: string;
     targetId: string;
-    details?: any;
+    details?: Record<string, unknown> | null;
     ipAddress?: string;
     userAgent?: string;
   }) {
@@ -47,7 +48,7 @@ export class MaintenanceRepository {
         action: data.action,
         targetType: data.targetType,
         targetId: data.targetId,
-        details: data.details,
+        details: (data.details as any) || null,
         ipAddress: data.ipAddress,
         userAgent: data.userAgent,
       },

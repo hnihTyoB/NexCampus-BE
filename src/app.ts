@@ -38,7 +38,7 @@ const corsOptions: cors.CorsOptions = {
   credentials: true,
 };
 app.use(cors(corsOptions));
-app.use(morgan('dev'));
+app.use(morgan(envConfig.nodeEnv === 'production' ? 'combined' : 'dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());

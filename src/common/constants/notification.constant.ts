@@ -54,3 +54,10 @@ export const EMAIL_STATUS = {
 export type EmailStatus = keyof typeof EMAIL_STATUS;
 
 export const EMAIL_MAX_ATTEMPTS = 3;
+
+export const DEFAULT_EMAIL_SUBJECTS: Record<string, string> = {
+  VERIFY_EMAIL: 'Xác thực tài khoản của bạn',
+  RESET_PASSWORD: 'Đặt lại mật khẩu',
+  NEW_DEVICE_ALERT: 'Phát hiện đăng nhập từ thiết bị mới',
+  CUSTOM: 'Thông báo từ hệ thống',
+};

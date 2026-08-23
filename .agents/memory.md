@@ -42,9 +42,9 @@
   - Hỗ trợ các trạng thái `ONLINE`, `MAINTENANCE`, `READ_ONLY` (cho phép `GET`/`HEAD`/`OPTIONS` và chặn mutations với 503).
   - Trả về mã lỗi chuẩn `503 Service Unavailable` và response body `{ success: false, code: 'SYSTEM_MAINTENANCE', message: '...', data: { title, message, estimatedEndAt, startAt } }`.
   - Cung cấp API Public `GET /api/v1/maintenance/public` cho các ứng dụng client/frontend truy vấn trạng thái và thời gian hoàn tất.
-  - Phân quyền bypass bằng Dynamic RBAC permissions (`MAINTENANCE_MANAGE`, `MAINTENANCE_BYPASS`) và bypass roles (`ADMIN`).
-  - Cơ chế Anti-Lockout: Tuyệt đối không chặn các endpoint `/health`, `/api/docs`, `/api/v1/auth/*`, và `/api/v1/maintenance/*`.
-  - Tối ưu hóa hiệu năng bằng `MaintenanceCacheService` (in-memory TTL cache) kèm cơ chế tự động xóa cache tức thời khi trạng thái bảo trì thay đổi.
+  - Phân quyền bypass bằng Dynamic RBAC permissions (`MAINTENANCE_MANAGE`, `MAINTENANCE_BYPASS`), bypass roles (`ADMIN`), và bypass IP whitelists (`bypassIps` hỗ trợ IPv4, IPv6 và dải CIDR subnet như `10.0.0.0/8`, `192.168.1.0/24`).
+  - Cơ chế Anti-Lockout: Tuyệt đối không chặn các endpoint `/health`, `/api/docs`, `/api/v1/auth/(login|refresh|logout|me|sessions)`, và `/api/v1/maintenance/*`.
+  - Tối ưu hóa hiệu năng bằng `MaintenanceCacheService` (in-memory TTL cache) kết hợp **Redis Pub/Sub Cache Invalidation Adapter** (`maintenance:events`) để đồng bộ việc xóa cache tức thời giữa nhiều cluster instances / container pods, kèm cơ chế fallback tự động an toàn khi Redis không khả dụng.
   - Tự động ghi `AuditLog` cho các hành động `ENABLE_MAINTENANCE`, `UPDATE_MAINTENANCE`, `DISABLE_MAINTENANCE`.
 
 ## Trạng thái đã biết
@@ -53,4 +53,28 @@
 - Cơ sở dữ liệu sạch chuẩn template với các migration `20260722073204_`, `20260822152200_dynamic_rbac`, `20260822164800_notification_system`, `20260822170800_remove_domain_financial_models`, `20260822173600_add_maintenance_and_audit_index`.
 - Cấu hình port: fallback code là `8888` (hoặc `7777` theo `.env.example`).
 - Tài liệu Swagger UI tại `/api/docs`.
+
+- **Advanced SSRF Defense & URL Validation** (`src/common/helpers/url.helper.ts`):
+  - `isPrivateOrReservedIp(ip)`: Phát hiện mọi địa chỉ IPv4/IPv6 private (10.x, 172.16-31.x, 192.168.x, 169.254.x, CGN 100.64-127.x, Loopback 127.x, ULA fc00::/7, Link-local fe80::/10, Multicast ff00::/8, và IPv4-mapped IPv6 `::ffff:127.0.0.1` / `::ffff:169.254.169.254`).
+  - `resolveAndValidateDns(hostname, options)`: Phân giải toàn bộ bản ghi DNS A & AAAA, chống tấn công **DNS Rebinding** và domain public trỏ về IP private.
+  - `resolveSafeRedirectChain(urlString, options)`: Theo dõi và xác thực từng bước chuyển hướng **HTTP 301/302/303/307/308 redirect** (tối đa 5 redirects), chặn mọi hành vi chuyển hướng sang private IP, metadata IP, protocol không an toàn (`file:`, `ftp:`, `javascript:`), hoặc redirect loop.
+  - `isPublicHttpUrl(url, options)`: Validate cú pháp URL, tự động cho phép localhost trong môi trường `development` (`allowPrivate: true`) và chặn nghiêm ngặt trong `production`.
+  - Đã gắn vào Zod validation schema cho `avatarUrl` (`auth.validation.ts`) và `actionUrl` (`notification.validation.ts`).
+  - Unit tests đầy đủ tại `tests/helpers.test.ts` (102 tests pass).
+- **Multi-Tier Rate Limiting & RFC 6585 Standard** (`src/middlewares/rate-limit.middleware.ts`):
+  - Factory `createRateLimiter` sliding-window in-memory kèm cơ chế dọn dẹp định kỳ không rò rỉ bộ nhớ.
+  - Trả về đầy đủ HTTP Headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` và `Retry-After` (khi chạm 429).
+  - `rateLimitMiddleware`: Áp dụng toàn cục `/api/v1` (1000 req/15 phút).
+  - `authRateLimitMiddleware`: Áp dụng riêng cho các endpoint nhạy cảm `/register`, `/login`, `/forgot-password`, `/reset-password`, `/resend-verification` (30 req/15 phút) để phòng chống Brute Force và Credential Stuffing.
+  - Định nghĩa mã lỗi tập trung `ERROR_CODE.RATE_LIMIT_EXCEEDED`.
+- **CORS Production Fail-Safe** (`src/config/env.config.ts`):
+  - Bắt buộc khai báo danh sách domain cụ thể qua `ALLOWED_ORIGINS` khi chạy `NODE_ENV=production`.
+  - Cấm sử dụng wildcard `'*'` hoặc bỏ trống trong môi trường production để bảo vệ cookie/credentials.
+- **Audit & Remediation (full-project-audit)**:
+  - **Prisma Error Handling**: `errorMiddleware` tự động phân giải các lỗi Prisma (`P2002` -> 409 DUPLICATE_ENTRY, `P2025` -> 404 NOT_FOUND, `P2003` & Validation -> 400 VALIDATION_ERROR) ngăn ngừa lỗi 500 unhandled.
+  - **Token Lifecycle Hygiene**: `createVerificationToken` và `createPasswordResetToken` tự động xóa toàn bộ token cũ của cùng user trong `$transaction` trước khi tạo token mới.
+  - **RBAC Cache Invalidation**: `assignUserRole` tự động xóa cache cho cả `oldRoleId` và `newRoleId` để bảo đảm không tồn đọng quyền cũ.
+  - **Integration Architecture**: `IntegrationService` sử dụng `createAuditLog` qua repository thay vì gọi Prisma trực tiếp; `dispatchWebhookEvent` đẩy job vào queue song song bằng `Promise.all`.
+  - **Broadcast Notifications**: Phân tách người nhận thành các batch 500 bản ghi để tối ưu hóa hiệu năng chèn cơ sở dữ liệu.
+
 

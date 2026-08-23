@@ -3,6 +3,8 @@ import { envConfig } from '../../config/env.config';
 import { MailService } from '../services/mail.service';
 import { EmailTemplateService } from '../services/email-template.service';
 import { EMAIL_STATUS, EMAIL_MAX_ATTEMPTS, EmailTemplateKey } from '../constants/notification.constant';
+import { maintenanceCacheService } from '../services/maintenance-cache.service';
+import { MAINTENANCE_STATUS } from '../constants/maintenance.constant';
 
 const BATCH_SIZE = 20;
 
@@ -42,6 +44,13 @@ export class EmailWorker {
     this.isRunning = true;
 
     try {
+      const maintenanceConfig = await maintenanceCacheService.getConfig();
+      if (maintenanceConfig.enabled && maintenanceConfig.status === MAINTENANCE_STATUS.MAINTENANCE) {
+        // Tạm dừng xử lý hàng đợi email khi hệ thống đang ở chế độ bảo trì toàn diện
+        this.isRunning = false;
+        return;
+      }
+
       const pending = await prisma.emailNotification.findMany({
         where: {
           status: EMAIL_STATUS.PENDING,

@@ -14,4 +14,7 @@ export const DEFAULT_MAINTENANCE_CONFIG = {
   message: 'Hệ thống đang được bảo trì để nâng cấp dịch vụ. Vui lòng quay lại sau.',
   bypassPermissions: ['MAINTENANCE_MANAGE', 'MAINTENANCE_BYPASS'],
   bypassRoles: ['ADMIN'],
+  bypassIps: [] as string[],
 } as const;
+
+export const MAINTENANCE_PUBSUB_CHANNEL = 'maintenance:events';

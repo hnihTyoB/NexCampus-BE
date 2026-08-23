@@ -11,7 +11,7 @@ export class MaintenanceService {
   ) {}
 
   async getConfig(key = 'DEFAULT') {
-    const config = await this.repo.getOrCreateDefaultConfig();
+    const config = await this.repo.getOrCreateDefaultConfig(key);
     return config;
   }
 
@@ -47,6 +47,7 @@ export class MaintenanceService {
       estimatedEndAt,
       bypassPermissions: (dto.bypassPermissions ?? (previousConfig.bypassPermissions as any)) as any,
       bypassRoles: (dto.bypassRoles ?? (previousConfig.bypassRoles as any)) as any,
+      bypassIps: (dto.bypassIps ?? (previousConfig.bypassIps as any)) as any,
     });
 
     this.cacheService.invalidate();
@@ -107,6 +108,7 @@ export class MaintenanceService {
       estimatedEndAt,
       bypassPermissions: (dto.bypassPermissions ?? (previousConfig.bypassPermissions as any)) as any,
       bypassRoles: (dto.bypassRoles ?? (previousConfig.bypassRoles as any)) as any,
+      bypassIps: (dto.bypassIps ?? (previousConfig.bypassIps as any)) as any,
     });
 
     this.cacheService.invalidate();

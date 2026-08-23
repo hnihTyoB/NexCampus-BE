@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { Prisma } from '@prisma/client';
 import { AppError } from '../common/errors/app-error';
 import { ERROR_CODE } from '../common/errors/error-code';
 
@@ -33,6 +34,44 @@ export function errorMiddleware(
     res.status(400).json({
       success: false,
       message: 'Invalid JSON payload format',
+      code: ERROR_CODE.VALIDATION_ERROR,
+    });
+    return;
+  }
+
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === 'P2002') {
+      res.status(409).json({
+        success: false,
+        message: 'Dữ liệu đã tồn tại trong hệ thống (trùng lặp giá trị duy nhất)',
+        code: ERROR_CODE.DUPLICATE_ENTRY,
+      });
+      return;
+    }
+
+    if (error.code === 'P2025') {
+      res.status(404).json({
+        success: false,
+        message: 'Bản ghi không tồn tại hoặc đã bị xóa',
+        code: ERROR_CODE.NOT_FOUND,
+      });
+      return;
+    }
+
+    if (error.code === 'P2003') {
+      res.status(400).json({
+        success: false,
+        message: 'Dữ liệu liên kết không hợp lệ',
+        code: ERROR_CODE.VALIDATION_ERROR,
+      });
+      return;
+    }
+  }
+
+  if (error instanceof Prisma.PrismaClientValidationError) {
+    res.status(400).json({
+      success: false,
+      message: 'Dữ liệu truy vấn không hợp lệ',
       code: ERROR_CODE.VALIDATION_ERROR,
     });
     return;

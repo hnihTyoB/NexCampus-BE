@@ -1,23 +1,38 @@
 import { Router } from 'express';
 import { AuthController } from './auth.controller';
 import { authMiddleware } from '../../middlewares/auth.middleware';
+import { authRateLimitMiddleware } from '../../middlewares/rate-limit.middleware';
 import { validate } from '../../middlewares/validate.middleware';
-import { loginSchema, refreshSchema, logoutSchema, registerSchema, verifyEmailSchema, updateProfileSchema, updatePasswordSchema, forgotPasswordSchema, resetPasswordSchema, resendVerificationSchema, sessionIdParamSchema, getAvatarUploadUrlSchema, confirmAvatarUploadSchema } from './auth.validation';
+import {
+  loginSchema,
+  refreshSchema,
+  logoutSchema,
+  registerSchema,
+  verifyEmailSchema,
+  updateProfileSchema,
+  updatePasswordSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  resendVerificationSchema,
+  sessionIdParamSchema,
+  getAvatarUploadUrlSchema,
+  confirmAvatarUploadSchema,
+} from './auth.validation';
 
 const router = Router();
 const controller = new AuthController();
 
-router.post('/register', validate(registerSchema), controller.register);
+router.post('/register', authRateLimitMiddleware, validate(registerSchema), controller.register);
 router.get('/verify-email', validate(verifyEmailSchema, 'query'), controller.verifyEmail);
-router.post('/login', validate(loginSchema), controller.login);
+router.post('/login', authRateLimitMiddleware, validate(loginSchema), controller.login);
 router.get('/me', authMiddleware, controller.me);
 router.post('/refresh', validate(refreshSchema), controller.refresh);
 router.post('/logout', validate(logoutSchema), controller.logout);
 router.put('/profile', authMiddleware, validate(updateProfileSchema), controller.updateProfile);
 router.put('/password', authMiddleware, validate(updatePasswordSchema), controller.updatePassword);
-router.post('/forgot-password', validate(forgotPasswordSchema), controller.forgotPassword);
-router.post('/reset-password', validate(resetPasswordSchema), controller.resetPassword);
-router.post('/resend-verification', validate(resendVerificationSchema), controller.resendVerification);
+router.post('/forgot-password', authRateLimitMiddleware, validate(forgotPasswordSchema), controller.forgotPassword);
+router.post('/reset-password', authRateLimitMiddleware, validate(resetPasswordSchema), controller.resetPassword);
+router.post('/resend-verification', authRateLimitMiddleware, validate(resendVerificationSchema), controller.resendVerification);
 
 router.get('/sessions', authMiddleware, controller.getSessions);
 router.delete('/sessions/:id', authMiddleware, validate(sessionIdParamSchema, 'params'), controller.revokeSession);

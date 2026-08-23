@@ -20,6 +20,9 @@ export const enableMaintenanceSchema = z.object({
   bypassRoles: z
     .array(z.string().min(1, 'Role name cannot be empty'))
     .optional(),
+  bypassIps: z
+    .array(z.string().trim().min(1, 'IP address / subnet cannot be empty'))
+    .optional(),
   status: z
     .enum([MAINTENANCE_STATUS.MAINTENANCE, MAINTENANCE_STATUS.READ_ONLY])
     .optional(),
@@ -51,5 +54,8 @@ export const updateMaintenanceSchema = z.object({
     .optional(),
   bypassRoles: z
     .array(z.string().min(1, 'Role name cannot be empty'))
+    .optional(),
+  bypassIps: z
+    .array(z.string().trim().min(1, 'IP address / subnet cannot be empty'))
     .optional(),
 });

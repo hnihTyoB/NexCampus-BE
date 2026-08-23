@@ -108,3 +108,147 @@ describe('Audit Remediation: Pagination Response Shape Invariant', () => {
     assert.equal(standardized.meta.totalPages, 1);
   });
 });
+
+describe('Audit Remediation: Rate Limiting & RFC 6585 Headers', () => {
+  it('should enforce rate limit, set X-RateLimit headers, and return 429 with Retry-After when exceeded', async () => {
+    const { createRateLimiter } = await import('../src/middlewares/rate-limit.middleware');
+    const { ERROR_CODE } = await import('../src/common/errors/error-code');
+
+    const limiter = createRateLimiter({
+      windowMs: 60 * 1000,
+      maxRequests: 3,
+      message: 'Rate limit test exceeded',
+      keyGenerator: () => 'test-ip-123',
+    });
+
+    const createMockReqRes = () => {
+      const headers: Record<string, any> = {};
+      let statusCode = 200;
+      let responseBody: any = null;
+
+      const req: any = { ip: '127.0.0.1', socket: { remoteAddress: '127.0.0.1' } };
+      const res: any = {
+        setHeader: (key: string, val: any) => {
+          headers[key.toLowerCase()] = val;
+        },
+        status: (code: number) => {
+          statusCode = code;
+          return {
+            json: (body: any) => {
+              responseBody = body;
+            },
+          };
+        },
+      };
+
+      return { req, res, headers, getStatusCode: () => statusCode, getBody: () => responseBody };
+    };
+
+    // Request 1: OK
+    const r1 = createMockReqRes();
+    let nextCalled1 = false;
+    limiter(r1.req, r1.res, () => { nextCalled1 = true; });
+    assert.equal(nextCalled1, true);
+    assert.equal(r1.headers['x-ratelimit-limit'], 3);
+    assert.equal(r1.headers['x-ratelimit-remaining'], 2);
+
+    // Request 2: OK
+    const r2 = createMockReqRes();
+    let nextCalled2 = false;
+    limiter(r2.req, r2.res, () => { nextCalled2 = true; });
+    assert.equal(nextCalled2, true);
+    assert.equal(r2.headers['x-ratelimit-remaining'], 1);
+
+    // Request 3: OK
+    const r3 = createMockReqRes();
+    let nextCalled3 = false;
+    limiter(r3.req, r3.res, () => { nextCalled3 = true; });
+    assert.equal(nextCalled3, true);
+    assert.equal(r3.headers['x-ratelimit-remaining'], 0);
+
+    // Request 4: Exceeded (429)
+    const r4 = createMockReqRes();
+    let nextCalled4 = false;
+    limiter(r4.req, r4.res, () => { nextCalled4 = true; });
+    assert.equal(nextCalled4, false);
+    assert.equal(r4.getStatusCode(), 429);
+    assert.ok(Number(r4.headers['retry-after']) >= 1);
+    assert.equal(r4.getBody().code, ERROR_CODE.RATE_LIMIT_EXCEEDED);
+    assert.equal(r4.getBody().message, 'Rate limit test exceeded');
+  });
+});
+
+describe('Audit Remediation: Prisma Error Mapping & Validation', () => {
+  it('should map Prisma P2002 to 409 DUPLICATE_ENTRY in errorMiddleware', async () => {
+    const { errorMiddleware } = await import('../src/middlewares/error.middleware');
+    const { ERROR_CODE } = await import('../src/common/errors/error-code');
+    const { Prisma } = await import('@prisma/client');
+
+    const prismaError = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+      code: 'P2002',
+      clientVersion: '5.22.0',
+    });
+
+    let statusCode = 200;
+    let responseBody: any = null;
+
+    const res: any = {
+      status: (code: number) => {
+        statusCode = code;
+        return {
+          json: (body: any) => {
+            responseBody = body;
+          },
+        };
+      },
+    };
+
+    errorMiddleware(prismaError, {} as any, res, () => {});
+
+    assert.equal(statusCode, 409);
+    assert.equal(responseBody.success, false);
+    assert.equal(responseBody.code, ERROR_CODE.DUPLICATE_ENTRY);
+  });
+
+  it('should map Prisma P2025 to 404 NOT_FOUND in errorMiddleware', async () => {
+    const { errorMiddleware } = await import('../src/middlewares/error.middleware');
+    const { ERROR_CODE } = await import('../src/common/errors/error-code');
+    const { Prisma } = await import('@prisma/client');
+
+    const prismaError = new Prisma.PrismaClientKnownRequestError('Record not found', {
+      code: 'P2025',
+      clientVersion: '5.22.0',
+    });
+
+    let statusCode = 200;
+    let responseBody: any = null;
+
+    const res: any = {
+      status: (code: number) => {
+        statusCode = code;
+        return {
+          json: (body: any) => {
+            responseBody = body;
+          },
+        };
+      },
+    };
+
+    errorMiddleware(prismaError, {} as any, res, () => {});
+
+    assert.equal(statusCode, 404);
+    assert.equal(responseBody.success, false);
+    assert.equal(responseBody.code, ERROR_CODE.NOT_FOUND);
+  });
+
+  it('should validate UUID in verifyEmailSchema', async () => {
+    const { verifyEmailSchema } = await import('../src/modules/auth/auth.validation');
+
+    const valid = { token: '123e4567-e89b-12d3-a456-426614174000' };
+    const invalid = { token: 'not-a-valid-uuid' };
+
+    assert.equal(verifyEmailSchema.safeParse(valid).success, true);
+    assert.equal(verifyEmailSchema.safeParse(invalid).success, false);
+  });
+});
+
