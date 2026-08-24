@@ -18,9 +18,6 @@ describe('System Maintenance Mode Module', () => {
     permissionCacheService.clear();
   });
 
-  after(async () => {
-    await maintenanceCacheService.close();
-  });
 
   it('1. Maintenance disabled -> normal user can access API', async () => {
     const mockConfig: any = {

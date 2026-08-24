@@ -1,4 +1,3 @@
-import { prisma } from '../../database/prisma.client';
 import {
   NOTIFICATION_CHANNEL,
   NotificationChannel,
@@ -9,6 +8,7 @@ import {
   DEFAULT_EMAIL_SUBJECTS,
 } from '../constants/notification.constant';
 import { renderTemplateString } from '../helpers/template.helper';
+import { notificationRepository } from '../../modules/notification/notification.repository';
 
 export interface WebNotificationPayload {
   type: string;
@@ -69,9 +69,7 @@ class NotificationDispatcher {
   async sendWithTemplate(options: SendWithTemplateOptions): Promise<void> {
     const { userId, templateCode, variables, toEmail, actionUrl, metadata } = options;
 
-    const template = await prisma.notificationTemplate.findUnique({
-      where: { code: templateCode },
-    });
+    const template = await notificationRepository.findTemplateByCode(templateCode);
 
     if (!template || !template.isActive) {
       console.warn(`[NotificationDispatcher] Template '${templateCode}' not found or inactive.`);
@@ -101,7 +99,7 @@ class NotificationDispatcher {
     if (targetChannels.includes(NOTIFICATION_CHANNEL.EMAIL)) {
       let emailAddress = toEmail;
       if (!emailAddress) {
-        const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+        const user = await notificationRepository.findUserEmailById(userId);
         emailAddress = user?.email || undefined;
       }
 
@@ -122,16 +120,14 @@ class NotificationDispatcher {
   }
 
   private async dispatchWeb(userId: string, payload: WebNotificationPayload): Promise<void> {
-    await prisma.notification.create({
-      data: {
-        userId,
-        type: payload.type,
-        priority: payload.priority ?? 'NORMAL',
-        title: payload.title,
-        content: payload.content,
-        actionUrl: payload.actionUrl,
-        metadata: payload.metadata as any,
-      },
+    await notificationRepository.createSingleNotification({
+      userId,
+      type: payload.type,
+      priority: payload.priority,
+      title: payload.title,
+      content: payload.content,
+      actionUrl: payload.actionUrl,
+      metadata: payload.metadata,
     });
   }
 
@@ -142,15 +138,13 @@ class NotificationDispatcher {
       DEFAULT_EMAIL_SUBJECTS[payload.templateKey] ||
       'Thông báo từ hệ thống';
 
-    await prisma.emailNotification.create({
-      data: {
-        userId,
-        toEmail: payload.toEmail,
-        subject,
-        templateKey: payload.templateKey,
-        templateData: payload.templateData as any,
-        status: EMAIL_STATUS.PENDING,
-      },
+    await notificationRepository.createSingleEmailNotification({
+      userId,
+      toEmail: payload.toEmail,
+      subject,
+      templateKey: payload.templateKey,
+      templateData: payload.templateData,
+      status: EMAIL_STATUS.PENDING,
     });
   }
 
@@ -169,3 +163,4 @@ class NotificationDispatcher {
 }
 
 export const notificationDispatcher = new NotificationDispatcher();
+

@@ -7,6 +7,7 @@ import {
   loginSchema,
   refreshSchema,
   logoutSchema,
+  revokeOtherSessionsSchema,
   registerSchema,
   verifyEmailSchema,
   updateProfileSchema,
@@ -36,7 +37,8 @@ router.post('/resend-verification', authRateLimitMiddleware, validate(resendVeri
 
 router.get('/sessions', authMiddleware, controller.getSessions);
 router.delete('/sessions/:id', authMiddleware, validate(sessionIdParamSchema, 'params'), controller.revokeSession);
-router.delete('/sessions', authMiddleware, validate(logoutSchema), controller.revokeOtherSessions);
+router.delete('/sessions', authMiddleware, validate(revokeOtherSessionsSchema), controller.revokeOtherSessions);
+
 
 router.post('/avatar/upload-url', authMiddleware, validate(getAvatarUploadUrlSchema), controller.getAvatarUploadUrl);
 router.post('/avatar/confirm', authMiddleware, validate(confirmAvatarUploadSchema), controller.confirmAvatarUpload);

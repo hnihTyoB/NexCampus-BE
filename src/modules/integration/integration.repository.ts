@@ -156,7 +156,7 @@ export class IntegrationRepository {
     };
 
     const skip = (options.page - 1) * options.limit;
-    const [items, total] = await Promise.all([
+    const [items, total] = await prisma.$transaction([
       prisma.webhookDelivery.findMany({
         where,
         skip,
@@ -184,6 +184,7 @@ export class IntegrationRepository {
     deliveryId: string,
     data: {
       status: string;
+      signature?: string;
       statusCode?: number | null;
       responseBody?: string | null;
       attempts: number;
@@ -194,6 +195,24 @@ export class IntegrationRepository {
     return prisma.webhookDelivery.update({
       where: { id: deliveryId },
       data,
+    });
+  }
+
+  async findApiKeyByKeyHash(keyHash: string) {
+    return prisma.apiKey.findUnique({
+      where: { keyHash },
+      include: {
+        user: {
+          include: { role: true },
+        },
+      },
+    });
+  }
+
+  async updateApiKeyLastUsed(id: string) {
+    return prisma.apiKey.update({
+      where: { id },
+      data: { lastUsedAt: new Date() },
     });
   }
 
@@ -219,3 +238,7 @@ export class IntegrationRepository {
     });
   }
 }
+
+export const integrationRepository = new IntegrationRepository();
+
+

@@ -1,10 +1,10 @@
 import { Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
-import { prisma } from '../../database/prisma.client';
 import { envConfig } from '../../config/env.config';
 import { WEBHOOK_QUEUE_NAME, WebhookJobData } from '../queues/webhook.queue';
 import { decryptSecret, signHmacSha256 } from '../helpers/crypto.helper';
 import { isPublicHttpUrl, resolveAndValidateDns } from '../helpers/url.helper';
+import { integrationRepository } from '../../modules/integration/integration.repository';
 import {
   WEBHOOK_STATUS,
   WEBHOOK_MAX_ATTEMPTS,
@@ -92,14 +92,11 @@ export class WebhookWorker {
     const isUrlSyntaxValid = isPublicHttpUrl(data.url);
     if (!isUrlSyntaxValid) {
       const errorMsg = `SSRF Check Failed: URL '${data.url}' contains private, loopback or invalid host`;
-      await prisma.webhookDelivery?.update({
-        where: { id: data.deliveryId },
-        data: {
-          status: WEBHOOK_STATUS.FAILED,
-          attempts: currentAttempt,
-          lastError: errorMsg,
-        },
-      })?.catch(() => {});
+      await integrationRepository.updateDeliveryStatus(data.deliveryId, {
+        status: WEBHOOK_STATUS.FAILED,
+        attempts: currentAttempt,
+        lastError: errorMsg,
+      }).catch(() => {});
       return { success: false, error: errorMsg };
     }
 
@@ -110,14 +107,11 @@ export class WebhookWorker {
         const dnsCheck = await resolveAndValidateDns(parsed.hostname);
         if (!dnsCheck.isValid) {
           const errorMsg = `SSRF DNS Check Failed: ${dnsCheck.reason}`;
-          await prisma.webhookDelivery?.update({
-            where: { id: data.deliveryId },
-            data: {
-              status: WEBHOOK_STATUS.FAILED,
-              attempts: currentAttempt,
-              lastError: errorMsg,
-            },
-          })?.catch(() => {});
+          await integrationRepository.updateDeliveryStatus(data.deliveryId, {
+            status: WEBHOOK_STATUS.FAILED,
+            attempts: currentAttempt,
+            lastError: errorMsg,
+          }).catch(() => {});
           return { success: false, error: errorMsg };
         }
       } catch (err: any) {
@@ -131,14 +125,11 @@ export class WebhookWorker {
       plainSecret = decryptSecret(data.encryptedSecret);
     } catch (err: any) {
       const errorMsg = `Failed to decrypt webhook secret: ${err?.message}`;
-      await prisma.webhookDelivery?.update({
-        where: { id: data.deliveryId },
-        data: {
-          status: WEBHOOK_STATUS.FAILED,
-          attempts: currentAttempt,
-          lastError: errorMsg,
-        },
-      })?.catch(() => {});
+      await integrationRepository.updateDeliveryStatus(data.deliveryId, {
+        status: WEBHOOK_STATUS.FAILED,
+        attempts: currentAttempt,
+        lastError: errorMsg,
+      }).catch(() => {});
       return { success: false, error: errorMsg };
     }
 
@@ -148,14 +139,11 @@ export class WebhookWorker {
     const { header: signatureHeader, signature } = signHmacSha256(payloadString, plainSecret, timestamp);
 
     // 4. Update status to PROCESSING
-    await prisma.webhookDelivery?.update({
-      where: { id: data.deliveryId },
-      data: {
-        status: WEBHOOK_STATUS.PROCESSING,
-        signature,
-        attempts: currentAttempt,
-      },
-    })?.catch(() => {});
+    await integrationRepository.updateDeliveryStatus(data.deliveryId, {
+      status: WEBHOOK_STATUS.PROCESSING,
+      signature,
+      attempts: currentAttempt,
+    }).catch(() => {});
 
     // 5. Send HTTP POST request
     const controller = new AbortController();
@@ -189,16 +177,14 @@ export class WebhookWorker {
 
       if (res.ok) {
         // HTTP 2xx -> Success
-        await prisma.webhookDelivery?.update({
-          where: { id: data.deliveryId },
-          data: {
-            status: WEBHOOK_STATUS.SUCCESS,
-            statusCode,
-            responseBody: responseText,
-            deliveredAt: new Date(),
-            lastError: null,
-          },
-        })?.catch(() => {});
+        await integrationRepository.updateDeliveryStatus(data.deliveryId, {
+          status: WEBHOOK_STATUS.SUCCESS,
+          statusCode,
+          responseBody: responseText,
+          deliveredAt: new Date(),
+          lastError: null,
+          attempts: currentAttempt,
+        }).catch(() => {});
 
         return { success: true, statusCode, responseBody: responseText };
       } else {
@@ -206,15 +192,13 @@ export class WebhookWorker {
         const isFinalFail = currentAttempt >= maxAttempts;
         const errorMsg = `Webhook receiver responded with HTTP ${statusCode}: ${responseText}`;
 
-        await prisma.webhookDelivery?.update({
-          where: { id: data.deliveryId },
-          data: {
-            status: isFinalFail ? WEBHOOK_STATUS.FAILED : WEBHOOK_STATUS.PENDING,
-            statusCode,
-            responseBody: responseText,
-            lastError: errorMsg,
-          },
-        })?.catch(() => {});
+        await integrationRepository.updateDeliveryStatus(data.deliveryId, {
+          status: isFinalFail ? WEBHOOK_STATUS.FAILED : WEBHOOK_STATUS.PENDING,
+          statusCode,
+          responseBody: responseText,
+          lastError: errorMsg,
+          attempts: currentAttempt,
+        }).catch(() => {});
 
         throw new Error(errorMsg);
       }
@@ -222,15 +206,13 @@ export class WebhookWorker {
       const isFinalFail = currentAttempt >= maxAttempts;
       const errorMsg = err?.message || 'Network request error';
 
-      await prisma.webhookDelivery?.update({
-        where: { id: data.deliveryId },
-        data: {
-          status: isFinalFail ? WEBHOOK_STATUS.FAILED : WEBHOOK_STATUS.PENDING,
-          statusCode: statusCode || null,
-          responseBody: responseText || null,
-          lastError: errorMsg,
-        },
-      })?.catch(() => {});
+      await integrationRepository.updateDeliveryStatus(data.deliveryId, {
+        status: isFinalFail ? WEBHOOK_STATUS.FAILED : WEBHOOK_STATUS.PENDING,
+        statusCode: statusCode || null,
+        responseBody: responseText || null,
+        lastError: errorMsg,
+        attempts: currentAttempt,
+      }).catch(() => {});
 
       throw err;
     } finally {

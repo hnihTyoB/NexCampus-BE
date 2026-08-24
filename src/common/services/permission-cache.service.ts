@@ -1,4 +1,5 @@
-import { prisma } from '../../database/prisma.client';
+import { rbacRepository } from '../../modules/rbac/rbac.repository';
+import { userRepository } from '../../modules/users/user.repository';
 
 interface CacheEntry {
   permissions: Set<string>;
@@ -35,24 +36,16 @@ export class PermissionCacheService {
 
     const fetchPromise = (async () => {
       try {
-        // Query database for role permissions
-        const roleWithPermissions = await prisma.role.findUnique({
-          where: { id: roleId },
-          include: {
-            permissions: {
-              include: {
-                permission: true,
-              },
-            },
-          },
-        });
+        // Query repository for role permissions
+        const roleWithPermissions = await rbacRepository.findRoleById(roleId);
 
         const permissionSet = new Set<string>();
-        if (roleWithPermissions) {
-          for (const rp of roleWithPermissions.permissions) {
-            permissionSet.add(rp.permission.name);
+        if (roleWithPermissions && roleWithPermissions.permissions) {
+          for (const perm of roleWithPermissions.permissions) {
+            permissionSet.add(perm.name);
           }
         }
+
 
         this.cache.set(roleId, {
           permissions: permissionSet,
@@ -70,10 +63,7 @@ export class PermissionCacheService {
   }
 
   async getUserPermissions(userId: string): Promise<string[]> {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { roleId: true },
-    });
+    const user = await userRepository.findById(userId);
 
     if (!user || !user.roleId) {
       return [];
@@ -93,3 +83,4 @@ export class PermissionCacheService {
 }
 
 export const permissionCacheService = new PermissionCacheService();
+

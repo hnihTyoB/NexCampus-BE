@@ -1,5 +1,5 @@
 import { mailConfig } from '../../config/mail.config';
-import { prisma } from '../../database/prisma.client';
+import { notificationRepository } from '../../modules/notification/notification.repository';
 import { EMAIL_TEMPLATE_KEY, EmailTemplateKey } from '../constants/notification.constant';
 import { renderTemplateString } from '../helpers/template.helper';
 
@@ -21,9 +21,7 @@ export class EmailTemplateService {
    */
   async renderAsync(templateKey: string, data: Record<string, unknown>): Promise<EmailTemplate> {
     try {
-      const dbTemplate = await prisma.notificationTemplate.findUnique({
-        where: { code: templateKey },
-      });
+      const dbTemplate = await notificationRepository.findTemplateByCode(templateKey);
 
       if (dbTemplate && dbTemplate.isActive) {
         const subject = renderTemplateString(dbTemplate.subject || 'Thông báo từ hệ thống', data);

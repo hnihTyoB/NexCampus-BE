@@ -37,6 +37,11 @@ export const PERMISSIONS = {
   // Webhooks
   WEBHOOK_READ: 'WEBHOOK_READ',
   WEBHOOK_MANAGE: 'WEBHOOK_MANAGE',
+
+  // System Configuration & Feature Flags
+  SYSTEM_CONFIG_READ: 'SYSTEM_CONFIG_READ',
+  SYSTEM_CONFIG_MANAGE: 'SYSTEM_CONFIG_MANAGE',
 } as const;
 
 export type PermissionKey = keyof typeof PERMISSIONS;
+

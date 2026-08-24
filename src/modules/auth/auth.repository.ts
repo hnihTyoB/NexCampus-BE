@@ -278,7 +278,10 @@ export class AuthRepository {
       });
 
       if (deleted.count === 0) {
-        throw new AppError('Refresh token không hợp lệ hoặc đã được sử dụng', 401, ERROR_CODE.TOKEN_INVALID);
+        // Automatic Token Family Invalidation (RFC 6819):
+        // If an already rotated/revoked refresh token is re-sent, invalidate all active tokens for this user
+        await tx.refreshToken.deleteMany({ where: { userId } });
+        throw new AppError('Refresh token không hợp lệ hoặc đã được sử dụng. Toàn bộ phiên đăng nhập đã được thu hồi vì lý do bảo mật.', 401, ERROR_CODE.TOKEN_INVALID);
       }
 
       return tx.refreshToken.create({

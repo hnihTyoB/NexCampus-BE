@@ -177,11 +177,18 @@ describe('Integration: Zod Validation & SSRF Protection', () => {
   });
 });
 
+import { integrationRepository } from '../src/modules/integration/integration.repository';
+
 describe('Integration: Webhook Dispatcher & Delivery Worker Execution', () => {
   it('should decrypt secret, sign HMAC header, and successfully execute HTTP POST delivery', async () => {
+    // Stub repository update to prevent remote DB call during unit test
+    (integrationRepository as any).updateDeliveryStatus = async () => ({} as any);
+
     const plainSecret = 'whsec_client_secret_xyz123';
+
     const encryptedSecret = encryptSecret(plainSecret);
     const worker = new WebhookWorker();
+
 
     let capturedHeaders: Record<string, string> = {};
     let capturedBody: string = '';
@@ -225,7 +232,10 @@ describe('Integration: Webhook Dispatcher & Delivery Worker Execution', () => {
   });
 
   it('should halt delivery and return error if target URL fails SSRF check', async () => {
+    (integrationRepository as any).updateDeliveryStatus = async () => ({} as any);
     const oldEnv = process.env.NODE_ENV;
+
+
     try {
       process.env.NODE_ENV = 'production';
       const plainSecret = 'whsec_client_secret_xyz123';

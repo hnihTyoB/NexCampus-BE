@@ -204,7 +204,7 @@ model EmailNotification {
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  @@index([status, attempts])
+  @@index([status, attempts, createdAt])
   @@index([userId])
   @@map("email_notifications")
 }
@@ -224,8 +224,11 @@ model NotificationTemplate {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  @@index([isActive, createdAt])
+  @@index([isSystem, createdAt])
   @@map("notification_templates")
 }
+
 
 model MaintenanceConfig {
   id                String    @id @default(uuid()) @db.Uuid
@@ -311,4 +314,20 @@ model WebhookDelivery {
   @@index([createdAt])
   @@map("webhook_deliveries")
 }
+
+model SystemConfig {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique
+  value       Json
+  description String?
+  category    String   @default("GENERAL") // GENERAL, FEATURE_FLAG, INTEGRATION, SECURITY
+  isPublic    Boolean  @default(false) @map("is_public")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([isPublic])
+  @@map("system_configs")
+}
+
 

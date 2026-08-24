@@ -1,10 +1,10 @@
-import { prisma } from '../../database/prisma.client';
 import { envConfig } from '../../config/env.config';
 import { MailService } from '../services/mail.service';
 import { EmailTemplateService } from '../services/email-template.service';
-import { EMAIL_STATUS, EMAIL_MAX_ATTEMPTS, EmailTemplateKey } from '../constants/notification.constant';
+import { EMAIL_STATUS, EMAIL_MAX_ATTEMPTS } from '../constants/notification.constant';
 import { maintenanceCacheService } from '../services/maintenance-cache.service';
 import { MAINTENANCE_STATUS } from '../constants/maintenance.constant';
+import { notificationRepository, ClaimedEmailRecord } from '../../modules/notification/notification.repository';
 
 const BATCH_SIZE = 20;
 
@@ -51,32 +51,15 @@ export class EmailWorker {
         return;
       }
 
-      const pending = await prisma.emailNotification.findMany({
-        where: {
-          status: EMAIL_STATUS.PENDING,
-          attempts: { lt: EMAIL_MAX_ATTEMPTS },
-        },
-        orderBy: { createdAt: 'asc' },
-        take: BATCH_SIZE,
-      });
+      // Atomic claim via PostgreSQL FOR UPDATE SKIP LOCKED
+      const pending = await notificationRepository.claimPendingEmails(BATCH_SIZE);
 
-      if (pending.length === 0) {
+      if (!pending || pending.length === 0) {
         this.isRunning = false;
         return;
       }
 
-      const pendingIds = pending.map((p) => p.id);
-      await prisma.emailNotification.updateMany({
-        where: {
-          id: { in: pendingIds },
-          status: EMAIL_STATUS.PENDING,
-        },
-        data: {
-          status: EMAIL_STATUS.PROCESSING,
-        },
-      });
-
-      console.log(`[EmailWorker] Processing ${pending.length} pending email(s)`);
+      console.log(`[EmailWorker] Processing ${pending.length} atomically claimed pending email(s)`);
 
       await Promise.allSettled(
         pending.map((record) => this.sendOne(record)),
@@ -88,14 +71,7 @@ export class EmailWorker {
     }
   }
 
-  private async sendOne(record: {
-    id: string;
-    toEmail: string;
-    subject: string;
-    templateKey: string;
-    templateData: unknown;
-    attempts: number;
-  }): Promise<void> {
+  private async sendOne(record: ClaimedEmailRecord): Promise<void> {
     try {
       const { html, subject } = await this.templateService.renderAsync(
         record.templateKey,
@@ -104,14 +80,11 @@ export class EmailWorker {
 
       await this.mailService.sendRaw(record.toEmail, subject || record.subject, html);
 
-      await prisma.emailNotification.update({
-        where: { id: record.id },
-        data: {
-          status: EMAIL_STATUS.SENT,
-          sentAt: new Date(),
-          attempts: record.attempts + 1,
-          lastError: null,
-        },
+      await notificationRepository.updateEmailStatus(record.id, {
+        status: EMAIL_STATUS.SENT,
+        sentAt: new Date(),
+        attempts: record.attempts + 1,
+        lastError: null,
       });
 
       console.log(`[EmailWorker] ✅ Sent email ${record.id} to ${record.toEmail}`);
@@ -119,13 +92,10 @@ export class EmailWorker {
       const newAttempts = record.attempts + 1;
       const newStatus = newAttempts >= EMAIL_MAX_ATTEMPTS ? EMAIL_STATUS.FAILED : EMAIL_STATUS.PENDING;
 
-      await prisma.emailNotification.update({
-        where: { id: record.id },
-        data: {
-          status: newStatus,
-          attempts: newAttempts,
-          lastError: error?.message ?? String(error),
-        },
+      await notificationRepository.updateEmailStatus(record.id, {
+        status: newStatus,
+        attempts: newAttempts,
+        lastError: error?.message ?? String(error),
       }).catch(() => {/* ignore update failure */});
 
       console.error(
@@ -137,3 +107,4 @@ export class EmailWorker {
 }
 
 export const emailWorker = new EmailWorker();
+

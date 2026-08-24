@@ -70,11 +70,24 @@
 - **CORS Production Fail-Safe** (`src/config/env.config.ts`):
   - Bắt buộc khai báo danh sách domain cụ thể qua `ALLOWED_ORIGINS` khi chạy `NODE_ENV=production`.
   - Cấm sử dụng wildcard `'*'` hoặc bỏ trống trong môi trường production để bảo vệ cookie/credentials.
-- **Audit & Remediation (full-project-audit)**:
-  - **Prisma Error Handling**: `errorMiddleware` tự động phân giải các lỗi Prisma (`P2002` -> 409 DUPLICATE_ENTRY, `P2025` -> 404 NOT_FOUND, `P2003` & Validation -> 400 VALIDATION_ERROR) ngăn ngừa lỗi 500 unhandled.
-  - **Token Lifecycle Hygiene**: `createVerificationToken` và `createPasswordResetToken` tự động xóa toàn bộ token cũ của cùng user trong `$transaction` trước khi tạo token mới.
-  - **RBAC Cache Invalidation**: `assignUserRole` tự động xóa cache cho cả `oldRoleId` và `newRoleId` để bảo đảm không tồn đọng quyền cũ.
-  - **Integration Architecture**: `IntegrationService` sử dụng `createAuditLog` qua repository thay vì gọi Prisma trực tiếp; `dispatchWebhookEvent` đẩy job vào queue song song bằng `Promise.all`.
-  - **Broadcast Notifications**: Phân tách người nhận thành các batch 500 bản ghi để tối ưu hóa hiệu năng chèn cơ sở dữ liệu.
+- **Dynamic System Configuration & Feature Flags** (`src/modules/system-config/`):
+  - Module quản lý cấu hình động và cờ tính năng (Feature Flags) tại `/api/v1/system/configs`, `/api/v1/system/features/:key/toggle` và endpoint công khai `/api/v1/system/public`.
+  - Phân loại theo danh mục: `GENERAL`, `FEATURE_FLAG`, `INTEGRATION`, `SECURITY`.
+  - Hỗ trợ đánh giá cờ tính năng tức thời `systemConfigService.isFeatureEnabled(flagKey)` kèm middleware bảo vệ route `requireFeatureFlag('flagKey')`.
+  - Tối ưu hóa hiệu năng bằng in-memory TTL caching kết hợp Redis Pub/Sub invalidation (`system_config:events`) và tự động ghi `AuditLog` cho mọi thao tác cấu hình.
+- **Production Observability & Deep Diagnostics** (`src/routes/health.route.ts` & `src/middlewares/request-id.middleware.ts`):
+  - Middleware `requestIdMiddleware` tự động cấp phát và chuyển tiếp header `X-Request-Id` (UUID) phục vụ truy vết phân tán (distributed tracing).
+  - Cung cấp `/api/v1/health` (liveness) và `/api/v1/health/readiness` (thực hiện truy vấn kiểm tra PostgreSQL database live, kiểm tra ping Redis, thu thập thông số heapUsedMb, heapTotalMb, rssMb và uptime).
+- **Graceful Shutdown & Resilience** (`src/server.ts`):
+  - Xử lý tín hiệu `SIGINT` / `SIGTERM` an toàn: đóng HTTP listener, dừng background workers (`EmailWorker`, `WebhookWorker`), đóng BullMQ queue, ngắt kết nối Redis và Prisma client, kèm failsafe timeout 10 giây.
+- **Strict Layer Encapsulation & Worker Concurrency**:
+  - Toàn bộ Middlewares (`apiKeyAuthMiddleware`, `permissionMiddleware`), Services (`PermissionCacheService`, `MaintenanceCacheService`, `NotificationDispatcher`, `EmailTemplateService`) và Workers (`EmailWorker`, `WebhookWorker`) truy vấn cơ sở dữ liệu độc quyền qua các Repository (`IntegrationRepository`, `AuthRepository`, `UserRepository`, `RbacRepository`, `MaintenanceRepository`, `NotificationRepository`, `SystemConfigRepository`).
+  - `EmailWorker` áp dụng cơ chế khóa hàng nguyên tử `FOR UPDATE SKIP LOCKED` (`NotificationRepository.claimPendingEmails`), triệt tiêu hoàn toàn race condition duplicate email khi chạy multi-pod cluster.
+  - `rotateRefreshToken()` áp dụng RFC 6819 Token Family Revocation: tự động thu hồi toàn bộ refresh token của user khi phát hiện hành vi tái sử dụng token đã xoay vòng.
+  - Tối ưu hóa `api_keys.last_used_at` với cơ chế debounce 5 phút tránh nghẽn write lock khi tiếp nhận tải cao.
+  - Tối ưu hóa composite indexes qua migration `20260824010000_update_notification_indexes`.
+  - Chuẩn hóa mã lỗi `INTERNAL_SERVER_ERROR` trong `error.middleware.ts` qua hằng số tập trung `ERROR_CODE.INTERNAL_SERVER_ERROR`.
+
+
 
 

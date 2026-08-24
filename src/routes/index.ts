@@ -5,16 +5,22 @@ import rbacRoute from '../modules/rbac/rbac.route';
 import notificationRoute from '../modules/notification/notification.route';
 import maintenanceRoute from '../modules/maintenance/maintenance.route';
 import integrationRoute from '../modules/integration/integration.route';
+import systemConfigRoute from '../modules/system-config/system-config.route';
+import healthRoute from './health.route';
 import { maintenanceGuard } from '../middlewares/maintenance.middleware';
 
 const router = Router();
 
-router.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+// Observability & Diagnostics
+router.use('/health', healthRoute);
 
+// Maintenance Mode Controls & Public Status
 router.use('/maintenance', maintenanceRoute);
 
+// System Configuration & Feature Flags Public Endpoints
+router.use('/system', systemConfigRoute);
+
+// Maintenance Enforcement Guard for all Business APIs below
 router.use(maintenanceGuard());
 
 router.use('/auth', authRoute);
@@ -24,3 +30,4 @@ router.use('/notifications', notificationRoute);
 router.use('/integrations', integrationRoute);
 
 export default router;
+

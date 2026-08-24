@@ -2,7 +2,9 @@ import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../common/errors/app-error';
 import { ERROR_CODE } from '../common/errors/error-code';
 import { permissionCacheService } from '../common/services/permission-cache.service';
-import { prisma } from '../database/prisma.client';
+import { AuthRepository } from '../modules/auth/auth.repository';
+
+const authRepository = new AuthRepository();
 
 /**
  * Trích xuất và giải quyết danh sách quyền (Set<string>) của người dùng từ cache/database.
@@ -14,12 +16,9 @@ async function resolveUserPermissions(req: Request): Promise<Set<string>> {
 
   let roleId = req.user.roleId;
 
-  // Fallback: Nếu roleId chưa có trong JWT payload, truy vấn từ database
+  // Fallback: Nếu roleId chưa có trong JWT payload, truy vấn từ repository
   if (!roleId) {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
-      select: { roleId: true },
-    });
+    const user = await authRepository.findById(req.user.id);
 
     if (!user || !user.roleId) {
       throw new AppError('Forbidden: User role not found', 403, ERROR_CODE.FORBIDDEN);
@@ -33,6 +32,7 @@ async function resolveUserPermissions(req: Request): Promise<Set<string>> {
   req.user.permissions = Array.from(userPermissions);
   return userPermissions;
 }
+
 
 /**
  * Middleware bắt buộc người dùng phải có TẤT CẢ các quyền được chỉ định.
