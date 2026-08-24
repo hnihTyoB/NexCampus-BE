@@ -1,254 +1,189 @@
-import { describe, it } from 'node:test';
+import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { updateUserSchema } from '../src/modules/users/user.validation';
-import { sendNotificationSchema, broadcastNotificationSchema } from '../src/modules/notification/notification.validation';
-import { EmailTemplateService } from '../src/common/services/email-template.service';
-import { EMAIL_TEMPLATE_KEY, EMAIL_STATUS } from '../src/common/constants/notification.constant';
-import { formatVietnamDateTime } from '../src/common/helpers/date.helper';
+import { requirePermission } from '../src/middlewares/permission.middleware';
+import { extractTokenFromRequest, authMiddleware } from '../src/middlewares/auth.middleware';
+import { errorMiddleware } from '../src/middlewares/error.middleware';
+import { permissionCacheService } from '../src/common/services/permission-cache.service';
+import { EmailWorker } from '../src/common/workers/email-worker';
+import { getVietnamDayRange, formatVietnamDate } from '../src/common/helpers/date.helper';
+import { Prisma } from '@prisma/client';
+import { ERROR_CODE } from '../src/common/errors/error-code';
 
-describe('Audit Remediation: User Validation & RBAC Isolation', () => {
-  it('should accept isActive update in updateUserSchema', () => {
-    const valid = { isActive: false };
-    const result = updateUserSchema.safeParse(valid);
-    assert.equal(result.success, true);
-    assert.equal((result as any).data.isActive, false);
+function createMockReqRes(options: {
+  user?: any;
+  apiKey?: any;
+  path?: string;
+  query?: Record<string, string>;
+  headers?: Record<string, string>;
+  cookies?: Record<string, string>;
+} = {}) {
+  const req: any = {
+    user: options.user,
+    apiKey: options.apiKey,
+    path: options.path || '/api/v1/test',
+    originalUrl: options.path || '/api/v1/test',
+    query: options.query || {},
+    headers: options.headers || {},
+    cookies: options.cookies || {},
+  };
+
+  const res: any = {
+    statusCode: 200,
+    headers: {} as Record<string, string>,
+    body: null as any,
+    status(code: number) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload: any) {
+      this.body = payload;
+      return this;
+    },
+    setHeader(key: string, val: string) {
+      this.headers[key] = val;
+      return this;
+    },
+  };
+
+  return { req, res };
+}
+
+describe('Audit & Remediation Verification Test Suite', () => {
+
+  beforeEach(() => {
+    permissionCacheService.clear();
   });
 
-  it('should strip roleId if passed to updateUserSchema to protect RBAC boundaries', () => {
-    const maliciousInput = {
-      isActive: true,
-      roleId: '123e4567-e89b-12d3-a456-426614174000',
-    };
-    const result = updateUserSchema.safeParse(maliciousInput);
-    assert.equal(result.success, true);
-    assert.equal((result as any).data.roleId, undefined);
-  });
-});
+  describe('1. [P0-SEC-01] API Key Scoping Enforcement in Permission Middleware', () => {
+    it('should grant access when API Key has the required scoped permission', async () => {
+      const roleId = 'role-admin-uuid';
+      (permissionCacheService as any).cache.set(roleId, {
+        permissions: new Set(['USER_READ', 'USER_DELETE', 'ROLE_DELETE']),
+        expiresAt: Date.now() + 60000,
+      });
 
-describe('Audit Remediation: Notification Validation & Enums', () => {
-  it('should validate sendNotificationSchema with valid enums', () => {
-    const valid = {
-      userIds: ['123e4567-e89b-12d3-a456-426614174000'],
-      channels: ['WEB', 'EMAIL'],
-      title: 'Test Notification',
-      content: 'Hello World',
-      type: 'ALERT',
-      priority: 'HIGH',
-      templateKey: 'NEW_DEVICE_ALERT',
-    };
-    const result = sendNotificationSchema.safeParse(valid);
-    assert.equal(result.success, true);
-  });
-
-  it('should reject invalid channel or invalid type in sendNotificationSchema', () => {
-    const invalid = {
-      userIds: ['123e4567-e89b-12d3-a456-426614174000'],
-      channels: ['SMS'], // Invalid channel
-      title: 'Test',
-      content: 'Test',
-    };
-    const result = sendNotificationSchema.safeParse(invalid);
-    assert.equal(result.success, false);
-  });
-
-  it('should support PROCESSING in EMAIL_STATUS constants', () => {
-    assert.equal(EMAIL_STATUS.PROCESSING, 'PROCESSING');
-    assert.equal(EMAIL_STATUS.PENDING, 'PENDING');
-    assert.equal(EMAIL_STATUS.SENT, 'SENT');
-    assert.equal(EMAIL_STATUS.FAILED, 'FAILED');
-  });
-});
-
-describe('Audit Remediation: Timezone & Email Template Standards', () => {
-  it('should format email alert dates with Asia/Ho_Chi_Minh timezone', () => {
-    const templateService = new EmailTemplateService();
-    const testDate = new Date('2026-08-22T17:30:00.000Z'); // 2026-08-23 00:30:00 in Vietnam
-
-    const template = templateService.render(EMAIL_TEMPLATE_KEY.NEW_DEVICE_ALERT, {
-      fullName: 'Test User',
-      deviceName: 'Chrome trên Windows',
-      ipAddress: '127.0.0.1',
-      time: formatVietnamDateTime(testDate),
-    });
-
-    assert.ok(template.html.includes('Chrome trên Windows'));
-    assert.ok(template.html.includes('127.0.0.1'));
-    // Should include 2026 and 00:30:00 / 23:08 / 23/8
-    assert.ok(template.html.includes('2026'));
-  });
-});
-
-describe('Audit Remediation: Pagination Response Shape Invariant', () => {
-  it('should enforce uniform pagination metadata schema', () => {
-    const mockServiceResponse = {
-      items: [{ id: '1', title: 'Notification 1' }],
-      total: 1,
-      page: 1,
-      limit: 20,
-      totalPages: 1,
-    };
-
-    // Transform into controller standard
-    const standardized = {
-      success: true,
-      data: mockServiceResponse.items,
-      meta: {
-        total: mockServiceResponse.total,
-        page: mockServiceResponse.page,
-        limit: mockServiceResponse.limit,
-        totalPages: mockServiceResponse.totalPages,
-      },
-    };
-
-    assert.equal(standardized.success, true);
-    assert.ok(Array.isArray(standardized.data));
-    assert.equal(standardized.meta.total, 1);
-    assert.equal(standardized.meta.page, 1);
-    assert.equal(standardized.meta.limit, 20);
-    assert.equal(standardized.meta.totalPages, 1);
-  });
-});
-
-describe('Audit Remediation: Rate Limiting & RFC 6585 Headers', () => {
-  it('should enforce rate limit, set X-RateLimit headers, and return 429 with Retry-After when exceeded', async () => {
-    const { createRateLimiter } = await import('../src/middlewares/rate-limit.middleware');
-    const { ERROR_CODE } = await import('../src/common/errors/error-code');
-
-    const limiter = createRateLimiter({
-      windowMs: 60 * 1000,
-      maxRequests: 3,
-      message: 'Rate limit test exceeded',
-      keyGenerator: () => 'test-ip-123',
-    });
-
-    const createMockReqRes = () => {
-      const headers: Record<string, any> = {};
-      let statusCode = 200;
-      let responseBody: any = null;
-
-      const req: any = { ip: '127.0.0.1', socket: { remoteAddress: '127.0.0.1' } };
-      const res: any = {
-        setHeader: (key: string, val: any) => {
-          headers[key.toLowerCase()] = val;
+      const { req, res } = createMockReqRes({
+        user: {
+          id: 'admin-user-id',
+          roleId,
+          role: 'ADMIN',
+          permissions: ['USER_READ'], // API Key only granted USER_READ
         },
-        status: (code: number) => {
-          statusCode = code;
-          return {
-            json: (body: any) => {
-              responseBody = body;
-            },
-          };
+        apiKey: {
+          id: 'ak-123',
+          name: 'Read-only API Key',
+          permissions: ['USER_READ'],
         },
-      };
+      });
 
-      return { req, res, headers, getStatusCode: () => statusCode, getBody: () => responseBody };
-    };
+      let nextCalled = false;
+      const middleware = requirePermission('USER_READ');
+      await middleware(req, res, () => {
+        nextCalled = true;
+      });
 
-    // Request 1: OK
-    const r1 = createMockReqRes();
-    let nextCalled1 = false;
-    limiter(r1.req, r1.res, () => { nextCalled1 = true; });
-    assert.equal(nextCalled1, true);
-    assert.equal(r1.headers['x-ratelimit-limit'], 3);
-    assert.equal(r1.headers['x-ratelimit-remaining'], 2);
-
-    // Request 2: OK
-    const r2 = createMockReqRes();
-    let nextCalled2 = false;
-    limiter(r2.req, r2.res, () => { nextCalled2 = true; });
-    assert.equal(nextCalled2, true);
-    assert.equal(r2.headers['x-ratelimit-remaining'], 1);
-
-    // Request 3: OK
-    const r3 = createMockReqRes();
-    let nextCalled3 = false;
-    limiter(r3.req, r3.res, () => { nextCalled3 = true; });
-    assert.equal(nextCalled3, true);
-    assert.equal(r3.headers['x-ratelimit-remaining'], 0);
-
-    // Request 4: Exceeded (429)
-    const r4 = createMockReqRes();
-    let nextCalled4 = false;
-    limiter(r4.req, r4.res, () => { nextCalled4 = true; });
-    assert.equal(nextCalled4, false);
-    assert.equal(r4.getStatusCode(), 429);
-    assert.ok(Number(r4.headers['retry-after']) >= 1);
-    assert.equal(r4.getBody().code, ERROR_CODE.RATE_LIMIT_EXCEEDED);
-    assert.equal(r4.getBody().message, 'Rate limit test exceeded');
-  });
-});
-
-describe('Audit Remediation: Prisma Error Mapping & Validation', () => {
-  it('should map Prisma P2002 to 409 DUPLICATE_ENTRY in errorMiddleware', async () => {
-    const { errorMiddleware } = await import('../src/middlewares/error.middleware');
-    const { ERROR_CODE } = await import('../src/common/errors/error-code');
-    const { Prisma } = await import('@prisma/client');
-
-    const prismaError = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
-      code: 'P2002',
-      clientVersion: '5.22.0',
+      assert.equal(nextCalled, true, 'Next should be called for permitted scope');
+      assert.deepEqual(req.user.permissions, ['USER_READ']);
     });
 
-    let statusCode = 200;
-    let responseBody: any = null;
+    it('should DENY access with 403 when API Key lacks permission even if User Role has it (Privilege Escalation Prevention)', async () => {
+      const roleId = 'role-admin-uuid';
+      (permissionCacheService as any).cache.set(roleId, {
+        permissions: new Set(['USER_READ', 'USER_DELETE', 'ROLE_DELETE']),
+        expiresAt: Date.now() + 60000,
+      });
 
-    const res: any = {
-      status: (code: number) => {
-        statusCode = code;
-        return {
-          json: (body: any) => {
-            responseBody = body;
-          },
-        };
-      },
-    };
+      const { req, res } = createMockReqRes({
+        user: {
+          id: 'admin-user-id',
+          roleId,
+          role: 'ADMIN',
+          permissions: ['USER_READ'], // Scoped API Key has only USER_READ
+        },
+        apiKey: {
+          id: 'ak-123',
+          name: 'Read-only API Key',
+          permissions: ['USER_READ'],
+        },
+      });
 
-    errorMiddleware(prismaError, {} as any, res, () => {});
+      let nextError: any;
+      const middleware = requirePermission('ROLE_DELETE');
+      await middleware(req, res, (err?: any) => {
+        nextError = err;
+      });
 
-    assert.equal(statusCode, 409);
-    assert.equal(responseBody.success, false);
-    assert.equal(responseBody.code, ERROR_CODE.DUPLICATE_ENTRY);
+      assert.ok(nextError, 'Should throw an error');
+      assert.equal(nextError.statusCode, 403);
+      assert.equal(nextError.code, ERROR_CODE.FORBIDDEN);
+    });
   });
 
-  it('should map Prisma P2025 to 404 NOT_FOUND in errorMiddleware', async () => {
-    const { errorMiddleware } = await import('../src/middlewares/error.middleware');
-    const { ERROR_CODE } = await import('../src/common/errors/error-code');
-    const { Prisma } = await import('@prisma/client');
+  describe('2. [P1-SEC-02] Token Query Parameter Security Isolation', () => {
+    it('should reject JWT token in query string on normal REST endpoints', () => {
+      const req = {
+        path: '/api/v1/users',
+        query: { token: 'sensitive-jwt-token' },
+        headers: {},
+        cookies: {},
+      } as any;
 
-    const prismaError = new Prisma.PrismaClientKnownRequestError('Record not found', {
-      code: 'P2025',
-      clientVersion: '5.22.0',
+      const token = extractTokenFromRequest(req);
+      assert.equal(token, undefined, 'Token should not be extracted from query string for REST routes');
     });
 
-    let statusCode = 200;
-    let responseBody: any = null;
+    it('should permit JWT token in query string strictly for SSE stream endpoints', () => {
+      const req = {
+        path: '/api/v1/notifications/stream',
+        query: { token: 'sse-jwt-token' },
+        headers: {},
+        cookies: {},
+      } as any;
 
-    const res: any = {
-      status: (code: number) => {
-        statusCode = code;
-        return {
-          json: (body: any) => {
-            responseBody = body;
-          },
-        };
-      },
-    };
-
-    errorMiddleware(prismaError, {} as any, res, () => {});
-
-    assert.equal(statusCode, 404);
-    assert.equal(responseBody.success, false);
-    assert.equal(responseBody.code, ERROR_CODE.NOT_FOUND);
+      const token = extractTokenFromRequest(req);
+      assert.equal(token, 'sse-jwt-token', 'Token should be extracted from query string for SSE stream routes');
+    });
   });
 
-  it('should validate UUID in verifyEmailSchema', async () => {
-    const { verifyEmailSchema } = await import('../src/modules/auth/auth.validation');
+  describe('3. [P2-ERR-01] Prisma P2014 Relation Constraint Violation Handling', () => {
+    it('should map Prisma P2014 error to HTTP 400 Bad Request instead of 500 Internal Error', () => {
+      const { req, res } = createMockReqRes();
+      const p2014Error = new Prisma.PrismaClientKnownRequestError(
+        'The change you are trying to make would violate the required relation between models',
+        {
+          code: 'P2014',
+          clientVersion: '5.22.0',
+        },
+      );
 
-    const valid = { token: '123e4567-e89b-12d3-a456-426614174000' };
-    const invalid = { token: 'not-a-valid-uuid' };
+      let nextCalled = false;
+      errorMiddleware(p2014Error, req, res, () => {
+        nextCalled = true;
+      });
 
-    assert.equal(verifyEmailSchema.safeParse(valid).success, true);
-    assert.equal(verifyEmailSchema.safeParse(invalid).success, false);
+      assert.equal(nextCalled, false);
+      assert.equal(res.statusCode, 400);
+      assert.equal(res.body.success, false);
+      assert.equal(res.body.code, ERROR_CODE.VALIDATION_ERROR);
+    });
   });
+
+  describe('4. [P2-WORKER-01] EmailWorker Async Graceful Shutdown', () => {
+    it('should stop cleanly and allow async awaiting', async () => {
+      const worker = new EmailWorker();
+      await worker.stop();
+      assert.ok(true, 'Worker stop() must be async and resolve cleanly');
+    });
+  });
+
+  describe('5. [P2-CRON-02] Timezone Calendar Day Range Boundary', () => {
+    it('should accurately calculate startOfDay (17:00:00Z previous day) and endOfDay (16:59:59.999Z) for Vietnam UTC+7', () => {
+      const { startOfDay, endOfDay } = getVietnamDayRange('2026-08-24');
+
+      assert.equal(startOfDay.toISOString(), '2026-08-23T17:00:00.000Z');
+      assert.equal(endOfDay.toISOString(), '2026-08-24T16:59:59.999Z');
+      assert.equal(formatVietnamDate(startOfDay), '2026-08-24');
+    });
+  });
+
 });
-

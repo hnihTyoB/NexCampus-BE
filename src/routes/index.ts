@@ -6,6 +6,7 @@ import notificationRoute from '../modules/notification/notification.route';
 import maintenanceRoute from '../modules/maintenance/maintenance.route';
 import integrationRoute from '../modules/integration/integration.route';
 import systemConfigRoute from '../modules/system-config/system-config.route';
+import cronRoute from '../modules/cron/cron.route';
 import healthRoute from './health.route';
 import { maintenanceGuard } from '../middlewares/maintenance.middleware';
 
@@ -28,6 +29,8 @@ router.use('/users', userRoute);
 router.use('/rbac', rbacRoute);
 router.use('/notifications', notificationRoute);
 router.use('/integrations', integrationRoute);
+router.use('/cron', cronRoute);
 
 export default router;
+
 

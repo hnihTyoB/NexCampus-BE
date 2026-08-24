@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { NotificationService } from './notification.service';
+import { sseManagerService } from '../../common/services/sse-manager.service';
 import {
   ListNotificationsDto,
   SendNotificationDto,
@@ -14,6 +15,11 @@ import {
 
 export class NotificationController {
   private readonly service = new NotificationService();
+
+  stream = (req: Request, res: Response): void => {
+    sseManagerService.registerClient(req.user.id, res, req);
+  };
+
 
   list = async (req: Request, res: Response, next: NextFunction) => {
     try {

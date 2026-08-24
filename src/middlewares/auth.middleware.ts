@@ -7,10 +7,15 @@ import { ERROR_CODE } from '../common/errors/error-code';
 export function extractTokenFromRequest(req: Request): string | undefined {
   let token = req.cookies?.accessToken;
   if (!token) {
-    const authHeader = req.headers.authorization;
+    const authHeader = req.headers?.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       token = authHeader.split(' ')[1];
     }
+  }
+  // Only allow token in query string for SSE stream connections (EventSource in browsers does not support custom headers)
+  const path = req.path || req.originalUrl || '';
+  if (!token && req.query?.token && typeof req.query.token === 'string' && path.includes('/stream')) {
+    token = req.query.token;
   }
   return token;
 }

@@ -30,6 +30,7 @@ export const NOTIFICATION_TEMPLATE_CODE = {
   WELCOME: 'WELCOME',
   PASSWORD_CHANGED: 'PASSWORD_CHANGED',
   ROLE_ASSIGNED: 'ROLE_ASSIGNED',
+  ACTIVITY_SUMMARY_DIGEST: 'ACTIVITY_SUMMARY_DIGEST',
   CUSTOM: 'CUSTOM',
 } as const;
 
@@ -39,6 +40,7 @@ export const EMAIL_TEMPLATE_KEY = {
   VERIFY_EMAIL: 'VERIFY_EMAIL',
   RESET_PASSWORD: 'RESET_PASSWORD',
   NEW_DEVICE_ALERT: 'NEW_DEVICE_ALERT',
+  ACTIVITY_SUMMARY_DIGEST: 'ACTIVITY_SUMMARY_DIGEST',
   CUSTOM: 'CUSTOM',
 } as const;
 
@@ -59,5 +61,7 @@ export const DEFAULT_EMAIL_SUBJECTS: Record<string, string> = {
   VERIFY_EMAIL: 'Xác thực tài khoản của bạn',
   RESET_PASSWORD: 'Đặt lại mật khẩu',
   NEW_DEVICE_ALERT: 'Phát hiện đăng nhập từ thiết bị mới',
+  ACTIVITY_SUMMARY_DIGEST: 'Báo cáo tổng kết hoạt động hệ thống',
   CUSTOM: 'Thông báo từ hệ thống',
 };
+

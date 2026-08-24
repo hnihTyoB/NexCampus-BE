@@ -14,7 +14,9 @@ import {
 } from '../../common/constants/system-config.constant';
 import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from '../../common/constants/audit-log.constant';
 import { envConfig } from '../../config/env.config';
+import { sseManagerService } from '../../common/services/sse-manager.service';
 import IORedis from 'ioredis';
+
 
 interface CacheEntry {
   value: unknown;
@@ -263,6 +265,12 @@ export class SystemConfigService {
 
     this.invalidateCache(key);
 
+    // Broadcast SSE event
+    sseManagerService.broadcast({
+      type: 'system:feature_toggle',
+      data: { key, enabled: data.enabled },
+    });
+
     await this.repository.createAuditLog({
       actorId: context?.actorId,
       action: AUDIT_ACTION.TOGGLE_FEATURE_FLAG,
@@ -272,6 +280,7 @@ export class SystemConfigService {
       ipAddress: context?.ipAddress,
       userAgent: context?.userAgent,
     });
+
 
     return record;
   }

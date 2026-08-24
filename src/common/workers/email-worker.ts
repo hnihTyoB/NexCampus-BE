@@ -13,6 +13,7 @@ export class EmailWorker {
   private readonly templateService = new EmailTemplateService();
   private intervalId?: ReturnType<typeof setInterval>;
   private isRunning = false;
+  private activeBatchPromise?: Promise<void>;
 
   start(): void {
     if (!envConfig.notification.workerEnabled) {
@@ -31,44 +32,50 @@ export class EmailWorker {
     }, interval);
   }
 
-  stop(): void {
+  async stop(): Promise<void> {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = undefined;
-      console.log('[EmailWorker] Stopped');
     }
+    if (this.activeBatchPromise) {
+      await this.activeBatchPromise.catch(() => {});
+    }
+    console.log('[EmailWorker] Stopped cleanly');
   }
 
   private async process(): Promise<void> {
     if (this.isRunning) return; // Tránh chạy đồng thời nếu job trước chưa xong
     this.isRunning = true;
 
-    try {
-      const maintenanceConfig = await maintenanceCacheService.getConfig();
-      if (maintenanceConfig.enabled && maintenanceConfig.status === MAINTENANCE_STATUS.MAINTENANCE) {
-        // Tạm dừng xử lý hàng đợi email khi hệ thống đang ở chế độ bảo trì toàn diện
+    this.activeBatchPromise = (async () => {
+      try {
+        const maintenanceConfig = await maintenanceCacheService.getConfig();
+        if (maintenanceConfig.enabled && maintenanceConfig.status === MAINTENANCE_STATUS.MAINTENANCE) {
+          // Tạm dừng xử lý hàng đợi email khi hệ thống đang ở chế độ bảo trì toàn diện
+          return;
+        }
+
+        // Atomic claim via PostgreSQL FOR UPDATE SKIP LOCKED
+        const pending = await notificationRepository.claimPendingEmails(BATCH_SIZE);
+
+        if (!pending || pending.length === 0) {
+          return;
+        }
+
+        console.log(`[EmailWorker] Processing ${pending.length} atomically claimed pending email(s)`);
+
+        await Promise.allSettled(
+          pending.map((record) => this.sendOne(record)),
+        );
+      } catch (error) {
+        console.error('[EmailWorker] Unexpected error during processing:', error);
+      } finally {
         this.isRunning = false;
-        return;
+        this.activeBatchPromise = undefined;
       }
+    })();
 
-      // Atomic claim via PostgreSQL FOR UPDATE SKIP LOCKED
-      const pending = await notificationRepository.claimPendingEmails(BATCH_SIZE);
-
-      if (!pending || pending.length === 0) {
-        this.isRunning = false;
-        return;
-      }
-
-      console.log(`[EmailWorker] Processing ${pending.length} atomically claimed pending email(s)`);
-
-      await Promise.allSettled(
-        pending.map((record) => this.sendOne(record)),
-      );
-    } catch (error) {
-      console.error('[EmailWorker] Unexpected error during processing:', error);
-    } finally {
-      this.isRunning = false;
-    }
+    await this.activeBatchPromise;
   }
 
   private async sendOne(record: ClaimedEmailRecord): Promise<void> {

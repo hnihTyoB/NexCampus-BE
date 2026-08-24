@@ -33,6 +33,21 @@ export const DEFAULT_SYSTEM_CONFIGS = [
     isPublic: true,
   },
   {
+    key: 'app.timezone',
+    value: 'Asia/Ho_Chi_Minh',
+    description: 'Múi giờ chuẩn mặc định của hệ thống (UTC+7 / Asia/Ho_Chi_Minh)',
+    category: SYSTEM_CONFIG_CATEGORY.GENERAL,
+    isPublic: true,
+  },
+  {
+    key: 'app.locale',
+    value: 'vi-VN',
+    description: 'Ngôn ngữ và định dạng vùng mặc định (Tiếng Việt)',
+    category: SYSTEM_CONFIG_CATEGORY.GENERAL,
+    isPublic: true,
+  },
+
+  {
     key: FEATURE_FLAGS.REGISTRATION_ENABLED,
     value: true,
     description: 'Cho phép người dùng mới đăng ký tài khoản tự do',

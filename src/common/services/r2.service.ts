@@ -1,4 +1,4 @@
-import { S3Client, DeleteObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, DeleteObjectCommand, PutObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { r2Config } from '../../config/r2.config';
 
@@ -46,6 +46,30 @@ export class R2Service {
   }
 
   /**
+   * Liệt kê các đối tượng trong bucket theo tiền tố (Prefix).
+   */
+  async listObjects(prefix?: string): Promise<Array<{ key: string; lastModified?: Date; size?: number }>> {
+    try {
+      const command = new ListObjectsV2Command({
+        Bucket: this.bucketName,
+        Prefix: prefix,
+      });
+
+      const response = await this.client.send(command);
+      if (!response.Contents) return [];
+
+      return response.Contents.map((obj) => ({
+        key: obj.Key || '',
+        lastModified: obj.LastModified,
+        size: obj.Size,
+      })).filter((item) => item.key.length > 0);
+    } catch (err: any) {
+      console.warn('[R2Service] listObjects failed or bucket not accessible:', err.message);
+      return [];
+    }
+  }
+
+  /**
    * Xóa file khỏi R2.
    * @param key Đường dẫn file trong bucket
    */
@@ -57,3 +81,4 @@ export class R2Service {
     await this.client.send(command);
   }
 }
+

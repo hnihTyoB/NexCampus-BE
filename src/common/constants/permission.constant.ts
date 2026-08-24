@@ -41,7 +41,12 @@ export const PERMISSIONS = {
   // System Configuration & Feature Flags
   SYSTEM_CONFIG_READ: 'SYSTEM_CONFIG_READ',
   SYSTEM_CONFIG_MANAGE: 'SYSTEM_CONFIG_MANAGE',
+
+  // Scheduled / Cron Jobs Management
+  CRON_JOB_READ: 'CRON_JOB_READ',
+  CRON_JOB_MANAGE: 'CRON_JOB_MANAGE',
 } as const;
+
 
 export type PermissionKey = keyof typeof PERMISSIONS;
 

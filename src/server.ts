@@ -3,9 +3,12 @@ import app from './app';
 import { envConfig } from './config/env.config';
 import { emailWorker } from './common/workers/email-worker';
 import { webhookWorker } from './common/workers/webhook.worker';
+import { cronWorker } from './common/workers/cron.worker';
 import { webhookQueue } from './common/queues/webhook.queue';
+import { cronQueue } from './common/queues/cron.queue';
 import { maintenanceCacheService } from './common/services/maintenance-cache.service';
 import { systemConfigService } from './modules/system-config/system-config.service';
+import { sseManagerService } from './common/services/sse-manager.service';
 import { prisma } from './database/prisma.client';
 
 const PORT = envConfig.port;
@@ -18,8 +21,11 @@ const server = app.listen(PORT, async () => {
     console.warn('[SystemConfig] Failed to seed default configs:', err.message);
   });
 
+  // Start background workers and register cron schedules
   emailWorker.start();
   webhookWorker.start();
+  cronWorker.start();
+  await cronQueue.registerSchedules();
 });
 
 // Graceful Shutdown Handler
@@ -37,15 +43,20 @@ async function handleShutdown(signal: string) {
 
     try {
       // 1. Stop background workers
-      emailWorker.stop();
+      await emailWorker.stop();
       await webhookWorker.stop();
+      await cronWorker.stop();
       console.log('[Server] Background workers stopped.');
 
-      // 2. Close BullMQ queue & Redis connections
+      // 2. Close BullMQ queues, SSE streams & Redis connections
+      await sseManagerService.close();
       await webhookQueue.close();
+      await cronQueue.close();
       await maintenanceCacheService.close();
       await systemConfigService.close();
-      console.log('[Server] Redis & Queue connections closed.');
+      console.log('[Server] SSE, Redis & Queue connections closed.');
+
+
 
       // 3. Disconnect Prisma DB client
       await prisma.$disconnect();

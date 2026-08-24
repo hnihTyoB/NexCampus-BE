@@ -25,8 +25,10 @@ const controller = new NotificationController();
 
 router.use(authMiddleware);
 
+router.get('/stream', controller.stream);
 router.get('/', validate(listNotificationsSchema, 'query'), controller.list);
 router.get('/unread-count', controller.unreadCount);
+
 router.patch('/read-all', controller.markAllAsRead);
 router.patch('/:id/read', validate(notificationIdParamSchema, 'params'), controller.markAsRead);
 router.delete('/:id', validate(notificationIdParamSchema, 'params'), controller.delete);
