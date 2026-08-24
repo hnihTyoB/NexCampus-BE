@@ -1,5 +1,6 @@
 import { prisma } from '../../database/prisma.client';
 import { SYSTEM_TARGET_ID } from '../../common/constants/audit-log.constant';
+import { EMAIL_MAX_ATTEMPTS } from '../../common/constants/notification.constant';
 import {
   ListNotificationsDto,
   ListEmailsDto,
@@ -8,8 +9,23 @@ import {
   UpdateNotificationTemplateDto,
 } from './notification.dto';
 
+export interface ClaimedEmailRecord {
+  id: string;
+  userId: string | null;
+  toEmail: string;
+  subject: string;
+  templateKey: string;
+  templateData: unknown;
+  status: string;
+  attempts: number;
+  lastError: string | null;
+  sentAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export class NotificationRepository {
-  findMany(userId: string, dto: ListNotificationsDto) {
+  async findMany(userId: string, dto: ListNotificationsDto) {
     const { page = 1, limit = 20, isRead, type } = dto;
     const skip = (page - 1) * limit;
 
@@ -19,7 +35,7 @@ export class NotificationRepository {
       ...(type && { type }),
     };
 
-    return Promise.all([
+    return prisma.$transaction([
       prisma.notification.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -82,6 +98,55 @@ export class NotificationRepository {
     });
   }
 
+  findUserEmailById(userId: string) {
+    return prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+  }
+
+  createSingleNotification(data: {
+    userId: string;
+    type: string;
+    priority?: string;
+    title: string;
+    content: string;
+    actionUrl?: string | null;
+    metadata?: any;
+  }) {
+    return prisma.notification.create({
+      data: {
+        userId: data.userId,
+        type: data.type,
+        priority: data.priority ?? 'NORMAL',
+        title: data.title,
+        content: data.content,
+        actionUrl: data.actionUrl ?? null,
+        metadata: data.metadata ?? null,
+      },
+    });
+  }
+
+  createSingleEmailNotification(data: {
+    userId: string;
+    toEmail: string;
+    subject: string;
+    templateKey: string;
+    templateData: any;
+    status?: string;
+  }) {
+    return prisma.emailNotification.create({
+      data: {
+        userId: data.userId,
+        toEmail: data.toEmail,
+        subject: data.subject,
+        templateKey: data.templateKey,
+        templateData: data.templateData,
+        status: data.status ?? 'PENDING',
+      },
+    });
+  }
+
   createManyNotifications(
     data: Array<{
       userId: string;
@@ -109,7 +174,78 @@ export class NotificationRepository {
     return prisma.emailNotification.createMany({ data });
   }
 
-  findEmails(dto: ListEmailsDto) {
+  createMultiChannelNotifications(
+    webData: Array<{
+      userId: string;
+      type: string;
+      priority: string;
+      title: string;
+      content: string;
+      actionUrl?: string | null;
+      metadata?: any;
+    }>,
+    emailData: Array<{
+      userId: string;
+      toEmail: string;
+      subject: string;
+      templateKey: string;
+      templateData: any;
+      status: string;
+    }>,
+  ) {
+    return prisma.$transaction(async (tx) => {
+      if (webData.length > 0) {
+        await tx.notification.createMany({ data: webData });
+      }
+      if (emailData.length > 0) {
+        await tx.emailNotification.createMany({ data: emailData });
+      }
+    });
+  }
+
+  async claimPendingEmails(batchSize = 20): Promise<ClaimedEmailRecord[]> {
+    return prisma.$queryRaw<ClaimedEmailRecord[]>`
+      UPDATE email_notifications
+      SET status = 'PROCESSING', updated_at = NOW()
+      WHERE id IN (
+        SELECT id FROM email_notifications
+        WHERE status = 'PENDING' AND attempts < ${EMAIL_MAX_ATTEMPTS}
+        ORDER BY created_at ASC
+        LIMIT ${batchSize}
+        FOR UPDATE SKIP LOCKED
+      )
+      RETURNING
+        id,
+        user_id AS "userId",
+        to_email AS "toEmail",
+        subject,
+        template_key AS "templateKey",
+        template_data AS "templateData",
+        status,
+        attempts,
+        last_error AS "lastError",
+        sent_at AS "sentAt",
+        created_at AS "createdAt",
+        updated_at AS "updatedAt"
+    `;
+  }
+
+  updateEmailStatus(
+    id: string,
+    data: {
+      status: string;
+      attempts?: number;
+      lastError?: string | null;
+      sentAt?: Date | null;
+    },
+  ) {
+    return prisma.emailNotification.update({
+      where: { id },
+      data,
+    });
+  }
+
+  async findEmails(dto: ListEmailsDto) {
     const { page = 1, limit = 20, status, toEmail } = dto;
     const skip = (page - 1) * limit;
 
@@ -118,7 +254,7 @@ export class NotificationRepository {
       ...(toEmail && { toEmail: { contains: toEmail, mode: 'insensitive' as const } }),
     };
 
-    return Promise.all([
+    return prisma.$transaction([
       prisma.emailNotification.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -148,13 +284,13 @@ export class NotificationRepository {
   // Template Repository Methods
   // ─────────────────────────────────────────────
 
-  findTemplates(dto: ListNotificationTemplatesDto) {
+  async findTemplates(dto: ListNotificationTemplatesDto) {
     const { page = 1, limit = 20, isActive, search, channel } = dto;
     const skip = (page - 1) * limit;
 
     const where: any = {
       ...(isActive !== undefined && { isActive }),
-      ...(channel && { channels: { array_contains: [channel] } }),
+      ...(channel && { channels: { array_contains: channel } }),
       ...(search && {
         OR: [
           { code: { contains: search, mode: 'insensitive' } },
@@ -164,7 +300,7 @@ export class NotificationRepository {
       }),
     };
 
-    return Promise.all([
+    return prisma.$transaction([
       prisma.notificationTemplate.findMany({
         where,
         orderBy: [{ isSystem: 'desc' }, { createdAt: 'desc' }],
@@ -242,3 +378,6 @@ export class NotificationRepository {
     });
   }
 }
+
+export const notificationRepository = new NotificationRepository();
+

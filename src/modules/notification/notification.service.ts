@@ -75,25 +75,32 @@ export class NotificationService {
   async send(dto: SendNotificationDto): Promise<{ sentCount: number }> {
     const { userIds, channels, title, content, type, priority, actionUrl, metadata, templateKey = EMAIL_TEMPLATE_KEY.CUSTOM, templateData } = dto;
 
-    if (channels.includes(NOTIFICATION_CHANNEL.WEB)) {
-      const records = userIds.map((userId) => ({
-        userId,
-        type: type || NOTIFICATION_TYPE.INFO,
-        priority: priority || NOTIFICATION_PRIORITY.NORMAL,
-        title,
-        content,
-        actionUrl: actionUrl || null,
-        metadata: metadata || null,
-      }));
-      await this.repository.createManyNotifications(records);
-    }
+    const webRecords = channels.includes(NOTIFICATION_CHANNEL.WEB)
+      ? userIds.map((userId) => ({
+          userId,
+          type: type || NOTIFICATION_TYPE.INFO,
+          priority: priority || NOTIFICATION_PRIORITY.NORMAL,
+          title,
+          content,
+          actionUrl: actionUrl || null,
+          metadata: metadata || null,
+        }))
+      : [];
+
+    let emailRecords: Array<{
+      userId: string;
+      toEmail: string;
+      subject: string;
+      templateKey: string;
+      templateData: any;
+      status: string;
+    }> = [];
 
     if (channels.includes(NOTIFICATION_CHANNEL.EMAIL)) {
       const targetUsers = await this.repository.findActiveUsersByIds(userIds);
-
       const subject = ((templateData?.subject as string) || DEFAULT_EMAIL_SUBJECTS[templateKey] || title) ?? 'Thông báo từ hệ thống';
 
-      const emailRecords = targetUsers.map((u) => ({
+      emailRecords = targetUsers.map((u) => ({
         userId: u.id,
         toEmail: u.email!,
         subject,
@@ -101,10 +108,10 @@ export class NotificationService {
         templateData: (templateData || { subject: title, html: content }) as any,
         status: 'PENDING',
       }));
+    }
 
-      if (emailRecords.length > 0) {
-        await this.repository.createManyEmailNotifications(emailRecords);
-      }
+    if (webRecords.length > 0 || emailRecords.length > 0) {
+      await this.repository.createMultiChannelNotifications(webRecords, emailRecords);
     }
 
     return { sentCount: userIds.length };

@@ -14,6 +14,11 @@ export const logoutSchema = z.object({
   refreshToken: z.string().optional(),
 });
 
+export const revokeOtherSessionsSchema = z.object({
+  refreshToken: z.string().optional(),
+});
+
+
 export const registerSchema = z.object({
   email: z
     .string()

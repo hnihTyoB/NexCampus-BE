@@ -263,3 +263,6 @@ export class RbacRepository {
     };
   }
 }
+
+export const rbacRepository = new RbacRepository();
+

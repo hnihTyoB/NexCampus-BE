@@ -82,6 +82,7 @@ export function errorMiddleware(
   res.status(500).json({
     success: false,
     message: 'Internal server error',
-    code: 'INTERNAL_SERVER_ERROR',
+    code: ERROR_CODE.INTERNAL_SERVER_ERROR,
   });
 }
+

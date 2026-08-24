@@ -1,9 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../database/prisma.client';
+import { IntegrationRepository } from '../modules/integration/integration.repository';
 import { AppError } from '../common/errors/app-error';
 import { ERROR_CODE } from '../common/errors/error-code';
 import { hashApiKey } from '../common/helpers/crypto.helper';
 import { API_KEY_HEADER } from '../common/constants/integration.constant';
+
+const integrationRepository = new IntegrationRepository();
 
 export async function apiKeyAuthMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
   let key = req.headers[API_KEY_HEADER] as string | undefined;
@@ -22,14 +24,7 @@ export async function apiKeyAuthMiddleware(req: Request, res: Response, next: Ne
 
   try {
     const keyHash = hashApiKey(key);
-    const apiKey = await prisma.apiKey.findUnique({
-      where: { keyHash },
-      include: {
-        user: {
-          include: { role: true },
-        },
-      },
-    });
+    const apiKey = await integrationRepository.findApiKeyByKeyHash(keyHash);
 
     if (!apiKey || !apiKey.isActive) {
       next(new AppError('Invalid or deactivated API Key', 401, ERROR_CODE.UNAUTHORIZED));
@@ -46,11 +41,12 @@ export async function apiKeyAuthMiddleware(req: Request, res: Response, next: Ne
       return;
     }
 
-    // Cập nhật lastUsedAt asynchronously không block request
-    prisma.apiKey.update({
-      where: { id: apiKey.id },
-      data: { lastUsedAt: new Date() },
-    }).catch(() => {});
+    // Cập nhật lastUsedAt asynchronously có throttle (5 phút) tránh write-lock DB liên tục
+    const FIVE_MINUTES_MS = 5 * 60 * 1000;
+    if (!apiKey.lastUsedAt || Date.now() - apiKey.lastUsedAt.getTime() > FIVE_MINUTES_MS) {
+      integrationRepository.updateApiKeyLastUsed(apiKey.id).catch(() => {});
+    }
+
 
     // Gán thông tin user sở hữu API Key vào request
     req.user = {

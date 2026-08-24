@@ -1,8 +1,8 @@
 import { MaintenanceConfig } from '@prisma/client';
 import IORedis from 'ioredis';
-import { prisma } from '../../database/prisma.client';
 import { envConfig } from '../../config/env.config';
-import { DEFAULT_MAINTENANCE_CONFIG, MAINTENANCE_PUBSUB_CHANNEL } from '../constants/maintenance.constant';
+import { MAINTENANCE_PUBSUB_CHANNEL } from '../constants/maintenance.constant';
+import { maintenanceRepository } from '../../modules/maintenance/maintenance.repository';
 
 interface CacheEntry {
   config: MaintenanceConfig;
@@ -88,27 +88,7 @@ export class MaintenanceCacheService {
       return this.cache.config;
     }
 
-    let config = await prisma.maintenanceConfig.findUnique({
-      where: { key },
-    });
-
-    if (!config) {
-      // Upsert default config if not yet in database
-      config = await prisma.maintenanceConfig.upsert({
-        where: { key },
-        update: {},
-        create: {
-          key: DEFAULT_MAINTENANCE_CONFIG.key,
-          enabled: DEFAULT_MAINTENANCE_CONFIG.enabled,
-          status: DEFAULT_MAINTENANCE_CONFIG.status,
-          title: DEFAULT_MAINTENANCE_CONFIG.title,
-          message: DEFAULT_MAINTENANCE_CONFIG.message,
-          bypassPermissions: DEFAULT_MAINTENANCE_CONFIG.bypassPermissions as any,
-          bypassRoles: DEFAULT_MAINTENANCE_CONFIG.bypassRoles as any,
-          bypassIps: DEFAULT_MAINTENANCE_CONFIG.bypassIps as any,
-        },
-      });
-    }
+    const config = await maintenanceRepository.getOrCreateDefaultConfig(key);
 
     this.cache = {
       config,

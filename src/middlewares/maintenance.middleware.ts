@@ -19,7 +19,9 @@ const DEFAULT_EXEMPT_PATHS: (string | RegExp)[] = [
   /^\/api\/docs/,
   /^\/api\/v1\/maintenance/,
   /^\/api\/v1\/auth\/(login|refresh|logout|me|sessions)/,
+  /^\/api\/v1\/system\/public/,
 ];
+
 
 export function maintenanceGuard(options?: MaintenanceGuardOptions) {
   const exemptPaths = options?.exemptPaths ?? DEFAULT_EXEMPT_PATHS;
