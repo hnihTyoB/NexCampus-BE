@@ -29,6 +29,7 @@ import {
   DEFAULT_EMAIL_SUBJECTS,
 } from '../../common/constants/notification.constant';
 import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from '../../common/constants/audit-log.constant';
+import { sseManagerService } from '../../common/services/sse-manager.service';
 
 export class NotificationService {
   private readonly repository = new NotificationRepository();
@@ -58,11 +59,20 @@ export class NotificationService {
       throw new AppError('Notification not found', 404, ERROR_CODE.NOT_FOUND);
     }
     await this.repository.markAsRead(notificationId, userId);
+    sseManagerService.sendToUser(userId, {
+      type: 'notification:read',
+      data: { notificationId },
+    });
   }
 
   async markAllAsRead(userId: string): Promise<void> {
     await this.repository.markAllAsRead(userId);
+    sseManagerService.sendToUser(userId, {
+      type: 'notification:read_all',
+      data: {},
+    });
   }
+
 
   async delete(userId: string, notificationId: string): Promise<void> {
     const notification = await this.repository.findOne(notificationId, userId);
@@ -112,35 +122,76 @@ export class NotificationService {
 
     if (webRecords.length > 0 || emailRecords.length > 0) {
       await this.repository.createMultiChannelNotifications(webRecords, emailRecords);
+
+      // Real-time Push via SSE cho các user nhận kênh WEB
+      if (channels.includes(NOTIFICATION_CHANNEL.WEB)) {
+        for (const userId of userIds) {
+          sseManagerService.sendToUser(userId, {
+            type: 'notification:new',
+            data: {
+              title,
+              content,
+              type: type || NOTIFICATION_TYPE.INFO,
+              priority: priority || NOTIFICATION_PRIORITY.NORMAL,
+              actionUrl: actionUrl || null,
+              createdAt: new Date().toISOString(),
+            },
+          });
+        }
+      }
     }
 
     return { sentCount: userIds.length };
   }
 
   async broadcast(dto: BroadcastNotificationDto): Promise<{ totalRecipients: number }> {
-    const activeUsers = await this.repository.getAllActiveUsers();
-    if (activeUsers.length === 0) {
-      return { totalRecipients: 0 };
-    }
-
-    const records = activeUsers.map((u) => ({
-      userId: u.id,
-      type: dto.type || NOTIFICATION_TYPE.SYSTEM,
-      priority: dto.priority || NOTIFICATION_PRIORITY.NORMAL,
-      title: dto.title,
-      content: dto.content,
-      actionUrl: dto.actionUrl || null,
-      metadata: dto.metadata || null,
-    }));
-
     const BATCH_SIZE = 500;
-    for (let i = 0; i < records.length; i += BATCH_SIZE) {
-      const batch = records.slice(i, i + BATCH_SIZE);
-      await this.repository.createManyNotifications(batch);
+    let cursorId: string | undefined;
+    let totalRecipients = 0;
+
+    while (true) {
+      const usersChunk = await this.repository.getActiveUsersChunk(BATCH_SIZE, cursorId);
+      if (usersChunk.length === 0) {
+        break;
+      }
+
+      const records = usersChunk.map((u) => ({
+        userId: u.id,
+        type: dto.type || NOTIFICATION_TYPE.SYSTEM,
+        priority: dto.priority || NOTIFICATION_PRIORITY.NORMAL,
+        title: dto.title,
+        content: dto.content,
+        actionUrl: dto.actionUrl || null,
+        metadata: dto.metadata || null,
+      }));
+
+      await this.repository.createManyNotifications(records);
+      totalRecipients += usersChunk.length;
+      cursorId = usersChunk[usersChunk.length - 1].id;
+
+      if (usersChunk.length < BATCH_SIZE) {
+        break;
+      }
     }
 
-    return { totalRecipients: activeUsers.length };
+    if (totalRecipients > 0) {
+      // Real-time Push via SSE (Broadcast)
+      sseManagerService.broadcast({
+        type: 'notification:broadcast',
+        data: {
+          title: dto.title,
+          content: dto.content,
+          type: dto.type || NOTIFICATION_TYPE.SYSTEM,
+          priority: dto.priority || NOTIFICATION_PRIORITY.NORMAL,
+          actionUrl: dto.actionUrl || null,
+          createdAt: new Date().toISOString(),
+        },
+      });
+    }
+
+    return { totalRecipients };
   }
+
 
   async listEmails(dto: ListEmailsDto): Promise<ListEmailsResponseDto> {
     const { page = 1, limit = 20 } = dto;

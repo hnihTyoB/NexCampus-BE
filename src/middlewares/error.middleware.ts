@@ -58,10 +58,10 @@ export function errorMiddleware(
       return;
     }
 
-    if (error.code === 'P2003') {
+    if (error.code === 'P2003' || error.code === 'P2014') {
       res.status(400).json({
         success: false,
-        message: 'Dữ liệu liên kết không hợp lệ',
+        message: 'Dữ liệu liên kết hoặc ràng buộc quan hệ không hợp lệ',
         code: ERROR_CODE.VALIDATION_ERROR,
       });
       return;

@@ -91,6 +91,16 @@ export class NotificationRepository {
     });
   }
 
+  getActiveUsersChunk(take = 500, cursorId?: string) {
+    return prisma.user.findMany({
+      where: { isActive: true, deletedAt: null },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+      take,
+      ...(cursorId ? { skip: 1, cursor: { id: cursorId } } : {}),
+    });
+  }
+
   findActiveUsersByIds(ids: string[]) {
     return prisma.user.findMany({
       where: { id: { in: ids }, isActive: true, deletedAt: null },
@@ -290,7 +300,7 @@ export class NotificationRepository {
 
     const where: any = {
       ...(isActive !== undefined && { isActive }),
-      ...(channel && { channels: { array_contains: channel } }),
+      ...(channel && { channels: { array_contains: [channel] } }),
       ...(search && {
         OR: [
           { code: { contains: search, mode: 'insensitive' } },

@@ -1,5 +1,7 @@
 import nodemailer from 'nodemailer';
 import { mailConfig } from '../../config/mail.config';
+import { formatVietnamDateTime } from '../helpers/date.helper';
+
 
 export class MailService {
   private transporter: nodemailer.Transporter;
@@ -97,8 +99,9 @@ export class MailService {
   }
 
   async sendNewDeviceAlertEmail(email: string, details: { deviceName: string; ipAddress: string; loginTime: Date }, fullName?: string) {
-    const formattedDate = details.loginTime.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+    const formattedDate = formatVietnamDateTime(details.loginTime);
     const mailOptions = {
+
       from: mailConfig.from,
       to: email,
       subject: '[Cảnh báo bảo mật] Đăng nhập từ thiết bị mới',

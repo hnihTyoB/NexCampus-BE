@@ -29,6 +29,20 @@ async function resolveUserPermissions(req: Request): Promise<Set<string>> {
   }
 
   const userPermissions = await permissionCacheService.getRolePermissions(roleId);
+
+  // If request is authenticated via API Key, intersect role permissions with scoped API Key permissions
+  if ((req as any).apiKey && Array.isArray(req.user.permissions)) {
+    const apiKeyPermissions = new Set(req.user.permissions);
+    const effectivePermissions = new Set<string>();
+    for (const perm of userPermissions) {
+      if (apiKeyPermissions.has(perm)) {
+        effectivePermissions.add(perm);
+      }
+    }
+    req.user.permissions = Array.from(effectivePermissions);
+    return effectivePermissions;
+  }
+
   req.user.permissions = Array.from(userPermissions);
   return userPermissions;
 }

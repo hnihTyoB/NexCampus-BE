@@ -86,7 +86,22 @@
   - `rotateRefreshToken()` áp dụng RFC 6819 Token Family Revocation: tự động thu hồi toàn bộ refresh token của user khi phát hiện hành vi tái sử dụng token đã xoay vòng.
   - Tối ưu hóa `api_keys.last_used_at` với cơ chế debounce 5 phút tránh nghẽn write lock khi tiếp nhận tải cao.
   - Tối ưu hóa composite indexes qua migration `20260824010000_update_notification_indexes`.
-  - Chuẩn hóa mã lỗi `INTERNAL_SERVER_ERROR` trong `error.middleware.ts` qua hằng số tập trung `ERROR_CODE.INTERNAL_SERVER_ERROR`.
+- **Automated OpenAPI & Swagger Documentation** (`@asteasolutions/zod-to-openapi`):
+  - Tài liệu Swagger UI tại `/api/docs` được sinh tự động và đồng bộ 100% theo thời gian thực từ các Zod Schema trong `*.validation.ts`.
+  - Loại bỏ hoàn toàn việc duy trì file tĩnh thủ công 1900 dòng.
+  - Mỗi module quản lý OpenAPI route definitions độc lập tại `src/modules/*/*.openapi.ts`, tập trung qua `OpenAPIRegistry` (`src/config/openapi/openapi.registry.ts`).
+- **Scheduled Background Tasks & Cron Engine** (`BullMQ Repeatable Jobs`):
+  - Module quản lý Cron Jobs tập trung tại `src/modules/cron/` và `src/common/queues/cron.queue.ts`.
+  - Hỗ trợ 4 tác vụ định kỳ chính:
+    1. `cleanup-audit-logs`: Xóa Audit Logs cũ hơn 30 ngày.
+    2. `cleanup-unconfirmed-uploads`: Quét bucket Cloudflare R2 / S3 xóa file avatar rác quá 24h không liên kết user.
+    3. `cleanup-expired-tokens`: Dọn dẹp Refresh Token, Verification Token và Password Reset Token đã hết hạn.
+    4. `daily-summary-digest` & `weekly-summary-digest`: Tổng hợp KPI hệ thống và gửi email báo cáo tới Quản trị viên.
+  - Cung cấp REST endpoints `GET /api/v1/cron/jobs` và `POST /api/v1/cron/jobs/:jobName/trigger` cho phép Admin chủ động kích hoạt chạy ngay kèm Audit Log.
+  - Quản lý lifecycle an toàn qua `CronWorker` và `CronQueueService` trong `src/server.ts`.
+
+
+
 
 
 

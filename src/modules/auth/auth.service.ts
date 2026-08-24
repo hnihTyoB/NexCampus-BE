@@ -220,7 +220,11 @@ export class AuthService {
       isActive: false,
     }, token, expiresAt);
 
-    await this.mailService.sendVerificationEmail(email, token, fullName || undefined);
+    try {
+      await this.mailService.sendVerificationEmail(email, token, fullName || undefined);
+    } catch (mailErr: any) {
+      console.warn(`[AuthService] Failed to send verification email to ${email}:`, mailErr?.message || mailErr);
+    }
   }
 
   async verifyEmail(token: string): Promise<void> {
@@ -294,15 +298,6 @@ export class AuthService {
       'Mật khẩu tài khoản của bạn vừa được thay đổi. Nếu không phải bạn thực hiện, vui lòng liên hệ quản trị viên ngay lập tức.',
       { priority: NOTIFICATION_PRIORITY.HIGH }
     ).catch(err => console.error('Failed to dispatch password changed notification:', err));
-  }
-
-  async softDeleteUser(userId: string, adminId: string): Promise<void> {
-    const user = await this.repository.findById(userId);
-    if (!user) {
-      throw new AppError('User not found', 404, ERROR_CODE.NOT_FOUND);
-    }
-
-    await this.repository.softDelete(userId, adminId);
   }
 
   async forgotPassword(data: ForgotPasswordDto): Promise<void> {

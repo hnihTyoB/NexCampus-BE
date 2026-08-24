@@ -2,6 +2,7 @@ import { mailConfig } from '../../config/mail.config';
 import { notificationRepository } from '../../modules/notification/notification.repository';
 import { EMAIL_TEMPLATE_KEY, EmailTemplateKey } from '../constants/notification.constant';
 import { renderTemplateString } from '../helpers/template.helper';
+import { formatVietnamDateTime } from '../helpers/date.helper';
 
 export interface EmailTemplate {
   subject: string;
@@ -47,8 +48,11 @@ export class EmailTemplateService {
         return this.resetPassword(data);
       case EMAIL_TEMPLATE_KEY.NEW_DEVICE_ALERT:
         return this.newDeviceAlert(data);
+      case EMAIL_TEMPLATE_KEY.ACTIVITY_SUMMARY_DIGEST:
+        return this.activitySummaryDigest(data);
       case EMAIL_TEMPLATE_KEY.CUSTOM:
         return this.custom(data);
+
       default:
         return {
           subject: (data['subject'] as string) || 'Thông báo từ hệ thống',
@@ -125,11 +129,63 @@ export class EmailTemplateService {
         <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
           <tr><td style="padding: 8px; color: #666; width: 140px;">Thiết bị:</td><td style="padding: 8px; font-weight: bold;">${deviceName || 'Không xác định'}</td></tr>
           <tr><td style="padding: 8px; color: #666;">Địa chỉ IP:</td><td style="padding: 8px; font-weight: bold;">${ipAddress || 'Không xác định'}</td></tr>
-          <tr><td style="padding: 8px; color: #666;">Thời gian:</td><td style="padding: 8px; font-weight: bold;">${time || new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</td></tr>
+          <tr><td style="padding: 8px; color: #666;">Thời gian:</td><td style="padding: 8px; font-weight: bold;">${time || formatVietnamDateTime(new Date())}</td></tr>
         </table>
+
         <p>Nếu đây không phải bạn, hãy đổi mật khẩu ngay lập tức.</p>
       `),
     };
+  }
+
+  private activitySummaryDigest(data: Record<string, unknown>): EmailTemplate {
+    const period = (data['period'] as string) || 'Hàng ngày';
+    const startDate = (data['startDate'] as string) || '';
+    const endDate = (data['endDate'] as string) || '';
+    const newUsersCount = Number(data['newUsersCount'] || 0);
+    const activeSessionsCount = Number(data['activeSessionsCount'] || 0);
+    const notificationsSentCount = Number(data['notificationsSentCount'] || 0);
+    const emailsSentCount = Number(data['emailsSentCount'] || 0);
+    const webhookDeliveriesCount = Number(data['webhookDeliveriesCount'] || 0);
+    const auditLogsCount = Number(data['auditLogsCount'] || 0);
+
+    const subject = `[Báo cáo ${period}] Tổng kết hoạt động hệ thống (${startDate} - ${endDate})`;
+
+    const html = this.baseLayout(`📊 Báo cáo Tổng kết Hoạt động (${period})`, `
+      <p style="color: #444; font-size: 14px;">Kính gửi Quản trị viên,</p>
+      <p style="color: #444; font-size: 14px;">Dưới đây là số liệu tổng hợp hoạt động của hệ thống trong khoảng thời gian từ <strong>${startDate}</strong> đến <strong>${endDate}</strong>:</p>
+      
+      <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background-color: #f9f9fb; border-radius: 6px; overflow: hidden;">
+        <tr style="border-bottom: 1px solid #e5e7eb;">
+          <td style="padding: 12px 16px; color: #4b5563; font-weight: 500;">👤 Người dùng đăng ký mới:</td>
+          <td style="padding: 12px 16px; font-weight: bold; color: #111827; text-align: right;">${newUsersCount.toLocaleString('vi-VN')}</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #e5e7eb;">
+          <td style="padding: 12px 16px; color: #4b5563; font-weight: 500;">🔑 Phiên đăng nhập / Tokens:</td>
+          <td style="padding: 12px 16px; font-weight: bold; color: #111827; text-align: right;">${activeSessionsCount.toLocaleString('vi-VN')}</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #e5e7eb;">
+          <td style="padding: 12px 16px; color: #4b5563; font-weight: 500;">🔔 Thông báo In-App tạo mới:</td>
+          <td style="padding: 12px 16px; font-weight: bold; color: #111827; text-align: right;">${notificationsSentCount.toLocaleString('vi-VN')}</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #e5e7eb;">
+          <td style="padding: 12px 16px; color: #4b5563; font-weight: 500;">📧 Email đã gửi thành công:</td>
+          <td style="padding: 12px 16px; font-weight: bold; color: #111827; text-align: right;">${emailsSentCount.toLocaleString('vi-VN')}</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #e5e7eb;">
+          <td style="padding: 12px 16px; color: #4b5563; font-weight: 500;">🚀 Webhook Deliveries:</td>
+          <td style="padding: 12px 16px; font-weight: bold; color: #111827; text-align: right;">${webhookDeliveriesCount.toLocaleString('vi-VN')}</td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 16px; color: #4b5563; font-weight: 500;">🛡️ Hành động Audit Logs ghi nhận:</td>
+          <td style="padding: 12px 16px; font-weight: bold; color: #111827; text-align: right;">${auditLogsCount.toLocaleString('vi-VN')}</td>
+        </tr>
+      </table>
+
+      <p style="color: #6b7280; font-size: 13px;">Báo cáo được sinh tự động bởi Cron Scheduler Engine vào lúc ${formatVietnamDateTime(new Date())}.</p>
+    `);
+
+
+    return { subject, html };
   }
 
   private custom(data: Record<string, unknown>): EmailTemplate {
@@ -137,3 +193,4 @@ export class EmailTemplateService {
     return { subject, html };
   }
 }
+

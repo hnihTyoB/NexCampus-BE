@@ -20,9 +20,8 @@
     "format": "prettier --write .",
     "test": "node --test --import tsx tests/*.test.ts"
   },
-
-
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^7.3.4",
     "@aws-sdk/client-s3": "^3.1116.0",
     "@aws-sdk/s3-request-presigner": "^3.1116.0",
     "@prisma/client": "^5.22.0",

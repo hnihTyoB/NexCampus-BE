@@ -1,8 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { Prisma } from '@prisma/client';
-import { getVietnamDayRange, formatVietnamDate } from '../src/common/helpers/date.helper';
+import { getVietnamDayRange, formatVietnamDate, formatVietnamDateTime } from '../src/common/helpers/date.helper';
 import { toSlug } from '../src/common/helpers/slug.helper';
+
 import { generateDeviceHash } from '../src/common/helpers/user-agent.helper';
 import {
   isPublicHttpUrl,
@@ -72,7 +73,16 @@ describe('Timezone & Date Helper (Asia/Ho_Chi_Minh - UTC+7)', () => {
     const lateNight = new Date('2026-08-22T16:30:00.000Z');
     assert.equal(formatVietnamDate(lateNight), '2026-08-22');
   });
+
+  it('should format date with formatVietnamDateTime in Asia/Ho_Chi_Minh timezone', () => {
+    // 2026-08-24 07:00:00 UTC is 14:00:00 in Vietnam
+    const sampleDate = new Date('2026-08-24T07:00:00.000Z');
+    const formatted = formatVietnamDateTime(sampleDate);
+    assert.ok(formatted.includes('2026'));
+    assert.ok(formatted.includes('14:00') || formatted.includes('2:00'));
+  });
 });
+
 
 describe('Helpers & Sanitization', () => {
   it('should convert Vietnamese accented strings into clean slug', () => {

@@ -1,5 +1,6 @@
 import { maintenanceRepository, MaintenanceRepository } from './maintenance.repository';
 import { maintenanceCacheService, MaintenanceCacheService } from '../../common/services/maintenance-cache.service';
+import { sseManagerService } from '../../common/services/sse-manager.service';
 import { EnableMaintenanceDto, UpdateMaintenanceDto, PublicMaintenanceStatusDto } from './maintenance.dto';
 import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from '../../common/constants/audit-log.constant';
 import { MAINTENANCE_STATUS, MaintenanceStatus } from '../../common/constants/maintenance.constant';
@@ -51,6 +52,20 @@ export class MaintenanceService {
     });
 
     this.cacheService.invalidate();
+
+    // Broadcast SSE event
+    sseManagerService.broadcast({
+      type: 'system:maintenance',
+      data: {
+        enabled: updatedConfig.enabled,
+        status: updatedConfig.status,
+        title: updatedConfig.title,
+        message: updatedConfig.message,
+        startAt: updatedConfig.startAt ? updatedConfig.startAt.toISOString() : null,
+        estimatedEndAt: updatedConfig.estimatedEndAt ? updatedConfig.estimatedEndAt.toISOString() : null,
+      },
+    });
+
 
     // Audit log
     await this.repo.createAuditLog({
@@ -113,6 +128,19 @@ export class MaintenanceService {
 
     this.cacheService.invalidate();
 
+    // Broadcast SSE event
+    sseManagerService.broadcast({
+      type: 'system:maintenance',
+      data: {
+        enabled: updatedConfig.enabled,
+        status: updatedConfig.status,
+        title: updatedConfig.title,
+        message: updatedConfig.message,
+        startAt: updatedConfig.startAt ? updatedConfig.startAt.toISOString() : null,
+        estimatedEndAt: updatedConfig.estimatedEndAt ? updatedConfig.estimatedEndAt.toISOString() : null,
+      },
+    });
+
     // Audit log
     await this.repo.createAuditLog({
       actorId: context?.actorId,
@@ -152,6 +180,19 @@ export class MaintenanceService {
 
     this.cacheService.invalidate();
 
+    // Broadcast SSE event
+    sseManagerService.broadcast({
+      type: 'system:maintenance',
+      data: {
+        enabled: false,
+        status: MAINTENANCE_STATUS.ONLINE,
+        title: updatedConfig.title,
+        message: updatedConfig.message,
+        startAt: null,
+        estimatedEndAt: null,
+      },
+    });
+
     // Audit log
     await this.repo.createAuditLog({
       actorId: context?.actorId,
@@ -175,5 +216,6 @@ export class MaintenanceService {
     return updatedConfig;
   }
 }
+
 
 export const maintenanceService = new MaintenanceService();
