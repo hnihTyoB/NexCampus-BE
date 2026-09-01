@@ -1,6 +1,15 @@
+import crypto from 'crypto';
 import { prisma } from '../../database/prisma.client';
 import { AppError } from '../../common/errors/app-error';
 import { ERROR_CODE } from '../../common/errors/error-code';
+
+/**
+ * Băm token bằng SHA-256 trước khi lưu vào database.
+ * Plain text token chỉ trả về client 1 lần; DB chỉ lưu hash để tra cứu.
+ */
+function hashToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
 
 export class AuthRepository {
   findByEmail(email: string) {
@@ -21,7 +30,7 @@ export class AuthRepository {
     return prisma.refreshToken.create({
       data: {
         userId,
-        token,
+        token: hashToken(token), // Lưu hash, không lưu plain-text
         expiresAt,
         userAgent,
         ipAddress,
@@ -31,13 +40,13 @@ export class AuthRepository {
 
   async findRefreshToken(token: string) {
     return prisma.refreshToken.findUnique({
-      where: { token },
+      where: { token: hashToken(token) },
     });
   }
 
   async deleteRefreshToken(token: string) {
     return prisma.refreshToken.deleteMany({
-      where: { token },
+      where: { token: hashToken(token) },
     });
   }
 
@@ -90,7 +99,7 @@ export class AuthRepository {
       return tx.verificationToken.create({
         data: {
           userId,
-          token,
+          token: hashToken(token), // Lưu hash
           expiresAt,
         },
       });
@@ -99,7 +108,7 @@ export class AuthRepository {
 
   async findVerificationToken(token: string) {
     return prisma.verificationToken.findUnique({
-      where: { token },
+      where: { token: hashToken(token) },
       include: { user: true },
     });
   }
@@ -185,7 +194,7 @@ export class AuthRepository {
       return tx.passwordResetToken.create({
         data: {
           userId,
-          token,
+          token: hashToken(token), // Lưu hash
           expiresAt,
         },
       });
@@ -194,7 +203,7 @@ export class AuthRepository {
 
   async findPasswordResetToken(token: string) {
     return prisma.passwordResetToken.findUnique({
-      where: { token },
+      where: { token: hashToken(token) },
       include: { user: true },
     });
   }
@@ -272,9 +281,11 @@ export class AuthRepository {
   }
 
   async rotateRefreshToken(userId: string, oldToken: string, newToken: string, expiresAt: Date, userAgent?: string, ipAddress?: string) {
+    const hashedOldToken = hashToken(oldToken);
+    const hashedNewToken = hashToken(newToken);
     return prisma.$transaction(async (tx) => {
       const deleted = await tx.refreshToken.deleteMany({
-        where: { token: oldToken },
+        where: { token: hashedOldToken },
       });
 
       if (deleted.count === 0) {
@@ -287,7 +298,7 @@ export class AuthRepository {
       return tx.refreshToken.create({
         data: {
           userId,
-          token: newToken,
+          token: hashedNewToken,
           expiresAt,
           userAgent,
           ipAddress,
@@ -328,7 +339,7 @@ export class AuthRepository {
       await tx.verificationToken.create({
         data: {
           userId: user.id,
-          token,
+          token: hashToken(token), // Lưu hash
           expiresAt,
         },
       });
@@ -364,11 +375,12 @@ export class AuthRepository {
   }
 
   async deleteOtherSessions(userId: string, currentToken: string) {
+    const hashedCurrentToken = hashToken(currentToken);
     return prisma.refreshToken.deleteMany({
       where: {
         userId,
         NOT: {
-          token: currentToken,
+          token: hashedCurrentToken,
         },
       },
     });

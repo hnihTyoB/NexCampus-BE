@@ -18,6 +18,8 @@ export interface MeDto {
   id: string;
   email: string | null;
   fullName: string | null;
+  avatarUrl: string | null;
+  phoneNumber: string | null;
   role: string;
   roleId: string;
   permissions: string[];

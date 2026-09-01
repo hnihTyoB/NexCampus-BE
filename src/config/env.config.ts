@@ -68,12 +68,31 @@ export const envConfig = {
       return key || 'default_32_bytes_secret_key_aes256_gcm!!';
     })(),
   },
-  redis: {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6381', 10),
-    password: process.env.REDIS_PASSWORD || undefined,
-    enabled: process.env.REDIS_ENABLED !== 'false',
-  },
+  redis: (() => {
+    let host = process.env.REDIS_HOST || 'localhost';
+    let port = parseInt(process.env.REDIS_PORT || '6381', 10);
+    let password = process.env.REDIS_PASSWORD || undefined;
+
+    if (process.env.REDIS_URL) {
+      try {
+        const parsed = new URL(process.env.REDIS_URL);
+        host = parsed.hostname || host;
+        port = parsed.port ? parseInt(parsed.port, 10) : (parsed.protocol === 'rediss:' ? 6380 : 6379);
+        if (parsed.password) {
+          password = decodeURIComponent(parsed.password);
+        }
+      } catch {
+        // Fallback về biến đơn nếu parse URL thất bại
+      }
+    }
+
+    return {
+      host,
+      port,
+      password,
+      enabled: process.env.REDIS_ENABLED !== 'false',
+    };
+  })(),
   webhook: {
     maxAttempts: parseInt(process.env.WEBHOOK_MAX_ATTEMPTS || '5', 10),
     timeoutMs: parseInt(process.env.WEBHOOK_TIMEOUT_MS || '10000', 10),

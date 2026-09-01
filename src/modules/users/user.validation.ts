@@ -33,8 +33,22 @@ export const createUserSchema = z.object({
     .regex(/[0-9]/, 'Password must contain at least one number')
     .regex(/[^a-zA-Z0-9]/, 'Password must contain at least one special character'),
   roleId: z.string().uuid('Invalid roleId format'),
+  fullName: z.string().trim().min(1).max(100).optional(),
+  phoneNumber: z.string().regex(/^[0-9]{10,11}$/, 'Invalid phone number format').optional(),
 });
 
 export const updateUserSchema = z.object({
   isActive: z.boolean().optional(),
+  fullName: z.string().trim().min(1).max(100).optional(),
+  phoneNumber: z.string().regex(/^[0-9]{10,11}$/, 'Invalid phone number format').optional(),
+});
+
+export const userSessionParamsSchema = z.object({
+  id: z.string().uuid('ID người dùng phải là UUID hợp lệ'),
+  sessionId: z.string().uuid('ID phiên đăng nhập phải là UUID hợp lệ'),
+});
+
+export const userDeviceParamsSchema = z.object({
+  id: z.string().uuid('ID người dùng phải là UUID hợp lệ'),
+  deviceId: z.string().uuid('ID thiết bị phải là UUID hợp lệ'),
 });

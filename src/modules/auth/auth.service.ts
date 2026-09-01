@@ -185,6 +185,8 @@ export class AuthService {
       id: user.id,
       email: user.email,
       fullName: user.fullName,
+      avatarUrl: user.avatarUrl,
+      phoneNumber: user.phoneNumber,
       role: user.role.name,
       roleId: user.roleId,
       permissions,
@@ -362,12 +364,16 @@ export class AuthService {
 
   async getActiveSessions(userId: string, currentToken?: string) {
     const sessions = await this.repository.findSessionsByUserId(userId);
+    // So sánh hash vì DB đang lưu SHA-256 hash của token
+    const hashedCurrentToken = currentToken
+      ? crypto.createHash('sha256').update(currentToken).digest('hex')
+      : undefined;
     return sessions.map(session => ({
       id: session.id,
       deviceName: parseUserAgent(session.userAgent || undefined),
       ipAddress: session.ipAddress || 'Không rõ',
       createdAt: session.createdAt,
-      isCurrent: currentToken ? session.token === currentToken : false,
+      isCurrent: hashedCurrentToken ? session.token === hashedCurrentToken : false,
     }));
   }
 

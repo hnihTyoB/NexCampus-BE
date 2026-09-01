@@ -208,6 +208,7 @@ model EmailNotification {
 
   @@index([status, attempts, createdAt])
   @@index([userId])
+  @@index([toEmail])
   @@map("email_notifications")
 }
 

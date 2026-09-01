@@ -99,6 +99,30 @@
     4. `daily-summary-digest` & `weekly-summary-digest`: Tổng hợp KPI hệ thống và gửi email báo cáo tới Quản trị viên.
   - Cung cấp REST endpoints `GET /api/v1/cron/jobs` và `POST /api/v1/cron/jobs/:jobName/trigger` cho phép Admin chủ động kích hoạt chạy ngay kèm Audit Log.
   - Quản lý lifecycle an toàn qua `CronWorker` và `CronQueueService` trong `src/server.ts`.
+  - **enableJobScheduler/disableJobScheduler**: API mới bật/tắt cron job động không cần restart; `registerSchedules(disabledJobs[])` skip job khi khởi động.
+
+- **Security Hardening (2026-09-01)**:
+  - **Token Hashing SHA-256**: `auth.repository.ts` băm SHA-256 toàn bộ token trước khi lưu DB (`refresh_tokens`, `verification_tokens`, `password_reset_tokens`). Breaking change — token cũ plain-text không tìm được sau deploy. `auth.service.ts → getActiveSessions()` so sánh hash.
+  - **optionalAuthMiddleware**: Middleware mới trong `auth.middleware.ts` — parse JWT nếu có, bỏ qua nếu sai/thiếu. Dùng cho API public cần context user.
+  - **Permission Middleware DB Validation**: Truy vấn DB kiểm tra `isActive` và `deletedAt` trong mỗi request có permission check, chống JWT cũ khi user bị khóa/hạ role. API Key bypass.
+  - **XSS Email Protection**: `escapeHtml()` trong `template.helper.ts`; áp dụng vào `verifyEmail`, `resetPassword`, `newDeviceAlert` trong `email-template.service.ts`.
+  - **hashToken() public helper**: Thêm vào `crypto.helper.ts` để dùng ở các module khác nếu cần.
+  - **R2 listObjects pagination**: Vòng lặp `ContinuationToken` xử lý bucket > 1000 objects.
+  - **Redis .connect()**: `maintenance-cache.service.ts` gọi `.connect()` tường minh sau khởi tạo.
+  - **Slug P2002 Error**: `error.middleware.ts` trả thông báo slug riêng biệt thân thiện.
+  - **Payload Limit**: `app.ts` giới hạn `512kb` chống DoS payload.
+  - **CORS Trailing Slash**: Normalize origin trước khi so sánh `allowedOrigins`.
+  - **REDIS_URL Parser**: `env.config.ts` hỗ trợ cloud Redis URL (`redis://`, `rediss://`).
+- **Full Project Audit & Autonomous Remediation (2026-09-01)**:
+  - **XSS & HTML Injection in MailService**: Áp dụng `escapeHtml()` trong `src/common/services/mail.service.ts` cho toàn bộ template email trực tiếp (`sendVerificationEmail`, `sendPasswordResetEmail`, `sendNewDeviceAlertEmail`).
+  - **UUID Normalization for Email Notifications**: Chuẩn hóa `userId` thành `null` nếu không đúng chuẩn UUID trong `notification.repository.ts` (`createSingleEmailNotification`, `createManyEmailNotifications`, `createMultiChannelNotifications`), tránh crash runtime PostgreSQL khi dispatch email không kèm user ID.
+  - **User State Caching in PermissionCacheService**: Bổ sung in-memory TTL cache (60s) `getUserState(userId)` trong `PermissionCacheService` và sử dụng trong `permission.middleware.ts`, triệt tiêu điểm nghẽn 1 DB query trên mọi request authenticated. Tự động xóa cache khi user bị cập nhật, soft-delete, hoặc gán vai trò mới.
+  - **Prisma JSON Array Containment Filter**: Chuẩn hóa `channels: { array_contains: channel }` trong `NotificationRepository.findTemplates`.
+  - **Distributed Tracing in Error Handler**: Bổ sung `X-Request-Id` vào log lỗi 500 của `error.middleware.ts` phục vụ trace log trên production.
+  - **Database Indexing**: Thêm `@@index([toEmail])` vào model `EmailNotification` trong `prisma/schema.prisma`.
+  - **User Management Schemas Enhancement**: Mở rộng `createUserSchema`, `updateUserSchema`, DTOs và `UserService` hỗ trợ cập nhật `fullName` và `phoneNumber`.
+  - **Defensive Date Boundary Guard**: Thêm regex validation `/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/` trong `getVietnamDayRange`.
+
 
 
 

@@ -173,3 +173,14 @@ export function verifyHmacSignature(
     Buffer.from(expectedSignature, 'utf8'),
   );
 }
+
+/**
+ * Băm token bằng SHA-256 để lưu trữ an toàn trong database.
+ * Plain text token chỉ trả về client 1 lần; DB chỉ lưu hash.
+ *
+ * Tương thích với verificationToken, passwordResetToken và refreshToken.
+ */
+export function hashToken(token: string): string {
+  if (!token) return '';
+  return crypto.createHash('sha256').update(token).digest('hex');
+}

@@ -14,10 +14,11 @@ const VIETNAM_OFFSET_MS = VIETNAM_OFFSET_HOURS * 60 * 60 * 1000;
  *   endOfDay: 2026-08-22T16:59:59.999Z (which is 2026-08-22 23:59:59.999 UTC+7)
  */
 export function getVietnamDayRange(dateString: string): { startOfDay: Date; endOfDay: Date } {
-  const [year, month, day] = dateString.split('-').map(Number);
-  if (!year || !month || !day) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(dateString)) {
     throw new Error(`Invalid date format for Vietnam day range: ${dateString}. Expected YYYY-MM-DD.`);
   }
+
+  const [year, month, day] = dateString.split('-').map(Number);
 
   // Create UTC date representing the local 00:00:00 in UTC+7
   const startOfDay = new Date(Date.UTC(year, month - 1, day, 0 - VIETNAM_OFFSET_HOURS, 0, 0, 0));

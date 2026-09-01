@@ -13,10 +13,14 @@ export interface CreateUserDto {
   email: string;
   password: string;
   roleId: string;
+  fullName?: string;
+  phoneNumber?: string;
 }
 
 export interface UpdateUserDto {
   isActive?: boolean;
+  fullName?: string;
+  phoneNumber?: string;
 }
 
 export interface UserResponseDto {

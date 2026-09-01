@@ -76,13 +76,18 @@ export class CronQueueService {
   }
 
   /**
-   * Đăng ký tất cả các Repeatable Cron Jobs theo biểu thức cron chuẩn
+   * Đăng ký tất cả các Repeatable Cron Jobs theo biểu thức cron chuẩn.
+   * @param disabledJobs Danh sách tên job cần tạm dừng (sẽ xóa khỏi scheduler nếu đang tồn tại)
    */
-  async registerSchedules(): Promise<void> {
+  async registerSchedules(disabledJobs: string[] = []): Promise<void> {
     if (!this.queue || !this.isRedisAvailable) return;
 
     try {
       for (const [jobName, config] of Object.entries(DEFAULT_CRON_SCHEDULES)) {
+        if (disabledJobs.includes(jobName)) {
+          await this.queue.removeJobScheduler(jobName).catch(() => {});
+          continue;
+        }
         await this.queue.upsertJobScheduler(
           jobName,
           { pattern: config.cron },
@@ -98,6 +103,42 @@ export class CronQueueService {
       console.log('[CronQueue] Repeatable cron jobs successfully registered');
     } catch (err: any) {
       console.warn('[CronQueue] Failed to register repeatable schedules:', err.message);
+    }
+  }
+
+  /**
+   * Bật lịch trình cho một cron job cụ thể (upsert vào BullMQ scheduler)
+   */
+  async enableJobScheduler(jobName: CronJobName): Promise<void> {
+    if (!this.queue || !this.isRedisAvailable) return;
+    const config = DEFAULT_CRON_SCHEDULES[jobName];
+    if (!config) return;
+    try {
+      await this.queue.upsertJobScheduler(
+        jobName,
+        { pattern: config.cron },
+        {
+          name: jobName,
+          data: {
+            jobName,
+            triggeredAt: new Date().toISOString(),
+          },
+        },
+      );
+    } catch (err: any) {
+      console.warn(`[CronQueue] Failed to enable scheduler for ${jobName}:`, err.message);
+    }
+  }
+
+  /**
+   * Tắt lịch trình cho một cron job cụ thể (xóa khỏi BullMQ scheduler)
+   */
+  async disableJobScheduler(jobName: CronJobName): Promise<void> {
+    if (!this.queue || !this.isRedisAvailable) return;
+    try {
+      await this.queue.removeJobScheduler(jobName).catch(() => {});
+    } catch (err: any) {
+      console.warn(`[CronQueue] Failed to disable scheduler for ${jobName}:`, err.message);
     }
   }
 

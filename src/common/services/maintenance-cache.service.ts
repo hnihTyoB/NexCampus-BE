@@ -77,6 +77,13 @@ export class MaintenanceCacheService {
       this.redisSubscriber.on('error', () => {
         this.isRedisAvailable = false;
       });
+
+      this.redisSubscriber.connect().catch(() => {
+        this.isRedisAvailable = false;
+      });
+      this.redisPublisher.connect().catch(() => {
+        this.isRedisAvailable = false;
+      });
     } catch {
       this.isRedisAvailable = false;
     }

@@ -97,7 +97,7 @@ export class UserRepository {
     });
   }
 
-  update(id: string, data: { isActive?: boolean }) {
+  update(id: string, data: { isActive?: boolean; fullName?: string; phoneNumber?: string }) {
     return prisma.user.update({
       where: { id },
       data,
@@ -120,8 +120,78 @@ export class UserRepository {
       }),
     ]);
   }
+
+  // ────── Session Management ──────
+
+  findSessionsByUserId(userId: string) {
+    return prisma.refreshToken.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  findSessionById(userId: string, sessionId: string) {
+    return prisma.refreshToken.findFirst({
+      where: { id: sessionId, userId },
+    });
+  }
+
+  deleteSessionById(userId: string, sessionId: string) {
+    return prisma.refreshToken.deleteMany({
+      where: { id: sessionId, userId },
+    });
+  }
+
+  deleteAllSessionsByUserId(userId: string) {
+    return prisma.refreshToken.deleteMany({
+      where: { userId },
+    });
+  }
+
+  // ────── Device Management ──────
+
+  findDevicesByUserId(userId: string) {
+    return prisma.userDevice.findMany({
+      where: { userId },
+      orderBy: { lastLoginAt: 'desc' },
+    });
+  }
+
+  findDeviceById(userId: string, deviceId: string) {
+    return prisma.userDevice.findFirst({
+      where: { id: deviceId, userId },
+    });
+  }
+
+  deleteDeviceById(userId: string, deviceId: string) {
+    return prisma.userDevice.deleteMany({
+      where: { id: deviceId, userId },
+    });
+  }
+
+  // ────── Audit Log ──────
+
+  createAuditLog(data: {
+    actorId?: string;
+    action: string;
+    targetType: string;
+    targetId?: string;
+    details?: Record<string, unknown>;
+    ipAddress?: string;
+    userAgent?: string;
+  }) {
+    return prisma.auditLog.create({
+      data: {
+        actorId: data.actorId,
+        action: data.action,
+        targetType: data.targetType,
+        targetId: data.targetId ?? 'SYSTEM', // AuditLog.targetId is required String in schema
+        details: data.details as any,
+        ipAddress: data.ipAddress,
+        userAgent: data.userAgent,
+      },
+    });
+  }
 }
 
 export const userRepository = new UserRepository();
-
-

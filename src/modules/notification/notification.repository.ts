@@ -138,16 +138,17 @@ export class NotificationRepository {
   }
 
   createSingleEmailNotification(data: {
-    userId: string;
+    userId?: string | null;
     toEmail: string;
     subject: string;
     templateKey: string;
     templateData: any;
     status?: string;
   }) {
+    const validUserId = data.userId && /^[0-9a-fA-F-]{36}$/.test(data.userId) ? data.userId : null;
     return prisma.emailNotification.create({
       data: {
-        userId: data.userId,
+        userId: validUserId,
         toEmail: data.toEmail,
         subject: data.subject,
         templateKey: data.templateKey,
@@ -173,7 +174,7 @@ export class NotificationRepository {
 
   createManyEmailNotifications(
     data: Array<{
-      userId: string;
+      userId?: string | null;
       toEmail: string;
       subject: string;
       templateKey: string;
@@ -181,7 +182,11 @@ export class NotificationRepository {
       status: string;
     }>,
   ) {
-    return prisma.emailNotification.createMany({ data });
+    const formattedData = data.map((d) => ({
+      ...d,
+      userId: d.userId && /^[0-9a-fA-F-]{36}$/.test(d.userId) ? d.userId : null,
+    }));
+    return prisma.emailNotification.createMany({ data: formattedData });
   }
 
   createMultiChannelNotifications(
@@ -195,7 +200,7 @@ export class NotificationRepository {
       metadata?: any;
     }>,
     emailData: Array<{
-      userId: string;
+      userId?: string | null;
       toEmail: string;
       subject: string;
       templateKey: string;
@@ -203,12 +208,16 @@ export class NotificationRepository {
       status: string;
     }>,
   ) {
+    const formattedEmailData = emailData.map((d) => ({
+      ...d,
+      userId: d.userId && /^[0-9a-fA-F-]{36}$/.test(d.userId) ? d.userId : null,
+    }));
     return prisma.$transaction(async (tx) => {
       if (webData.length > 0) {
         await tx.notification.createMany({ data: webData });
       }
-      if (emailData.length > 0) {
-        await tx.emailNotification.createMany({ data: emailData });
+      if (formattedEmailData.length > 0) {
+        await tx.emailNotification.createMany({ data: formattedEmailData });
       }
     });
   }
@@ -300,7 +309,7 @@ export class NotificationRepository {
 
     const where: any = {
       ...(isActive !== undefined && { isActive }),
-      ...(channel && { channels: { array_contains: [channel] } }),
+      ...(channel && { channels: { array_contains: channel } }),
       ...(search && {
         OR: [
           { code: { contains: search, mode: 'insensitive' } },

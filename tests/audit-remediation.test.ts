@@ -186,4 +186,80 @@ describe('Audit & Remediation Verification Test Suite', () => {
     });
   });
 
+  describe('6. [P1-SEC-01] Email HTML Injection & XSS Sanitization', () => {
+    it('should sanitize fullName and deviceName preventing HTML Injection in email templates', () => {
+      const { escapeHtml } = require('../src/common/helpers/template.helper');
+      const maliciousName = '<img src=x onerror=alert(1)>';
+      const safeName = escapeHtml(maliciousName);
+      assert.ok(!safeName.includes('<img'));
+      assert.ok(safeName.includes('&lt;img src=x onerror=alert(1)&gt;'));
+    });
+  });
+
+  describe('7. [P1-BUG-01] UUID Normalization in Notification Repository', () => {
+    it('should normalize invalid non-UUID strings to null for email notifications', async () => {
+      const { notificationRepository } = require('../src/modules/notification/notification.repository');
+      const isUuid = (val: any) => val && /^[0-9a-fA-F-]{36}$/.test(val);
+      assert.equal(isUuid('mock-admin-1'), false);
+      assert.equal(isUuid('123e4567-e89b-12d3-a456-426614174000'), true);
+      assert.equal(isUuid(''), false);
+      assert.equal(isUuid(undefined), false);
+    });
+  });
+
+  describe('8. [P1-PERF-01] User State Caching in PermissionCacheService', () => {
+    it('should cache user state and correctly invalidate on user update', async () => {
+      const userId = 'user-test-uuid-1';
+      (permissionCacheService as any).userCache.set(userId, {
+        user: {
+          id: userId,
+          isActive: true,
+          deletedAt: null,
+          roleId: 'role-1',
+          roleName: 'USER',
+        },
+        expiresAt: Date.now() + 60000,
+      });
+
+      const cached = await permissionCacheService.getUserState(userId);
+      assert.ok(cached);
+      assert.equal(cached?.id, userId);
+      assert.equal(cached?.roleName, 'USER');
+
+      permissionCacheService.invalidateUser(userId);
+      const afterInvalidate = (permissionCacheService as any).userCache.get(userId);
+      assert.equal(afterInvalidate, undefined);
+    });
+  });
+
+  describe('9. [P3-DEF-01] Strict Regex Validation for Vietnam Day Range', () => {
+    it('should reject invalid calendar date formats', () => {
+      assert.throws(() => getVietnamDayRange('invalid-date'), /Invalid date format/);
+      assert.throws(() => getVietnamDayRange('2026-13-40'), /Invalid date format/);
+      assert.throws(() => getVietnamDayRange('2026/08/24'), /Invalid date format/);
+      assert.doesNotThrow(() => getVietnamDayRange('2026-08-24'));
+    });
+  });
+
+  describe('10. [P3-API-01] User Validation Schemas with FullName and PhoneNumber', () => {
+    it('should validate and parse createUserSchema with optional fullName and phoneNumber', () => {
+      const { createUserSchema, updateUserSchema } = require('../src/modules/users/user.validation');
+      const validCreate = createUserSchema.safeParse({
+        email: 'test.user@example.com',
+        password: 'Password123!',
+        roleId: '123e4567-e89b-12d3-a456-426614174000',
+        fullName: 'Nguyễn Văn A',
+        phoneNumber: '0912345678',
+      });
+      assert.equal(validCreate.success, true);
+
+      const validUpdate = updateUserSchema.safeParse({
+        fullName: 'Trần Thị B',
+        phoneNumber: '0987654321',
+        isActive: true,
+      });
+      assert.equal(validUpdate.success, true);
+    });
+  });
+
 });

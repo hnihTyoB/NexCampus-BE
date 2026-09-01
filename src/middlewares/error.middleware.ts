@@ -41,6 +41,15 @@ export function errorMiddleware(
 
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === 'P2002') {
+      const conflictingFields = (error.meta?.target as string[] | undefined) ?? [];
+      if (conflictingFields.some((f) => f.toLowerCase().includes('slug'))) {
+        res.status(409).json({
+          success: false,
+          message: 'Đường dẫn định danh đã tồn tại. Vui lòng chọn tên khác.',
+          code: ERROR_CODE.DUPLICATE_ENTRY,
+        });
+        return;
+      }
       res.status(409).json({
         success: false,
         message: 'Dữ liệu đã tồn tại trong hệ thống (trùng lặp giá trị duy nhất)',
@@ -77,7 +86,8 @@ export function errorMiddleware(
     return;
   }
 
-  console.error('[Unhandled Error]', error);
+  const requestId = (req.headers['x-request-id'] as string) || (req as any).id || 'no-request-id';
+  console.error(`[Unhandled Error][Request-ID: ${requestId}]`, error);
 
   res.status(500).json({
     success: false,

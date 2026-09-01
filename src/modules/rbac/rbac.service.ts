@@ -221,6 +221,7 @@ export class RbacService {
       permissionCacheService.invalidateRole(oldRoleId);
     }
     permissionCacheService.invalidateRole(user.roleId);
+    permissionCacheService.invalidateUser(userId);
 
     await this.repository.createAuditLog({
       actorId: context?.actorId,

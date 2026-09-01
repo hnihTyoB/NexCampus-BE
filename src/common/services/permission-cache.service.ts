@@ -1,8 +1,22 @@
 import { rbacRepository } from '../../modules/rbac/rbac.repository';
 import { userRepository } from '../../modules/users/user.repository';
+import { prisma } from '../../database/prisma.client';
 
 interface CacheEntry {
   permissions: Set<string>;
+  expiresAt: number;
+}
+
+export interface CachedUserState {
+  id: string;
+  isActive: boolean;
+  deletedAt: Date | null;
+  roleId: string | null;
+  roleName: string | null;
+}
+
+interface UserCacheEntry {
+  user: CachedUserState | null;
   expiresAt: number;
 }
 
@@ -11,13 +25,22 @@ export class PermissionCacheService {
   private inflight = new Map<string, Promise<Set<string>>>();
   private readonly TTL_MS = 10 * 60 * 1000; // 10 minutes
 
+  private userCache = new Map<string, UserCacheEntry>();
+  private userInflight = new Map<string, Promise<CachedUserState | null>>();
+  private readonly USER_TTL_MS = 60 * 1000; // 1 minute
+
   constructor() {
-    // Periodically clean up expired role caches
+    // Periodically clean up expired role and user caches
     setInterval(() => {
       const now = Date.now();
       for (const [roleId, entry] of this.cache.entries()) {
         if (now > entry.expiresAt) {
           this.cache.delete(roleId);
+        }
+      }
+      for (const [userId, entry] of this.userCache.entries()) {
+        if (now > entry.expiresAt) {
+          this.userCache.delete(userId);
         }
       }
     }, 5 * 60 * 1000).unref();
@@ -46,7 +69,6 @@ export class PermissionCacheService {
           }
         }
 
-
         this.cache.set(roleId, {
           permissions: permissionSet,
           expiresAt: Date.now() + this.TTL_MS,
@@ -59,6 +81,55 @@ export class PermissionCacheService {
     })();
 
     this.inflight.set(roleId, fetchPromise);
+    return fetchPromise;
+  }
+
+  async getUserState(userId: string): Promise<CachedUserState | null> {
+    const cached = this.userCache.get(userId);
+    if (cached && Date.now() < cached.expiresAt) {
+      return cached.user;
+    }
+
+    const inflightPromise = this.userInflight.get(userId);
+    if (inflightPromise) {
+      return inflightPromise;
+    }
+
+    const fetchPromise = (async () => {
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            id: true,
+            isActive: true,
+            deletedAt: true,
+            roleId: true,
+            role: { select: { name: true } },
+          },
+        });
+
+        const userState: CachedUserState | null = user
+          ? {
+              id: user.id,
+              isActive: user.isActive,
+              deletedAt: user.deletedAt,
+              roleId: user.roleId,
+              roleName: user.role?.name || null,
+            }
+          : null;
+
+        this.userCache.set(userId, {
+          user: userState,
+          expiresAt: Date.now() + this.USER_TTL_MS,
+        });
+
+        return userState;
+      } finally {
+        this.userInflight.delete(userId);
+      }
+    })();
+
+    this.userInflight.set(userId, fetchPromise);
     return fetchPromise;
   }
 
@@ -77,8 +148,13 @@ export class PermissionCacheService {
     this.cache.delete(roleId);
   }
 
+  invalidateUser(userId: string): void {
+    this.userCache.delete(userId);
+  }
+
   clear(): void {
     this.cache.clear();
+    this.userCache.clear();
   }
 }
 

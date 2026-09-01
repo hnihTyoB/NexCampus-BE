@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer';
 import { mailConfig } from '../../config/mail.config';
 import { formatVietnamDateTime } from '../helpers/date.helper';
-
+import { escapeHtml } from '../helpers/template.helper';
 
 export class MailService {
   private transporter: nodemailer.Transporter;
@@ -20,6 +20,7 @@ export class MailService {
 
   async sendVerificationEmail(email: string, token: string, fullName?: string) {
     const verificationUrl = `${mailConfig.verificationUrl}?token=${token}`;
+    const safeFullName = escapeHtml(fullName) || 'bạn';
     const mailOptions = {
       from: mailConfig.from,
       to: email,
@@ -27,7 +28,7 @@ export class MailService {
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
           <h2 style="color: #4CAF50; text-align: center;">Chào mừng bạn đến với hệ thống!</h2>
-          <p>Chào ${fullName || 'bạn'},</p>
+          <p>Chào ${safeFullName},</p>
           <p>Cảm ơn bạn đã đăng ký tài khoản.</p>
           <p>Vui lòng xác nhận địa chỉ email của bạn để kích hoạt tài khoản bằng cách click vào nút bên dưới:</p>
           <div style="text-align: center; margin: 30px 0;">
@@ -60,6 +61,7 @@ export class MailService {
 
   async sendPasswordResetEmail(email: string, token: string, fullName?: string) {
     const resetUrl = `${mailConfig.resetPasswordUrl}?token=${token}`;
+    const safeFullName = escapeHtml(fullName) || 'bạn';
     const mailOptions = {
       from: mailConfig.from,
       to: email,
@@ -67,7 +69,7 @@ export class MailService {
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
           <h2 style="color: #f44336; text-align: center;">Khôi phục mật khẩu tài khoản</h2>
-          <p>Chào ${fullName || 'bạn'},</p>
+          <p>Chào ${safeFullName},</p>
           <p>Chúng tôi nhận được yêu cầu khôi phục mật khẩu cho tài khoản liên kết với địa chỉ email này.</p>
           <p>Vui lòng click vào nút bên dưới để tiến hành đặt lại mật khẩu mới:</p>
           <div style="text-align: center; margin: 30px 0;">
@@ -100,20 +102,22 @@ export class MailService {
 
   async sendNewDeviceAlertEmail(email: string, details: { deviceName: string; ipAddress: string; loginTime: Date }, fullName?: string) {
     const formattedDate = formatVietnamDateTime(details.loginTime);
+    const safeFullName = escapeHtml(fullName) || 'bạn';
+    const safeDeviceName = escapeHtml(details.deviceName) || 'Thiết bị không rõ';
+    const safeIpAddress = escapeHtml(details.ipAddress) || 'Không rõ';
     const mailOptions = {
-
       from: mailConfig.from,
       to: email,
       subject: '[Cảnh báo bảo mật] Đăng nhập từ thiết bị mới',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
           <h2 style="color: #f44336; text-align: center;">Cảnh báo đăng nhập thiết bị mới</h2>
-          <p>Chào ${fullName || 'bạn'},</p>
+          <p>Chào ${safeFullName},</p>
           <p>Hệ thống phát hiện tài khoản của bạn vừa được đăng nhập từ một thiết bị mới hoặc trình duyệt lạ.</p>
           
           <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #f44336;">
-            <p style="margin: 5px 0;"><strong>Thiết bị:</strong> ${details.deviceName}</p>
-            <p style="margin: 5px 0;"><strong>Địa chỉ IP:</strong> ${details.ipAddress}</p>
+            <p style="margin: 5px 0;"><strong>Thiết bị:</strong> ${safeDeviceName}</p>
+            <p style="margin: 5px 0;"><strong>Địa chỉ IP:</strong> ${safeIpAddress}</p>
             <p style="margin: 5px 0;"><strong>Thời gian:</strong> ${formattedDate} (Giờ Việt Nam)</p>
           </div>
 

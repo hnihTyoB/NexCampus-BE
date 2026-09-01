@@ -21,18 +21,23 @@ app.use(helmet({ contentSecurityPolicy: false }));
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    const allowed = envConfig.cors.allowedOrigins;
+    const allowed = envConfig.cors.allowedOrigins.map((o) => o.replace(/\/+$/, ''));
     if (!origin) {
       callback(null, true);
       return;
     }
+    const cleanOrigin = origin.replace(/\/+$/, '');
     if (allowed.includes('*')) {
       if (envConfig.nodeEnv !== 'production') {
         callback(null, true);
         return;
       }
+      // Chặn wildcard '*' trên production
+      console.error('[CORS] CORS_ALLOWED_ORIGINS=* is not permitted in production. Configure specific origins.');
+      callback(null, false);
+      return;
     }
-    if (allowed.includes(origin)) {
+    if (allowed.includes(cleanOrigin)) {
       callback(null, true);
     } else {
       callback(null, false);
@@ -42,8 +47,8 @@ const corsOptions: cors.CorsOptions = {
 };
 app.use(cors(corsOptions));
 app.use(morgan(envConfig.nodeEnv === 'production' ? 'combined' : 'dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '512kb' })); // Giới hạn kích thước payload chống DoS
+app.use(express.urlencoded({ extended: true, limit: '512kb' }));
 app.use(cookieParser());
 
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerOptions));

@@ -18,3 +18,17 @@ export function renderTemplateString(
     return String(value);
   });
 }
+
+/**
+ * Escape các ký tự đặc biệt HTML để chống tấn công XSS / HTML Injection
+ * trong nội dung email hoặc bất kỳ đầu ra HTML nào nhận dữ liệu từ người dùng.
+ */
+export function escapeHtml(str: string | undefined | null): string {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
