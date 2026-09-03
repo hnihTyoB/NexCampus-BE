@@ -152,6 +152,60 @@ export class MailService {
     }
   }
 
+  async sendAccountDeactivationEmail(email: string, token: string, fullName?: string) {
+    const deactivationUrl = `${mailConfig.verificationUrl}/deactivate?token=${token}`;
+    const safeFullName = escapeHtml(fullName) || 'bạn';
+    const mailOptions = {
+      from: mailConfig.from,
+      to: email,
+      subject: '[Cảnh báo quan trọng] Xác nhận yêu cầu vô hiệu hóa tài khoản',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
+          <h2 style="color: #d32f2f; text-align: center;">Yêu cầu vô hiệu hóa tài khoản</h2>
+          <p>Chào ${safeFullName},</p>
+          <p>Chúng tôi nhận được yêu cầu <strong>vô hiệu hóa tài khoản</strong> của bạn trên hệ thống.</p>
+          
+          <div style="background-color: #ffebee; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #d32f2f;">
+            <p style="margin: 0; color: #b71c1c; font-weight: bold;">CẢNH BÁO QUAN TRỌNG:</p>
+            <p style="margin: 5px 0 0 0; color: #b71c1c; font-size: 14px;">
+              Khi xác nhận, tài khoản của bạn sẽ lập tức bị khóa, toàn bộ các phiên đăng nhập trên tất cả thiết bị sẽ bị hủy bỏ ngay lập tức và bạn sẽ không thể đăng nhập lại.
+            </p>
+          </div>
+
+          <p>Nếu bạn thực sự muốn tiếp tục, vui lòng click vào nút xác nhận bên dưới:</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${deactivationUrl}" style="background-color: #d32f2f; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Xác nhận vô hiệu hóa tài khoản</a>
+          </div>
+
+          <p>Hoặc sử dụng mã xác nhận (Token) trực tiếp qua ứng dụng:</p>
+          <div style="background-color: #f5f5f5; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; word-break: break-all; text-align: center;">
+            ${token}
+          </div>
+
+          <p style="color: #666; font-size: 13px; margin-top: 15px;">Yêu cầu này sẽ tự động hết hạn sau <strong>15 phút</strong>.</p>
+          <hr style="border: 0; border-top: 1px solid #e0e0e0; margin: 20px 0;" />
+          <p style="font-size: 12px; color: #888888; text-align: center;">Nếu bạn KHÔNG thực hiện yêu cầu này, vui lòng bỏ qua email này và <strong>tiến hành đổi mật khẩu ngay lập tức</strong> để bảo vệ tài khoản của bạn.</p>
+        </div>
+      `,
+    };
+
+    if (!mailConfig.auth.user || !mailConfig.auth.pass) {
+      console.warn('-------- EMAIL ACCOUNT DEACTIVATION TOKEN (DEV MODE) --------');
+      console.warn(`To: ${email}`);
+      console.warn(`Token: ${token}`);
+      console.warn(`Link: ${deactivationUrl}`);
+      console.warn('--------------------------------------------------------------');
+      return;
+    }
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+    } catch (error) {
+      console.error('Failed to send account deactivation email:', error);
+      throw error;
+    }
+  }
+
   async sendRaw(to: string, subject: string, html: string): Promise<void> {
     const mailOptions = {
       from: mailConfig.from,

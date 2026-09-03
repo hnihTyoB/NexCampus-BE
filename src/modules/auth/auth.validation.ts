@@ -96,3 +96,13 @@ export const confirmAvatarUploadSchema = z.object({
     .min(1, 'Key is required')
     .regex(/^avatars\/[a-f0-9-]+\/\d+\.[a-z]+$/, 'Invalid avatar key format'),
 });
+
+export const requestDeactivateSchema = z.object({
+  password: z.string().min(1, 'Mật khẩu hiện tại là bắt buộc để xác nhận yêu cầu'),
+  reason: z.string().max(500, 'Lý do tối đa 500 ký tự').optional(),
+});
+
+export const confirmDeactivateSchema = z.object({
+  token: z.string().min(1, 'Token xác nhận vô hiệu hóa là bắt buộc'),
+});
+

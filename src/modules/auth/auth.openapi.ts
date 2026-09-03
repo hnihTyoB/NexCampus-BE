@@ -14,6 +14,8 @@ import {
   getAvatarUploadUrlSchema,
   confirmAvatarUploadSchema,
   revokeOtherSessionsSchema,
+  requestDeactivateSchema,
+  confirmDeactivateSchema,
 } from './auth.validation';
 import { z } from 'zod';
 
@@ -28,6 +30,9 @@ export function registerAuthOpenApi(): void {
   openapiRegistry.register('ResendVerificationRequest', resendVerificationSchema);
   openapiRegistry.register('GetAvatarUploadUrlRequest', getAvatarUploadUrlSchema);
   openapiRegistry.register('ConfirmAvatarUploadRequest', confirmAvatarUploadSchema);
+  openapiRegistry.register('RequestDeactivateRequest', requestDeactivateSchema);
+  openapiRegistry.register('ConfirmDeactivateRequest', confirmDeactivateSchema);
+
 
   // ── Routes ───────────────────────────────────────────────────────────────────
 
@@ -521,4 +526,67 @@ export function registerAuthOpenApi(): void {
       },
     },
   });
+
+  // POST /auth/deactivate/request
+  openapiRegistry.registerPath({
+    method: 'post',
+    path: '/auth/deactivate/request',
+    tags: ['Auth'],
+    summary: 'Yêu cầu vô hiệu hóa tài khoản (gửi email xác nhận kèm token 15 phút)',
+    security: [{ BearerAuth: [] }],
+    request: {
+      body: {
+        content: {
+          'application/json': { schema: requestDeactivateSchema },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: 'Yêu cầu vô hiệu hóa đã được tiếp nhận',
+        content: {
+          'application/json': {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              message: z.string().openapi({ example: 'Yêu cầu vô hiệu hóa tài khoản đã được tiếp nhận. Vui lòng kiểm tra email để xác nhận (hạn 15 phút).' }),
+            }),
+          },
+        },
+      },
+      400: { description: 'Mật khẩu hiện tại không chính xác hoặc dữ liệu không hợp lệ' },
+      401: { description: 'Chưa đăng nhập' },
+      403: { description: 'Không thể vô hiệu hóa tài khoản Admin duy nhất của hệ thống' },
+    },
+  });
+
+  // POST /auth/deactivate/confirm
+  openapiRegistry.registerPath({
+    method: 'post',
+    path: '/auth/deactivate/confirm',
+    tags: ['Auth'],
+    summary: 'Xác nhận vô hiệu hóa tài khoản bằng mã token nhận qua email',
+    request: {
+      body: {
+        content: {
+          'application/json': { schema: confirmDeactivateSchema },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: 'Vô hiệu hóa tài khoản thành công và toàn bộ phiên đăng nhập đã bị hủy',
+        content: {
+          'application/json': {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              message: z.string().openapi({ example: 'Tài khoản của bạn đã được vô hiệu hóa thành công. Toàn bộ phiên đăng nhập đã bị hủy.' }),
+            }),
+          },
+        },
+      },
+      400: { description: 'Mã xác nhận vô hiệu hóa không hợp lệ hoặc đã hết hạn' },
+      403: { description: 'Không thể vô hiệu hóa tài khoản Admin duy nhất của hệ thống' },
+    },
+  });
 }
+

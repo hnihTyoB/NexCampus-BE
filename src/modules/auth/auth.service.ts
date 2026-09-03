@@ -6,14 +6,16 @@ import { AppError } from '../../common/errors/app-error';
 import { ERROR_CODE } from '../../common/errors/error-code';
 import { jwtConfig } from '../../config/jwt.config';
 import { r2Config } from '../../config/r2.config';
-import { LoginDto, LoginResponseDto, AuthTokensDto, MeDto, RegisterDto, UpdateProfileDto, UpdatePasswordDto, ForgotPasswordDto, ResetPasswordDto, ResendVerificationDto, GetAvatarUploadUrlDto, GetAvatarUploadUrlResponseDto, ConfirmAvatarUploadDto } from './auth.dto';
+import { LoginDto, LoginResponseDto, AuthTokensDto, MeDto, RegisterDto, UpdateProfileDto, UpdatePasswordDto, ForgotPasswordDto, ResetPasswordDto, ResendVerificationDto, GetAvatarUploadUrlDto, GetAvatarUploadUrlResponseDto, ConfirmAvatarUploadDto, RequestDeactivateDto, ConfirmDeactivateDto } from './auth.dto';
 import { MailService } from '../../common/services/mail.service';
 import { R2Service } from '../../common/services/r2.service';
 import { ROLES } from '../../common/constants/role.constant';
+import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from '../../common/constants/audit-log.constant';
 import { NOTIFICATION_TYPE, NOTIFICATION_PRIORITY } from '../../common/constants/notification.constant';
 import { notificationDispatcher } from '../../common/services/notification-dispatcher.service';
 import { generateDeviceHash, parseUserAgent } from '../../common/helpers/user-agent.helper';
 import { permissionCacheService } from '../../common/services/permission-cache.service';
+
 
 export class AuthService {
   private readonly repository = new AuthRepository();
@@ -458,5 +460,110 @@ export class AuthService {
     }
 
     return newAvatarUrl;
+  }
+
+  async requestDeactivate(
+    userId: string,
+    data: RequestDeactivateDto,
+    metadata?: { ipAddress?: string; userAgent?: string },
+  ): Promise<void> {
+    const user = await this.repository.findById(userId);
+    if (!user) {
+      throw new AppError('User not found', 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    if (!user.isActive) {
+      throw new AppError('Tài khoản đã bị vô hiệu hóa trước đó', 400, ERROR_CODE.USER_INACTIVE);
+    }
+
+    if (!user.password) {
+      throw new AppError('Tài khoản liên kết mạng xã hội không thể vô hiệu hóa bằng mật khẩu', 400, ERROR_CODE.VALIDATION_ERROR);
+    }
+
+    const isPasswordValid = await bcrypt.compare(data.password, user.password);
+    if (!isPasswordValid) {
+      throw new AppError('Mật khẩu hiện tại không chính xác', 400, ERROR_CODE.INVALID_CREDENTIALS);
+    }
+
+    // Anti-lockout: Nếu user là ADMIN, kiểm tra xem có còn admin nào khác không
+    if (user.role.name === ROLES.ADMIN) {
+      const activeAdminCount = await this.repository.countActiveAdmins();
+      if (activeAdminCount <= 1) {
+        throw new AppError(
+          'Không thể vô hiệu hóa tài khoản Quản trị viên duy nhất còn lại trong hệ thống',
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
+      }
+    }
+
+    if (!user.email) {
+      throw new AppError('Tài khoản không có email để nhận mã xác nhận vô hiệu hóa', 400, ERROR_CODE.VALIDATION_ERROR);
+    }
+
+    // Sinh token có hạn 15 phút
+    const token = crypto.randomUUID();
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 15);
+
+    await this.repository.createDeactivationToken(userId, token, expiresAt);
+
+    // Gửi email xác nhận
+    await this.mailService.sendAccountDeactivationEmail(user.email, token, user.fullName || undefined);
+
+    // Ghi audit log
+    await this.repository.createAuditLog({
+      actorId: userId,
+      action: AUDIT_ACTION.REQUEST_ACCOUNT_DEACTIVATION,
+      targetType: AUDIT_TARGET_TYPE.USER,
+      targetId: userId,
+      details: { reason: data.reason || null },
+      ipAddress: metadata?.ipAddress,
+      userAgent: metadata?.userAgent,
+    });
+  }
+
+  async confirmDeactivate(
+    data: ConfirmDeactivateDto,
+    metadata?: { ipAddress?: string; userAgent?: string },
+  ): Promise<void> {
+    const record = await this.repository.findDeactivationToken(data.token);
+    if (!record) {
+      throw new AppError('Mã xác nhận vô hiệu hóa không hợp lệ hoặc đã được sử dụng', 400, ERROR_CODE.TOKEN_INVALID);
+    }
+
+    if (record.expiresAt < new Date()) {
+      await this.repository.deleteVerificationToken(record.id);
+      throw new AppError('Mã xác nhận vô hiệu hóa đã hết hạn (chỉ có hiệu lực trong 15 phút)', 400, ERROR_CODE.TOKEN_EXPIRED);
+    }
+
+    // Anti-lockout lần 2 tại thời điểm confirm
+    if (record.user.role.name === ROLES.ADMIN) {
+      const activeAdminCount = await this.repository.countActiveAdmins();
+      if (activeAdminCount <= 1) {
+        throw new AppError(
+          'Không thể vô hiệu hóa tài khoản Quản trị viên duy nhất còn lại trong hệ thống',
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
+      }
+    }
+
+    // Vô hiệu hóa tài khoản, xóa toàn bộ session/refresh tokens và xóa token
+    await this.repository.deactivateUserAndRevokeSessions(record.userId, record.id);
+
+    // Xóa cache user để permission middleware lập tức chặn access token cũ
+    permissionCacheService.invalidateUser(record.userId);
+
+    // Ghi audit log
+    await this.repository.createAuditLog({
+      actorId: record.userId,
+      action: AUDIT_ACTION.CONFIRM_ACCOUNT_DEACTIVATION,
+      targetType: AUDIT_TARGET_TYPE.USER,
+      targetId: record.userId,
+      details: { deactivationTime: new Date() },
+      ipAddress: metadata?.ipAddress,
+      userAgent: metadata?.userAgent,
+    });
   }
 }

@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto, UpdateProfileDto, UpdatePasswordDto, ForgotPasswordDto, ResetPasswordDto, ResendVerificationDto, GetAvatarUploadUrlDto, ConfirmAvatarUploadDto } from './auth.dto';
+import { LoginDto, RegisterDto, UpdateProfileDto, UpdatePasswordDto, ForgotPasswordDto, ResetPasswordDto, ResendVerificationDto, GetAvatarUploadUrlDto, ConfirmAvatarUploadDto, RequestDeactivateDto, ConfirmDeactivateDto } from './auth.dto';
 import { AppError } from '../../common/errors/app-error';
 import { ERROR_CODE } from '../../common/errors/error-code';
+
 
 export class AuthController {
   private readonly service = new AuthService();
@@ -289,4 +290,41 @@ export class AuthController {
       next(error);
     }
   };
+
+  requestDeactivate = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = req.body as RequestDeactivateDto;
+      const ipAddress = req.ip;
+      const userAgent = req.headers['user-agent'];
+      await this.service.requestDeactivate(req.user.id, body, { ipAddress, userAgent });
+
+      res.json({
+        success: true,
+        message: 'Yêu cầu vô hiệu hóa tài khoản đã được tiếp nhận. Vui lòng kiểm tra email để xác nhận (hạn 15 phút).',
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  confirmDeactivate = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = req.body as ConfirmDeactivateDto;
+      const ipAddress = req.ip;
+      const userAgent = req.headers['user-agent'];
+      await this.service.confirmDeactivate(body, { ipAddress, userAgent });
+
+      // Xóa cookies xác thực nếu có
+      res.clearCookie('accessToken');
+      res.clearCookie('refreshToken');
+
+      res.json({
+        success: true,
+        message: 'Tài khoản của bạn đã được vô hiệu hóa thành công. Toàn bộ phiên đăng nhập đã bị hủy.',
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
+

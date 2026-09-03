@@ -130,6 +130,16 @@
 - **Enterprise Standard Hardening (2026-09-03)**:
   - **Dockerfile Multi-Stage Non-Root**: Tạo mới `Dockerfile` chuẩn production tại thư mục gốc. Sử dụng 3-stage build (`deps` → `builder` → `runner`) trên `node:22-alpine`. Stage runner chỉ chứa production artifacts (`dist/`, `prisma/`, prod `node_modules`); chạy dưới user `node` (uid=1000, non-root); sử dụng `tini` làm PID 1 để xử lý SIGTERM/SIGINT đúng cách và chống zombie process. Docker Compose service `app` đã được bình luận sẵn, sẵn sàng bật khi cần.
   - **Zod Env Config Fail-Fast**: Chuyển đổi `src/config/env.config.ts` từ validation thủ công (IIFE/throw) sang Zod schema (`envSchema`) với `safeParse(process.env)`. Server thoát `process.exit(1)` với thông báo lỗi rõ ràng ra stderr ngay khi thiếu / sai biến môi trường bắt buộc (`DATABASE_URL`). Giữ nguyên 100% interface `envConfig` (cùng key, cùng kiểu dữ liệu) — toàn bộ consumer (`src/app.ts`, `src/server.ts`, workers, middlewares) không bị thay đổi. Bổ sung thêm `as const` để TypeScript suy luận type chính xác hơn. Các ràng buộc production (`JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `ALLOWED_ORIGINS`, `ENCRYPTION_KEY`) được giữ lại qua các `.refine()` trong Zod schema. Build `pnpm build` và `pnpm run lint` đều pass `0 errors / 0 warnings`.
+- **User Self-Deactivation with Email Verification (2026-09-03)**:
+  - Triển khai trọn vẹn tính năng người dùng tự vô hiệu hóa tài khoản (chuẩn GDPR "Right to be Forgotten" & Self-Service) qua 2 endpoint: `POST /api/v1/auth/deactivate/request` và `POST /api/v1/auth/deactivate/confirm`.
+  - **Re-Authentication**: Yêu cầu người dùng nhập mật khẩu hiện tại khi gửi yêu cầu để chống chiếm đoạt phiên (session hijacking).
+  - **Anti-Lockout Protection**: Ngăn chặn tài khoản `ADMIN` duy nhất còn lại trong hệ thống tự vô hiệu hóa (kiểm tra cả ở bước request và confirm).
+  - **Cryptographic Token Isolation**: Token xác nhận được băm SHA-256 kèm prefix cách ly `sha256('deactivate:' + token)` lưu trong `verification_tokens`, ngăn chặn triệt để lỗ hổng Type Confusion giữa token đăng ký và token vô hiệu hóa mà không cần migration database.
+  - **Hạn dùng 15 phút**: Token tự động hết hạn và dọn dẹp sau 15 phút.
+  - **Immediate RTR Revocation**: Khi xác nhận thành công, Prisma `$transaction` cập nhật `isActive: false`, `deletedAt: new Date()`, `deletedBy: userId`, xóa toàn bộ `refresh_tokens`, xóa token và giải phóng bộ nhớ đệm `permissionCacheService.invalidateUser(userId)`.
+  - **Giao tiếp & Kiểm toán**: Gửi email cảnh báo màu đỏ (`MailService.sendAccountDeactivationEmail`) kèm mã/link xác nhận, tự động ghi `AuditLog` cho cả 2 hành động (`REQUEST_ACCOUNT_DEACTIVATION`, `CONFIRM_ACCOUNT_DEACTIVATION`).
+  - **OpenAPI & Testing**: Đăng ký đầy đủ OpenAPI 3.0 trong `auth.openapi.ts` và bao phủ 12 test cases tự động trong `tests/auth-deactivation.test.ts` (100% pass, 0 regressions).
+
 
 
 

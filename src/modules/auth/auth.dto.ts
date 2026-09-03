@@ -78,3 +78,13 @@ export interface GetAvatarUploadUrlResponseDto {
 export interface ConfirmAvatarUploadDto {
   key: string;
 }
+
+export interface RequestDeactivateDto {
+  password: string;
+  reason?: string;
+}
+
+export interface ConfirmDeactivateDto {
+  token: string;
+}
+

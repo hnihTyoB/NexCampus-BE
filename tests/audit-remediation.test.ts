@@ -199,7 +199,7 @@ describe('Audit & Remediation Verification Test Suite', () => {
   describe('7. [P1-BUG-01] UUID Normalization in Notification Repository', () => {
     it('should normalize invalid non-UUID strings to null for email notifications', async () => {
       const { notificationRepository } = require('../src/modules/notification/notification.repository');
-      const isUuid = (val: any) => val && /^[0-9a-fA-F-]{36}$/.test(val);
+      const isUuid = (val: any) => Boolean(val && /^[0-9a-fA-F-]{36}$/.test(val));
       assert.equal(isUuid('mock-admin-1'), false);
       assert.equal(isUuid('123e4567-e89b-12d3-a456-426614174000'), true);
       assert.equal(isUuid(''), false);

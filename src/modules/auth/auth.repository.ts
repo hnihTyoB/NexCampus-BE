@@ -2,6 +2,8 @@ import crypto from 'crypto';
 import { prisma } from '../../database/prisma.client';
 import { AppError } from '../../common/errors/app-error';
 import { ERROR_CODE } from '../../common/errors/error-code';
+import { ROLES } from '../../common/constants/role.constant';
+
 
 /**
  * Băm token bằng SHA-256 trước khi lưu vào database.
@@ -382,6 +384,85 @@ export class AuthRepository {
         NOT: {
           token: hashedCurrentToken,
         },
+      },
+    });
+  }
+
+  async countActiveAdmins(): Promise<number> {
+    return prisma.user.count({
+      where: {
+        role: { name: ROLES.ADMIN },
+        isActive: true,
+        deletedAt: null,
+      },
+    });
+  }
+
+  async createDeactivationToken(userId: string, token: string, expiresAt: Date) {
+    const hashedToken = hashToken(`deactivate:${token}`);
+    return prisma.$transaction(async (tx) => {
+      await tx.verificationToken.deleteMany({
+        where: { userId },
+      });
+      return tx.verificationToken.create({
+        data: {
+          userId,
+          token: hashedToken,
+          expiresAt,
+        },
+      });
+    });
+  }
+
+  async findDeactivationToken(token: string) {
+    const hashedToken = hashToken(`deactivate:${token}`);
+    return prisma.verificationToken.findUnique({
+      where: { token: hashedToken },
+      include: {
+        user: {
+          include: { role: true },
+        },
+      },
+    });
+  }
+
+  async deactivateUserAndRevokeSessions(userId: string, tokenId: string) {
+    return prisma.$transaction([
+      prisma.user.update({
+        where: { id: userId },
+        data: {
+          isActive: false,
+          deletedAt: new Date(),
+          deletedBy: userId,
+        },
+      }),
+      prisma.refreshToken.deleteMany({
+        where: { userId },
+      }),
+      prisma.verificationToken.delete({
+        where: { id: tokenId },
+      }),
+    ]);
+  }
+
+  createAuditLog(data: {
+    actorId?: string;
+    action: string;
+    targetType: string;
+    targetId: string;
+    details?: any;
+    ipAddress?: string;
+    userAgent?: string;
+  }) {
+    return prisma.auditLog.create({
+      data: {
+        actorId: data.actorId,
+        action: data.action,
+        targetType: data.targetType,
+        targetId: data.targetId,
+        details: data.details,
+        ipAddress: data.ipAddress,
+        userAgent: data.userAgent,
       },
     });
   }
