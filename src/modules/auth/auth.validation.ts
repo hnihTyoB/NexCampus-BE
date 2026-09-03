@@ -106,3 +106,24 @@ export const confirmDeactivateSchema = z.object({
   token: z.string().min(1, 'Token xác nhận vô hiệu hóa là bắt buộc'),
 });
 
+export const enable2FASchema = z.object({
+  secret: z.string().min(16, 'Secret key Base32 là bắt buộc'),
+  code: z.string().regex(/^\d{6}$/, 'Mã xác thực TOTP phải bao gồm đúng 6 chữ số'),
+});
+
+export const verify2FALoginSchema = z.object({
+  tempToken: z.string().min(1, 'Token tạm thời (tempToken) là bắt buộc'),
+  code: z.string().min(6, 'Mã xác nhận là bắt buộc').max(20, 'Mã xác nhận không hợp lệ'),
+});
+
+export const disable2FASchema = z.object({
+  password: z.string().min(1, 'Mật khẩu hiện tại là bắt buộc để tắt 2FA'),
+  code: z.string().min(6, 'Mã TOTP hoặc mã dự phòng là bắt buộc').max(20),
+});
+
+export const regenerateBackupCodesSchema = z.object({
+  password: z.string().min(1, 'Mật khẩu hiện tại là bắt buộc để tái tạo mã dự phòng'),
+  code: z.string().min(6, 'Mã TOTP hoặc mã dự phòng là bắt buộc').max(20),
+});
+
+

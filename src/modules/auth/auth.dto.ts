@@ -24,13 +24,14 @@ export interface MeDto {
   roleId: string;
   permissions: string[];
   isActive: boolean;
+  twoFactorEnabled: boolean;
   createdAt: Date;
 }
 
 export interface LoginResponseDto {
-  accessToken: string;
-  refreshToken: string;
-  user: {
+  accessToken?: string;
+  refreshToken?: string;
+  user?: {
     id: string;
     email: string | null;
     fullName: string | null;
@@ -38,6 +39,8 @@ export interface LoginResponseDto {
     roleId: string;
     permissions: string[];
   };
+  requires2FA?: boolean;
+  tempToken?: string;
 }
 
 export interface UpdateProfileDto {
@@ -87,4 +90,34 @@ export interface RequestDeactivateDto {
 export interface ConfirmDeactivateDto {
   token: string;
 }
+
+export interface Setup2FAResponseDto {
+  secret: string;
+  otpauthUrl: string;
+}
+
+export interface Enable2FADto {
+  secret: string;
+  code: string;
+}
+
+export interface Enable2FAResponseDto {
+  backupCodes: string[];
+}
+
+export interface Verify2FALoginDto {
+  tempToken: string;
+  code: string;
+}
+
+export interface Disable2FADto {
+  password: string;
+  code: string;
+}
+
+export interface RegenerateBackupCodesDto {
+  password: string;
+  code: string;
+}
+
 

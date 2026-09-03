@@ -20,6 +20,10 @@ import {
   confirmAvatarUploadSchema,
   requestDeactivateSchema,
   confirmDeactivateSchema,
+  enable2FASchema,
+  verify2FALoginSchema,
+  disable2FASchema,
+  regenerateBackupCodesSchema,
 } from './auth.validation';
 
 const router = Router();
@@ -47,5 +51,12 @@ router.post('/avatar/confirm', authMiddleware, validate(confirmAvatarUploadSchem
 router.post('/deactivate/request', authMiddleware, authRateLimitMiddleware, validate(requestDeactivateSchema), controller.requestDeactivate);
 router.post('/deactivate/confirm', authRateLimitMiddleware, validate(confirmDeactivateSchema), controller.confirmDeactivate);
 
+router.post('/2fa/setup', authMiddleware, controller.setup2FA);
+router.post('/2fa/enable', authMiddleware, authRateLimitMiddleware, validate(enable2FASchema), controller.enable2FA);
+router.post('/2fa/verify', authRateLimitMiddleware, validate(verify2FALoginSchema), controller.verify2FALogin);
+router.post('/2fa/disable', authMiddleware, authRateLimitMiddleware, validate(disable2FASchema), controller.disable2FA);
+router.post('/2fa/backup-codes/regenerate', authMiddleware, authRateLimitMiddleware, validate(regenerateBackupCodesSchema), controller.regenerateBackupCodes);
+
 export default router;
+
 

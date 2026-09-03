@@ -139,6 +139,23 @@
   - **Immediate RTR Revocation**: Khi xác nhận thành công, Prisma `$transaction` cập nhật `isActive: false`, `deletedAt: new Date()`, `deletedBy: userId`, xóa toàn bộ `refresh_tokens`, xóa token và giải phóng bộ nhớ đệm `permissionCacheService.invalidateUser(userId)`.
   - **Giao tiếp & Kiểm toán**: Gửi email cảnh báo màu đỏ (`MailService.sendAccountDeactivationEmail`) kèm mã/link xác nhận, tự động ghi `AuditLog` cho cả 2 hành động (`REQUEST_ACCOUNT_DEACTIVATION`, `CONFIRM_ACCOUNT_DEACTIVATION`).
   - **OpenAPI & Testing**: Đăng ký đầy đủ OpenAPI 3.0 trong `auth.openapi.ts` và bao phủ 12 test cases tự động trong `tests/auth-deactivation.test.ts` (100% pass, 0 regressions).
+- **Two-Factor Authentication (2FA / TOTP) (2026-09-03)**:
+  - Triển khai hoàn chỉnh tính năng Xác thực 2 bước (2FA) theo thuật toán TOTP chuẩn RFC 6238 / RFC 4226 tương thích với mọi Authenticator Apps (Google Authenticator, Microsoft Authenticator, Authy, 1Password).
+  - **Zero External Dependencies**: Thuật toán sinh khóa Base32, HMAC-SHA1 và dynamic truncation được cài đặt thuần túy bằng `node:crypto` trong `src/common/helpers/totp.helper.ts`.
+  - **Secret Encryption At-Rest**: Khóa bí mật TOTP được mã hóa đối xứng AES-256-GCM (`encryptSecret` / `decryptSecret`) trước khi lưu vào cột `two_factor_secret` của bảng `users`.
+  - **Single-Use Backup Recovery Codes**: Sinh 8 mã dự phòng khẩn cấp dạng `xxxx-xxxx`, lưu mảng băm SHA-256 trong cột `two_factor_backup_codes` (JSONB). Mỗi mã chỉ được sử dụng duy nhất một lần (xóa khỏi mảng ngay khi dùng thành công).
+  - **Timing-Safe Comparison & Window Drift**: Áp dụng `crypto.timingSafeEqual` chống Timing Attack và cho phép bù lệch giờ $\pm 30$ giây ($window = 1$).
+  - **Login Challenge & Isolated Temp Token**: Khi đăng nhập với tài khoản đã bật 2FA, API trả về `{ requires2FA: true, tempToken }` (hạn 5 phút, purpose `2FA_VERIFICATION`), không phát hành cookie hoặc token chính thức cho đến khi qua được endpoint `POST /api/v1/auth/2fa/verify`.
+  - **5 API Endpoints & Rate Limiting**:
+    1. `POST /api/v1/auth/2fa/setup` (authMiddleware)
+    2. `POST /api/v1/auth/2fa/enable` (authMiddleware, authRateLimitMiddleware)
+    3. `POST /api/v1/auth/2fa/verify` (authRateLimitMiddleware)
+    4. `POST /api/v1/auth/2fa/disable` (authMiddleware, authRateLimitMiddleware)
+    5. `POST /api/v1/auth/2fa/backup-codes/regenerate` (authMiddleware, authRateLimitMiddleware)
+  - **Session Invalidation & Anti-Hijacking (Cách 1)**: Khi người dùng Bật 2FA (`enable2FA`) hoặc Tắt 2FA (`disable2FA`), hệ thống tự động gọi `revokeOtherSessions(userId, currentRefreshToken)` để xóa toàn bộ refresh token của các thiết bị/trình duyệt khác trong CSDL và giải phóng bộ nhớ đệm quyền (`permissionCacheService.invalidateUser`). Phiên làm việc trên thiết bị hiện tại được bảo lưu nguyên vẹn, trong khi tất cả phiên cũ/bị chiếm đoạt trên các máy khác sẽ lập tức bị đá văng và buộc phải đăng nhập lại từ đầu qua thử thách 2FA.
+  - **Database Migration**: `prisma/migrations/20260903000000_add_user_two_factor/migration.sql` bổ sung 3 cột tùy chọn (`two_factor_enabled`, `two_factor_secret`, `two_factor_backup_codes`) vào bảng `users`, bảo đảm tương thích ngược 100%.
+  - **OpenAPI 3.0 & Testing**: Tự động sinh tài liệu Swagger UI và bảo đảm bởi 29 automated test cases (12 unit tests trong `tests/totp-helper.test.ts` và 17 integration tests trong `tests/auth-2fa.test.ts`, 100% pass, build và lint 0 warnings/errors).
+
 
 
 

@@ -1,9 +1,24 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto, UpdateProfileDto, UpdatePasswordDto, ForgotPasswordDto, ResetPasswordDto, ResendVerificationDto, GetAvatarUploadUrlDto, ConfirmAvatarUploadDto, RequestDeactivateDto, ConfirmDeactivateDto } from './auth.dto';
+import {
+  LoginDto,
+  RegisterDto,
+  UpdateProfileDto,
+  UpdatePasswordDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+  ResendVerificationDto,
+  GetAvatarUploadUrlDto,
+  ConfirmAvatarUploadDto,
+  RequestDeactivateDto,
+  ConfirmDeactivateDto,
+  Enable2FADto,
+  Verify2FALoginDto,
+  Disable2FADto,
+  RegenerateBackupCodesDto,
+} from './auth.dto';
 import { AppError } from '../../common/errors/app-error';
 import { ERROR_CODE } from '../../common/errors/error-code';
-
 
 export class AuthController {
   private readonly service = new AuthService();
@@ -15,14 +30,25 @@ export class AuthController {
       const ipAddress = req.ip;
       const result = await this.service.login(body, { userAgent, ipAddress });
 
-      res.cookie('accessToken', result.accessToken, {
+      // Nếu tài khoản yêu cầu 2FA, trả về thử thách kèm tempToken
+      if (result.requires2FA) {
+        return res.json({
+          success: true,
+          data: {
+            requires2FA: true,
+            tempToken: result.tempToken,
+          },
+        });
+      }
+
+      res.cookie('accessToken', result.accessToken!, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
         maxAge: 15 * 60 * 1000, // 15 minutes
       });
 
-      res.cookie('refreshToken', result.refreshToken, {
+      res.cookie('refreshToken', result.refreshToken!, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
@@ -41,6 +67,7 @@ export class AuthController {
       next(error);
     }
   };
+
 
   me = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -326,5 +353,114 @@ export class AuthController {
       next(error);
     }
   };
+
+  setup2FA = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.service.setup2FA(req.user.id);
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  enable2FA = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = req.body as Enable2FADto;
+      const ipAddress = req.ip;
+      const userAgent = req.headers['user-agent'];
+      const currentRefreshToken =
+        req.cookies?.refreshToken || (req.headers['x-refresh-token'] as string) || (req.body as any)?.refreshToken;
+      const result = await this.service.enable2FA(req.user.id, body, {
+        ipAddress,
+        userAgent,
+        currentRefreshToken,
+      });
+
+      res.json({
+        success: true,
+        message: 'Kích hoạt xác thực 2 bước (2FA) thành công. Các phiên đăng nhập khác đã được thu hồi.',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  verify2FALogin = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = req.body as Verify2FALoginDto;
+      const userAgent = req.headers['user-agent'];
+      const ipAddress = req.ip;
+      const result = await this.service.verify2FALogin(body, { userAgent, ipAddress });
+
+      res.cookie('accessToken', result.accessToken!, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 15 * 60 * 1000,
+      });
+
+      res.cookie('refreshToken', result.refreshToken!, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+
+      res.json({
+        success: true,
+        data: {
+          accessToken: result.accessToken,
+          refreshToken: result.refreshToken,
+          user: result.user,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  disable2FA = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = req.body as Disable2FADto;
+      const ipAddress = req.ip;
+      const userAgent = req.headers['user-agent'];
+      const currentRefreshToken =
+        req.cookies?.refreshToken || (req.headers['x-refresh-token'] as string) || (req.body as any)?.refreshToken;
+      await this.service.disable2FA(req.user.id, body, {
+        ipAddress,
+        userAgent,
+        currentRefreshToken,
+      });
+
+      res.json({
+        success: true,
+        message: 'Đã tắt xác thực 2 bước (2FA) thành công. Các phiên đăng nhập khác đã được thu hồi.',
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  regenerateBackupCodes = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = req.body as RegenerateBackupCodesDto;
+      const ipAddress = req.ip;
+      const userAgent = req.headers['user-agent'];
+      const result = await this.service.regenerateBackupCodes(req.user.id, body, { ipAddress, userAgent });
+
+      res.json({
+        success: true,
+        message: 'Tái tạo mã dự phòng 2FA thành công',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
+
 

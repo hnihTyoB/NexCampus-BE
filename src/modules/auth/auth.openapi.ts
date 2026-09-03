@@ -16,6 +16,10 @@ import {
   revokeOtherSessionsSchema,
   requestDeactivateSchema,
   confirmDeactivateSchema,
+  enable2FASchema,
+  verify2FALoginSchema,
+  disable2FASchema,
+  regenerateBackupCodesSchema,
 } from './auth.validation';
 import { z } from 'zod';
 
@@ -32,6 +36,11 @@ export function registerAuthOpenApi(): void {
   openapiRegistry.register('ConfirmAvatarUploadRequest', confirmAvatarUploadSchema);
   openapiRegistry.register('RequestDeactivateRequest', requestDeactivateSchema);
   openapiRegistry.register('ConfirmDeactivateRequest', confirmDeactivateSchema);
+  openapiRegistry.register('Enable2FARequest', enable2FASchema);
+  openapiRegistry.register('Verify2FALoginRequest', verify2FALoginSchema);
+  openapiRegistry.register('Disable2FARequest', disable2FASchema);
+  openapiRegistry.register('RegenerateBackupCodesRequest', regenerateBackupCodesSchema);
+
 
 
   // ── Routes ───────────────────────────────────────────────────────────────────
@@ -588,5 +597,175 @@ export function registerAuthOpenApi(): void {
       403: { description: 'Không thể vô hiệu hóa tài khoản Admin duy nhất của hệ thống' },
     },
   });
+
+  // ── 2FA Routes ─────────────────────────────────────────────────────────────
+
+  // POST /auth/2fa/setup
+  openapiRegistry.registerPath({
+    method: 'post',
+    path: '/auth/2fa/setup',
+    tags: ['Auth - 2FA'],
+    summary: 'Khởi tạo thiết lập 2FA (sinh khóa Base32 và URI quét mã QR)',
+    security: [{ BearerAuth: [] }],
+    responses: {
+      200: {
+        description: 'Khởi tạo thành công, trả về secret và otpauthUrl',
+        content: {
+          'application/json': {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              data: z.object({
+                secret: z.string().openapi({ example: 'JBSWY3DPEHPK3PXP...' }),
+                otpauthUrl: z.string().openapi({ example: 'otpauth://totp/TemplateBE:user@example.com?secret=...' }),
+              }),
+            }),
+          },
+        },
+      },
+      400: { description: '2FA đã được kích hoạt trước đó' },
+      401: { description: 'Chưa đăng nhập' },
+    },
+  });
+
+  // POST /auth/2fa/enable
+  openapiRegistry.registerPath({
+    method: 'post',
+    path: '/auth/2fa/enable',
+    tags: ['Auth - 2FA'],
+    summary: 'Xác nhận mã 6 số và chính thức kích hoạt 2FA (trả về 8 mã dự phòng)',
+    security: [{ BearerAuth: [] }],
+    request: {
+      body: {
+        content: {
+          'application/json': { schema: enable2FASchema },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: 'Kích hoạt 2FA thành công, trả về danh sách backup codes',
+        content: {
+          'application/json': {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              message: z.string().openapi({ example: 'Kích hoạt xác thực 2 bước (2FA) thành công' }),
+              data: z.object({
+                backupCodes: z.array(z.string()).openapi({ example: ['A1B2-C3D4', 'E5F6-G7H8'] }),
+              }),
+            }),
+          },
+        },
+      },
+      400: { description: 'Mã TOTP không chính xác hoặc 2FA đã được kích hoạt trước đó' },
+      401: { description: 'Chưa đăng nhập' },
+    },
+  });
+
+  // POST /auth/2fa/verify
+  openapiRegistry.registerPath({
+    method: 'post',
+    path: '/auth/2fa/verify',
+    tags: ['Auth - 2FA'],
+    summary: 'Xác thực thử thách 2FA khi đăng nhập bằng mã TOTP 6 số hoặc mã dự phòng',
+    request: {
+      body: {
+        content: {
+          'application/json': { schema: verify2FALoginSchema },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: 'Xác thực thành công, cấp Access Token và Refresh Token chính thức',
+        content: {
+          'application/json': {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              data: z.object({
+                accessToken: z.string(),
+                refreshToken: z.string(),
+                user: z.object({
+                  id: z.string().uuid(),
+                  email: z.string().email().nullable(),
+                  fullName: z.string().nullable(),
+                  role: z.string(),
+                  roleId: z.string().uuid(),
+                  permissions: z.array(z.string()),
+                }),
+              }),
+            }),
+          },
+        },
+      },
+      400: { description: 'Mã xác thực hoặc mã dự phòng không chính xác' },
+      401: { description: 'Token tạm thời (tempToken) không hợp lệ hoặc đã hết hạn' },
+    },
+  });
+
+  // POST /auth/2fa/disable
+  openapiRegistry.registerPath({
+    method: 'post',
+    path: '/auth/2fa/disable',
+    tags: ['Auth - 2FA'],
+    summary: 'Tắt 2FA (yêu cầu mật khẩu hiện tại + mã TOTP hoặc mã dự phòng)',
+    security: [{ BearerAuth: [] }],
+    request: {
+      body: {
+        content: {
+          'application/json': { schema: disable2FASchema },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: 'Tắt 2FA thành công',
+        content: {
+          'application/json': {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              message: z.string().openapi({ example: 'Đã tắt xác thực 2 bước (2FA) thành công' }),
+            }),
+          },
+        },
+      },
+      400: { description: 'Mật khẩu hoặc mã 2FA không chính xác' },
+      401: { description: 'Chưa đăng nhập' },
+    },
+  });
+
+  // POST /auth/2fa/backup-codes/regenerate
+  openapiRegistry.registerPath({
+    method: 'post',
+    path: '/auth/2fa/backup-codes/regenerate',
+    tags: ['Auth - 2FA'],
+    summary: 'Tái tạo danh sách mã dự phòng 2FA (hủy toàn bộ mã cũ)',
+    security: [{ BearerAuth: [] }],
+    request: {
+      body: {
+        content: {
+          'application/json': { schema: regenerateBackupCodesSchema },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: 'Tái tạo mã dự phòng thành công',
+        content: {
+          'application/json': {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              message: z.string().openapi({ example: 'Tái tạo mã dự phòng 2FA thành công' }),
+              data: z.object({
+                backupCodes: z.array(z.string()).openapi({ example: ['X1Y2-Z3A4', 'B5C6-D7E8'] }),
+              }),
+            }),
+          },
+        },
+      },
+      400: { description: 'Mật khẩu hoặc mã 2FA không chính xác' },
+      401: { description: 'Chưa đăng nhập' },
+    },
+  });
 }
+
 

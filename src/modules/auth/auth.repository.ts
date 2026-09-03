@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../database/prisma.client';
 import { AppError } from '../../common/errors/app-error';
 import { ERROR_CODE } from '../../common/errors/error-code';
@@ -465,6 +466,68 @@ export class AuthRepository {
         userAgent: data.userAgent,
       },
     });
+  }
+
+  async enable2FA(userId: string, encryptedSecret: string, hashedBackupCodes: string[]) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: {
+        twoFactorEnabled: true,
+        twoFactorSecret: encryptedSecret,
+        twoFactorBackupCodes: hashedBackupCodes,
+      },
+    });
+  }
+
+  async disable2FA(userId: string) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: {
+        twoFactorEnabled: false,
+        twoFactorSecret: null,
+        twoFactorBackupCodes: Prisma.DbNull,
+      },
+    });
+  }
+
+  async updateBackupCodes(userId: string, hashedBackupCodes: string[]) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: {
+        twoFactorBackupCodes: hashedBackupCodes,
+      },
+    });
+  }
+
+  async revokeOtherSessions(userId: string, currentRefreshToken?: string) {
+    if (currentRefreshToken) {
+      const hashedCurrentToken = hashToken(currentRefreshToken);
+      return prisma.refreshToken.deleteMany({
+        where: {
+          userId,
+          NOT: {
+            token: hashedCurrentToken,
+          },
+        },
+      });
+    }
+
+    const latestSession = await prisma.refreshToken.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+
+    if (latestSession) {
+      return prisma.refreshToken.deleteMany({
+        where: {
+          userId,
+          id: { not: latestSession.id },
+        },
+      });
+    }
+
+    return { count: 0 };
   }
 }
 
