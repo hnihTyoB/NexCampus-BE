@@ -122,6 +122,14 @@
   - **Database Indexing**: Thêm `@@index([toEmail])` vào model `EmailNotification` trong `prisma/schema.prisma`.
   - **User Management Schemas Enhancement**: Mở rộng `createUserSchema`, `updateUserSchema`, DTOs và `UserService` hỗ trợ cập nhật `fullName` và `phoneNumber`.
   - **Defensive Date Boundary Guard**: Thêm regex validation `/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/` trong `getVietnamDayRange`.
+- **Dependencies Upgrade & Security Audit Hardening (2026-09-03)**:
+  - **Core Upgrades**: Nâng cấp an toàn lên các phiên bản ổn định mới nhất: `express` (4.22.2), `zod` (3.25.76), `bcryptjs` (3.0.3), `bullmq` (6.3.4), `dotenv` (17.4.2), `helmet` (8.3.0), `@aws-sdk/client-s3` và `@aws-sdk/s3-request-presigner` (3.1125.0), `cors` (2.8.6), `jsonwebtoken` (9.0.3), `morgan` (1.12.0), `multer` (2.3.0), `nodemailer` (9.1.1), `sharp` (0.35.4).
+  - **DevDependencies Upgrades**: Nâng cấp `typescript` (5.9.3), `eslint` (9.39.4), `prettier` (3.9.6), `tsx` (4.23.13), `@types/node` (22.20.0), `@types/express` (4.17.25) cùng các types liên quan; gỡ bỏ `@types/bcryptjs` do `bcryptjs@3.0.3` đã tích hợp native types.
+  - **Framework Preservation**: Giữ nguyên `Express 4.x`, `Prisma 5.22.0` và `@asteasolutions/zod-to-openapi` 7.3.4 để bảo đảm tính tương thích kiến trúc tuyệt đối.
+  - **Security Overrides**: Bổ sung `pnpm.overrides` cho `qs` (^6.16.0), `body-parser` (^1.20.6), `brace-expansion` (^1.1.18), `js-yaml` (^4.3.1), đưa `pnpm audit` về `0 vulnerabilities`.
+- **Enterprise Standard Hardening (2026-09-03)**:
+  - **Dockerfile Multi-Stage Non-Root**: Tạo mới `Dockerfile` chuẩn production tại thư mục gốc. Sử dụng 3-stage build (`deps` → `builder` → `runner`) trên `node:22-alpine`. Stage runner chỉ chứa production artifacts (`dist/`, `prisma/`, prod `node_modules`); chạy dưới user `node` (uid=1000, non-root); sử dụng `tini` làm PID 1 để xử lý SIGTERM/SIGINT đúng cách và chống zombie process. Docker Compose service `app` đã được bình luận sẵn, sẵn sàng bật khi cần.
+  - **Zod Env Config Fail-Fast**: Chuyển đổi `src/config/env.config.ts` từ validation thủ công (IIFE/throw) sang Zod schema (`envSchema`) với `safeParse(process.env)`. Server thoát `process.exit(1)` với thông báo lỗi rõ ràng ra stderr ngay khi thiếu / sai biến môi trường bắt buộc (`DATABASE_URL`). Giữ nguyên 100% interface `envConfig` (cùng key, cùng kiểu dữ liệu) — toàn bộ consumer (`src/app.ts`, `src/server.ts`, workers, middlewares) không bị thay đổi. Bổ sung thêm `as const` để TypeScript suy luận type chính xác hơn. Các ràng buộc production (`JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `ALLOWED_ORIGINS`, `ENCRYPTION_KEY`) được giữ lại qua các `.refine()` trong Zod schema. Build `pnpm build` và `pnpm run lint` đều pass `0 errors / 0 warnings`.
 
 
 
