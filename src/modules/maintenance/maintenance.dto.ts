@@ -1,4 +1,4 @@
-import { MaintenanceStatus } from '../../common/constants/maintenance.constant';
+import { MaintenanceStatus } from "../../common/constants/maintenance.constant";
 
 export interface PublicMaintenanceStatusDto {
   enabled: boolean;
@@ -17,7 +17,7 @@ export interface EnableMaintenanceDto {
   bypassPermissions?: string[];
   bypassRoles?: string[];
   bypassIps?: string[];
-  status?: 'MAINTENANCE' | 'READ_ONLY';
+  status?: "MAINTENANCE" | "READ_ONLY";
 }
 
 export interface UpdateMaintenanceDto {

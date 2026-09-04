@@ -7,6 +7,7 @@ Tài liệu hướng dẫn tích hợp **System Maintenance Mode** từ backend 
 ## 1. Cơ chế hoạt động
 
 Khi hệ thống bật chế độ bảo trì:
+
 1. Toàn bộ API nghiệp vụ (Users, RBAC, Notifications, ...) trả về mã HTTP `503 Service Unavailable` với payload chuẩn:
    ```json
    {
@@ -31,29 +32,38 @@ Khi hệ thống bật chế độ bảo trì:
 Thêm interceptor vào instance Axios toàn cục:
 
 ```typescript
-import axios, { AxiosError } from 'axios';
-import { isMaintenanceError } from './common/client/axios-interceptor.example';
+import axios, { AxiosError } from "axios";
+import { isMaintenanceError } from "./common/client/axios-interceptor.example";
 
 export const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8888/api/v1',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8888/api/v1",
   withCredentials: true,
 });
 
 apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    if (error.response?.status === 503 && (error.response.data as any)?.code === 'SYSTEM_MAINTENANCE') {
+    if (
+      error.response?.status === 503 &&
+      (error.response.data as any)?.code === "SYSTEM_MAINTENANCE"
+    ) {
       const maintenanceData = (error.response.data as any).data;
-      
+
       // Lưu state hoặc chuyển hướng tới trang /maintenance
-      if (typeof window !== 'undefined' && window.location.pathname !== '/maintenance') {
+      if (
+        typeof window !== "undefined" &&
+        window.location.pathname !== "/maintenance"
+      ) {
         // Tùy chọn: Lưu thông tin bảo trì vào sessionStorage để hiển thị tức thì
-        sessionStorage.setItem('maintenance_info', JSON.stringify(maintenanceData));
-        window.location.href = '/maintenance';
+        sessionStorage.setItem(
+          "maintenance_info",
+          JSON.stringify(maintenanceData),
+        );
+        window.location.href = "/maintenance";
       }
     }
     return Promise.reject(error);
-  }
+  },
 );
 ```
 
@@ -62,21 +72,21 @@ apiClient.interceptors.response.use(
 ## 3. React / Next.js Component `/maintenance`
 
 ```tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 
 export default function MaintenancePage() {
   const [info, setInfo] = useState({
-    title: 'Hệ thống đang bảo trì',
-    message: 'Chúng tôi đang bảo trì để nâng cấp hệ thống.',
+    title: "Hệ thống đang bảo trì",
+    message: "Chúng tôi đang bảo trì để nâng cấp hệ thống.",
     estimatedEndAt: null as string | null,
   });
 
   const checkStatus = async () => {
     try {
-      const res = await fetch('/api/v1/maintenance/public');
+      const res = await fetch("/api/v1/maintenance/public");
       const data = await res.json();
       if (data.success && !data.data.enabled) {
-        window.location.href = '/';
+        window.location.href = "/";
       } else if (data.data) {
         setInfo(data.data);
       }
@@ -92,11 +102,14 @@ export default function MaintenancePage() {
   }, []);
 
   return (
-    <div style={{ textAlign: 'center', padding: '4rem' }}>
+    <div style={{ textAlign: "center", padding: "4rem" }}>
       <h1>{info.title}</h1>
       <p>{info.message}</p>
       {info.estimatedEndAt && (
-        <p>Dự kiến hoàn tất: {new Date(info.estimatedEndAt).toLocaleString('vi-VN')}</p>
+        <p>
+          Dự kiến hoàn tất:{" "}
+          {new Date(info.estimatedEndAt).toLocaleString("vi-VN")}
+        </p>
       )}
       <button onClick={checkStatus}>Kiểm tra lại</button>
     </div>

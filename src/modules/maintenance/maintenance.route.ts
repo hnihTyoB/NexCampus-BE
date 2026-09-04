@@ -1,42 +1,51 @@
-import { Router } from 'express';
-import { maintenanceController } from './maintenance.controller';
-import { authMiddleware } from '../../middlewares/auth.middleware';
-import { requirePermission, requireAnyPermission } from '../../middlewares/permission.middleware';
-import { validate } from '../../middlewares/validate.middleware';
-import { enableMaintenanceSchema, updateMaintenanceSchema } from './maintenance.validation';
-import { PERMISSIONS } from '../../common/constants/permission.constant';
+import { Router } from "express";
+import { maintenanceController } from "./maintenance.controller";
+import { authMiddleware } from "../../middlewares/auth.middleware";
+import {
+  requirePermission,
+  requireAnyPermission,
+} from "../../middlewares/permission.middleware";
+import { validate } from "../../middlewares/validate.middleware";
+import {
+  enableMaintenanceSchema,
+  updateMaintenanceSchema,
+} from "./maintenance.validation";
+import { PERMISSIONS } from "../../common/constants/permission.constant";
 
 const router = Router();
 
 // Public endpoint for clients to check maintenance status
-router.get('/public', maintenanceController.getPublicStatus);
+router.get("/public", maintenanceController.getPublicStatus);
 
 // Protected endpoints for administrators
 router.get(
-  '/status',
+  "/status",
   authMiddleware,
-  requireAnyPermission(PERMISSIONS.MAINTENANCE_READ, PERMISSIONS.MAINTENANCE_MANAGE),
+  requireAnyPermission(
+    PERMISSIONS.MAINTENANCE_READ,
+    PERMISSIONS.MAINTENANCE_MANAGE,
+  ),
   maintenanceController.getStatus,
 );
 
 router.post(
-  '/enable',
+  "/enable",
   authMiddleware,
   requirePermission(PERMISSIONS.MAINTENANCE_MANAGE),
-  validate(enableMaintenanceSchema, 'body'),
+  validate(enableMaintenanceSchema, "body"),
   maintenanceController.enable,
 );
 
 router.put(
-  '/config',
+  "/config",
   authMiddleware,
   requirePermission(PERMISSIONS.MAINTENANCE_MANAGE),
-  validate(updateMaintenanceSchema, 'body'),
+  validate(updateMaintenanceSchema, "body"),
   maintenanceController.updateConfig,
 );
 
 router.post(
-  '/disable',
+  "/disable",
   authMiddleware,
   requirePermission(PERMISSIONS.MAINTENANCE_MANAGE),
   maintenanceController.disable,

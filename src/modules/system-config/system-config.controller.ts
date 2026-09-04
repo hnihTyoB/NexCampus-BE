@@ -1,11 +1,25 @@
-import { Request, Response, NextFunction } from 'express';
-import { systemConfigService, SystemConfigService } from './system-config.service';
-import { CreateSystemConfigDto, UpdateSystemConfigDto, ToggleFeatureFlagDto, SystemConfigQueryDto } from './system-config.dto';
+import { Request, Response, NextFunction } from "express";
+import {
+  systemConfigService,
+  SystemConfigService,
+} from "./system-config.service";
+import {
+  CreateSystemConfigDto,
+  UpdateSystemConfigDto,
+  ToggleFeatureFlagDto,
+  SystemConfigQueryDto,
+} from "./system-config.dto";
 
 export class SystemConfigController {
-  constructor(private readonly service: SystemConfigService = systemConfigService) {}
+  constructor(
+    private readonly service: SystemConfigService = systemConfigService,
+  ) {}
 
-  getPublicConfigs = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getPublicConfigs = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const data = await this.service.getPublicConfigs();
       res.json({
@@ -17,7 +31,11 @@ export class SystemConfigController {
     }
   };
 
-  findAll = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  findAll = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const query = req.query as unknown as SystemConfigQueryDto;
       const data = await this.service.findAll(query);
@@ -30,7 +48,11 @@ export class SystemConfigController {
     }
   };
 
-  findByKey = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  findByKey = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const { key } = req.params;
       const data = await this.service.get(key);
@@ -46,13 +68,17 @@ export class SystemConfigController {
     }
   };
 
-  create = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  create = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const body = req.body as CreateSystemConfigDto;
       const context = {
         actorId: req.user?.id,
         ipAddress: req.ip || req.socket.remoteAddress,
-        userAgent: req.headers['user-agent'],
+        userAgent: req.headers["user-agent"],
       };
 
       const data = await this.service.create(body, context);
@@ -65,14 +91,18 @@ export class SystemConfigController {
     }
   };
 
-  update = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  update = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const { key } = req.params;
       const body = req.body as UpdateSystemConfigDto;
       const context = {
         actorId: req.user?.id,
         ipAddress: req.ip || req.socket.remoteAddress,
-        userAgent: req.headers['user-agent'],
+        userAgent: req.headers["user-agent"],
       };
 
       const data = await this.service.update(key, body, context);
@@ -85,14 +115,18 @@ export class SystemConfigController {
     }
   };
 
-  toggleFeatureFlag = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  toggleFeatureFlag = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const { key } = req.params;
       const body = req.body as ToggleFeatureFlagDto;
       const context = {
         actorId: req.user?.id,
         ipAddress: req.ip || req.socket.remoteAddress,
-        userAgent: req.headers['user-agent'],
+        userAgent: req.headers["user-agent"],
       };
 
       const data = await this.service.toggleFeatureFlag(key, body, context);
@@ -106,13 +140,17 @@ export class SystemConfigController {
     }
   };
 
-  delete = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  delete = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const { key } = req.params;
       const context = {
         actorId: req.user?.id,
         ipAddress: req.ip || req.socket.remoteAddress,
-        userAgent: req.headers['user-agent'],
+        userAgent: req.headers["user-agent"],
       };
 
       await this.service.delete(key, context);

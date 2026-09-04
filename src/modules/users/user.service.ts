@@ -1,11 +1,14 @@
-import bcrypt from 'bcryptjs';
-import { UserRepository } from './user.repository';
-import { AppError } from '../../common/errors/app-error';
-import { ERROR_CODE } from '../../common/errors/error-code';
-import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from '../../common/constants/audit-log.constant';
-import { parseUserAgent } from '../../common/helpers/user-agent.helper';
-import { permissionCacheService } from '../../common/services/permission-cache.service';
-import { UserQueryDto, CreateUserDto, UpdateUserDto } from './user.dto';
+import bcrypt from "bcryptjs";
+import { UserRepository } from "./user.repository";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODE } from "../../common/errors/error-code";
+import {
+  AUDIT_ACTION,
+  AUDIT_TARGET_TYPE,
+} from "../../common/constants/audit-log.constant";
+import { parseUserAgent } from "../../common/helpers/user-agent.helper";
+import { permissionCacheService } from "../../common/services/permission-cache.service";
+import { UserQueryDto, CreateUserDto, UpdateUserDto } from "./user.dto";
 
 export class UserService {
   private readonly repository = new UserRepository();
@@ -18,7 +21,7 @@ export class UserService {
     const user = await this.repository.findById(id);
 
     if (!user) {
-      throw new AppError('User not found', 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError("User not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
     return user;
@@ -28,7 +31,11 @@ export class UserService {
     const existing = await this.repository.findByEmail(data.email);
 
     if (existing) {
-      throw new AppError('Email already exists', 409, ERROR_CODE.DUPLICATE_ENTRY);
+      throw new AppError(
+        "Email already exists",
+        409,
+        ERROR_CODE.DUPLICATE_ENTRY,
+      );
     }
 
     const passwordHash = await bcrypt.hash(data.password, 10);
@@ -58,7 +65,11 @@ export class UserService {
 
   async softDelete(id: string, adminId: string) {
     if (id === adminId) {
-      throw new AppError('Cannot delete your own account', 400, ERROR_CODE.VALIDATION_ERROR);
+      throw new AppError(
+        "Cannot delete your own account",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
     }
     await this.findById(id);
     const result = await this.repository.softDelete(id, adminId);
@@ -74,7 +85,7 @@ export class UserService {
     return sessions.map((s) => ({
       id: s.id,
       deviceName: parseUserAgent(s.userAgent || undefined),
-      ipAddress: s.ipAddress || 'Không rõ',
+      ipAddress: s.ipAddress || "Không rõ",
       createdAt: s.createdAt,
       expiresAt: s.expiresAt,
     }));
@@ -89,7 +100,11 @@ export class UserService {
     await this.findById(userId);
     const session = await this.repository.findSessionById(userId, sessionId);
     if (!session) {
-      throw new AppError('Phiên đăng nhập không tồn tại hoặc đã hết hạn', 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError(
+        "Phiên đăng nhập không tồn tại hoặc đã hết hạn",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
     }
     await this.repository.deleteSessionById(userId, sessionId);
     await this.repository.createAuditLog({
@@ -129,8 +144,8 @@ export class UserService {
     const devices = await this.repository.findDevicesByUserId(userId);
     return devices.map((d) => ({
       id: d.id,
-      deviceName: d.deviceName || 'Thiết bị không rõ',
-      ipAddress: d.ipAddress || 'Không rõ',
+      deviceName: d.deviceName || "Thiết bị không rõ",
+      ipAddress: d.ipAddress || "Không rõ",
       lastLoginAt: d.lastLoginAt,
       createdAt: d.createdAt,
     }));
@@ -145,7 +160,11 @@ export class UserService {
     await this.findById(userId);
     const device = await this.repository.findDeviceById(userId, deviceId);
     if (!device) {
-      throw new AppError('Thiết bị không tồn tại', 404, ERROR_CODE.DEVICE_NOT_FOUND);
+      throw new AppError(
+        "Thiết bị không tồn tại",
+        404,
+        ERROR_CODE.DEVICE_NOT_FOUND,
+      );
     }
     await this.repository.deleteDeviceById(userId, deviceId);
     await this.repository.createAuditLog({

@@ -1,4 +1,4 @@
-import dns from 'node:dns';
+import dns from "node:dns";
 
 /**
  * URL & SSRF Helper
@@ -13,23 +13,25 @@ import dns from 'node:dns';
  * link-local, multicast, cloud metadata hoặc reserved hay không.
  */
 export function isPrivateOrReservedIp(ip: string): boolean {
-  if (!ip || typeof ip !== 'string') return true;
+  if (!ip || typeof ip !== "string") return true;
 
   const trimmed = ip.trim().toLowerCase();
 
   // ── Xử lý IPv4-mapped IPv6 (e.g., "::ffff:127.0.0.1", "::ffff:10.0.0.1") ──
-  if (trimmed.startsWith('::ffff:')) {
+  if (trimmed.startsWith("::ffff:")) {
     const mappedIpv4 = trimmed.slice(7);
-    if (mappedIpv4.includes('.')) {
+    if (mappedIpv4.includes(".")) {
       return isPrivateOrReservedIp(mappedIpv4);
     }
   }
 
   // ── IPv4 Check ──
-  const ipv4Parts = trimmed.split('.');
+  const ipv4Parts = trimmed.split(".");
   if (ipv4Parts.length === 4 && ipv4Parts.every((p) => /^\d+$/.test(p))) {
     const [a, b, c, d] = ipv4Parts.map(Number);
-    if ([a, b, c, d].some((octet) => octet < 0 || octet > 255 || isNaN(octet))) {
+    if (
+      [a, b, c, d].some((octet) => octet < 0 || octet > 255 || isNaN(octet))
+    ) {
       return true;
     }
 
@@ -66,15 +68,16 @@ export function isPrivateOrReservedIp(ip: string): boolean {
   }
 
   // ── IPv6 Check ──
-  const ipv6Clean = trimmed.startsWith('[') && trimmed.endsWith(']')
-    ? trimmed.slice(1, -1)
-    : trimmed;
+  const ipv6Clean =
+    trimmed.startsWith("[") && trimmed.endsWith("]")
+      ? trimmed.slice(1, -1)
+      : trimmed;
 
-  if (ipv6Clean.includes(':')) {
+  if (ipv6Clean.includes(":")) {
     // Loopback ::1
-    if (ipv6Clean === '::1' || ipv6Clean === '0:0:0:0:0:0:0:1') return true;
+    if (ipv6Clean === "::1" || ipv6Clean === "0:0:0:0:0:0:0:1") return true;
     // Unspecified ::
-    if (ipv6Clean === '::' || ipv6Clean === '0:0:0:0:0:0:0:0') return true;
+    if (ipv6Clean === "::" || ipv6Clean === "0:0:0:0:0:0:0:0") return true;
     // ULA fc00::/7 — bắt đầu bằng fc hoặc fd
     if (/^f[cd]/i.test(ipv6Clean)) return true;
     // Link-local fe80::/10 — bắt đầu bằng fe8, fe9, fea, feb
@@ -99,16 +102,19 @@ export function isPrivateOrReservedHost(hostname: string): boolean {
   const host = hostname.toLowerCase().trim();
 
   // Loopback and well-known local names
-  if (host === 'localhost' || host === '0.0.0.0') return true;
+  if (host === "localhost" || host === "0.0.0.0") return true;
 
   // Bare hostname with no dot = intranet (e.g. "intranet", "myserver", "backend")
-  if (!host.includes('.') && !host.startsWith('[')) return true;
+  if (!host.includes(".") && !host.startsWith("[")) return true;
 
   // .local / .internal / .localhost / .lan TLD
   if (/\.(local|internal|localhost|lan)$/.test(host)) return true;
 
   // Nếu hostname là IP trực tiếp (IPv4 hoặc IPv6)
-  const isIp = /^\d+\.\d+\.\d+\.\d+$/.test(host) || host.includes(':') || (host.startsWith('[') && host.endsWith(']'));
+  const isIp =
+    /^\d+\.\d+\.\d+\.\d+$/.test(host) ||
+    host.includes(":") ||
+    (host.startsWith("[") && host.endsWith("]"));
   if (isIp) {
     return isPrivateOrReservedIp(host);
   }
@@ -132,12 +138,13 @@ export function isPublicHttpUrl(
   urlString: string,
   options: IsPublicHttpUrlOptions = {},
 ): boolean {
-  if (!urlString || typeof urlString !== 'string') return false;
+  if (!urlString || typeof urlString !== "string") return false;
   try {
     const parsed = new URL(urlString);
-    if (!['http:', 'https:'].includes(parsed.protocol)) return false;
+    if (!["http:", "https:"].includes(parsed.protocol)) return false;
 
-    const allowPrivate = options.allowPrivate ?? process.env.NODE_ENV !== 'production';
+    const allowPrivate =
+      options.allowPrivate ?? process.env.NODE_ENV !== "production";
     if (allowPrivate) return true;
 
     return !isPrivateOrReservedHost(parsed.hostname);
@@ -152,7 +159,7 @@ export function isPublicHttpUrl(
 export function isValidHttpUrl(urlString: string): boolean {
   try {
     const parsed = new URL(urlString);
-    return ['http:', 'https:'].includes(parsed.protocol);
+    return ["http:", "https:"].includes(parsed.protocol);
   } catch {
     return false;
   }
@@ -166,7 +173,7 @@ export function extractDomain(url: string): string {
     const parsed = new URL(url);
     return parsed.hostname;
   } catch {
-    return '';
+    return "";
   }
 }
 
@@ -178,7 +185,10 @@ export interface DnsValidationOptions {
   /**
    * Mock resolver phục vụ kiểm thử unit test độc lập
    */
-  dnsLookup?: (hostname: string, options: { all: boolean }) => Promise<Array<{ address: string; family: number }>>;
+  dnsLookup?: (
+    hostname: string,
+    options: { all: boolean },
+  ) => Promise<Array<{ address: string; family: number }>>;
 }
 
 export interface DnsValidationResult {
@@ -195,7 +205,8 @@ export async function resolveAndValidateDns(
   hostname: string,
   options: DnsValidationOptions = {},
 ): Promise<DnsValidationResult> {
-  const allowPrivate = options.allowPrivate ?? process.env.NODE_ENV !== 'production';
+  const allowPrivate =
+    options.allowPrivate ?? process.env.NODE_ENV !== "production";
 
   // 1. Nếu hostname là cú pháp IP thô hoặc localhost
   if (isPrivateOrReservedHost(hostname)) {
@@ -211,9 +222,12 @@ export async function resolveAndValidateDns(
 
   // 2. Thực hiện DNS resolution lấy tất cả A và AAAA records
   try {
-    const lookupFn = options.dnsLookup ?? ((host, opts) => dns.promises.lookup(host, opts));
+    const lookupFn =
+      options.dnsLookup ?? ((host, opts) => dns.promises.lookup(host, opts));
     const rawRecords = await lookupFn(hostname, { all: true });
-    const records: Array<{ address: string; family?: number }> = Array.isArray(rawRecords)
+    const records: Array<{ address: string; family?: number }> = Array.isArray(
+      rawRecords,
+    )
       ? rawRecords
       : rawRecords
         ? [rawRecords]
@@ -227,7 +241,9 @@ export async function resolveAndValidateDns(
       };
     }
 
-    const ips = records.map((r: { address: string; family?: number }) => r.address);
+    const ips = records.map(
+      (r: { address: string; family?: number }) => r.address,
+    );
 
     // 3. Kiểm tra từng IP đã phân giải được
     for (const ip of ips) {
@@ -247,7 +263,7 @@ export async function resolveAndValidateDns(
     return {
       isValid: false,
       ips: [],
-      reason: `DNS resolution failed for '${hostname}': ${error?.message || 'Lookup error'}`,
+      reason: `DNS resolution failed for '${hostname}': ${error?.message || "Lookup error"}`,
     };
   }
 }
@@ -264,7 +280,10 @@ export interface SafeRedirectOptions extends DnsValidationOptions {
   /**
    * Custom HTTP fetcher phục vụ kiểm thử unit test giả lập HTTP redirect
    */
-  httpFetcher?: (url: string) => Promise<{ status: number; headers: Record<string, string | string[] | undefined> }>;
+  httpFetcher?: (url: string) => Promise<{
+    status: number;
+    headers: Record<string, string | string[] | undefined>;
+  }>;
 }
 
 export interface SafeRedirectResult {
@@ -321,7 +340,7 @@ export async function resolveSafeRedirectChain(
     }
 
     // B. Kiểm tra Protocol
-    if (!['http:', 'https:'].includes(parsed.protocol)) {
+    if (!["http:", "https:"].includes(parsed.protocol)) {
       return {
         isValid: false,
         initialUrl: urlString,
@@ -371,7 +390,7 @@ export async function resolveSafeRedirectChain(
       if (options.httpFetcher) {
         const res = await options.httpFetcher(currentUrl);
         status = res.status;
-        const loc = res.headers['location'] || res.headers['Location'];
+        const loc = res.headers["location"] || res.headers["Location"];
         locationHeader = Array.isArray(loc) ? loc[0] : loc;
       } else {
         const controller = new AbortController();
@@ -379,12 +398,12 @@ export async function resolveSafeRedirectChain(
 
         try {
           const res = await fetch(currentUrl, {
-            method: 'HEAD',
-            redirect: 'manual',
+            method: "HEAD",
+            redirect: "manual",
             signal: controller.signal,
           });
           status = res.status;
-          locationHeader = res.headers.get('location') || undefined;
+          locationHeader = res.headers.get("location") || undefined;
         } finally {
           clearTimeout(timeoutId);
         }
@@ -397,7 +416,7 @@ export async function resolveSafeRedirectChain(
         redirectCount,
         redirectChain,
         ips: allIps,
-        reason: `Network fetch failed at '${currentUrl}': ${err?.message || 'Request error'}`,
+        reason: `Network fetch failed at '${currentUrl}': ${err?.message || "Request error"}`,
       };
     }
 

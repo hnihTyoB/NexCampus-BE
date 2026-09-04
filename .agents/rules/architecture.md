@@ -50,4 +50,3 @@
 - Không sửa migration cũ đã chia sẻ; tạo migration mới.
 - Không chạy `db:migrate:reset` nếu người dùng chưa yêu cầu rõ ràng.
 - Với tiền tệ, giữ Prisma `Decimal`; không âm thầm chuyển sang JavaScript float.
-

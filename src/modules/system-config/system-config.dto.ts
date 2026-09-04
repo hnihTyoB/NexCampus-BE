@@ -1,4 +1,4 @@
-import { SystemConfigCategory } from '../../common/constants/system-config.constant';
+import { SystemConfigCategory } from "../../common/constants/system-config.constant";
 
 export interface SystemConfigItemDto {
   id: string;

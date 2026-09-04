@@ -9,6 +9,7 @@
 ## 1. Migration Overview
 
 The migration to Dynamic RBAC is non-destructive:
+
 - It preserves all existing `users`, `roles`, `wallets`, `categories`, and `transactions`.
 - It introduces new relational tables: `permissions`, `role_permissions`, `audit_logs`.
 - It updates the existing `roles` table with `description` and `is_system` columns.
@@ -46,5 +47,6 @@ The migration to Dynamic RBAC is non-destructive:
 ## 3. Rollback Strategy
 
 In the unlikely event of an issue:
+
 1. Since the foreign keys on `role_permissions` and `permissions` are additive, existing queries on `User.roleId` continue to resolve normally.
 2. Route guards retain fallback authorization capabilities if required.

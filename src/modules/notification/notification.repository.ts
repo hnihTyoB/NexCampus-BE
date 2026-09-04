@@ -1,13 +1,13 @@
-import { prisma } from '../../database/prisma.client';
-import { SYSTEM_TARGET_ID } from '../../common/constants/audit-log.constant';
-import { EMAIL_MAX_ATTEMPTS } from '../../common/constants/notification.constant';
+import { prisma } from "../../database/prisma.client";
+import { SYSTEM_TARGET_ID } from "../../common/constants/audit-log.constant";
+import { EMAIL_MAX_ATTEMPTS } from "../../common/constants/notification.constant";
 import {
   ListNotificationsDto,
   ListEmailsDto,
   ListNotificationTemplatesDto,
   CreateNotificationTemplateDto,
   UpdateNotificationTemplateDto,
-} from './notification.dto';
+} from "./notification.dto";
 
 export interface ClaimedEmailRecord {
   id: string;
@@ -38,7 +38,7 @@ export class NotificationRepository {
     return prisma.$transaction([
       prisma.notification.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip,
         take: limit,
         select: {
@@ -95,7 +95,7 @@ export class NotificationRepository {
     return prisma.user.findMany({
       where: { isActive: true, deletedAt: null },
       select: { id: true },
-      orderBy: { id: 'asc' },
+      orderBy: { id: "asc" },
       take,
       ...(cursorId ? { skip: 1, cursor: { id: cursorId } } : {}),
     });
@@ -128,7 +128,7 @@ export class NotificationRepository {
       data: {
         userId: data.userId,
         type: data.type,
-        priority: data.priority ?? 'NORMAL',
+        priority: data.priority ?? "NORMAL",
         title: data.title,
         content: data.content,
         actionUrl: data.actionUrl ?? null,
@@ -145,7 +145,10 @@ export class NotificationRepository {
     templateData: any;
     status?: string;
   }) {
-    const validUserId = data.userId && /^[0-9a-fA-F-]{36}$/.test(data.userId) ? data.userId : null;
+    const validUserId =
+      data.userId && /^[0-9a-fA-F-]{36}$/.test(data.userId)
+        ? data.userId
+        : null;
     return prisma.emailNotification.create({
       data: {
         userId: validUserId,
@@ -153,7 +156,7 @@ export class NotificationRepository {
         subject: data.subject,
         templateKey: data.templateKey,
         templateData: data.templateData,
-        status: data.status ?? 'PENDING',
+        status: data.status ?? "PENDING",
       },
     });
   }
@@ -270,13 +273,15 @@ export class NotificationRepository {
 
     const where = {
       ...(status && { status }),
-      ...(toEmail && { toEmail: { contains: toEmail, mode: 'insensitive' as const } }),
+      ...(toEmail && {
+        toEmail: { contains: toEmail, mode: "insensitive" as const },
+      }),
     };
 
     return prisma.$transaction([
       prisma.emailNotification.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip,
         take: limit,
       }),
@@ -292,7 +297,7 @@ export class NotificationRepository {
     return prisma.emailNotification.update({
       where: { id },
       data: {
-        status: 'PENDING',
+        status: "PENDING",
         attempts: 0,
         lastError: null,
       },
@@ -312,9 +317,9 @@ export class NotificationRepository {
       ...(channel && { channels: { array_contains: channel } }),
       ...(search && {
         OR: [
-          { code: { contains: search, mode: 'insensitive' } },
-          { name: { contains: search, mode: 'insensitive' } },
-          { description: { contains: search, mode: 'insensitive' } },
+          { code: { contains: search, mode: "insensitive" } },
+          { name: { contains: search, mode: "insensitive" } },
+          { description: { contains: search, mode: "insensitive" } },
         ],
       }),
     };
@@ -322,7 +327,7 @@ export class NotificationRepository {
     return prisma.$transaction([
       prisma.notificationTemplate.findMany({
         where,
-        orderBy: [{ isSystem: 'desc' }, { createdAt: 'desc' }],
+        orderBy: [{ isSystem: "desc" }, { createdAt: "desc" }],
         skip,
         take: limit,
       }),
@@ -360,12 +365,16 @@ export class NotificationRepository {
       where: { id },
       data: {
         ...(data.name !== undefined && { name: data.name }),
-        ...(data.description !== undefined && { description: data.description }),
+        ...(data.description !== undefined && {
+          description: data.description,
+        }),
         ...(data.channels !== undefined && { channels: data.channels as any }),
         ...(data.subject !== undefined && { subject: data.subject }),
         ...(data.title !== undefined && { title: data.title }),
         ...(data.content !== undefined && { content: data.content }),
-        ...(data.variables !== undefined && { variables: data.variables as any }),
+        ...(data.variables !== undefined && {
+          variables: data.variables as any,
+        }),
         ...(data.isActive !== undefined && { isActive: data.isActive }),
       },
     });
@@ -399,4 +408,3 @@ export class NotificationRepository {
 }
 
 export const notificationRepository = new NotificationRepository();
-

@@ -1,15 +1,15 @@
-import { Prisma } from '@prisma/client';
-import { prisma } from '../../database/prisma.client';
-import { DEFAULT_MAINTENANCE_CONFIG } from '../../common/constants/maintenance.constant';
+import { Prisma } from "@prisma/client";
+import { prisma } from "../../database/prisma.client";
+import { DEFAULT_MAINTENANCE_CONFIG } from "../../common/constants/maintenance.constant";
 
 export class MaintenanceRepository {
-  async getConfig(key = 'DEFAULT') {
+  async getConfig(key = "DEFAULT") {
     return prisma.maintenanceConfig.findUnique({
       where: { key },
     });
   }
 
-  async getOrCreateDefaultConfig(key = 'DEFAULT') {
+  async getOrCreateDefaultConfig(key = "DEFAULT") {
     return prisma.maintenanceConfig.upsert({
       where: { key },
       update: {},

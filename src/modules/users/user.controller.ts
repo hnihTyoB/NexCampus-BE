@@ -1,6 +1,6 @@
-import { Request, Response, NextFunction } from 'express';
-import { UserService } from './user.service';
-import { UserQueryDto, CreateUserDto, UpdateUserDto } from './user.dto';
+import { Request, Response, NextFunction } from "express";
+import { UserService } from "./user.service";
+import { UserQueryDto, CreateUserDto, UpdateUserDto } from "./user.dto";
 
 export class UserController {
   private readonly service = new UserService();
@@ -65,7 +65,7 @@ export class UserController {
 
       res.json({
         success: true,
-        message: 'User soft-deleted successfully',
+        message: "User soft-deleted successfully",
       });
     } catch (error) {
       next(error);
@@ -83,28 +83,40 @@ export class UserController {
     }
   };
 
-  revokeUserSession = async (req: Request, res: Response, next: NextFunction) => {
+  revokeUserSession = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
     try {
       await this.service.revokeUserSession(
         req.params.id,
         req.params.sessionId,
         req.user?.id,
-        { ipAddress: req.ip, userAgent: req.headers['user-agent'] },
+        { ipAddress: req.ip, userAgent: req.headers["user-agent"] },
       );
-      res.json({ success: true, message: 'Phiên đăng nhập đã được thu hồi' });
+      res.json({ success: true, message: "Phiên đăng nhập đã được thu hồi" });
     } catch (error) {
       next(error);
     }
   };
 
-  revokeAllUserSessions = async (req: Request, res: Response, next: NextFunction) => {
+  revokeAllUserSessions = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
     try {
       const result = await this.service.revokeAllUserSessions(
         req.params.id,
         req.user?.id,
-        { ipAddress: req.ip, userAgent: req.headers['user-agent'] },
+        { ipAddress: req.ip, userAgent: req.headers["user-agent"] },
       );
-      res.json({ success: true, message: `Đã thu hồi ${result.count} phiên đăng nhập`, data: result });
+      res.json({
+        success: true,
+        message: `Đã thu hồi ${result.count} phiên đăng nhập`,
+        data: result,
+      });
     } catch (error) {
       next(error);
     }
@@ -121,15 +133,22 @@ export class UserController {
     }
   };
 
-  deleteUserDevice = async (req: Request, res: Response, next: NextFunction) => {
+  deleteUserDevice = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
     try {
       await this.service.deleteUserDevice(
         req.params.id,
         req.params.deviceId,
         req.user?.id,
-        { ipAddress: req.ip, userAgent: req.headers['user-agent'] },
+        { ipAddress: req.ip, userAgent: req.headers["user-agent"] },
       );
-      res.json({ success: true, message: 'Thiết bị đã được xóa khỏi tài khoản' });
+      res.json({
+        success: true,
+        message: "Thiết bị đã được xóa khỏi tài khoản",
+      });
     } catch (error) {
       next(error);
     }

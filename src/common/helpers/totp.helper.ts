@@ -1,8 +1,8 @@
-import crypto from 'node:crypto';
-import { hashToken } from './crypto.helper';
+import crypto from "node:crypto";
+import { hashToken } from "./crypto.helper";
 
 // Bảng mã chuẩn RFC 4648 Base32 (không phân biệt hoa thường, chỉ gồm A-Z và 2-7)
-const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
 /**
  * Mã hóa Buffer sang chuỗi Base32 chuẩn RFC 4648 (dùng cho Google Authenticator).
@@ -10,7 +10,7 @@ const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 export function base32Encode(buffer: Buffer): string {
   let bits = 0;
   let value = 0;
-  let output = '';
+  let output = "";
 
   for (let i = 0; i < buffer.length; i++) {
     value = (value << 8) | buffer[i];
@@ -34,7 +34,7 @@ export function base32Encode(buffer: Buffer): string {
  * Tự động loại bỏ khoảng trắng, dấu gạch nối và chuẩn hóa chữ in hoa.
  */
 export function base32Decode(base32: string): Buffer {
-  const clean = base32.replace(/[\s-=]/g, '').toUpperCase();
+  const clean = base32.replace(/[\s-=]/g, "").toUpperCase();
   let bits = 0;
   let value = 0;
   const bytes: number[] = [];
@@ -77,7 +77,7 @@ export function generateOtpauthUri(options: {
   const { issuer, accountName, secret } = options;
   const cleanIssuer = encodeURIComponent(issuer.trim());
   const cleanAccount = encodeURIComponent(accountName.trim());
-  const cleanSecret = secret.replace(/[\s-]/g, '').toUpperCase();
+  const cleanSecret = secret.replace(/[\s-]/g, "").toUpperCase();
 
   return `otpauth://totp/${cleanIssuer}:${cleanAccount}?secret=${cleanSecret}&issuer=${cleanIssuer}&algorithm=SHA1&digits=6&period=30`;
 }
@@ -99,7 +99,7 @@ export function generateTotpCode(
   timeBuffer.writeBigUInt64BE(BigInt(counter));
 
   // HMAC-SHA1
-  const hmac = crypto.createHmac('sha1', key).update(timeBuffer).digest();
+  const hmac = crypto.createHmac("sha1", key).update(timeBuffer).digest();
 
   // Dynamic truncation (RFC 4226 phần 5.4)
   const offset = hmac[hmac.length - 1] & 0x0f;
@@ -109,7 +109,9 @@ export function generateTotpCode(
     ((hmac[offset + 2] & 0xff) << 8) |
     (hmac[offset + 3] & 0xff);
 
-  const otp = (binaryCode % Math.pow(10, digits)).toString().padStart(digits, '0');
+  const otp = (binaryCode % Math.pow(10, digits))
+    .toString()
+    .padStart(digits, "0");
   return otp;
 }
 
@@ -135,10 +137,13 @@ export function verifyTotpCode(
       const stepTime = timestamp + step * period * 1000;
       const expectedOtp = generateTotpCode(secret, stepTime, period, 6);
 
-      const bufToken = Buffer.from(cleanToken, 'utf8');
-      const bufExpected = Buffer.from(expectedOtp, 'utf8');
+      const bufToken = Buffer.from(cleanToken, "utf8");
+      const bufExpected = Buffer.from(expectedOtp, "utf8");
 
-      if (bufToken.length === bufExpected.length && crypto.timingSafeEqual(bufToken, bufExpected)) {
+      if (
+        bufToken.length === bufExpected.length &&
+        crypto.timingSafeEqual(bufToken, bufExpected)
+      ) {
         return true;
       }
     }
@@ -164,7 +169,7 @@ export function generateBackupCodes(count = 8): {
   const hashedCodes: string[] = [];
 
   for (let i = 0; i < count; i++) {
-    const raw = crypto.randomBytes(4).toString('hex').toUpperCase();
+    const raw = crypto.randomBytes(4).toString("hex").toUpperCase();
     const formattedCode = `${raw.slice(0, 4)}-${raw.slice(4, 8)}`;
     plainCodes.push(formattedCode);
     hashedCodes.push(hashToken(formattedCode));

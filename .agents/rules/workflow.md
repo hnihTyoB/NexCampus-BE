@@ -38,4 +38,3 @@ pnpm run prisma:generate
   đưa vào diff.
 - Báo ngắn gọn: kết quả, file chính, verification đã chạy và phần chưa kiểm tra.
 - Cập nhật `.agents/memory.md` nếu có quyết định dài hạn mới.
-

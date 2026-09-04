@@ -1,6 +1,6 @@
-import { Request, Response, NextFunction } from 'express';
-import { ERROR_CODE } from '../common/errors/error-code';
-import { envConfig } from '../config/env.config';
+import { Request, Response, NextFunction } from "express";
+import { ERROR_CODE } from "../common/errors/error-code";
+import { envConfig } from "../config/env.config";
 
 export interface RateLimitOptions {
   windowMs?: number;
@@ -17,24 +17,28 @@ export interface RateLimitOptions {
 export function createRateLimiter(options: RateLimitOptions = {}) {
   const windowMs = options.windowMs ?? envConfig.rateLimit.windowMs;
   const maxRequests = options.maxRequests ?? envConfig.rateLimit.maxRequests;
-  const message = options.message ?? 'Too many requests, please try again later';
+  const message =
+    options.message ?? "Too many requests, please try again later";
   const requestCounts = new Map<string, { count: number; resetAt: number }>();
 
   // Dọn dẹp định kỳ các record đã hết hạn để ngăn ngừa rò rỉ bộ nhớ
-  const cleanupTimer = setInterval(() => {
-    const now = Date.now();
-    for (const [key, record] of requestCounts.entries()) {
-      if (now > record.resetAt) {
-        requestCounts.delete(key);
+  const cleanupTimer = setInterval(
+    () => {
+      const now = Date.now();
+      for (const [key, record] of requestCounts.entries()) {
+        if (now > record.resetAt) {
+          requestCounts.delete(key);
+        }
       }
-    }
-  }, 5 * 60 * 1000);
+    },
+    5 * 60 * 1000,
+  );
   cleanupTimer.unref();
 
   return (req: Request, res: Response, next: NextFunction): void => {
     const key = options.keyGenerator
       ? options.keyGenerator(req)
-      : (req.ip || req.socket.remoteAddress || 'unknown');
+      : req.ip || req.socket.remoteAddress || "unknown";
     const now = Date.now();
 
     const record = requestCounts.get(key);
@@ -43,9 +47,9 @@ export function createRateLimiter(options: RateLimitOptions = {}) {
       const resetAt = now + windowMs;
       requestCounts.set(key, { count: 1, resetAt });
 
-      res.setHeader('X-RateLimit-Limit', maxRequests);
-      res.setHeader('X-RateLimit-Remaining', Math.max(0, maxRequests - 1));
-      res.setHeader('X-RateLimit-Reset', Math.ceil(resetAt / 1000));
+      res.setHeader("X-RateLimit-Limit", maxRequests);
+      res.setHeader("X-RateLimit-Remaining", Math.max(0, maxRequests - 1));
+      res.setHeader("X-RateLimit-Reset", Math.ceil(resetAt / 1000));
 
       next();
       return;
@@ -55,13 +59,16 @@ export function createRateLimiter(options: RateLimitOptions = {}) {
     const remaining = Math.max(0, maxRequests - record.count);
     const resetTimeSeconds = Math.ceil(record.resetAt / 1000);
 
-    res.setHeader('X-RateLimit-Limit', maxRequests);
-    res.setHeader('X-RateLimit-Remaining', remaining);
-    res.setHeader('X-RateLimit-Reset', resetTimeSeconds);
+    res.setHeader("X-RateLimit-Limit", maxRequests);
+    res.setHeader("X-RateLimit-Remaining", remaining);
+    res.setHeader("X-RateLimit-Reset", resetTimeSeconds);
 
     if (record.count > maxRequests) {
-      const retryAfterSeconds = Math.max(1, Math.ceil((record.resetAt - now) / 1000));
-      res.setHeader('Retry-After', retryAfterSeconds);
+      const retryAfterSeconds = Math.max(
+        1,
+        Math.ceil((record.resetAt - now) / 1000),
+      );
+      res.setHeader("Retry-After", retryAfterSeconds);
       res.status(429).json({
         success: false,
         message,
@@ -80,7 +87,7 @@ export function createRateLimiter(options: RateLimitOptions = {}) {
 export const rateLimitMiddleware = createRateLimiter({
   windowMs: envConfig.rateLimit.windowMs,
   maxRequests: envConfig.rateLimit.maxRequests,
-  message: 'Too many requests, please try again later',
+  message: "Too many requests, please try again later",
 });
 
 /**
@@ -90,6 +97,5 @@ export const rateLimitMiddleware = createRateLimiter({
 export const authRateLimitMiddleware = createRateLimiter({
   windowMs: envConfig.rateLimit.authWindowMs,
   maxRequests: envConfig.rateLimit.authMaxRequests,
-  message: 'Too many authentication attempts, please try again later',
+  message: "Too many authentication attempts, please try again later",
 });
-

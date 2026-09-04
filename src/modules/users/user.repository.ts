@@ -1,6 +1,6 @@
-import { Prisma } from '@prisma/client';
-import { prisma } from '../../database/prisma.client';
-import { UserQueryDto } from './user.dto';
+import { Prisma } from "@prisma/client";
+import { prisma } from "../../database/prisma.client";
+import { UserQueryDto } from "./user.dto";
 
 const userSelect = {
   id: true,
@@ -27,16 +27,18 @@ export class UserRepository {
       fullName,
       roleName,
       isActive,
-      sortBy = 'createdAt',
-      order = 'desc',
+      sortBy = "createdAt",
+      order = "desc",
       page = 1,
       limit = 20,
     } = query;
 
     const where: Prisma.UserWhereInput = {
       deletedAt: null,
-      ...(email ? { email: { contains: email, mode: 'insensitive' } } : {}),
-      ...(fullName ? { fullName: { contains: fullName, mode: 'insensitive' } } : {}),
+      ...(email ? { email: { contains: email, mode: "insensitive" } } : {}),
+      ...(fullName
+        ? { fullName: { contains: fullName, mode: "insensitive" } }
+        : {}),
       ...(isActive !== undefined ? { isActive } : {}),
       ...(roleName ? { role: { name: roleName } } : {}),
     };
@@ -97,7 +99,10 @@ export class UserRepository {
     });
   }
 
-  update(id: string, data: { isActive?: boolean; fullName?: string; phoneNumber?: string }) {
+  update(
+    id: string,
+    data: { isActive?: boolean; fullName?: string; phoneNumber?: string },
+  ) {
     return prisma.user.update({
       where: { id },
       data,
@@ -126,7 +131,7 @@ export class UserRepository {
   findSessionsByUserId(userId: string) {
     return prisma.refreshToken.findMany({
       where: { userId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -153,7 +158,7 @@ export class UserRepository {
   findDevicesByUserId(userId: string) {
     return prisma.userDevice.findMany({
       where: { userId },
-      orderBy: { lastLoginAt: 'desc' },
+      orderBy: { lastLoginAt: "desc" },
     });
   }
 
@@ -185,7 +190,7 @@ export class UserRepository {
         actorId: data.actorId,
         action: data.action,
         targetType: data.targetType,
-        targetId: data.targetId ?? 'SYSTEM', // AuditLog.targetId is required String in schema
+        targetId: data.targetId ?? "SYSTEM", // AuditLog.targetId is required String in schema
         details: data.details as any,
         ipAddress: data.ipAddress,
         userAgent: data.userAgent,

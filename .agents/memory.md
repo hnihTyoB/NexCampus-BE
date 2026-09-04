@@ -155,13 +155,30 @@
   - **Session Invalidation & Anti-Hijacking (Cách 1)**: Khi người dùng Bật 2FA (`enable2FA`) hoặc Tắt 2FA (`disable2FA`), hệ thống tự động gọi `revokeOtherSessions(userId, currentRefreshToken)` để xóa toàn bộ refresh token của các thiết bị/trình duyệt khác trong CSDL và giải phóng bộ nhớ đệm quyền (`permissionCacheService.invalidateUser`). Phiên làm việc trên thiết bị hiện tại được bảo lưu nguyên vẹn, trong khi tất cả phiên cũ/bị chiếm đoạt trên các máy khác sẽ lập tức bị đá văng và buộc phải đăng nhập lại từ đầu qua thử thách 2FA.
   - **Database Migration**: `prisma/migrations/20260903000000_add_user_two_factor/migration.sql` bổ sung 3 cột tùy chọn (`two_factor_enabled`, `two_factor_secret`, `two_factor_backup_codes`) vào bảng `users`, bảo đảm tương thích ngược 100%.
   - **OpenAPI 3.0 & Testing**: Tự động sinh tài liệu Swagger UI và bảo đảm bởi 29 automated test cases (12 unit tests trong `tests/totp-helper.test.ts` và 17 integration tests trong `tests/auth-2fa.test.ts`, 100% pass, build và lint 0 warnings/errors).
-
-
-
-
-
-
-
-
-
-
+- **Google OAuth2 Login & Account Linking (2026-09-04)**:
+  - Triển khai toàn diện tính năng đăng nhập và liên kết tài khoản bằng Google OAuth2 (Google Sign-In button, One-Tap, Mobile App credentials, và standard OAuth2 redirect code flow).
+  - **Zero External Dependencies**: Giao tiếp trực tiếp với các endpoint chính thức của Google (`oauth2.googleapis.com/tokeninfo` và `oauth2.googleapis.com/token`) qua native `fetch` của Node.js 22, triệt tiêu phụ thuộc các thư viện nặng và rủi ro chuỗi cung ứng.
+  - **Zero 2FA Bypass**: Nếu tài khoản liên kết Google đã kích hoạt Two-Factor Authentication (`twoFactorEnabled === true`), hệ thống bắt buộc chuyển sang thử thách 2FA (`requires2FA: true, tempToken: ...`), ngăn chặn hoàn toàn việc bypass 2FA thông qua social login.
+  - **Auto Email Activation & Account Linking**:
+    - Khi đăng nhập lần đầu với Google: tự động tạo user mới với vai trò mặc định `USER` và liên kết `UserSocial(provider='GOOGLE', providerUserId=sub)`.
+    - Khi user đã tồn tại qua email thông thường: tự động liên kết tài khoản mạng xã hội `UserSocial` và kích hoạt tài khoản (`isActive = true`) nếu user trước đó chưa kích hoạt email.
+    - Chặn đăng nhập đối với tài khoản đã bị soft-deleted (`deletedAt !== null`).
+  - **Centralized Constants & Clean Layering**:
+    - Quản lý nhà cung cấp tập trung qua `AUTH_PROVIDER.GOOGLE` (`src/common/constants/auth.constant.ts`).
+    - Ghi nhận Audit Log tập trung cho cả 2 hành động: `LOGIN_GOOGLE` và `LINK_SOCIAL_ACCOUNT`.
+    - Định nghĩa mã lỗi tập trung `ERROR_CODE.GOOGLE_AUTH_FAILED`.
+  - **2 Endpoints & Rate Limiting**:
+    1. `GET /api/v1/auth/google/url`: Sinh Google OAuth2 authorization URL với `clientId`, `redirectUri`, `state`.
+    2. `POST /api/v1/auth/google`: Đăng nhập/liên kết tài khoản với `idToken` hoặc `{ code, redirectUri }`, áp dụng `authRateLimitMiddleware` (30 req/15 phút).
+  - **OpenAPI 3.0 & Testing**: Tự động sinh Swagger documentation tại `/api/docs` và bao phủ 21 automated test cases trong `tests/auth-google.test.ts` (100% pass, zero regressions, build và lint 0 errors).
+- **Profile Social Account Management & Anti-Lockout Defense (2026-09-04)**:
+  - Bổ sung 3 APIs chuyên dụng quản lý liên kết tài khoản mạng xã hội cho trang cá nhân (Profile Settings) theo chuẩn layered architecture:
+    1. `GET /api/v1/auth/social` (`authMiddleware`): Lấy danh sách các tài khoản mạng xã hội đang liên kết của người dùng hiện tại (ID, provider, providerUserId, email, name, avatar, createdAt).
+    2. `POST /api/v1/auth/social/link` (`authMiddleware`, `authRateLimitMiddleware`): Chủ động liên kết tài khoản Google mới với tài khoản đang đăng nhập qua `idToken` hoặc `{ code, redirectUri }`.
+       - **Collision Guard**: Kiểm tra tài khoản Google đã liên kết với người dùng nào khác trong hệ thống chưa (`findUserSocialByProvider`). Nếu đã liên kết với user khác, chặn lại ngay với mã lỗi `409 Conflict` (`ERROR_CODE.DUPLICATE_ENTRY`).
+       - Tự động ghi `AuditLog` với action `LINK_SOCIAL_ACCOUNT`.
+    3. `DELETE /api/v1/auth/social/:provider` (`authMiddleware`, `authRateLimitMiddleware`): Hủy liên kết tài khoản mạng xã hội khỏi tài khoản người dùng.
+       - **Strict Anti-Lockout Defense**: Nếu người dùng đăng ký ban đầu thuần túy qua Google (`user.password === null`) và chỉ có duy nhất 1 tài khoản mạng xã hội (`countUserSocialAccounts <= 1`), hệ thống từ chối hủy liên kết với `400 Bad Request` (`ERROR_CODE.VALIDATION_ERROR`) kèm thông báo yêu cầu thiết lập mật khẩu trước khi hủy liên kết để ngăn chặn nguy cơ người dùng tự khóa vĩnh viễn tài khoản của chính mình.
+       - Tự động ghi `AuditLog` với action `UNLINK_SOCIAL_ACCOUNT`.
+  - **Database Migration & Seeding**: Đã chạy triển khai toàn bộ 11 migrations qua `pnpm run db:migrate:deploy` và nạp seed dữ liệu mẫu qua `pnpm run db:seed` thành công trên môi trường Supabase PostgreSQL mới.
+  - **Automated Verification**: Mở rộng `tests/auth-google.test.ts` thêm 10 bài test tích hợp và kiểm thử OpenAPI; toàn bộ 232 automated tests trên toàn dự án đều pass 100%, TypeScript build và ESLint sạch 0 warnings / 0 errors.

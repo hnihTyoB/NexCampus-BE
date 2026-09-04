@@ -7,7 +7,7 @@
 
 export interface MaintenanceResponsePayload {
   success: false;
-  code: 'SYSTEM_MAINTENANCE';
+  code: "SYSTEM_MAINTENANCE";
   message: string;
   data: {
     title: string;
@@ -19,7 +19,7 @@ export interface MaintenanceResponsePayload {
 
 export interface ClientMaintenanceOptions {
   maintenanceRedirectPath?: string;
-  onMaintenanceDetected?: (data: MaintenanceResponsePayload['data']) => void;
+  onMaintenanceDetected?: (data: MaintenanceResponsePayload["data"]) => void;
 }
 
 /**
@@ -31,7 +31,7 @@ export function isMaintenanceError(
 ): error is { response: { status: number; data: MaintenanceResponsePayload } } {
   return (
     error?.response?.status === 503 &&
-    error?.response?.data?.code === 'SYSTEM_MAINTENANCE'
+    error?.response?.data?.code === "SYSTEM_MAINTENANCE"
   );
 }
 

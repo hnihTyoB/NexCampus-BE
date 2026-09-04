@@ -44,6 +44,7 @@ Every financial operation must strictly preserve mathematical and transactional 
 ### 3. Absolute Safety Rules
 
 The agent must **NEVER**:
+
 - Delete live application data or truncate tables.
 - Drop or reset the database (`prisma migrate reset` / `db:migrate:reset`).
 - Apply destructive migrations that drop columns or tables without explicit user consent.
@@ -53,6 +54,7 @@ The agent must **NEVER**:
 - Disable security controls or rate limiters permanently.
 
 **STOP and request user confirmation ONLY when:**
+
 1. A destructive database schema migration is required.
 2. Live production data or external services could be impacted.
 3. Secrets, external API credentials, or `.env` configurations need manual intervention.
@@ -84,6 +86,7 @@ flowchart TD
 Inspect the complete repository without modifying any code. Evaluate all components against the five review axes (Correctness, Readability, Architecture, Security, Performance).
 
 #### Inspection Matrix:
+
 1. **Architecture & Clean Layering**:
    - Strict separation: `route -> validation -> controller -> service -> repository`.
    - No business logic or database queries in controllers or routes.
@@ -126,14 +129,17 @@ Inspect the complete repository without modifying any code. Evaluate all compone
 Convert all audit findings into a structured, prioritized technical backlog.
 
 #### Severity Definitions:
+
 - **P0 - Critical**: Potential data loss, financial calculation errors, critical security vulnerabilities, broken authentication, or system crashes.
 - **P1 - High**: Production bugs, business logic errors, authorization / IDOR bugs, unhandled exceptions, severe performance bottlenecks.
 - **P2 - Medium**: Edge-case bugs, in-memory leaks, missing parameter validation, timezone boundary inconsistencies, minor race conditions.
 - **P3 - Low**: Code quality, dead code removal, duplicate code refactoring, missing automated tests.
 
 #### Backlog Item Format:
+
 ```markdown
 ### `[ID]` Finding Title
+
 - **ID**: P0-01 / P1-01 / P2-01 / P3-01
 - **Severity**: P0 | P1 | P2 | P3
 - **Module**: Auth | Users | Wallets | Transactions | Budgets | Database | Common
@@ -166,6 +172,7 @@ Before modifying code, independently verify every **P0** and **P1** finding. Do 
 Remediate all `CONFIRMED` **P0** issues with surgical, minimal, and safe changes.
 
 #### Remediation Guidelines:
+
 - **Minimal Safe Diff**: Change only what is necessary to resolve the defect.
 - **Preserve Architecture**: Follow existing project conventions and layered design.
 - **Correctness Over Speed**: Ensure financial formulas, transactions, and token flows are completely robust.
@@ -195,6 +202,7 @@ Verify all P0 fixes using automated test suites and typechecks.
 ### STEP 6 — FIX P1 ISSUES
 
 Once all P0 fixes are tested and passing, proceed to fix all `CONFIRMED` **P1** issues following the same discipline:
+
 - Resolve database indexing and missing migration baselines.
 - Hash sensitive tokens before database persistence.
 - Enforce token lifecycle and session revocation.
@@ -205,6 +213,7 @@ Once all P0 fixes are tested and passing, proceed to fix all `CONFIRMED` **P1** 
 ### STEP 7 — TEST P1 FIXES
 
 Run the full validation suite:
+
 - TypeScript compilation (`pnpm build`).
 - Linter checks (`pnpm run lint`).
 - Unit & Integration test suite (`pnpm test`).
@@ -217,6 +226,7 @@ Ensure zero regressions across both backend and frontend contracts.
 ### STEP 8 — COMPLETE RE-AUDIT
 
 Perform an independent secondary audit across the entire codebase to verify:
+
 - Were all original P0 and P1 issues completely resolved?
 - Did any fix introduce new bugs or regressions?
 - Are financial invariants and precision intact?
@@ -228,6 +238,7 @@ Perform an independent secondary audit across the entire codebase to verify:
 ### STEP 9 — SECONDARY FIXES & CONVERGENCE LOOP
 
 If the re-audit uncovers new `CONFIRMED` P0 or P1 issues introduced during remediation:
+
 1. Re-enter the **VERIFY → FIX → TEST → RE-AUDIT** cycle.
 2. Limit iterations to prevent circular edits.
 3. Stop when:
@@ -252,15 +263,19 @@ Generate a comprehensive audit and remediation report saved to:
 **Branch / Commit**: <git commit / branch>
 
 ## Executive Summary
+
 High-level overview of findings, fixed vulnerabilities, financial accuracy improvements, and system health status.
 
 ## Initial Findings Summary
+
 Table showing count of P0, P1, P2, P3 findings discovered during the initial audit.
 
 ## Resolved & Fixed Issues
 
 ### P0 Fixes
+
 For each fixed P0 issue:
+
 - **Finding ID**: P0-XX
 - **Title**: ...
 - **Root Cause**: ...
@@ -270,18 +285,23 @@ For each fixed P0 issue:
 - **Verification Result**: CONFIRMED RESOLVED
 
 ### P1 Fixes
+
 (Same structure as P0)
 
 ## Re-Audit & Verification Results
+
 Detailed comparison between initial state and post-remediation state.
 
 ## Remaining & Deferred Issues (P2 / P3)
+
 List of non-blocking P2 and P3 issues scheduled for future maintenance.
 
 ## Changed Files Summary
+
 List of all modified and created files with brief explanations.
 
 ## Risk Assessment & Deployment Notes
+
 Operational guidance, database migration instructions, and environment variable requirements for production deployment.
 ```
 
@@ -290,6 +310,7 @@ Operational guidance, database migration instructions, and environment variable 
 ## Final Executive Output
 
 Upon completing the entire workflow, the agent must output a concise summary in the conversation containing:
+
 - **P0 Fixed**: Number and list of resolved critical issues.
 - **P1 Fixed**: Number and list of resolved high-priority issues.
 - **P2 / P3 Remaining**: Summary of deferred minor items.

@@ -6,9 +6,9 @@ import {
   NOTIFICATION_TYPE,
   NOTIFICATION_PRIORITY,
   DEFAULT_EMAIL_SUBJECTS,
-} from '../constants/notification.constant';
-import { renderTemplateString } from '../helpers/template.helper';
-import { notificationRepository } from '../../modules/notification/notification.repository';
+} from "../constants/notification.constant";
+import { renderTemplateString } from "../helpers/template.helper";
+import { notificationRepository } from "../../modules/notification/notification.repository";
 
 export interface WebNotificationPayload {
   type: string;
@@ -50,12 +50,14 @@ class NotificationDispatcher {
     const tasks: Promise<unknown>[] = [];
 
     if (event.channels.includes(NOTIFICATION_CHANNEL.WEB)) {
-      if (!event.web) throw new Error('web payload is required for WEB channel');
+      if (!event.web)
+        throw new Error("web payload is required for WEB channel");
       tasks.push(this.dispatchWeb(event.userId, event.web));
     }
 
     if (event.channels.includes(NOTIFICATION_CHANNEL.EMAIL)) {
-      if (!event.email) throw new Error('email payload is required for EMAIL channel');
+      if (!event.email)
+        throw new Error("email payload is required for EMAIL channel");
       tasks.push(this.dispatchEmail(event.userId, event.email));
     }
 
@@ -67,22 +69,30 @@ class NotificationDispatcher {
    * Tự động thay thế các biến {{variableName}} vào title/content cho WEB và subject/content cho EMAIL.
    */
   async sendWithTemplate(options: SendWithTemplateOptions): Promise<void> {
-    const { userId, templateCode, variables, toEmail, actionUrl, metadata } = options;
+    const { userId, templateCode, variables, toEmail, actionUrl, metadata } =
+      options;
 
-    const template = await notificationRepository.findTemplateByCode(templateCode);
+    const template =
+      await notificationRepository.findTemplateByCode(templateCode);
 
     if (!template || !template.isActive) {
-      console.warn(`[NotificationDispatcher] Template '${templateCode}' not found or inactive.`);
+      console.warn(
+        `[NotificationDispatcher] Template '${templateCode}' not found or inactive.`,
+      );
       return;
     }
 
     const templateChannels = (template.channels as string[]) || [];
-    const targetChannels = options.channels || (templateChannels as NotificationChannel[]);
+    const targetChannels =
+      options.channels || (templateChannels as NotificationChannel[]);
 
     const tasks: Promise<unknown>[] = [];
 
     if (targetChannels.includes(NOTIFICATION_CHANNEL.WEB)) {
-      const title = renderTemplateString(template.title || template.name, variables);
+      const title = renderTemplateString(
+        template.title || template.name,
+        variables,
+      );
       const content = renderTemplateString(template.content, variables);
       tasks.push(
         this.dispatchWeb(userId, {
@@ -104,7 +114,10 @@ class NotificationDispatcher {
       }
 
       if (emailAddress) {
-        const subject = renderTemplateString(template.subject || template.name, variables);
+        const subject = renderTemplateString(
+          template.subject || template.name,
+          variables,
+        );
         tasks.push(
           this.dispatchEmail(userId, {
             toEmail: emailAddress,
@@ -119,7 +132,10 @@ class NotificationDispatcher {
     await Promise.all(tasks);
   }
 
-  private async dispatchWeb(userId: string, payload: WebNotificationPayload): Promise<void> {
+  private async dispatchWeb(
+    userId: string,
+    payload: WebNotificationPayload,
+  ): Promise<void> {
     await notificationRepository.createSingleNotification({
       userId,
       type: payload.type,
@@ -131,12 +147,15 @@ class NotificationDispatcher {
     });
   }
 
-  private async dispatchEmail(userId: string, payload: EmailNotificationPayload): Promise<void> {
+  private async dispatchEmail(
+    userId: string,
+    payload: EmailNotificationPayload,
+  ): Promise<void> {
     const subject =
       payload.subject ||
-      (payload.templateData['subject'] as string) ||
+      (payload.templateData["subject"] as string) ||
       DEFAULT_EMAIL_SUBJECTS[payload.templateKey] ||
-      'Thông báo từ hệ thống';
+      "Thông báo từ hệ thống";
 
     await notificationRepository.createSingleEmailNotification({
       userId,
@@ -156,11 +175,14 @@ class NotificationDispatcher {
     type: string,
     title: string,
     content: string,
-    options?: { priority?: string; actionUrl?: string; metadata?: Record<string, unknown> },
+    options?: {
+      priority?: string;
+      actionUrl?: string;
+      metadata?: Record<string, unknown>;
+    },
   ): Promise<void> {
     await this.dispatchWeb(userId, { type, title, content, ...options });
   }
 }
 
 export const notificationDispatcher = new NotificationDispatcher();
-

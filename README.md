@@ -61,6 +61,7 @@ pnpm run db:seed
 ```
 
 > **Tài khoản Quản trị viên mặc định:**
+>
 > - **Email**: `admin@template.local`
 > - **Mật khẩu**: `Admin@123456`
 
@@ -95,5 +96,5 @@ pnpm run db:seed
 ## Tài liệu API (Swagger UI)
 
 Khi server đang chạy, truy cập tài liệu API trực quan tại:
-- **URL**: `http://localhost:8888/api/docs` (hoặc theo cổng `PORT` cấu hình trong `.env`)
 
+- **URL**: `http://localhost:8888/api/docs` (hoặc theo cổng `PORT` cấu hình trong `.env`)

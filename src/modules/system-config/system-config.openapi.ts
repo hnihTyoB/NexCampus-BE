@@ -1,29 +1,36 @@
-import { openapiRegistry } from '../../config/openapi/openapi.registry';
+import { openapiRegistry } from "../../config/openapi/openapi.registry";
 import {
   createSystemConfigSchema,
   updateSystemConfigSchema,
   toggleFeatureFlagSchema,
   configKeyParamSchema,
   querySystemConfigsSchema,
-} from './system-config.validation';
-import { z } from 'zod';
+} from "./system-config.validation";
+import { z } from "zod";
 
 export function registerSystemConfigOpenApi(): void {
-  openapiRegistry.register('CreateSystemConfigRequest', createSystemConfigSchema);
-  openapiRegistry.register('UpdateSystemConfigRequest', updateSystemConfigSchema);
-  openapiRegistry.register('ToggleFeatureFlagRequest', toggleFeatureFlagSchema);
+  openapiRegistry.register(
+    "CreateSystemConfigRequest",
+    createSystemConfigSchema,
+  );
+  openapiRegistry.register(
+    "UpdateSystemConfigRequest",
+    updateSystemConfigSchema,
+  );
+  openapiRegistry.register("ToggleFeatureFlagRequest", toggleFeatureFlagSchema);
 
   // GET /system/public
   openapiRegistry.registerPath({
-    method: 'get',
-    path: '/system/public',
-    tags: ['System Configuration & Feature Flags'],
-    summary: 'Lấy các cấu hình công khai & cờ tính năng (Dành cho Frontend / Web / App Bootstrap)',
+    method: "get",
+    path: "/system/public",
+    tags: ["System Configuration & Feature Flags"],
+    summary:
+      "Lấy các cấu hình công khai & cờ tính năng (Dành cho Frontend / Web / App Bootstrap)",
     responses: {
       200: {
-        description: 'Lấy cấu hình công khai thành công',
+        description: "Lấy cấu hình công khai thành công",
         content: {
-          'application/json': {
+          "application/json": {
             schema: z.object({
               success: z.boolean().openapi({ example: true }),
               data: z.array(
@@ -43,17 +50,18 @@ export function registerSystemConfigOpenApi(): void {
 
   // GET /system/configs
   openapiRegistry.registerPath({
-    method: 'get',
-    path: '/system/configs',
-    tags: ['System Configuration & Feature Flags'],
-    summary: 'Danh sách toàn bộ cấu hình hệ thống & cờ tính năng (Dành cho Quản trị viên)',
+    method: "get",
+    path: "/system/configs",
+    tags: ["System Configuration & Feature Flags"],
+    summary:
+      "Danh sách toàn bộ cấu hình hệ thống & cờ tính năng (Dành cho Quản trị viên)",
     security: [{ BearerAuth: [] }],
     request: { query: querySystemConfigsSchema },
     responses: {
       200: {
-        description: 'Lấy danh sách cấu hình thành công',
+        description: "Lấy danh sách cấu hình thành công",
         content: {
-          'application/json': {
+          "application/json": {
             schema: z.object({
               success: z.boolean().openapi({ example: true }),
               data: z.array(
@@ -72,23 +80,23 @@ export function registerSystemConfigOpenApi(): void {
           },
         },
       },
-      403: { description: 'Không có quyền SYSTEM_CONFIG_READ' },
+      403: { description: "Không có quyền SYSTEM_CONFIG_READ" },
     },
   });
 
   // GET /system/configs/:key
   openapiRegistry.registerPath({
-    method: 'get',
-    path: '/system/configs/{key}',
-    tags: ['System Configuration & Feature Flags'],
-    summary: 'Chi tiết cấu hình hệ thống theo Key',
+    method: "get",
+    path: "/system/configs/{key}",
+    tags: ["System Configuration & Feature Flags"],
+    summary: "Chi tiết cấu hình hệ thống theo Key",
     security: [{ BearerAuth: [] }],
     request: { params: configKeyParamSchema },
     responses: {
       200: {
-        description: 'Lấy chi tiết cấu hình thành công',
+        description: "Lấy chi tiết cấu hình thành công",
         content: {
-          'application/json': {
+          "application/json": {
             schema: z.object({
               success: z.boolean().openapi({ example: true }),
               data: z.object({
@@ -103,25 +111,27 @@ export function registerSystemConfigOpenApi(): void {
           },
         },
       },
-      404: { description: 'Không tìm thấy cấu hình' },
+      404: { description: "Không tìm thấy cấu hình" },
     },
   });
 
   // POST /system/configs
   openapiRegistry.registerPath({
-    method: 'post',
-    path: '/system/configs',
-    tags: ['System Configuration & Feature Flags'],
-    summary: 'Tạo mới hoặc cập nhật cấu hình hệ thống',
+    method: "post",
+    path: "/system/configs",
+    tags: ["System Configuration & Feature Flags"],
+    summary: "Tạo mới hoặc cập nhật cấu hình hệ thống",
     security: [{ BearerAuth: [] }],
     request: {
-      body: { content: { 'application/json': { schema: createSystemConfigSchema } } },
+      body: {
+        content: { "application/json": { schema: createSystemConfigSchema } },
+      },
     },
     responses: {
       201: {
-        description: 'Tạo cấu hình thành công',
+        description: "Tạo cấu hình thành công",
         content: {
-          'application/json': {
+          "application/json": {
             schema: z.object({
               success: z.boolean().openapi({ example: true }),
               data: z.record(z.unknown()),
@@ -134,20 +144,22 @@ export function registerSystemConfigOpenApi(): void {
 
   // PUT /system/configs/:key
   openapiRegistry.registerPath({
-    method: 'put',
-    path: '/system/configs/{key}',
-    tags: ['System Configuration & Feature Flags'],
-    summary: 'Cập nhật giá trị cấu hình hệ thống',
+    method: "put",
+    path: "/system/configs/{key}",
+    tags: ["System Configuration & Feature Flags"],
+    summary: "Cập nhật giá trị cấu hình hệ thống",
     security: [{ BearerAuth: [] }],
     request: {
       params: configKeyParamSchema,
-      body: { content: { 'application/json': { schema: updateSystemConfigSchema } } },
+      body: {
+        content: { "application/json": { schema: updateSystemConfigSchema } },
+      },
     },
     responses: {
       200: {
-        description: 'Cập nhật cấu hình thành công',
+        description: "Cập nhật cấu hình thành công",
         content: {
-          'application/json': {
+          "application/json": {
             schema: z.object({
               success: z.boolean().openapi({ example: true }),
               data: z.record(z.unknown()),
@@ -160,23 +172,27 @@ export function registerSystemConfigOpenApi(): void {
 
   // PATCH /system/features/:key/toggle
   openapiRegistry.registerPath({
-    method: 'patch',
-    path: '/system/features/{key}/toggle',
-    tags: ['System Configuration & Feature Flags'],
-    summary: 'Bật / Tắt nhanh một Feature Flag cụ thể',
+    method: "patch",
+    path: "/system/features/{key}/toggle",
+    tags: ["System Configuration & Feature Flags"],
+    summary: "Bật / Tắt nhanh một Feature Flag cụ thể",
     security: [{ BearerAuth: [] }],
     request: {
       params: configKeyParamSchema,
-      body: { content: { 'application/json': { schema: toggleFeatureFlagSchema } } },
+      body: {
+        content: { "application/json": { schema: toggleFeatureFlagSchema } },
+      },
     },
     responses: {
       200: {
-        description: 'Chuyển đổi cờ tính năng thành công',
+        description: "Chuyển đổi cờ tính năng thành công",
         content: {
-          'application/json': {
+          "application/json": {
             schema: z.object({
               success: z.boolean().openapi({ example: true }),
-              message: z.string().openapi({ example: 'Cập nhật Feature Flag thành công' }),
+              message: z
+                .string()
+                .openapi({ example: "Cập nhật Feature Flag thành công" }),
               data: z.record(z.unknown()),
             }),
           },
@@ -187,20 +203,22 @@ export function registerSystemConfigOpenApi(): void {
 
   // DELETE /system/configs/:key
   openapiRegistry.registerPath({
-    method: 'delete',
-    path: '/system/configs/{key}',
-    tags: ['System Configuration & Feature Flags'],
-    summary: 'Xóa một cấu hình hệ thống',
+    method: "delete",
+    path: "/system/configs/{key}",
+    tags: ["System Configuration & Feature Flags"],
+    summary: "Xóa một cấu hình hệ thống",
     security: [{ BearerAuth: [] }],
     request: { params: configKeyParamSchema },
     responses: {
       200: {
-        description: 'Xóa cấu hình thành công',
+        description: "Xóa cấu hình thành công",
         content: {
-          'application/json': {
+          "application/json": {
             schema: z.object({
               success: z.boolean().openapi({ example: true }),
-              message: z.string().openapi({ example: 'Xóa cấu hình thành công' }),
+              message: z
+                .string()
+                .openapi({ example: "Xóa cấu hình thành công" }),
             }),
           },
         },

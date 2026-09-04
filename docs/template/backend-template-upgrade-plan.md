@@ -2,7 +2,7 @@
 
 **Repository**: `template-be`  
 **Date**: 2026-08-24  
-**Target Architecture**: Modular Layered Monolith with Reusable Enterprise Infrastructure  
+**Target Architecture**: Modular Layered Monolith with Reusable Enterprise Infrastructure
 
 ---
 
@@ -39,6 +39,7 @@
 ## 2. File Modification & Creation Matrix
 
 ### [CREATE]
+
 - `prisma/migrations/20260824000000_add_system_configs_and_feature_flags/migration.sql` (if schema migration needed or unified schema)
 - `src/common/constants/system-config.constant.ts`
 - `src/middlewares/request-id.middleware.ts`
@@ -60,6 +61,7 @@
 - `docs/template/backend-template-completion.md`
 
 ### [MODIFY]
+
 - `prisma/schema.prisma` (Add `SystemConfig` / `FeatureFlag` model)
 - `src/common/constants/permission.constant.ts` (Add `SYSTEM_CONFIG_READ`, `SYSTEM_CONFIG_MANAGE`)
 - `src/common/constants/audit-log.constant.ts` (Add `SYSTEM_CONFIG_UPDATED`, `FEATURE_FLAG_TOGGLED`)

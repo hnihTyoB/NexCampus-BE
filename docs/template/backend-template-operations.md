@@ -1,7 +1,7 @@
 # Backend Template Operations & Deployment Guide
 
 **Repository**: `template-be`  
-**Target Environments**: Docker, Docker Compose, Kubernetes, Linux VM, Cloud Run  
+**Target Environments**: Docker, Docker Compose, Kubernetes, Linux VM, Cloud Run
 
 ---
 
@@ -87,19 +87,20 @@ pnpm run prisma:studio     # Open web database viewer
 
 ## 3. Observability & Health Probes
 
-| Endpoint | Probe Type | Purpose | Expected Status |
-|---|---|---|---|
-| `GET /api/v1/health` | Liveness | Basic process heartbeat and uptime | 200 OK |
-| `GET /api/v1/health/liveness` | Liveness | Kubernetes liveness probe | 200 OK |
-| `GET /api/v1/health/readiness` | Readiness | Deep checks for PostgreSQL query, Redis ping, heap/RSS memory | 200 OK (503 if DB down) |
-| `GET /api/v1/maintenance/public` | Public Status | Frontend maintenance banner & ETA query | 200 OK |
-| `GET /api/v1/system/public` | Public Config | Frontend bootstrap feature flags and settings | 200 OK |
+| Endpoint                         | Probe Type    | Purpose                                                       | Expected Status         |
+| -------------------------------- | ------------- | ------------------------------------------------------------- | ----------------------- |
+| `GET /api/v1/health`             | Liveness      | Basic process heartbeat and uptime                            | 200 OK                  |
+| `GET /api/v1/health/liveness`    | Liveness      | Kubernetes liveness probe                                     | 200 OK                  |
+| `GET /api/v1/health/readiness`   | Readiness     | Deep checks for PostgreSQL query, Redis ping, heap/RSS memory | 200 OK (503 if DB down) |
+| `GET /api/v1/maintenance/public` | Public Status | Frontend maintenance banner & ETA query                       | 200 OK                  |
+| `GET /api/v1/system/public`      | Public Config | Frontend bootstrap feature flags and settings                 | 200 OK                  |
 
 ---
 
 ## 4. Graceful Shutdown & Zero-Downtime Rollouts
 
 The backend implements clean lifecycle termination on `SIGINT` / `SIGTERM`:
+
 1. Closes HTTP listener (stops accepting new connections, drains active requests).
 2. Stops background polling workers (`EmailWorker`).
 3. Closes BullMQ workers and queues (`WebhookWorker`, `WebhookQueue`).

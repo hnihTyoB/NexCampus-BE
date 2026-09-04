@@ -1,7 +1,7 @@
-import nodemailer from 'nodemailer';
-import { mailConfig } from '../../config/mail.config';
-import { formatVietnamDateTime } from '../helpers/date.helper';
-import { escapeHtml } from '../helpers/template.helper';
+import nodemailer from "nodemailer";
+import { mailConfig } from "../../config/mail.config";
+import { formatVietnamDateTime } from "../helpers/date.helper";
+import { escapeHtml } from "../helpers/template.helper";
 
 export class MailService {
   private transporter: nodemailer.Transporter;
@@ -20,11 +20,11 @@ export class MailService {
 
   async sendVerificationEmail(email: string, token: string, fullName?: string) {
     const verificationUrl = `${mailConfig.verificationUrl}?token=${token}`;
-    const safeFullName = escapeHtml(fullName) || 'bạn';
+    const safeFullName = escapeHtml(fullName) || "bạn";
     const mailOptions = {
       from: mailConfig.from,
       to: email,
-      subject: 'Xác thực tài khoản',
+      subject: "Xác thực tài khoản",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
           <h2 style="color: #4CAF50; text-align: center;">Chào mừng bạn đến với hệ thống!</h2>
@@ -44,28 +44,32 @@ export class MailService {
     };
 
     if (!mailConfig.auth.user || !mailConfig.auth.pass) {
-      console.warn('-------- EMAIL VERIFICATION TOKEN (DEV MODE) --------');
+      console.warn("-------- EMAIL VERIFICATION TOKEN (DEV MODE) --------");
       console.warn(`To: ${email}`);
       console.warn(`Link: ${verificationUrl}`);
-      console.warn('----------------------------------------------------');
+      console.warn("----------------------------------------------------");
       return;
     }
 
     try {
       await this.transporter.sendMail(mailOptions);
     } catch (error) {
-      console.error('Failed to send verification email:', error);
+      console.error("Failed to send verification email:", error);
       throw error;
     }
   }
 
-  async sendPasswordResetEmail(email: string, token: string, fullName?: string) {
+  async sendPasswordResetEmail(
+    email: string,
+    token: string,
+    fullName?: string,
+  ) {
     const resetUrl = `${mailConfig.resetPasswordUrl}?token=${token}`;
-    const safeFullName = escapeHtml(fullName) || 'bạn';
+    const safeFullName = escapeHtml(fullName) || "bạn";
     const mailOptions = {
       from: mailConfig.from,
       to: email,
-      subject: 'Khôi phục mật khẩu tài khoản',
+      subject: "Khôi phục mật khẩu tài khoản",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
           <h2 style="color: #f44336; text-align: center;">Khôi phục mật khẩu tài khoản</h2>
@@ -85,30 +89,35 @@ export class MailService {
     };
 
     if (!mailConfig.auth.user || !mailConfig.auth.pass) {
-      console.warn('-------- EMAIL PASSWORD RESET TOKEN (DEV MODE) --------');
+      console.warn("-------- EMAIL PASSWORD RESET TOKEN (DEV MODE) --------");
       console.warn(`To: ${email}`);
       console.warn(`Link: ${resetUrl}`);
-      console.warn('-------------------------------------------------------');
+      console.warn("-------------------------------------------------------");
       return;
     }
 
     try {
       await this.transporter.sendMail(mailOptions);
     } catch (error) {
-      console.error('Failed to send password reset email:', error);
+      console.error("Failed to send password reset email:", error);
       throw error;
     }
   }
 
-  async sendNewDeviceAlertEmail(email: string, details: { deviceName: string; ipAddress: string; loginTime: Date }, fullName?: string) {
+  async sendNewDeviceAlertEmail(
+    email: string,
+    details: { deviceName: string; ipAddress: string; loginTime: Date },
+    fullName?: string,
+  ) {
     const formattedDate = formatVietnamDateTime(details.loginTime);
-    const safeFullName = escapeHtml(fullName) || 'bạn';
-    const safeDeviceName = escapeHtml(details.deviceName) || 'Thiết bị không rõ';
-    const safeIpAddress = escapeHtml(details.ipAddress) || 'Không rõ';
+    const safeFullName = escapeHtml(fullName) || "bạn";
+    const safeDeviceName =
+      escapeHtml(details.deviceName) || "Thiết bị không rõ";
+    const safeIpAddress = escapeHtml(details.ipAddress) || "Không rõ";
     const mailOptions = {
       from: mailConfig.from,
       to: email,
-      subject: '[Cảnh báo bảo mật] Đăng nhập từ thiết bị mới',
+      subject: "[Cảnh báo bảo mật] Đăng nhập từ thiết bị mới",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
           <h2 style="color: #f44336; text-align: center;">Cảnh báo đăng nhập thiết bị mới</h2>
@@ -135,30 +144,34 @@ export class MailService {
     };
 
     if (!mailConfig.auth.user || !mailConfig.auth.pass) {
-      console.warn('-------- NEW DEVICE ALERT EMAIL (DEV MODE) --------');
+      console.warn("-------- NEW DEVICE ALERT EMAIL (DEV MODE) --------");
       console.warn(`To: ${email}`);
       console.warn(`Device: ${details.deviceName}`);
       console.warn(`IP: ${details.ipAddress}`);
       console.warn(`Time: ${formattedDate}`);
-      console.warn('----------------------------------------------------');
+      console.warn("----------------------------------------------------");
       return;
     }
 
     try {
       await this.transporter.sendMail(mailOptions);
     } catch (error) {
-      console.error('Failed to send new device alert email:', error);
+      console.error("Failed to send new device alert email:", error);
       throw error;
     }
   }
 
-  async sendAccountDeactivationEmail(email: string, token: string, fullName?: string) {
+  async sendAccountDeactivationEmail(
+    email: string,
+    token: string,
+    fullName?: string,
+  ) {
     const deactivationUrl = `${mailConfig.verificationUrl}/deactivate?token=${token}`;
-    const safeFullName = escapeHtml(fullName) || 'bạn';
+    const safeFullName = escapeHtml(fullName) || "bạn";
     const mailOptions = {
       from: mailConfig.from,
       to: email,
-      subject: '[Cảnh báo quan trọng] Xác nhận yêu cầu vô hiệu hóa tài khoản',
+      subject: "[Cảnh báo quan trọng] Xác nhận yêu cầu vô hiệu hóa tài khoản",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
           <h2 style="color: #d32f2f; text-align: center;">Yêu cầu vô hiệu hóa tài khoản</h2>
@@ -190,18 +203,22 @@ export class MailService {
     };
 
     if (!mailConfig.auth.user || !mailConfig.auth.pass) {
-      console.warn('-------- EMAIL ACCOUNT DEACTIVATION TOKEN (DEV MODE) --------');
+      console.warn(
+        "-------- EMAIL ACCOUNT DEACTIVATION TOKEN (DEV MODE) --------",
+      );
       console.warn(`To: ${email}`);
       console.warn(`Token: ${token}`);
       console.warn(`Link: ${deactivationUrl}`);
-      console.warn('--------------------------------------------------------------');
+      console.warn(
+        "--------------------------------------------------------------",
+      );
       return;
     }
 
     try {
       await this.transporter.sendMail(mailOptions);
     } catch (error) {
-      console.error('Failed to send account deactivation email:', error);
+      console.error("Failed to send account deactivation email:", error);
       throw error;
     }
   }
@@ -217,7 +234,10 @@ export class MailService {
     try {
       await this.transporter.sendMail(mailOptions);
     } catch (error) {
-      console.error(`Failed to send email to ${to} (subject: ${subject}):`, error);
+      console.error(
+        `Failed to send email to ${to} (subject: ${subject}):`,
+        error,
+      );
       throw error;
     }
   }

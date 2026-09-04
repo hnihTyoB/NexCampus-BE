@@ -1,6 +1,6 @@
-import { Request, Response, NextFunction } from 'express';
-import { NotificationService } from './notification.service';
-import { sseManagerService } from '../../common/services/sse-manager.service';
+import { Request, Response, NextFunction } from "express";
+import { NotificationService } from "./notification.service";
+import { sseManagerService } from "../../common/services/sse-manager.service";
 import {
   ListNotificationsDto,
   SendNotificationDto,
@@ -11,7 +11,7 @@ import {
   UpdateNotificationTemplateDto,
   PreviewNotificationTemplateDto,
   TestSendNotificationTemplateDto,
-} from './notification.dto';
+} from "./notification.dto";
 
 export class NotificationController {
   private readonly service = new NotificationService();
@@ -20,11 +20,13 @@ export class NotificationController {
     sseManagerService.registerClient(req.user.id, res, req);
   };
 
-
   list = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const dto = req.query as unknown as ListNotificationsDto;
-      const { items, total, page, limit, totalPages } = await this.service.list(req.user.id, dto);
+      const { items, total, page, limit, totalPages } = await this.service.list(
+        req.user.id,
+        dto,
+      );
       res.json({
         success: true,
         data: items,
@@ -47,7 +49,7 @@ export class NotificationController {
   markAsRead = async (req: Request, res: Response, next: NextFunction) => {
     try {
       await this.service.markAsRead(req.user.id, req.params.id);
-      res.json({ success: true, message: 'Notification marked as read' });
+      res.json({ success: true, message: "Notification marked as read" });
     } catch (error) {
       next(error);
     }
@@ -56,7 +58,7 @@ export class NotificationController {
   markAllAsRead = async (req: Request, res: Response, next: NextFunction) => {
     try {
       await this.service.markAllAsRead(req.user.id);
-      res.json({ success: true, message: 'All notifications marked as read' });
+      res.json({ success: true, message: "All notifications marked as read" });
     } catch (error) {
       next(error);
     }
@@ -65,7 +67,7 @@ export class NotificationController {
   delete = async (req: Request, res: Response, next: NextFunction) => {
     try {
       await this.service.delete(req.user.id, req.params.id);
-      res.json({ success: true, message: 'Notification deleted' });
+      res.json({ success: true, message: "Notification deleted" });
     } catch (error) {
       next(error);
     }
@@ -77,7 +79,7 @@ export class NotificationController {
       const result = await this.service.send(dto);
       res.status(201).json({
         success: true,
-        message: 'Notification dispatched successfully',
+        message: "Notification dispatched successfully",
         data: result,
       });
     } catch (error) {
@@ -91,7 +93,7 @@ export class NotificationController {
       const result = await this.service.broadcast(dto);
       res.status(201).json({
         success: true,
-        message: 'Broadcast notification sent successfully',
+        message: "Broadcast notification sent successfully",
         data: result,
       });
     } catch (error) {
@@ -102,7 +104,8 @@ export class NotificationController {
   listEmails = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const dto = req.query as unknown as ListEmailsDto;
-      const { items, total, page, limit, totalPages } = await this.service.listEmails(dto);
+      const { items, total, page, limit, totalPages } =
+        await this.service.listEmails(dto);
       res.json({
         success: true,
         data: items,
@@ -118,7 +121,7 @@ export class NotificationController {
       await this.service.retryEmail(req.params.id);
       res.json({
         success: true,
-        message: 'Email scheduled for retry',
+        message: "Email scheduled for retry",
       });
     } catch (error) {
       next(error);
@@ -132,7 +135,8 @@ export class NotificationController {
   listTemplates = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const dto = req.query as unknown as ListNotificationTemplatesDto;
-      const { items, total, page, limit, totalPages } = await this.service.listTemplates(dto);
+      const { items, total, page, limit, totalPages } =
+        await this.service.listTemplates(dto);
       res.json({
         success: true,
         data: items,
@@ -143,7 +147,11 @@ export class NotificationController {
     }
   };
 
-  getTemplateByCode = async (req: Request, res: Response, next: NextFunction) => {
+  getTemplateByCode = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
     try {
       const template = await this.service.getTemplateByCode(req.params.code);
       res.json({ success: true, data: template });
@@ -158,11 +166,11 @@ export class NotificationController {
       const template = await this.service.createTemplate(dto, {
         actorId: req.user.id,
         ipAddress: req.ip,
-        userAgent: req.headers['user-agent'],
+        userAgent: req.headers["user-agent"],
       });
       res.status(201).json({
         success: true,
-        message: 'Notification template created successfully',
+        message: "Notification template created successfully",
         data: template,
       });
     } catch (error) {
@@ -176,11 +184,11 @@ export class NotificationController {
       const template = await this.service.updateTemplate(req.params.id, dto, {
         actorId: req.user.id,
         ipAddress: req.ip,
-        userAgent: req.headers['user-agent'],
+        userAgent: req.headers["user-agent"],
       });
       res.json({
         success: true,
-        message: 'Notification template updated successfully',
+        message: "Notification template updated successfully",
         data: template,
       });
     } catch (error) {
@@ -193,11 +201,11 @@ export class NotificationController {
       await this.service.deleteTemplate(req.params.id, {
         actorId: req.user.id,
         ipAddress: req.ip,
-        userAgent: req.headers['user-agent'],
+        userAgent: req.headers["user-agent"],
       });
       res.json({
         success: true,
-        message: 'Notification template deleted successfully',
+        message: "Notification template deleted successfully",
       });
     } catch (error) {
       next(error);
@@ -217,10 +225,18 @@ export class NotificationController {
     }
   };
 
-  testSendTemplate = async (req: Request, res: Response, next: NextFunction) => {
+  testSendTemplate = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
     try {
       const dto = req.body as TestSendNotificationTemplateDto;
-      const result = await this.service.testSendTemplate(req.params.code, req.user.id, dto);
+      const result = await this.service.testSendTemplate(
+        req.params.code,
+        req.user.id,
+        dto,
+      );
       res.json({
         success: true,
         message: result.message,

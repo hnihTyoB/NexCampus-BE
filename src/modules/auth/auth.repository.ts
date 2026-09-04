@@ -1,17 +1,16 @@
-import crypto from 'crypto';
-import { Prisma } from '@prisma/client';
-import { prisma } from '../../database/prisma.client';
-import { AppError } from '../../common/errors/app-error';
-import { ERROR_CODE } from '../../common/errors/error-code';
-import { ROLES } from '../../common/constants/role.constant';
-
+import crypto from "crypto";
+import { Prisma } from "@prisma/client";
+import { prisma } from "../../database/prisma.client";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODE } from "../../common/errors/error-code";
+import { ROLES } from "../../common/constants/role.constant";
 
 /**
  * Băm token bằng SHA-256 trước khi lưu vào database.
  * Plain text token chỉ trả về client 1 lần; DB chỉ lưu hash để tra cứu.
  */
 function hashToken(token: string): string {
-  return crypto.createHash('sha256').update(token).digest('hex');
+  return crypto.createHash("sha256").update(token).digest("hex");
 }
 
 export class AuthRepository {
@@ -29,7 +28,13 @@ export class AuthRepository {
     });
   }
 
-  async saveRefreshToken(userId: string, token: string, expiresAt: Date, userAgent?: string, ipAddress?: string) {
+  async saveRefreshToken(
+    userId: string,
+    token: string,
+    expiresAt: Date,
+    userAgent?: string,
+    ipAddress?: string,
+  ) {
     return prisma.refreshToken.create({
       data: {
         userId,
@@ -71,6 +76,7 @@ export class AuthRepository {
   }
 
   async createSocialUser(data: {
+    email?: string;
     fullName?: string;
     avatarUrl?: string;
     roleId: string;
@@ -79,6 +85,7 @@ export class AuthRepository {
   }) {
     return prisma.user.create({
       data: {
+        email: data.email,
         fullName: data.fullName,
         avatarUrl: data.avatarUrl,
         roleId: data.roleId,
@@ -94,7 +101,56 @@ export class AuthRepository {
     });
   }
 
-  async createVerificationToken(userId: string, token: string, expiresAt: Date) {
+  async linkSocialAccount(
+    userId: string,
+    provider: string,
+    providerUserId: string,
+  ) {
+    return prisma.userSocial.create({
+      data: {
+        userId,
+        provider,
+        providerUserId,
+      },
+    });
+  }
+
+  async getUserSocialAccounts(userId: string) {
+    return prisma.userSocial.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        provider: true,
+        providerUserId: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async findUserSocialByProvider(userId: string, provider: string) {
+    return prisma.userSocial.findFirst({
+      where: { userId, provider },
+    });
+  }
+
+  async unlinkSocialAccount(userId: string, provider: string) {
+    return prisma.userSocial.deleteMany({
+      where: { userId, provider },
+    });
+  }
+
+  async countUserSocialAccounts(userId: string): Promise<number> {
+    return prisma.userSocial.count({
+      where: { userId },
+    });
+  }
+
+  async createVerificationToken(
+    userId: string,
+    token: string,
+    expiresAt: Date,
+  ) {
     return prisma.$transaction(async (tx) => {
       await tx.verificationToken.deleteMany({
         where: { userId },
@@ -159,7 +215,10 @@ export class AuthRepository {
     });
   }
 
-  async updateProfile(userId: string, data: { fullName?: string; avatarUrl?: string; phoneNumber?: string }) {
+  async updateProfile(
+    userId: string,
+    data: { fullName?: string; avatarUrl?: string; phoneNumber?: string },
+  ) {
     return prisma.user.update({
       where: { id: userId },
       data,
@@ -189,7 +248,11 @@ export class AuthRepository {
     ]);
   }
 
-  async createPasswordResetToken(userId: string, token: string, expiresAt: Date) {
+  async createPasswordResetToken(
+    userId: string,
+    token: string,
+    expiresAt: Date,
+  ) {
     return prisma.$transaction(async (tx) => {
       await tx.passwordResetToken.deleteMany({
         where: { userId },
@@ -228,7 +291,12 @@ export class AuthRepository {
     });
   }
 
-  async upsertUserDevice(data: { userId: string; deviceHash: string; deviceName: string; ipAddress?: string }) {
+  async upsertUserDevice(data: {
+    userId: string;
+    deviceHash: string;
+    deviceName: string;
+    ipAddress?: string;
+  }) {
     return prisma.userDevice.upsert({
       where: {
         userId_deviceHash: {
@@ -249,7 +317,11 @@ export class AuthRepository {
     });
   }
 
-  async updateUserDeviceLastLogin(userId: string, deviceHash: string, ipAddress?: string) {
+  async updateUserDeviceLastLogin(
+    userId: string,
+    deviceHash: string,
+    ipAddress?: string,
+  ) {
     return prisma.userDevice.update({
       where: {
         userId_deviceHash: {
@@ -267,7 +339,7 @@ export class AuthRepository {
   async findSessionsByUserId(userId: string) {
     return prisma.refreshToken.findMany({
       where: { userId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -283,7 +355,14 @@ export class AuthRepository {
     });
   }
 
-  async rotateRefreshToken(userId: string, oldToken: string, newToken: string, expiresAt: Date, userAgent?: string, ipAddress?: string) {
+  async rotateRefreshToken(
+    userId: string,
+    oldToken: string,
+    newToken: string,
+    expiresAt: Date,
+    userAgent?: string,
+    ipAddress?: string,
+  ) {
     const hashedOldToken = hashToken(oldToken);
     const hashedNewToken = hashToken(newToken);
     return prisma.$transaction(async (tx) => {
@@ -295,7 +374,11 @@ export class AuthRepository {
         // Automatic Token Family Invalidation (RFC 6819):
         // If an already rotated/revoked refresh token is re-sent, invalidate all active tokens for this user
         await tx.refreshToken.deleteMany({ where: { userId } });
-        throw new AppError('Refresh token không hợp lệ hoặc đã được sử dụng. Toàn bộ phiên đăng nhập đã được thu hồi vì lý do bảo mật.', 401, ERROR_CODE.TOKEN_INVALID);
+        throw new AppError(
+          "Refresh token không hợp lệ hoặc đã được sử dụng. Toàn bộ phiên đăng nhập đã được thu hồi vì lý do bảo mật.",
+          401,
+          ERROR_CODE.TOKEN_INVALID,
+        );
       }
 
       return tx.refreshToken.create({
@@ -322,13 +405,17 @@ export class AuthRepository {
     ]);
   }
 
-  async registerUserWithVerification(userData: {
-    email: string;
-    passwordHash: string;
-    fullName?: string;
-    roleId: string;
-    isActive: boolean;
-  }, token: string, expiresAt: Date) {
+  async registerUserWithVerification(
+    userData: {
+      email: string;
+      passwordHash: string;
+      fullName?: string;
+      roleId: string;
+      isActive: boolean;
+    },
+    token: string,
+    expiresAt: Date,
+  ) {
     return prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
@@ -362,7 +449,11 @@ export class AuthRepository {
     ]);
   }
 
-  async resetPasswordAndRevokeTokens(userId: string, passwordHash: string, tokenId: string) {
+  async resetPasswordAndRevokeTokens(
+    userId: string,
+    passwordHash: string,
+    tokenId: string,
+  ) {
     return prisma.$transaction([
       prisma.user.update({
         where: { id: userId },
@@ -399,7 +490,11 @@ export class AuthRepository {
     });
   }
 
-  async createDeactivationToken(userId: string, token: string, expiresAt: Date) {
+  async createDeactivationToken(
+    userId: string,
+    token: string,
+    expiresAt: Date,
+  ) {
     const hashedToken = hashToken(`deactivate:${token}`);
     return prisma.$transaction(async (tx) => {
       await tx.verificationToken.deleteMany({
@@ -468,7 +563,11 @@ export class AuthRepository {
     });
   }
 
-  async enable2FA(userId: string, encryptedSecret: string, hashedBackupCodes: string[]) {
+  async enable2FA(
+    userId: string,
+    encryptedSecret: string,
+    hashedBackupCodes: string[],
+  ) {
     return prisma.user.update({
       where: { id: userId },
       data: {
@@ -514,7 +613,7 @@ export class AuthRepository {
 
     const latestSession = await prisma.refreshToken.findFirst({
       where: { userId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       select: { id: true },
     });
 
@@ -530,4 +629,3 @@ export class AuthRepository {
     return { count: 0 };
   }
 }
-

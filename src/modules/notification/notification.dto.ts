@@ -1,4 +1,4 @@
-import { NotificationChannel } from '../../common/constants/notification.constant';
+import { NotificationChannel } from "../../common/constants/notification.constant";
 
 export interface ListNotificationsDto {
   page?: number;

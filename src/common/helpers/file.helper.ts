@@ -1,4 +1,4 @@
-import fs from 'fs';
+import fs from "fs";
 
 export function ensureDirExists(dirPath: string): void {
   if (!fs.existsSync(dirPath)) {

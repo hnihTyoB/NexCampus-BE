@@ -120,4 +120,35 @@ export interface RegenerateBackupCodesDto {
   code: string;
 }
 
+export interface GoogleLoginDto {
+  idToken?: string;
+  code?: string;
+  redirectUri?: string;
+}
 
+export interface GoogleAuthUrlQueryDto {
+  redirectUri?: string;
+  state?: string;
+}
+
+export interface GoogleAuthUrlResponseDto {
+  url: string;
+}
+
+export interface LinkSocialAccountDto {
+  provider?: "GOOGLE" | "ZALO";
+  idToken?: string;
+  code?: string;
+  redirectUri?: string;
+}
+
+export interface SocialAccountDto {
+  id: string;
+  provider: string;
+  providerUserId: string;
+  createdAt: Date;
+}
+
+export interface UnlinkSocialAccountParamDto {
+  provider: "GOOGLE" | "ZALO";
+}

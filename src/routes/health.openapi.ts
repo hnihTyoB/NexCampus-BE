@@ -1,22 +1,22 @@
-import { openapiRegistry } from '../config/openapi/openapi.registry';
-import { z } from 'zod';
+import { openapiRegistry } from "../config/openapi/openapi.registry";
+import { z } from "zod";
 
 export function registerHealthOpenApi(): void {
   // GET /health
   openapiRegistry.registerPath({
-    method: 'get',
-    path: '/health',
-    tags: ['Health & Diagnostics'],
-    summary: 'Kiểm tra trạng thái máy chủ (Liveness probe)',
+    method: "get",
+    path: "/health",
+    tags: ["Health & Diagnostics"],
+    summary: "Kiểm tra trạng thái máy chủ (Liveness probe)",
     responses: {
       200: {
-        description: 'Máy chủ hoạt động bình thường',
+        description: "Máy chủ hoạt động bình thường",
         content: {
-          'application/json': {
+          "application/json": {
             schema: z.object({
-              status: z.string().openapi({ example: 'ok' }),
+              status: z.string().openapi({ example: "ok" }),
               timestamp: z.string().datetime(),
-              environment: z.string().openapi({ example: 'development' }),
+              environment: z.string().openapi({ example: "development" }),
             }),
           },
         },
@@ -26,17 +26,17 @@ export function registerHealthOpenApi(): void {
 
   // GET /health/liveness
   openapiRegistry.registerPath({
-    method: 'get',
-    path: '/health/liveness',
-    tags: ['Health & Diagnostics'],
-    summary: 'Liveness probe dành cho Kubernetes / Docker health checks',
+    method: "get",
+    path: "/health/liveness",
+    tags: ["Health & Diagnostics"],
+    summary: "Liveness probe dành cho Kubernetes / Docker health checks",
     responses: {
       200: {
-        description: 'Liveness OK',
+        description: "Liveness OK",
         content: {
-          'application/json': {
+          "application/json": {
             schema: z.object({
-              status: z.string().openapi({ example: 'ok' }),
+              status: z.string().openapi({ example: "ok" }),
               uptime: z.number().openapi({ example: 123.45 }),
               timestamp: z.string().datetime(),
             }),
@@ -48,25 +48,26 @@ export function registerHealthOpenApi(): void {
 
   // GET /health/readiness
   openapiRegistry.registerPath({
-    method: 'get',
-    path: '/health/readiness',
-    tags: ['Health & Diagnostics'],
-    summary: 'Readiness probe sâu (Kiểm tra kết nối PostgreSQL live, Redis live, Bộ nhớ Heap/RSS, Uptime)',
+    method: "get",
+    path: "/health/readiness",
+    tags: ["Health & Diagnostics"],
+    summary:
+      "Readiness probe sâu (Kiểm tra kết nối PostgreSQL live, Redis live, Bộ nhớ Heap/RSS, Uptime)",
     responses: {
       200: {
-        description: 'Hệ thống sẵn sàng nhận traffic',
+        description: "Hệ thống sẵn sàng nhận traffic",
         content: {
-          'application/json': {
+          "application/json": {
             schema: z.object({
-              status: z.string().openapi({ example: 'ready' }),
+              status: z.string().openapi({ example: "ready" }),
               timestamp: z.string().datetime(),
               services: z.object({
                 database: z.object({
-                  status: z.string().openapi({ example: 'connected' }),
+                  status: z.string().openapi({ example: "connected" }),
                   latencyMs: z.number().openapi({ example: 4.2 }),
                 }),
                 redis: z.object({
-                  status: z.string().openapi({ example: 'connected' }),
+                  status: z.string().openapi({ example: "connected" }),
                 }),
               }),
               system: z.object({
@@ -81,7 +82,9 @@ export function registerHealthOpenApi(): void {
           },
         },
       },
-      503: { description: 'Hệ thống chưa sẵn sàng (Mất kết nối Database hoặc Redis)' },
+      503: {
+        description: "Hệ thống chưa sẵn sàng (Mất kết nối Database hoặc Redis)",
+      },
     },
   });
 }

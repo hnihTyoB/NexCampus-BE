@@ -65,36 +65,36 @@ sequenceDiagram
 
 ## 3. Standard Permission Catalog
 
-| Resource | Action | Permission Name | Description |
-| :--- | :--- | :--- | :--- |
-| `USER` | `READ` | `USER_READ` | View user list and profile details |
-| `USER` | `CREATE` | `USER_CREATE` | Create new user accounts |
-| `USER` | `UPDATE` | `USER_UPDATE` | Update user status and roles |
-| `USER` | `DELETE` | `USER_DELETE` | Soft delete user accounts |
-| `WALLET` | `READ` | `WALLET_READ` | View wallet details and balance |
-| `WALLET` | `CREATE` | `WALLET_CREATE` | Create new wallet |
-| `WALLET` | `UPDATE` | `WALLET_UPDATE` | Update wallet information |
-| `WALLET` | `DELETE` | `WALLET_DELETE` | Delete wallet |
-| `TRANSACTION` | `READ` | `TRANSACTION_READ` | View transaction history |
-| `TRANSACTION` | `CREATE` | `TRANSACTION_CREATE` | Create income/expense/transfer transaction |
-| `TRANSACTION` | `UPDATE` | `TRANSACTION_UPDATE` | Edit existing transaction |
-| `TRANSACTION` | `DELETE` | `TRANSACTION_DELETE` | Delete transaction |
-| `CATEGORY` | `READ` | `CATEGORY_READ` | View categories |
-| `CATEGORY` | `CREATE` | `CATEGORY_CREATE` | Create custom category |
-| `CATEGORY` | `UPDATE` | `CATEGORY_UPDATE` | Edit category |
-| `CATEGORY` | `DELETE` | `CATEGORY_DELETE` | Delete category |
-| `BUDGET` | `READ` | `BUDGET_READ` | View budgets and progress |
-| `BUDGET` | `CREATE` | `BUDGET_CREATE` | Set budget |
-| `BUDGET` | `UPDATE` | `BUDGET_UPDATE` | Edit budget |
-| `BUDGET` | `DELETE` | `BUDGET_DELETE` | Remove budget |
-| `REPORT` | `READ` | `REPORT_READ` | View financial analytics and reports |
-| `ROLE` | `READ` | `ROLE_READ` | View roles and role permissions |
-| `ROLE` | `CREATE` | `ROLE_CREATE` | Create new custom roles |
-| `ROLE` | `UPDATE` | `ROLE_UPDATE` | Edit role information |
-| `ROLE` | `DELETE` | `ROLE_DELETE` | Delete non-system roles |
-| `PERMISSION` | `READ` | `PERMISSION_READ` | View system permission catalog |
-| `ROLE_PERMISSION` | `ASSIGN` | `ROLE_PERMISSION_ASSIGN` | Assign/revoke permissions to/from roles |
-| `AUDIT_LOG` | `READ` | `AUDIT_LOG_READ` | View security and RBAC audit logs |
+| Resource          | Action   | Permission Name          | Description                                |
+| :---------------- | :------- | :----------------------- | :----------------------------------------- |
+| `USER`            | `READ`   | `USER_READ`              | View user list and profile details         |
+| `USER`            | `CREATE` | `USER_CREATE`            | Create new user accounts                   |
+| `USER`            | `UPDATE` | `USER_UPDATE`            | Update user status and roles               |
+| `USER`            | `DELETE` | `USER_DELETE`            | Soft delete user accounts                  |
+| `WALLET`          | `READ`   | `WALLET_READ`            | View wallet details and balance            |
+| `WALLET`          | `CREATE` | `WALLET_CREATE`          | Create new wallet                          |
+| `WALLET`          | `UPDATE` | `WALLET_UPDATE`          | Update wallet information                  |
+| `WALLET`          | `DELETE` | `WALLET_DELETE`          | Delete wallet                              |
+| `TRANSACTION`     | `READ`   | `TRANSACTION_READ`       | View transaction history                   |
+| `TRANSACTION`     | `CREATE` | `TRANSACTION_CREATE`     | Create income/expense/transfer transaction |
+| `TRANSACTION`     | `UPDATE` | `TRANSACTION_UPDATE`     | Edit existing transaction                  |
+| `TRANSACTION`     | `DELETE` | `TRANSACTION_DELETE`     | Delete transaction                         |
+| `CATEGORY`        | `READ`   | `CATEGORY_READ`          | View categories                            |
+| `CATEGORY`        | `CREATE` | `CATEGORY_CREATE`        | Create custom category                     |
+| `CATEGORY`        | `UPDATE` | `CATEGORY_UPDATE`        | Edit category                              |
+| `CATEGORY`        | `DELETE` | `CATEGORY_DELETE`        | Delete category                            |
+| `BUDGET`          | `READ`   | `BUDGET_READ`            | View budgets and progress                  |
+| `BUDGET`          | `CREATE` | `BUDGET_CREATE`          | Set budget                                 |
+| `BUDGET`          | `UPDATE` | `BUDGET_UPDATE`          | Edit budget                                |
+| `BUDGET`          | `DELETE` | `BUDGET_DELETE`          | Remove budget                              |
+| `REPORT`          | `READ`   | `REPORT_READ`            | View financial analytics and reports       |
+| `ROLE`            | `READ`   | `ROLE_READ`              | View roles and role permissions            |
+| `ROLE`            | `CREATE` | `ROLE_CREATE`            | Create new custom roles                    |
+| `ROLE`            | `UPDATE` | `ROLE_UPDATE`            | Edit role information                      |
+| `ROLE`            | `DELETE` | `ROLE_DELETE`            | Delete non-system roles                    |
+| `PERMISSION`      | `READ`   | `PERMISSION_READ`        | View system permission catalog             |
+| `ROLE_PERMISSION` | `ASSIGN` | `ROLE_PERMISSION_ASSIGN` | Assign/revoke permissions to/from roles    |
+| `AUDIT_LOG`       | `READ`   | `AUDIT_LOG_READ`         | View security and RBAC audit logs          |
 
 ---
 

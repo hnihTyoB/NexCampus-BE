@@ -1,9 +1,9 @@
-import { Router } from 'express';
-import { RbacController } from './rbac.controller';
-import { authMiddleware } from '../../middlewares/auth.middleware';
-import { requirePermission } from '../../middlewares/permission.middleware';
-import { validate } from '../../middlewares/validate.middleware';
-import { PERMISSIONS } from '../../common/constants/permission.constant';
+import { Router } from "express";
+import { RbacController } from "./rbac.controller";
+import { authMiddleware } from "../../middlewares/auth.middleware";
+import { requirePermission } from "../../middlewares/permission.middleware";
+import { validate } from "../../middlewares/validate.middleware";
+import { PERMISSIONS } from "../../common/constants/permission.constant";
 import {
   createRoleSchema,
   updateRoleSchema,
@@ -13,104 +13,104 @@ import {
   rolePermissionParamsSchema,
   roleQuerySchema,
   auditLogQuerySchema,
-} from './rbac.validation';
-import { userIdParamSchema } from '../users/user.validation';
+} from "./rbac.validation";
+import { userIdParamSchema } from "../users/user.validation";
 
 const router = Router();
 const controller = new RbacController();
 
 // Roles endpoints
 router.get(
-  '/roles',
+  "/roles",
   authMiddleware,
   requirePermission(PERMISSIONS.ROLE_READ),
-  validate(roleQuerySchema, 'query'),
-  controller.findAllRoles
+  validate(roleQuerySchema, "query"),
+  controller.findAllRoles,
 );
 
 router.get(
-  '/roles/:id',
+  "/roles/:id",
   authMiddleware,
   requirePermission(PERMISSIONS.ROLE_READ),
-  validate(roleIdParamSchema, 'params'),
-  controller.findRoleById
+  validate(roleIdParamSchema, "params"),
+  controller.findRoleById,
 );
 
 router.post(
-  '/roles',
+  "/roles",
   authMiddleware,
   requirePermission(PERMISSIONS.ROLE_CREATE),
   validate(createRoleSchema),
-  controller.createRole
+  controller.createRole,
 );
 
 router.put(
-  '/roles/:id',
+  "/roles/:id",
   authMiddleware,
   requirePermission(PERMISSIONS.ROLE_UPDATE),
-  validate(roleIdParamSchema, 'params'),
+  validate(roleIdParamSchema, "params"),
   validate(updateRoleSchema),
-  controller.updateRole
+  controller.updateRole,
 );
 
 router.delete(
-  '/roles/:id',
+  "/roles/:id",
   authMiddleware,
   requirePermission(PERMISSIONS.ROLE_DELETE),
-  validate(roleIdParamSchema, 'params'),
-  controller.deleteRole
+  validate(roleIdParamSchema, "params"),
+  controller.deleteRole,
 );
 
 // Permissions endpoints
 router.get(
-  '/permissions',
+  "/permissions",
   authMiddleware,
   requirePermission(PERMISSIONS.PERMISSION_READ),
-  controller.findAllPermissions
+  controller.findAllPermissions,
 );
 
 router.get(
-  '/roles/:id/permissions',
+  "/roles/:id/permissions",
   authMiddleware,
   requirePermission(PERMISSIONS.ROLE_READ),
-  validate(roleIdParamSchema, 'params'),
-  controller.getRolePermissions
+  validate(roleIdParamSchema, "params"),
+  controller.getRolePermissions,
 );
 
 router.post(
-  '/roles/:id/permissions',
+  "/roles/:id/permissions",
   authMiddleware,
   requirePermission(PERMISSIONS.ROLE_PERMISSION_ASSIGN),
-  validate(roleIdParamSchema, 'params'),
+  validate(roleIdParamSchema, "params"),
   validate(assignPermissionsSchema),
-  controller.syncRolePermissions
+  controller.syncRolePermissions,
 );
 
 router.delete(
-  '/roles/:id/permissions/:permissionId',
+  "/roles/:id/permissions/:permissionId",
   authMiddleware,
   requirePermission(PERMISSIONS.ROLE_PERMISSION_ASSIGN),
-  validate(rolePermissionParamsSchema, 'params'),
-  controller.removePermissionFromRole
+  validate(rolePermissionParamsSchema, "params"),
+  controller.removePermissionFromRole,
 );
 
 // User role assignment endpoint
 router.put(
-  '/users/:id/role',
+  "/users/:id/role",
   authMiddleware,
   requirePermission(PERMISSIONS.USER_ROLE_ASSIGN),
-  validate(userIdParamSchema, 'params'),
+  validate(userIdParamSchema, "params"),
   validate(assignUserRoleSchema),
-  controller.assignUserRole
+  controller.assignUserRole,
 );
 
 // Audit logs endpoint
 router.get(
-  '/audit-logs',
+  "/audit-logs",
   authMiddleware,
   requirePermission(PERMISSIONS.AUDIT_LOG_READ),
-  validate(auditLogQuerySchema, 'query'),
-  controller.findAllAuditLogs
+  validate(auditLogQuerySchema, "query"),
+  controller.findAllAuditLogs,
 );
 
 export default router;

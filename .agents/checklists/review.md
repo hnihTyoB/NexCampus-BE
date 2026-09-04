@@ -27,4 +27,3 @@
 - [ ] Không có refactor hoặc dependency ngoài phạm vi.
 - [ ] Documentation và `.agents/memory.md` phản ánh quyết định bền vững mới.
 - [ ] Verification được báo chính xác, không đánh đồng build với test.
-

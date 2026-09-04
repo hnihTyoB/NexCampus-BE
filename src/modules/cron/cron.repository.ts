@@ -1,5 +1,5 @@
-import { prisma } from '../../database/prisma.client';
-import { ActivitySummaryStatsDto } from './cron.dto';
+import { prisma } from "../../database/prisma.client";
+import { ActivitySummaryStatsDto } from "./cron.dto";
 
 export class CronRepository {
   /**
@@ -62,7 +62,10 @@ export class CronRepository {
   /**
    * Tổng hợp thống kê hoạt động hệ thống trong khoảng thời gian từ startDate đến endDate
    */
-  async getActivityStats(startDate: Date, endDate: Date): Promise<ActivitySummaryStatsDto> {
+  async getActivityStats(
+    startDate: Date,
+    endDate: Date,
+  ): Promise<ActivitySummaryStatsDto> {
     const [
       newUsersCount,
       activeSessionsCount,
@@ -88,7 +91,7 @@ export class CronRepository {
       }),
       prisma.emailNotification.count({
         where: {
-          status: 'SENT',
+          status: "SENT",
           sentAt: { gte: startDate, lte: endDate },
         },
       }),
@@ -117,14 +120,16 @@ export class CronRepository {
   /**
    * Lấy danh sách email của tất cả người dùng có quyền Quản trị (vai trò ADMIN / SUPER_ADMIN)
    */
-  async findAdminUsers(): Promise<Array<{ id: string; email: string; fullName: string | null }>> {
+  async findAdminUsers(): Promise<
+    Array<{ id: string; email: string; fullName: string | null }>
+  > {
     const admins = await prisma.user.findMany({
       where: {
         isActive: true,
         deletedAt: null,
         email: { not: null },
         role: {
-          name: { in: ['ADMIN', 'SUPER_ADMIN', 'SYSTEM_ADMIN'] },
+          name: { in: ["ADMIN", "SUPER_ADMIN", "SYSTEM_ADMIN"] },
         },
       },
       select: {
@@ -134,7 +139,11 @@ export class CronRepository {
       },
     });
 
-    return admins as Array<{ id: string; email: string; fullName: string | null }>;
+    return admins as Array<{
+      id: string;
+      email: string;
+      fullName: string | null;
+    }>;
   }
 
   /**

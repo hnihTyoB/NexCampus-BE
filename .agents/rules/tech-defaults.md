@@ -41,4 +41,3 @@
 - Không sửa `dist/`, `node_modules/` hoặc generated Prisma Client.
 - Khi thêm env var, cập nhật `.env.example` bằng placeholder an toàn và cập nhật
   config validation/access tương ứng; không sao chép giá trị từ `.env`.
-

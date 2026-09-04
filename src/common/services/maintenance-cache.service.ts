@@ -1,8 +1,8 @@
-import { MaintenanceConfig } from '@prisma/client';
-import IORedis from 'ioredis';
-import { envConfig } from '../../config/env.config';
-import { MAINTENANCE_PUBSUB_CHANNEL } from '../constants/maintenance.constant';
-import { maintenanceRepository } from '../../modules/maintenance/maintenance.repository';
+import { MaintenanceConfig } from "@prisma/client";
+import IORedis from "ioredis";
+import { envConfig } from "../../config/env.config";
+import { MAINTENANCE_PUBSUB_CHANNEL } from "../constants/maintenance.constant";
+import { maintenanceRepository } from "../../modules/maintenance/maintenance.repository";
 
 interface CacheEntry {
   config: MaintenanceConfig;
@@ -10,9 +10,9 @@ interface CacheEntry {
 }
 
 const isTestEnv =
-  process.env.NODE_ENV === 'test' ||
-  process.argv.some((arg) => arg.includes('test')) ||
-  process.env.npm_lifecycle_event === 'test';
+  process.env.NODE_ENV === "test" ||
+  process.argv.some((arg) => arg.includes("test")) ||
+  process.env.npm_lifecycle_event === "test";
 
 export class MaintenanceCacheService {
   private cache: CacheEntry | null = null;
@@ -48,20 +48,23 @@ export class MaintenanceCacheService {
       this.redisPublisher = new IORedis(redisOptions);
       this.redisSubscriber = new IORedis(redisOptions);
 
-      this.redisSubscriber.on('connect', () => {
+      this.redisSubscriber.on("connect", () => {
         this.isRedisAvailable = true;
         this.redisSubscriber?.subscribe(MAINTENANCE_PUBSUB_CHANNEL, (err) => {
           if (err) {
-            console.error('[MaintenanceCacheService] Redis subscribe error:', err.message);
+            console.error(
+              "[MaintenanceCacheService] Redis subscribe error:",
+              err.message,
+            );
           }
         });
       });
 
-      this.redisSubscriber.on('message', (channel, message) => {
+      this.redisSubscriber.on("message", (channel, message) => {
         if (channel === MAINTENANCE_PUBSUB_CHANNEL) {
           try {
             const data = JSON.parse(message);
-            if (data?.action === 'INVALIDATE') {
+            if (data?.action === "INVALIDATE") {
               this.cache = null;
             }
           } catch {
@@ -70,11 +73,11 @@ export class MaintenanceCacheService {
         }
       });
 
-      this.redisPublisher.on('error', () => {
+      this.redisPublisher.on("error", () => {
         this.isRedisAvailable = false;
       });
 
-      this.redisSubscriber.on('error', () => {
+      this.redisSubscriber.on("error", () => {
         this.isRedisAvailable = false;
       });
 
@@ -89,7 +92,7 @@ export class MaintenanceCacheService {
     }
   }
 
-  async getConfig(key = 'DEFAULT'): Promise<MaintenanceConfig> {
+  async getConfig(key = "DEFAULT"): Promise<MaintenanceConfig> {
     const now = Date.now();
     if (this.cache && now < this.cache.expiresAt) {
       return this.cache.config;
@@ -120,7 +123,7 @@ export class MaintenanceCacheService {
       this.redisPublisher
         .publish(
           MAINTENANCE_PUBSUB_CHANNEL,
-          JSON.stringify({ action: 'INVALIDATE', timestamp: Date.now() }),
+          JSON.stringify({ action: "INVALIDATE", timestamp: Date.now() }),
         )
         .catch(() => {
           // Ignore publish errors gracefully

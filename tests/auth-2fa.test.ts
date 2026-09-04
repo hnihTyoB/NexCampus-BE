@@ -1,36 +1,37 @@
-import { describe, it, beforeEach } from 'node:test';
-import assert from 'node:assert/strict';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { AuthService } from '../src/modules/auth/auth.service';
-import { AuthRepository } from '../src/modules/auth/auth.repository';
-import { permissionCacheService } from '../src/common/services/permission-cache.service';
-import { ROLES } from '../src/common/constants/role.constant';
-import { AUDIT_ACTION } from '../src/common/constants/audit-log.constant';
-import { ERROR_CODE } from '../src/common/errors/error-code';
-import { AppError } from '../src/common/errors/app-error';
-import { jwtConfig } from '../src/config/jwt.config';
+import { describe, it, beforeEach } from "node:test";
+import assert from "node:assert/strict";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { AuthService } from "../src/modules/auth/auth.service";
+import { AuthRepository } from "../src/modules/auth/auth.repository";
+import { permissionCacheService } from "../src/common/services/permission-cache.service";
+import { ROLES } from "../src/common/constants/role.constant";
+import { AUDIT_ACTION } from "../src/common/constants/audit-log.constant";
+import { ERROR_CODE } from "../src/common/errors/error-code";
+import { AppError } from "../src/common/errors/app-error";
+import { jwtConfig } from "../src/config/jwt.config";
 import {
   generateTotpSecret,
   generateTotpCode,
   generateBackupCodes,
-} from '../src/common/helpers/totp.helper';
-import { encryptSecret, hashToken } from '../src/common/helpers/crypto.helper';
-import { swaggerSpec } from '../src/config/swagger.config';
+} from "../src/common/helpers/totp.helper";
+import { encryptSecret, hashToken } from "../src/common/helpers/crypto.helper";
+import { swaggerSpec } from "../src/config/swagger.config";
 import {
   enable2FASchema,
   verify2FALoginSchema,
   disable2FASchema,
   regenerateBackupCodesSchema,
-} from '../src/modules/auth/auth.validation';
+} from "../src/modules/auth/auth.validation";
 
-describe('Two-Factor Authentication (2FA / TOTP) Test Suite', () => {
+describe("Two-Factor Authentication (2FA / TOTP) Test Suite", () => {
   let authService: AuthService;
   let mockRepository: Partial<AuthRepository>;
   let auditLogs: Array<any> = [];
-  let revokedSessionsHistory: Array<{ userId: string; currentToken?: string }> = [];
+  let revokedSessionsHistory: Array<{ userId: string; currentToken?: string }> =
+    [];
 
-  const rawSecret = 'JBSWY3DPEHPK3PXP'; // Standard Base32 key
+  const rawSecret = "JBSWY3DPEHPK3PXP"; // Standard Base32 key
   const encryptedSecret = encryptSecret(rawSecret);
   const { plainCodes, hashedCodes } = generateBackupCodes(8);
 
@@ -41,17 +42,17 @@ describe('Two-Factor Authentication (2FA / TOTP) Test Suite', () => {
     revokedSessionsHistory = [];
     permissionCacheService.clear();
 
-    const roleId = 'a0000000-0000-0000-0000-000000000001';
+    const roleId = "a0000000-0000-0000-0000-000000000001";
     (permissionCacheService as any).cache.set(roleId, {
-      permissions: new Set(['USER_READ', 'USER_UPDATE']),
+      permissions: new Set(["USER_READ", "USER_UPDATE"]),
       expiresAt: Date.now() + 600000,
     });
 
     mockUser = {
-      id: 'user-2fa-1',
-      email: 'user2fa@example.com',
-      password: await bcrypt.hash('Password@123', 10),
-      fullName: 'User TwoFactor',
+      id: "user-2fa-1",
+      email: "user2fa@example.com",
+      password: await bcrypt.hash("Password@123", 10),
+      fullName: "User TwoFactor",
       phoneNumber: null,
       avatarUrl: null,
       isActive: true,
@@ -82,7 +83,11 @@ describe('Two-Factor Authentication (2FA / TOTP) Test Suite', () => {
         if (email === mockUser.email) return mockUser;
         return null;
       },
-      enable2FA: async (userId: string, secretEnc: string, backupHashed: string[]) => {
+      enable2FA: async (
+        userId: string,
+        secretEnc: string,
+        backupHashed: string[],
+      ) => {
         mockUser.twoFactorEnabled = true;
         mockUser.twoFactorSecret = secretEnc;
         mockUser.twoFactorBackupCodes = backupHashed;
@@ -102,8 +107,8 @@ describe('Two-Factor Authentication (2FA / TOTP) Test Suite', () => {
         revokedSessionsHistory.push({ userId, currentToken });
         return { count: 1 } as any;
       },
-      saveRefreshToken: async () => ({} as any),
-      updateUserDeviceLastLogin: async () => ({} as any),
+      saveRefreshToken: async () => ({}) as any,
+      updateUserDeviceLastLogin: async () => ({}) as any,
       createAuditLog: async (data: any) => {
         auditLogs.push(data);
         return data as any;
@@ -114,39 +119,80 @@ describe('Two-Factor Authentication (2FA / TOTP) Test Suite', () => {
     (authService as any).repository = mockRepository;
   });
 
-  describe('1. Zod Validation Schemas for 2FA', () => {
-    it('enable2FASchema requires secret (min 16 chars) and 6-digit code', () => {
-      assert.equal(enable2FASchema.safeParse({ secret: rawSecret, code: '123456' }).success, true);
-      assert.equal(enable2FASchema.safeParse({ secret: 'short', code: '123456' }).success, false);
-      assert.equal(enable2FASchema.safeParse({ secret: rawSecret, code: '12345' }).success, false);
-      assert.equal(enable2FASchema.safeParse({ secret: rawSecret, code: 'abcdef' }).success, false);
+  describe("1. Zod Validation Schemas for 2FA", () => {
+    it("enable2FASchema requires secret (min 16 chars) and 6-digit code", () => {
+      assert.equal(
+        enable2FASchema.safeParse({ secret: rawSecret, code: "123456" })
+          .success,
+        true,
+      );
+      assert.equal(
+        enable2FASchema.safeParse({ secret: "short", code: "123456" }).success,
+        false,
+      );
+      assert.equal(
+        enable2FASchema.safeParse({ secret: rawSecret, code: "12345" }).success,
+        false,
+      );
+      assert.equal(
+        enable2FASchema.safeParse({ secret: rawSecret, code: "abcdef" })
+          .success,
+        false,
+      );
     });
 
-    it('verify2FALoginSchema requires tempToken and code', () => {
-      assert.equal(verify2FALoginSchema.safeParse({ tempToken: 'token', code: '123456' }).success, true);
-      assert.equal(verify2FALoginSchema.safeParse({ tempToken: 'token', code: 'A1B2-C3D4' }).success, true);
-      assert.equal(verify2FALoginSchema.safeParse({ tempToken: '', code: '123456' }).success, false);
+    it("verify2FALoginSchema requires tempToken and code", () => {
+      assert.equal(
+        verify2FALoginSchema.safeParse({ tempToken: "token", code: "123456" })
+          .success,
+        true,
+      );
+      assert.equal(
+        verify2FALoginSchema.safeParse({
+          tempToken: "token",
+          code: "A1B2-C3D4",
+        }).success,
+        true,
+      );
+      assert.equal(
+        verify2FALoginSchema.safeParse({ tempToken: "", code: "123456" })
+          .success,
+        false,
+      );
     });
 
-    it('disable2FASchema requires password and code', () => {
-      assert.equal(disable2FASchema.safeParse({ password: 'Password@123', code: '123456' }).success, true);
-      assert.equal(disable2FASchema.safeParse({ password: '', code: '123456' }).success, false);
+    it("disable2FASchema requires password and code", () => {
+      assert.equal(
+        disable2FASchema.safeParse({ password: "Password@123", code: "123456" })
+          .success,
+        true,
+      );
+      assert.equal(
+        disable2FASchema.safeParse({ password: "", code: "123456" }).success,
+        false,
+      );
     });
 
-    it('regenerateBackupCodesSchema requires password and code', () => {
-      assert.equal(regenerateBackupCodesSchema.safeParse({ password: 'Password@123', code: '123456' }).success, true);
+    it("regenerateBackupCodesSchema requires password and code", () => {
+      assert.equal(
+        regenerateBackupCodesSchema.safeParse({
+          password: "Password@123",
+          code: "123456",
+        }).success,
+        true,
+      );
     });
   });
 
-  describe('2. Setup & Enable 2FA Flow', () => {
-    it('setup2FA should return a Base32 secret and otpauthUrl', async () => {
+  describe("2. Setup & Enable 2FA Flow", () => {
+    it("setup2FA should return a Base32 secret and otpauthUrl", async () => {
       const result = await authService.setup2FA(mockUser.id);
-      assert.equal(typeof result.secret, 'string');
+      assert.equal(typeof result.secret, "string");
       assert.ok(result.secret.length >= 16);
-      assert.ok(result.otpauthUrl.startsWith('otpauth://totp/TemplateBE:'));
+      assert.ok(result.otpauthUrl.startsWith("otpauth://totp/TemplateBE:"));
     });
 
-    it('setup2FA should reject if 2FA is already enabled', async () => {
+    it("setup2FA should reject if 2FA is already enabled", async () => {
       mockUser.twoFactorEnabled = true;
       await assert.rejects(authService.setup2FA(mockUser.id), (err: any) => {
         assert.equal(err instanceof AppError, true);
@@ -155,9 +201,12 @@ describe('Two-Factor Authentication (2FA / TOTP) Test Suite', () => {
       });
     });
 
-    it('enable2FA should reject if TOTP code is incorrect', async () => {
+    it("enable2FA should reject if TOTP code is incorrect", async () => {
       await assert.rejects(
-        authService.enable2FA(mockUser.id, { secret: rawSecret, code: '000000' }),
+        authService.enable2FA(mockUser.id, {
+          secret: rawSecret,
+          code: "000000",
+        }),
         (err: any) => {
           assert.equal(err instanceof AppError, true);
           assert.equal(err.code, ERROR_CODE.TWO_FACTOR_INVALID_CODE);
@@ -167,9 +216,12 @@ describe('Two-Factor Authentication (2FA / TOTP) Test Suite', () => {
       assert.equal(mockUser.twoFactorEnabled, false);
     });
 
-    it('enable2FA should succeed with valid TOTP code, return 8 backup codes, and revoke other sessions', async () => {
+    it("enable2FA should succeed with valid TOTP code, return 8 backup codes, and revoke other sessions", async () => {
       const validCode = generateTotpCode(rawSecret);
-      const result = await authService.enable2FA(mockUser.id, { secret: rawSecret, code: validCode });
+      const result = await authService.enable2FA(mockUser.id, {
+        secret: rawSecret,
+        code: validCode,
+      });
 
       assert.equal(mockUser.twoFactorEnabled, true);
       assert.ok(mockUser.twoFactorSecret);
@@ -184,17 +236,17 @@ describe('Two-Factor Authentication (2FA / TOTP) Test Suite', () => {
     });
   });
 
-  describe('3. Login Challenge Flow with 2FA Enabled', () => {
+  describe("3. Login Challenge Flow with 2FA Enabled", () => {
     beforeEach(() => {
       mockUser.twoFactorEnabled = true;
       mockUser.twoFactorSecret = encryptedSecret;
       mockUser.twoFactorBackupCodes = [...hashedCodes];
     });
 
-    it('login should return requires2FA: true and tempToken when 2FA is enabled', async () => {
+    it("login should return requires2FA: true and tempToken when 2FA is enabled", async () => {
       const result = await authService.login({
         email: mockUser.email,
-        password: 'Password@123',
+        password: "Password@123",
       });
 
       assert.equal(result.requires2FA, true);
@@ -202,14 +254,20 @@ describe('Two-Factor Authentication (2FA / TOTP) Test Suite', () => {
       assert.equal(result.accessToken, undefined);
 
       // Verify tempToken structure
-      const payload = jwt.verify(result.tempToken, jwtConfig.accessSecret) as any;
+      const payload = jwt.verify(
+        result.tempToken,
+        jwtConfig.accessSecret,
+      ) as any;
       assert.equal(payload.id, mockUser.id);
-      assert.equal(payload.purpose, '2FA_VERIFICATION');
+      assert.equal(payload.purpose, "2FA_VERIFICATION");
     });
 
-    it('verify2FALogin should reject invalid or expired tempToken', async () => {
+    it("verify2FALogin should reject invalid or expired tempToken", async () => {
       await assert.rejects(
-        authService.verify2FALogin({ tempToken: 'invalid.jwt.token', code: '123456' }),
+        authService.verify2FALogin({
+          tempToken: "invalid.jwt.token",
+          code: "123456",
+        }),
         (err: any) => {
           assert.equal(err instanceof AppError, true);
           assert.equal(err.statusCode, 401);
@@ -218,15 +276,15 @@ describe('Two-Factor Authentication (2FA / TOTP) Test Suite', () => {
       );
     });
 
-    it('verify2FALogin should reject wrong TOTP code', async () => {
+    it("verify2FALogin should reject wrong TOTP code", async () => {
       const tempToken = jwt.sign(
-        { id: mockUser.id, purpose: '2FA_VERIFICATION' },
+        { id: mockUser.id, purpose: "2FA_VERIFICATION" },
         jwtConfig.accessSecret,
-        { expiresIn: '5m' },
+        { expiresIn: "5m" },
       );
 
       await assert.rejects(
-        authService.verify2FALogin({ tempToken, code: '000000' }),
+        authService.verify2FALogin({ tempToken, code: "000000" }),
         (err: any) => {
           assert.equal(err instanceof AppError, true);
           assert.equal(err.code, ERROR_CODE.TWO_FACTOR_INVALID_CODE);
@@ -235,15 +293,18 @@ describe('Two-Factor Authentication (2FA / TOTP) Test Suite', () => {
       );
     });
 
-    it('verify2FALogin should succeed with valid 6-digit TOTP code and issue tokens', async () => {
+    it("verify2FALogin should succeed with valid 6-digit TOTP code and issue tokens", async () => {
       const tempToken = jwt.sign(
-        { id: mockUser.id, purpose: '2FA_VERIFICATION' },
+        { id: mockUser.id, purpose: "2FA_VERIFICATION" },
         jwtConfig.accessSecret,
-        { expiresIn: '5m' },
+        { expiresIn: "5m" },
       );
       const validCode = generateTotpCode(rawSecret);
 
-      const result = await authService.verify2FALogin({ tempToken, code: validCode });
+      const result = await authService.verify2FALogin({
+        tempToken,
+        code: validCode,
+      });
 
       assert.ok(result.accessToken);
       assert.ok(result.refreshToken);
@@ -253,15 +314,18 @@ describe('Two-Factor Authentication (2FA / TOTP) Test Suite', () => {
       assert.equal(auditLogs[0].action, AUDIT_ACTION.VERIFY_2FA_LOGIN);
     });
 
-    it('verify2FALogin should succeed with valid Backup Code and consume it (Single-use)', async () => {
+    it("verify2FALogin should succeed with valid Backup Code and consume it (Single-use)", async () => {
       const tempToken = jwt.sign(
-        { id: mockUser.id, purpose: '2FA_VERIFICATION' },
+        { id: mockUser.id, purpose: "2FA_VERIFICATION" },
         jwtConfig.accessSecret,
-        { expiresIn: '5m' },
+        { expiresIn: "5m" },
       );
       const backupCodeToUse = plainCodes[0]; // First code
 
-      const result = await authService.verify2FALogin({ tempToken, code: backupCodeToUse });
+      const result = await authService.verify2FALogin({
+        tempToken,
+        code: backupCodeToUse,
+      });
       assert.ok(result.accessToken);
 
       // Ensure that backup code was removed from user's remaining codes
@@ -271,12 +335,15 @@ describe('Two-Factor Authentication (2FA / TOTP) Test Suite', () => {
 
       // Attempt to reuse the same backup code must fail!
       const secondTempToken = jwt.sign(
-        { id: mockUser.id, purpose: '2FA_VERIFICATION' },
+        { id: mockUser.id, purpose: "2FA_VERIFICATION" },
         jwtConfig.accessSecret,
-        { expiresIn: '5m' },
+        { expiresIn: "5m" },
       );
       await assert.rejects(
-        authService.verify2FALogin({ tempToken: secondTempToken, code: backupCodeToUse }),
+        authService.verify2FALogin({
+          tempToken: secondTempToken,
+          code: backupCodeToUse,
+        }),
         (err: any) => {
           assert.equal(err instanceof AppError, true);
           assert.equal(err.code, ERROR_CODE.TWO_FACTOR_INVALID_CODE);
@@ -286,17 +353,20 @@ describe('Two-Factor Authentication (2FA / TOTP) Test Suite', () => {
     });
   });
 
-  describe('4. Disable 2FA & Regenerate Backup Codes', () => {
+  describe("4. Disable 2FA & Regenerate Backup Codes", () => {
     beforeEach(() => {
       mockUser.twoFactorEnabled = true;
       mockUser.twoFactorSecret = encryptedSecret;
       mockUser.twoFactorBackupCodes = [...hashedCodes];
     });
 
-    it('disable2FA should reject if password is wrong', async () => {
+    it("disable2FA should reject if password is wrong", async () => {
       const validCode = generateTotpCode(rawSecret);
       await assert.rejects(
-        authService.disable2FA(mockUser.id, { password: 'WrongPassword!', code: validCode }),
+        authService.disable2FA(mockUser.id, {
+          password: "WrongPassword!",
+          code: validCode,
+        }),
         (err: any) => {
           assert.equal(err instanceof AppError, true);
           assert.equal(err.code, ERROR_CODE.INVALID_CREDENTIALS);
@@ -306,9 +376,12 @@ describe('Two-Factor Authentication (2FA / TOTP) Test Suite', () => {
       assert.equal(mockUser.twoFactorEnabled, true);
     });
 
-    it('disable2FA should succeed with valid password and TOTP code, and revoke other sessions', async () => {
+    it("disable2FA should succeed with valid password and TOTP code, and revoke other sessions", async () => {
       const validCode = generateTotpCode(rawSecret);
-      await authService.disable2FA(mockUser.id, { password: 'Password@123', code: validCode });
+      await authService.disable2FA(mockUser.id, {
+        password: "Password@123",
+        code: validCode,
+      });
 
       assert.equal(mockUser.twoFactorEnabled, false);
       assert.equal(mockUser.twoFactorSecret, null);
@@ -322,10 +395,10 @@ describe('Two-Factor Authentication (2FA / TOTP) Test Suite', () => {
       assert.equal(auditLogs[0].action, AUDIT_ACTION.DISABLE_2FA);
     });
 
-    it('regenerateBackupCodes should invalidate old codes and return 8 new codes', async () => {
+    it("regenerateBackupCodes should invalidate old codes and return 8 new codes", async () => {
       const validCode = generateTotpCode(rawSecret);
       const result = await authService.regenerateBackupCodes(mockUser.id, {
-        password: 'Password@123',
+        password: "Password@123",
         code: validCode,
       });
 
@@ -337,19 +410,40 @@ describe('Two-Factor Authentication (2FA / TOTP) Test Suite', () => {
       assert.equal(mockUser.twoFactorBackupCodes.includes(oldHash), false);
 
       assert.equal(auditLogs.length, 1);
-      assert.equal(auditLogs[0].action, AUDIT_ACTION.REGENERATE_2FA_BACKUP_CODES);
+      assert.equal(
+        auditLogs[0].action,
+        AUDIT_ACTION.REGENERATE_2FA_BACKUP_CODES,
+      );
     });
   });
 
-  describe('5. OpenAPI 3.0 Documentation Registration for 2FA', () => {
-    it('should register all 5 2FA endpoints in OpenAPI spec', () => {
-      assert.ok(swaggerSpec.paths['/auth/2fa/setup']?.post, 'POST /auth/2fa/setup must exist');
-      assert.ok(swaggerSpec.paths['/auth/2fa/enable']?.post, 'POST /auth/2fa/enable must exist');
-      assert.ok(swaggerSpec.paths['/auth/2fa/verify']?.post, 'POST /auth/2fa/verify must exist');
-      assert.ok(swaggerSpec.paths['/auth/2fa/disable']?.post, 'POST /auth/2fa/disable must exist');
-      assert.ok(swaggerSpec.paths['/auth/2fa/backup-codes/regenerate']?.post, 'POST /auth/2fa/backup-codes/regenerate must exist');
+  describe("5. OpenAPI 3.0 Documentation Registration for 2FA", () => {
+    it("should register all 5 2FA endpoints in OpenAPI spec", () => {
+      assert.ok(
+        swaggerSpec.paths["/auth/2fa/setup"]?.post,
+        "POST /auth/2fa/setup must exist",
+      );
+      assert.ok(
+        swaggerSpec.paths["/auth/2fa/enable"]?.post,
+        "POST /auth/2fa/enable must exist",
+      );
+      assert.ok(
+        swaggerSpec.paths["/auth/2fa/verify"]?.post,
+        "POST /auth/2fa/verify must exist",
+      );
+      assert.ok(
+        swaggerSpec.paths["/auth/2fa/disable"]?.post,
+        "POST /auth/2fa/disable must exist",
+      );
+      assert.ok(
+        swaggerSpec.paths["/auth/2fa/backup-codes/regenerate"]?.post,
+        "POST /auth/2fa/backup-codes/regenerate must exist",
+      );
 
-      assert.equal(swaggerSpec.paths['/auth/2fa/setup'].post.tags[0], 'Auth - 2FA');
+      assert.equal(
+        swaggerSpec.paths["/auth/2fa/setup"].post.tags[0],
+        "Auth - 2FA",
+      );
     });
   });
 });

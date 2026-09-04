@@ -13,4 +13,3 @@
 - [ ] Cập nhật Swagger/README khi public API thay đổi.
 - [ ] Chạy build và các kiểm tra Prisma phù hợp.
 - [ ] Thêm test khi dự án có test framework; ghi rõ nếu hiện chưa thể test.
-

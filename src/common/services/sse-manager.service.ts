@@ -1,6 +1,6 @@
-import { Request, Response } from 'express';
-import IORedis from 'ioredis';
-import { envConfig } from '../../config/env.config';
+import { Request, Response } from "express";
+import IORedis from "ioredis";
+import { envConfig } from "../../config/env.config";
 
 export interface SseEvent<T = unknown> {
   type: string;
@@ -9,17 +9,17 @@ export interface SseEvent<T = unknown> {
 }
 
 interface RedisSseMessage {
-  target: 'user' | 'broadcast';
+  target: "user" | "broadcast";
   userId?: string;
   event: SseEvent;
 }
 
-const SSE_PUBSUB_CHANNEL = 'sse:events:stream';
+const SSE_PUBSUB_CHANNEL = "sse:events:stream";
 
 const isTestEnv =
-  process.env.NODE_ENV === 'test' ||
-  process.argv.some((arg) => arg.includes('test')) ||
-  process.env.npm_lifecycle_event === 'test';
+  process.env.NODE_ENV === "test" ||
+  process.argv.some((arg) => arg.includes("test")) ||
+  process.env.npm_lifecycle_event === "test";
 
 export class SseManagerService {
   private readonly userStreams = new Map<string, Set<Response>>();
@@ -57,34 +57,40 @@ export class SseManagerService {
       this.redisPublisher = new IORedis(redisOptions);
       this.redisSubscriber = new IORedis(redisOptions);
 
-      this.redisSubscriber.on('connect', () => {
+      this.redisSubscriber.on("connect", () => {
         this.isRedisAvailable = true;
         this.redisSubscriber?.subscribe(SSE_PUBSUB_CHANNEL, (err) => {
           if (err) {
-            console.error('[SseManagerService] Redis subscribe error:', err.message);
+            console.error(
+              "[SseManagerService] Redis subscribe error:",
+              err.message,
+            );
           }
         });
       });
 
-      this.redisSubscriber.on('message', (channel, message) => {
+      this.redisSubscriber.on("message", (channel, message) => {
         if (channel === SSE_PUBSUB_CHANNEL) {
           try {
             const parsed = JSON.parse(message) as RedisSseMessage;
-            if (parsed.target === 'user' && parsed.userId) {
+            if (parsed.target === "user" && parsed.userId) {
               this.deliverToLocalUser(parsed.userId, parsed.event);
-            } else if (parsed.target === 'broadcast') {
+            } else if (parsed.target === "broadcast") {
               this.deliverToLocalBroadcast(parsed.event);
             }
           } catch (err: any) {
-            console.warn('[SseManagerService] Error parsing Redis SSE message:', err.message);
+            console.warn(
+              "[SseManagerService] Error parsing Redis SSE message:",
+              err.message,
+            );
           }
         }
       });
 
-      this.redisSubscriber.on('error', () => {
+      this.redisSubscriber.on("error", () => {
         this.isRedisAvailable = false;
       });
-      this.redisPublisher.on('error', () => {
+      this.redisPublisher.on("error", () => {
         this.isRedisAvailable = false;
       });
 
@@ -136,10 +142,10 @@ export class SseManagerService {
    */
   registerClient(userId: string, res: Response, req: Request): void {
     // 1. Thiết lập các HTTP Headers chuẩn SSE
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache, no-transform');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no'); // Tắt buffering của Nginx reverse proxy
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no"); // Tắt buffering của Nginx reverse proxy
     res.flushHeaders?.();
 
     // 2. Lưu trữ connection vào Set theo userId
@@ -152,15 +158,15 @@ export class SseManagerService {
 
     // 3. Gửi sự kiện ban đầu thông báo kết nối thành công
     this.sendRaw(res, {
-      type: 'connected',
+      type: "connected",
       data: {
-        status: 'connected',
+        status: "connected",
         serverTime: new Date().toISOString(),
       },
     });
 
     // 4. Lắng nghe sự kiện ngắt kết nối để giải phóng bộ nhớ
-    req.on('close', () => {
+    req.on("close", () => {
       this.removeClient(userId, res);
     });
   }
@@ -182,8 +188,10 @@ export class SseManagerService {
   sendToUser(userId: string, event: SseEvent): void {
     // 1. Nếu có Redis, broadcast lên channel để các pod khác trong cluster cùng nhận
     if (this.isRedisAvailable && this.redisPublisher) {
-      const msg: RedisSseMessage = { target: 'user', userId, event };
-      this.redisPublisher.publish(SSE_PUBSUB_CHANNEL, JSON.stringify(msg)).catch(() => {});
+      const msg: RedisSseMessage = { target: "user", userId, event };
+      this.redisPublisher
+        .publish(SSE_PUBSUB_CHANNEL, JSON.stringify(msg))
+        .catch(() => {});
     }
 
     // 2. Deliver cho các kết nối nội bộ của instance hiện tại
@@ -196,8 +204,10 @@ export class SseManagerService {
   broadcast(event: SseEvent): void {
     // 1. Broadcast qua Redis cho toàn bộ cluster
     if (this.isRedisAvailable && this.redisPublisher) {
-      const msg: RedisSseMessage = { target: 'broadcast', event };
-      this.redisPublisher.publish(SSE_PUBSUB_CHANNEL, JSON.stringify(msg)).catch(() => {});
+      const msg: RedisSseMessage = { target: "broadcast", event };
+      this.redisPublisher
+        .publish(SSE_PUBSUB_CHANNEL, JSON.stringify(msg))
+        .catch(() => {});
     }
 
     // 2. Deliver nội bộ
@@ -233,7 +243,7 @@ export class SseManagerService {
 
   private sendRaw(res: Response, event: SseEvent): void {
     try {
-      let payload = '';
+      let payload = "";
       if (event.id) {
         payload += `id: ${event.id}\n`;
       }
@@ -242,7 +252,10 @@ export class SseManagerService {
 
       res.write(payload);
     } catch (err: any) {
-      console.warn('[SseManagerService] Failed to write event to stream:', err.message);
+      console.warn(
+        "[SseManagerService] Failed to write event to stream:",
+        err.message,
+      );
     }
   }
 
@@ -268,8 +281,8 @@ export class SseManagerService {
 
     // Gửi tín hiệu ngắt kết nối cho các client
     const shutdownEvent: SseEvent = {
-      type: 'shutdown',
-      data: { message: 'Server is restarting or shutting down' },
+      type: "shutdown",
+      data: { message: "Server is restarting or shutting down" },
     };
 
     for (const streams of this.userStreams.values()) {

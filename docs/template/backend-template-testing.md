@@ -2,7 +2,7 @@
 
 **Repository**: `template-be`  
 **Test Runner**: Node Native Test Runner (`node:test`) + `tsx`  
-**Execution Command**: `pnpm test`  
+**Execution Command**: `pnpm test`
 
 ---
 
@@ -43,6 +43,7 @@ pnpm test -- --reporter=tap
 ## 3. Failure & Resilience Verification
 
 The test suite explicitly verifies:
+
 - **SSRF Attacks**: Private IPs, AWS metadata IPs, redirect loops, and DNS rebinding domains are rejected.
 - **HMAC Replay Attacks**: Tampered signatures or requests outside the timestamp tolerance window fail verification.
 - **Crypto Tampering**: Tampered AES-256-GCM ciphertexts or auth tags throw authentication errors.

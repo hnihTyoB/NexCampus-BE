@@ -2,7 +2,7 @@
 
 **Repository**: `template-be`  
 **Version**: 1.0.0 (Production-Grade Template)  
-**Primary Language & Runtime**: Node.js, Express, TypeScript (Strict Mode), PostgreSQL, Prisma ORM, Redis (Optimization & Pub/Sub)  
+**Primary Language & Runtime**: Node.js, Express, TypeScript (Strict Mode), PostgreSQL, Prisma ORM, Redis (Optimization & Pub/Sub)
 
 ---
 
@@ -32,22 +32,27 @@ flowchart TD
 ## 2. Layer Boundaries & Responsibilities
 
 ### 1. Routes Layer (`src/modules/*/*.route.ts` & `src/routes/*.ts`)
+
 - **Responsibility**: Declares HTTP endpoints, URL parameters, methods, and chains middlewares in strict order.
 - **Constraints**: Never executes database queries or contains business decisions.
 
 ### 2. Validation Layer (`src/modules/*/*.validation.ts`)
+
 - **Responsibility**: Defines strict Zod schemas for `body`, `query`, `params`.
 - **Normalization**: Coerces dates, trims strings, strips unexpected properties, validates UUIDs, and protects against parameter pollution.
 
 ### 3. Controller Layer (`src/modules/*/*.controller.ts`)
+
 - **Responsibility**: Extracts validated data, extracts user context (`req.user`), delegates to service layer, and returns consistent HTTP response `{ success: true, data, meta }`.
 - **Constraints**: Forwards all unhandled exceptions directly to `next(error)`. No Prisma queries or hashing in controllers.
 
 ### 4. Service Layer (`src/modules/*/*.service.ts` & `src/common/services/*.ts`)
+
 - **Responsibility**: Business logic, domain rules, transaction boundaries (`prisma.$transaction`), in-memory cache coordination, and event dispatching.
 - **Error Handling**: Uses `AppError` paired with `ERROR_CODE` constants.
 
 ### 5. Repository Layer (`src/modules/*/*.repository.ts`)
+
 - **Responsibility**: Single point of contact with PostgreSQL via Prisma Client.
 - **Data Safety**: Oomits sensitive password hashes, applies soft delete filters (`deletedAt: null`), handles pagination and database indexes.
 

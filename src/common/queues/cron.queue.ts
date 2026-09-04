@@ -1,12 +1,12 @@
-import { Queue, QueueOptions } from 'bullmq';
-import IORedis from 'ioredis';
-import { envConfig } from '../../config/env.config';
+import { Queue, QueueOptions } from "bullmq";
+import IORedis from "ioredis";
+import { envConfig } from "../../config/env.config";
 import {
   CRON_QUEUE_NAME,
   CRON_JOB_NAMES,
   CronJobName,
   DEFAULT_CRON_SCHEDULES,
-} from '../constants/cron.constant';
+} from "../constants/cron.constant";
 
 export interface CronJobData {
   jobName: CronJobName;
@@ -15,9 +15,9 @@ export interface CronJobData {
 }
 
 const isTestEnv =
-  process.env.NODE_ENV === 'test' ||
-  process.argv.some((arg) => arg.includes('test')) ||
-  process.env.npm_lifecycle_event === 'test';
+  process.env.NODE_ENV === "test" ||
+  process.argv.some((arg) => arg.includes("test")) ||
+  process.env.npm_lifecycle_event === "test";
 
 export class CronQueueService {
   private queue?: Queue<CronJobData>;
@@ -48,11 +48,11 @@ export class CronQueueService {
         },
       });
 
-      this.redisConnection.on('connect', () => {
+      this.redisConnection.on("connect", () => {
         this.isRedisAvailable = true;
       });
 
-      this.redisConnection.on('error', () => {
+      this.redisConnection.on("error", () => {
         this.isRedisAvailable = false;
       });
 
@@ -61,7 +61,7 @@ export class CronQueueService {
         defaultJobOptions: {
           attempts: 2,
           backoff: {
-            type: 'exponential',
+            type: "exponential",
             delay: 5000,
           },
           removeOnComplete: true,
@@ -100,9 +100,12 @@ export class CronQueueService {
           },
         );
       }
-      console.log('[CronQueue] Repeatable cron jobs successfully registered');
+      console.log("[CronQueue] Repeatable cron jobs successfully registered");
     } catch (err: any) {
-      console.warn('[CronQueue] Failed to register repeatable schedules:', err.message);
+      console.warn(
+        "[CronQueue] Failed to register repeatable schedules:",
+        err.message,
+      );
     }
   }
 
@@ -126,7 +129,10 @@ export class CronQueueService {
         },
       );
     } catch (err: any) {
-      console.warn(`[CronQueue] Failed to enable scheduler for ${jobName}:`, err.message);
+      console.warn(
+        `[CronQueue] Failed to enable scheduler for ${jobName}:`,
+        err.message,
+      );
     }
   }
 
@@ -138,15 +144,20 @@ export class CronQueueService {
     try {
       await this.queue.removeJobScheduler(jobName).catch(() => {});
     } catch (err: any) {
-      console.warn(`[CronQueue] Failed to disable scheduler for ${jobName}:`, err.message);
+      console.warn(
+        `[CronQueue] Failed to disable scheduler for ${jobName}:`,
+        err.message,
+      );
     }
   }
-
 
   /**
    * Đưa 1 job vào hàng đợi thực thi ngay lập tức
    */
-  async triggerJob(jobName: CronJobName, params?: Record<string, unknown>): Promise<{ jobId: string }> {
+  async triggerJob(
+    jobName: CronJobName,
+    params?: Record<string, unknown>,
+  ): Promise<{ jobId: string }> {
     const data: CronJobData = {
       jobName,
       triggeredAt: new Date().toISOString(),

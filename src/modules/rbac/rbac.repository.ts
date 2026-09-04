@@ -1,17 +1,23 @@
-import { Prisma } from '@prisma/client';
-import { prisma } from '../../database/prisma.client';
-import { RoleQueryDto, AuditLogQueryDto } from './rbac.dto';
+import { Prisma } from "@prisma/client";
+import { prisma } from "../../database/prisma.client";
+import { RoleQueryDto, AuditLogQueryDto } from "./rbac.dto";
 
 export class RbacRepository {
   async findAllRoles(query: RoleQueryDto) {
-    const { search, sortBy = 'createdAt', order = 'asc', page = 1, limit = 20 } = query;
+    const {
+      search,
+      sortBy = "createdAt",
+      order = "asc",
+      page = 1,
+      limit = 20,
+    } = query;
 
     const where: Prisma.RoleWhereInput = {
       ...(search
         ? {
             OR: [
-              { name: { contains: search, mode: 'insensitive' } },
-              { description: { contains: search, mode: 'insensitive' } },
+              { name: { contains: search, mode: "insensitive" } },
+              { description: { contains: search, mode: "insensitive" } },
             ],
           }
         : {}),
@@ -89,7 +95,11 @@ export class RbacRepository {
     });
   }
 
-  async createRole(data: { name: string; description?: string; permissionIds?: string[] }) {
+  async createRole(data: {
+    name: string;
+    description?: string;
+    permissionIds?: string[];
+  }) {
     return prisma.$transaction(async (tx) => {
       const role = await tx.role.create({
         data: {
@@ -128,7 +138,7 @@ export class RbacRepository {
 
   async findAllPermissions() {
     return prisma.permission.findMany({
-      orderBy: [{ resource: 'asc' }, { action: 'asc' }],
+      orderBy: [{ resource: "asc" }, { action: "asc" }],
     });
   }
 
@@ -236,7 +246,14 @@ export class RbacRepository {
   }
 
   async findAllAuditLogs(query: AuditLogQueryDto) {
-    const { actorId, action, targetType, targetId, page = 1, limit = 20 } = query;
+    const {
+      actorId,
+      action,
+      targetType,
+      targetId,
+      page = 1,
+      limit = 20,
+    } = query;
 
     const where: Prisma.AuditLogWhereInput = {
       ...(actorId ? { actorId } : {}),
@@ -250,7 +267,7 @@ export class RbacRepository {
     const [data, total] = await prisma.$transaction([
       prisma.auditLog.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip,
         take: limit,
       }),
@@ -265,4 +282,3 @@ export class RbacRepository {
 }
 
 export const rbacRepository = new RbacRepository();
-

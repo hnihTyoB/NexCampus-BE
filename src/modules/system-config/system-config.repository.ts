@@ -1,6 +1,10 @@
-import { prisma } from '../../database/prisma.client';
-import { Prisma } from '@prisma/client';
-import { CreateSystemConfigDto, UpdateSystemConfigDto, SystemConfigQueryDto } from './system-config.dto';
+import { prisma } from "../../database/prisma.client";
+import { Prisma } from "@prisma/client";
+import {
+  CreateSystemConfigDto,
+  UpdateSystemConfigDto,
+  SystemConfigQueryDto,
+} from "./system-config.dto";
 
 export class SystemConfigRepository {
   async findAll(query: SystemConfigQueryDto) {
@@ -10,8 +14,8 @@ export class SystemConfigRepository {
       ...(query.search
         ? {
             OR: [
-              { key: { contains: query.search, mode: 'insensitive' } },
-              { description: { contains: query.search, mode: 'insensitive' } },
+              { key: { contains: query.search, mode: "insensitive" } },
+              { description: { contains: query.search, mode: "insensitive" } },
             ],
           }
         : {}),
@@ -19,7 +23,7 @@ export class SystemConfigRepository {
 
     return prisma.systemConfig.findMany({
       where,
-      orderBy: [{ category: 'asc' }, { key: 'asc' }],
+      orderBy: [{ category: "asc" }, { key: "asc" }],
     });
   }
 
@@ -53,7 +57,7 @@ export class SystemConfigRepository {
         key: data.key,
         value: data.value as Prisma.InputJsonValue,
         description: data.description,
-        category: data.category || 'GENERAL',
+        category: data.category || "GENERAL",
         isPublic: data.isPublic ?? false,
       },
     });
@@ -61,8 +65,10 @@ export class SystemConfigRepository {
 
   async update(key: string, data: UpdateSystemConfigDto) {
     const updateData: Prisma.SystemConfigUpdateInput = {};
-    if (data.value !== undefined) updateData.value = data.value as Prisma.InputJsonValue;
-    if (data.description !== undefined) updateData.description = data.description;
+    if (data.value !== undefined)
+      updateData.value = data.value as Prisma.InputJsonValue;
+    if (data.description !== undefined)
+      updateData.description = data.description;
     if (data.category !== undefined) updateData.category = data.category;
     if (data.isPublic !== undefined) updateData.isPublic = data.isPublic;
 
@@ -85,7 +91,7 @@ export class SystemConfigRepository {
         key: data.key,
         value: data.value as Prisma.InputJsonValue,
         description: data.description,
-        category: data.category || 'GENERAL',
+        category: data.category || "GENERAL",
         isPublic: data.isPublic ?? false,
       },
     });

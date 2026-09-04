@@ -1,4 +1,4 @@
-import { CronJobName } from '../../common/constants/cron.constant';
+import { CronJobName } from "../../common/constants/cron.constant";
 
 export interface CronJobItemDto {
   name: CronJobName;

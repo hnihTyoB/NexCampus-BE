@@ -8,11 +8,11 @@
  * Chuẩn hóa địa chỉ IP (loại bỏ IPv4-mapped IPv6 ::ffff:, khoảng trắng và chuyển về chữ thường)
  */
 export function normalizeIp(ip: string): string {
-  if (!ip || typeof ip !== 'string') return '';
+  if (!ip || typeof ip !== "string") return "";
   const trimmed = ip.trim().toLowerCase();
-  if (trimmed.startsWith('::ffff:')) {
+  if (trimmed.startsWith("::ffff:")) {
     const mapped = trimmed.slice(7);
-    if (mapped.includes('.')) {
+    if (mapped.includes(".")) {
       return mapped;
     }
   }
@@ -23,7 +23,7 @@ export function normalizeIp(ip: string): string {
  * Chuyển đổi địa chỉ IPv4 dạng chuỗi "a.b.c.d" sang số nguyên không dấu 32-bit
  */
 function ipv4ToInt(ip: string): number | null {
-  const parts = ip.split('.');
+  const parts = ip.split(".");
   if (parts.length !== 4) return null;
   let res = 0;
   for (const part of parts) {
@@ -39,7 +39,7 @@ function ipv4ToInt(ip: string): number | null {
  * Kiểm tra xem một địa chỉ IPv4 có nằm trong dải CIDR (e.g., "192.168.1.0/24", "10.0.0.0/8") hay không
  */
 export function isIpv4InCidr(ip: string, cidr: string): boolean {
-  const [range, prefixStr] = cidr.split('/');
+  const [range, prefixStr] = cidr.split("/");
   if (!range || !prefixStr) return false;
 
   const prefix = parseInt(prefixStr, 10);
@@ -51,7 +51,7 @@ export function isIpv4InCidr(ip: string, cidr: string): boolean {
 
   if (prefix === 0) return true;
 
-  const mask = ((0xffffffff << (32 - prefix)) >>> 0);
+  const mask = (0xffffffff << (32 - prefix)) >>> 0;
   return (ipInt & mask) === (rangeInt & mask);
 }
 
@@ -63,7 +63,10 @@ export function isIpv4InCidr(ip: string, cidr: string): boolean {
  * - Khớp chính xác IPv6 ("::1", "fe80::1")
  * - Dải IPv4 CIDR ("10.0.0.0/8", "172.16.0.0/12", "192.168.1.0/24", "118.69.123.0/24")
  */
-export function isIpInWhitelist(clientIp: string, whitelist: (string | unknown)[]): boolean {
+export function isIpInWhitelist(
+  clientIp: string,
+  whitelist: (string | unknown)[],
+): boolean {
   if (!clientIp || !Array.isArray(whitelist) || whitelist.length === 0) {
     return false;
   }
@@ -72,7 +75,7 @@ export function isIpInWhitelist(clientIp: string, whitelist: (string | unknown)[
   if (!normalizedClient) return false;
 
   for (const item of whitelist) {
-    if (typeof item !== 'string') continue;
+    if (typeof item !== "string") continue;
     const entry = normalizeIp(item);
     if (!entry) continue;
 
@@ -82,7 +85,7 @@ export function isIpInWhitelist(clientIp: string, whitelist: (string | unknown)[
     }
 
     // 2. Khớp CIDR subnet (chỉ áp dụng nếu entry có chứa '/')
-    if (entry.includes('/')) {
+    if (entry.includes("/")) {
       if (isIpv4InCidr(normalizedClient, entry)) {
         return true;
       }

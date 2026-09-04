@@ -1,19 +1,27 @@
-import { CronRepository, cronRepository } from './cron.repository';
-import { R2Service } from '../../common/services/r2.service';
-import { notificationDispatcher } from '../../common/services/notification-dispatcher.service';
+import { CronRepository, cronRepository } from "./cron.repository";
+import { R2Service } from "../../common/services/r2.service";
+import { notificationDispatcher } from "../../common/services/notification-dispatcher.service";
 import {
   CRON_JOB_NAMES,
   CronJobName,
   DEFAULT_CRON_SCHEDULES,
   DEFAULT_AUDIT_LOG_RETENTION_DAYS,
   DEFAULT_UNCONFIRMED_UPLOAD_MAX_AGE_HOURS,
-} from '../../common/constants/cron.constant';
-import { AUDIT_ACTION, AUDIT_TARGET_TYPE, SYSTEM_TARGET_ID } from '../../common/constants/audit-log.constant';
-import { EMAIL_TEMPLATE_KEY, NOTIFICATION_CHANNEL } from '../../common/constants/notification.constant';
-import { formatVietnamDate, getVietnamDayRange } from '../../common/helpers/date.helper';
-import { CronJobExecutionResultDto, CronJobItemDto } from './cron.dto';
-
-
+} from "../../common/constants/cron.constant";
+import {
+  AUDIT_ACTION,
+  AUDIT_TARGET_TYPE,
+  SYSTEM_TARGET_ID,
+} from "../../common/constants/audit-log.constant";
+import {
+  EMAIL_TEMPLATE_KEY,
+  NOTIFICATION_CHANNEL,
+} from "../../common/constants/notification.constant";
+import {
+  formatVietnamDate,
+  getVietnamDayRange,
+} from "../../common/helpers/date.helper";
+import { CronJobExecutionResultDto, CronJobItemDto } from "./cron.dto";
 
 export class CronService {
   constructor(
@@ -25,17 +33,21 @@ export class CronService {
    * Danh sách toàn bộ các tác vụ định kỳ đã đăng ký trong hệ thống
    */
   async listJobs(search?: string): Promise<CronJobItemDto[]> {
-    const jobs: CronJobItemDto[] = Object.entries(DEFAULT_CRON_SCHEDULES).map(([name, config]) => ({
-      name: name as CronJobName,
-      cron: config.cron,
-      description: config.description,
-      lastStatus: 'READY',
-    }));
+    const jobs: CronJobItemDto[] = Object.entries(DEFAULT_CRON_SCHEDULES).map(
+      ([name, config]) => ({
+        name: name as CronJobName,
+        cron: config.cron,
+        description: config.description,
+        lastStatus: "READY",
+      }),
+    );
 
     if (search) {
       const lower = search.toLowerCase();
       return jobs.filter(
-        (j) => j.name.toLowerCase().includes(lower) || j.description.toLowerCase().includes(lower),
+        (j) =>
+          j.name.toLowerCase().includes(lower) ||
+          j.description.toLowerCase().includes(lower),
       );
     }
 
@@ -45,20 +57,29 @@ export class CronService {
   /**
    * 1. Dọn dẹp các bản ghi Audit Logs cũ hơn số ngày quy định (mặc định 30 ngày)
    */
-  async executeAuditLogCleanup(retentionDays = DEFAULT_AUDIT_LOG_RETENTION_DAYS): Promise<{
+  async executeAuditLogCleanup(
+    retentionDays = DEFAULT_AUDIT_LOG_RETENTION_DAYS,
+  ): Promise<{
     deletedCount: number;
     retentionDays: number;
     cutoffDate: string;
   }> {
-    const cutoffDate = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
-    const deletedCount = await this.repository.deleteAuditLogsOlderThan(cutoffDate);
+    const cutoffDate = new Date(
+      Date.now() - retentionDays * 24 * 60 * 60 * 1000,
+    );
+    const deletedCount =
+      await this.repository.deleteAuditLogsOlderThan(cutoffDate);
 
     // Ghi audit log hệ thống về việc dọn dẹp
     await this.repository.createAuditLog({
       action: AUDIT_ACTION.CLEANUP_AUDIT_LOGS,
       targetType: AUDIT_TARGET_TYPE.CRON_JOB,
       targetId: CRON_JOB_NAMES.CLEANUP_AUDIT_LOGS,
-      details: { deletedCount, retentionDays, cutoffDate: cutoffDate.toISOString() },
+      details: {
+        deletedCount,
+        retentionDays,
+        cutoffDate: cutoffDate.toISOString(),
+      },
     });
 
     return {
@@ -71,7 +92,9 @@ export class CronService {
   /**
    * 2. Quét và dọn dẹp các file tải lên không xác nhận / rác trên Cloudflare R2 / S3
    */
-  async executeUploadsCleanup(maxAgeHours = DEFAULT_UNCONFIRMED_UPLOAD_MAX_AGE_HOURS): Promise<{
+  async executeUploadsCleanup(
+    maxAgeHours = DEFAULT_UNCONFIRMED_UPLOAD_MAX_AGE_HOURS,
+  ): Promise<{
     scannedCount: number;
     deletedCount: number;
     deletedKeys: string[];
@@ -80,7 +103,7 @@ export class CronService {
     const maxAgeMs = maxAgeHours * 60 * 60 * 1000;
 
     // Lấy toàn bộ danh sách file trong thư mục avatars/
-    const objects = await this.r2Service.listObjects('avatars/');
+    const objects = await this.r2Service.listObjects("avatars/");
     if (objects.length === 0) {
       return { scannedCount: 0, deletedCount: 0, deletedKeys: [] };
     }
@@ -102,11 +125,16 @@ export class CronService {
     for (const obj of objects) {
       // Nếu file chưa từng được liên kết với bất kỳ User nào và đã tồn tại quá maxAgeHours
       const isOrphaned = !activeKeySet.has(obj.key);
-      const isOldEnough = obj.lastModified ? now - obj.lastModified.getTime() > maxAgeMs : false;
+      const isOldEnough = obj.lastModified
+        ? now - obj.lastModified.getTime() > maxAgeMs
+        : false;
 
       if (isOrphaned && isOldEnough) {
         await this.r2Service.deleteFile(obj.key).catch((err) => {
-          console.warn(`[CronService] Failed to delete orphaned file ${obj.key}:`, err.message);
+          console.warn(
+            `[CronService] Failed to delete orphaned file ${obj.key}:`,
+            err.message,
+          );
         });
         deletedKeys.push(obj.key);
       }
@@ -117,7 +145,11 @@ export class CronService {
         action: AUDIT_ACTION.CLEANUP_UNCONFIRMED_UPLOADS,
         targetType: AUDIT_TARGET_TYPE.CRON_JOB,
         targetId: CRON_JOB_NAMES.CLEANUP_UNCONFIRMED_UPLOADS,
-        details: { scannedCount: objects.length, deletedCount: deletedKeys.length, maxAgeHours },
+        details: {
+          scannedCount: objects.length,
+          deletedCount: deletedKeys.length,
+          maxAgeHours,
+        },
       });
     }
 
@@ -140,7 +172,9 @@ export class CronService {
     const now = new Date();
     const result = await this.repository.deleteExpiredTokens(now);
     const totalDeleted =
-      result.refreshTokensCount + result.verificationTokensCount + result.passwordResetTokensCount;
+      result.refreshTokensCount +
+      result.verificationTokensCount +
+      result.passwordResetTokensCount;
 
     if (totalDeleted > 0) {
       await this.repository.createAuditLog({
@@ -160,17 +194,19 @@ export class CronService {
   /**
    * 4. Tổng hợp hoạt động định kỳ (Hàng ngày / Hàng tuần) và gửi email báo cáo tới Quản trị viên
    */
-  async executeSummaryDigest(options: { period: 'DAILY' | 'WEEKLY' }): Promise<{
-    period: 'DAILY' | 'WEEKLY';
+  async executeSummaryDigest(options: { period: "DAILY" | "WEEKLY" }): Promise<{
+    period: "DAILY" | "WEEKLY";
     startDate: string;
     endDate: string;
     stats: any;
     recipientCount: number;
   }> {
-    const durationDays = options.period === 'WEEKLY' ? 7 : 1;
+    const durationDays = options.period === "WEEKLY" ? 7 : 1;
     const prevDate = new Date(Date.now() - durationDays * 24 * 60 * 60 * 1000);
     const startDateStr = formatVietnamDate(prevDate);
-    const endDateStr = formatVietnamDate(new Date(Date.now() - 24 * 60 * 60 * 1000));
+    const endDateStr = formatVietnamDate(
+      new Date(Date.now() - 24 * 60 * 60 * 1000),
+    );
 
     const { startOfDay: startDate } = getVietnamDayRange(startDateStr);
     const { endOfDay: endDate } = getVietnamDayRange(endDateStr);
@@ -178,34 +214,41 @@ export class CronService {
     const stats = await this.repository.getActivityStats(startDate, endDate);
     const admins = await this.repository.findAdminUsers();
 
-    const periodText = options.period === 'WEEKLY' ? 'Hàng tuần' : 'Hàng ngày';
+    const periodText = options.period === "WEEKLY" ? "Hàng tuần" : "Hàng ngày";
 
     for (const admin of admins) {
       if (admin.email) {
-        await notificationDispatcher.send({
-          userId: admin.id,
-          channels: [NOTIFICATION_CHANNEL.EMAIL],
-          email: {
-            toEmail: admin.email,
-            templateKey: EMAIL_TEMPLATE_KEY.ACTIVITY_SUMMARY_DIGEST,
-            templateData: {
-              period: periodText,
-              startDate: startDateStr,
-              endDate: endDateStr,
-              ...stats,
+        await notificationDispatcher
+          .send({
+            userId: admin.id,
+            channels: [NOTIFICATION_CHANNEL.EMAIL],
+            email: {
+              toEmail: admin.email,
+              templateKey: EMAIL_TEMPLATE_KEY.ACTIVITY_SUMMARY_DIGEST,
+              templateData: {
+                period: periodText,
+                startDate: startDateStr,
+                endDate: endDateStr,
+                ...stats,
+              },
             },
-          },
-        }).catch((err: any) => {
-          console.warn(`[CronService] Failed to send digest email to ${admin.email}:`, err.message);
-        });
+          })
+          .catch((err: any) => {
+            console.warn(
+              `[CronService] Failed to send digest email to ${admin.email}:`,
+              err.message,
+            );
+          });
       }
     }
-
 
     await this.repository.createAuditLog({
       action: AUDIT_ACTION.SEND_SUMMARY_DIGEST,
       targetType: AUDIT_TARGET_TYPE.CRON_JOB,
-      targetId: options.period === 'WEEKLY' ? CRON_JOB_NAMES.WEEKLY_SUMMARY_DIGEST : CRON_JOB_NAMES.DAILY_SUMMARY_DIGEST,
+      targetId:
+        options.period === "WEEKLY"
+          ? CRON_JOB_NAMES.WEEKLY_SUMMARY_DIGEST
+          : CRON_JOB_NAMES.DAILY_SUMMARY_DIGEST,
       details: { period: options.period, stats, recipientCount: admins.length },
     });
 
@@ -232,12 +275,18 @@ export class CronService {
 
     switch (jobName) {
       case CRON_JOB_NAMES.CLEANUP_AUDIT_LOGS: {
-        const days = typeof params['retentionDays'] === 'number' ? params['retentionDays'] : DEFAULT_AUDIT_LOG_RETENTION_DAYS;
+        const days =
+          typeof params["retentionDays"] === "number"
+            ? params["retentionDays"]
+            : DEFAULT_AUDIT_LOG_RETENTION_DAYS;
         executionData = await this.executeAuditLogCleanup(days);
         break;
       }
       case CRON_JOB_NAMES.CLEANUP_UNCONFIRMED_UPLOADS: {
-        const hours = typeof params['maxAgeHours'] === 'number' ? params['maxAgeHours'] : DEFAULT_UNCONFIRMED_UPLOAD_MAX_AGE_HOURS;
+        const hours =
+          typeof params["maxAgeHours"] === "number"
+            ? params["maxAgeHours"]
+            : DEFAULT_UNCONFIRMED_UPLOAD_MAX_AGE_HOURS;
         executionData = await this.executeUploadsCleanup(hours);
         break;
       }
@@ -246,11 +295,11 @@ export class CronService {
         break;
       }
       case CRON_JOB_NAMES.DAILY_SUMMARY_DIGEST: {
-        executionData = await this.executeSummaryDigest({ period: 'DAILY' });
+        executionData = await this.executeSummaryDigest({ period: "DAILY" });
         break;
       }
       case CRON_JOB_NAMES.WEEKLY_SUMMARY_DIGEST: {
-        executionData = await this.executeSummaryDigest({ period: 'WEEKLY' });
+        executionData = await this.executeSummaryDigest({ period: "WEEKLY" });
         break;
       }
       default:

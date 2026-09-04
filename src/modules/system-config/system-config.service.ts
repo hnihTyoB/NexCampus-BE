@@ -1,22 +1,27 @@
-import { SystemConfigRepository, systemConfigRepository } from './system-config.repository';
-import { AppError } from '../../common/errors/app-error';
-import { ERROR_CODE } from '../../common/errors/error-code';
+import {
+  SystemConfigRepository,
+  systemConfigRepository,
+} from "./system-config.repository";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODE } from "../../common/errors/error-code";
 import {
   CreateSystemConfigDto,
   UpdateSystemConfigDto,
   SystemConfigQueryDto,
   ToggleFeatureFlagDto,
-} from './system-config.dto';
+} from "./system-config.dto";
 import {
   DEFAULT_SYSTEM_CONFIGS,
   SYSTEM_CONFIG_CATEGORY,
   SYSTEM_CONFIG_PUBSUB_CHANNEL,
-} from '../../common/constants/system-config.constant';
-import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from '../../common/constants/audit-log.constant';
-import { envConfig } from '../../config/env.config';
-import { sseManagerService } from '../../common/services/sse-manager.service';
-import IORedis from 'ioredis';
-
+} from "../../common/constants/system-config.constant";
+import {
+  AUDIT_ACTION,
+  AUDIT_TARGET_TYPE,
+} from "../../common/constants/audit-log.constant";
+import { envConfig } from "../../config/env.config";
+import { sseManagerService } from "../../common/services/sse-manager.service";
+import IORedis from "ioredis";
 
 interface CacheEntry {
   value: unknown;
@@ -26,9 +31,9 @@ interface CacheEntry {
 }
 
 const isTestEnv =
-  process.env.NODE_ENV === 'test' ||
-  process.argv.some((arg) => arg.includes('test')) ||
-  process.env.npm_lifecycle_event === 'test';
+  process.env.NODE_ENV === "test" ||
+  process.argv.some((arg) => arg.includes("test")) ||
+  process.env.npm_lifecycle_event === "test";
 
 export class SystemConfigService {
   private cache = new Map<string, CacheEntry>();
@@ -37,7 +42,9 @@ export class SystemConfigService {
   private redisSubscriber?: IORedis;
   private isRedisAvailable = false;
 
-  constructor(private readonly repository: SystemConfigRepository = systemConfigRepository) {
+  constructor(
+    private readonly repository: SystemConfigRepository = systemConfigRepository,
+  ) {
     if (!isTestEnv && envConfig.redis.enabled) {
       this.initRedisPubSub();
     }
@@ -64,16 +71,19 @@ export class SystemConfigService {
       this.redisPublisher = new IORedis(redisOptions);
       this.redisSubscriber = new IORedis(redisOptions);
 
-      this.redisSubscriber.on('connect', () => {
+      this.redisSubscriber.on("connect", () => {
         this.isRedisAvailable = true;
         this.redisSubscriber?.subscribe(SYSTEM_CONFIG_PUBSUB_CHANNEL, (err) => {
           if (err) {
-            console.error('[SystemConfigService] Redis subscribe error:', err.message);
+            console.error(
+              "[SystemConfigService] Redis subscribe error:",
+              err.message,
+            );
           }
         });
       });
 
-      this.redisSubscriber.on('message', (channel, message) => {
+      this.redisSubscriber.on("message", (channel, message) => {
         if (channel === SYSTEM_CONFIG_PUBSUB_CHANNEL) {
           try {
             const data = JSON.parse(message);
@@ -88,11 +98,11 @@ export class SystemConfigService {
         }
       });
 
-      this.redisPublisher.on('error', () => {
+      this.redisPublisher.on("error", () => {
         this.isRedisAvailable = false;
       });
 
-      this.redisSubscriber.on('error', () => {
+      this.redisSubscriber.on("error", () => {
         this.isRedisAvailable = false;
       });
     } catch {
@@ -130,7 +140,11 @@ export class SystemConfigService {
     const config = await this.repository.findByKey(key);
     if (!config) {
       if (defaultValue !== undefined) return defaultValue;
-      throw new AppError(`System configuration '${key}' not found`, 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError(
+        `System configuration '${key}' not found`,
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
     }
 
     this.cache.set(key, {
@@ -146,7 +160,10 @@ export class SystemConfigService {
   /**
    * Kiểm tra trạng thái Feature Flag (boolean).
    */
-  async isFeatureEnabled(flagKey: string, defaultState = true): Promise<boolean> {
+  async isFeatureEnabled(
+    flagKey: string,
+    defaultState = true,
+  ): Promise<boolean> {
     try {
       const val = await this.get<boolean>(flagKey, defaultState);
       return Boolean(val);
@@ -183,7 +200,11 @@ export class SystemConfigService {
   ) {
     const existing = await this.repository.findByKey(data.key);
     if (existing) {
-      throw new AppError(`Configuration key '${data.key}' already exists`, 409, ERROR_CODE.DUPLICATE_ENTRY);
+      throw new AppError(
+        `Configuration key '${data.key}' already exists`,
+        409,
+        ERROR_CODE.DUPLICATE_ENTRY,
+      );
     }
 
     const created = await this.repository.create(data);
@@ -194,7 +215,11 @@ export class SystemConfigService {
       action: AUDIT_ACTION.CREATE_SYSTEM_CONFIG,
       targetType: AUDIT_TARGET_TYPE.SYSTEM_CONFIG,
       targetId: created.id,
-      details: { key: created.key, category: created.category, isPublic: created.isPublic },
+      details: {
+        key: created.key,
+        category: created.category,
+        isPublic: created.isPublic,
+      },
       ipAddress: context?.ipAddress,
       userAgent: context?.userAgent,
     });
@@ -212,7 +237,11 @@ export class SystemConfigService {
   ) {
     const existing = await this.repository.findByKey(key);
     if (!existing) {
-      throw new AppError(`Configuration key '${key}' not found`, 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError(
+        `Configuration key '${key}' not found`,
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
     }
 
     const updated = await this.repository.update(key, data);
@@ -225,7 +254,11 @@ export class SystemConfigService {
       targetId: updated.id,
       details: {
         key,
-        previous: { value: existing.value, category: existing.category, isPublic: existing.isPublic },
+        previous: {
+          value: existing.value,
+          category: existing.category,
+          isPublic: existing.isPublic,
+        },
         updated: data,
       },
       ipAddress: context?.ipAddress,
@@ -251,7 +284,7 @@ export class SystemConfigService {
       record = await this.repository.create({
         key,
         value: data.enabled,
-        description: data.description || 'Feature Flag',
+        description: data.description || "Feature Flag",
         category: SYSTEM_CONFIG_CATEGORY.FEATURE_FLAG,
         isPublic: false,
       });
@@ -267,7 +300,7 @@ export class SystemConfigService {
 
     // Broadcast SSE event
     sseManagerService.broadcast({
-      type: 'system:feature_toggle',
+      type: "system:feature_toggle",
       data: { key, enabled: data.enabled },
     });
 
@@ -281,7 +314,6 @@ export class SystemConfigService {
       userAgent: context?.userAgent,
     });
 
-
     return record;
   }
 
@@ -294,7 +326,11 @@ export class SystemConfigService {
   ) {
     const existing = await this.repository.findByKey(key);
     if (!existing) {
-      throw new AppError(`Configuration key '${key}' not found`, 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError(
+        `Configuration key '${key}' not found`,
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
     }
 
     await this.repository.delete(key);

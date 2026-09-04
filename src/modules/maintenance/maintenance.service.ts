@@ -1,9 +1,25 @@
-import { maintenanceRepository, MaintenanceRepository } from './maintenance.repository';
-import { maintenanceCacheService, MaintenanceCacheService } from '../../common/services/maintenance-cache.service';
-import { sseManagerService } from '../../common/services/sse-manager.service';
-import { EnableMaintenanceDto, UpdateMaintenanceDto, PublicMaintenanceStatusDto } from './maintenance.dto';
-import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from '../../common/constants/audit-log.constant';
-import { MAINTENANCE_STATUS, MaintenanceStatus } from '../../common/constants/maintenance.constant';
+import {
+  maintenanceRepository,
+  MaintenanceRepository,
+} from "./maintenance.repository";
+import {
+  maintenanceCacheService,
+  MaintenanceCacheService,
+} from "../../common/services/maintenance-cache.service";
+import { sseManagerService } from "../../common/services/sse-manager.service";
+import {
+  EnableMaintenanceDto,
+  UpdateMaintenanceDto,
+  PublicMaintenanceStatusDto,
+} from "./maintenance.dto";
+import {
+  AUDIT_ACTION,
+  AUDIT_TARGET_TYPE,
+} from "../../common/constants/audit-log.constant";
+import {
+  MAINTENANCE_STATUS,
+  MaintenanceStatus,
+} from "../../common/constants/maintenance.constant";
 
 export class MaintenanceService {
   constructor(
@@ -11,12 +27,12 @@ export class MaintenanceService {
     private cacheService: MaintenanceCacheService = maintenanceCacheService,
   ) {}
 
-  async getConfig(key = 'DEFAULT') {
+  async getConfig(key = "DEFAULT") {
     const config = await this.repo.getOrCreateDefaultConfig(key);
     return config;
   }
 
-  async getPublicStatus(key = 'DEFAULT'): Promise<PublicMaintenanceStatusDto> {
+  async getPublicStatus(key = "DEFAULT"): Promise<PublicMaintenanceStatusDto> {
     const config = await this.cacheService.getConfig(key);
     return {
       enabled: config.enabled,
@@ -24,7 +40,9 @@ export class MaintenanceService {
       title: config.title,
       message: config.message,
       startAt: config.startAt ? config.startAt.toISOString() : null,
-      estimatedEndAt: config.estimatedEndAt ? config.estimatedEndAt.toISOString() : null,
+      estimatedEndAt: config.estimatedEndAt
+        ? config.estimatedEndAt.toISOString()
+        : null,
     };
   }
 
@@ -34,8 +52,18 @@ export class MaintenanceService {
   ) {
     const previousConfig = await this.repo.getOrCreateDefaultConfig();
 
-    const startAt = dto.startAt !== undefined ? (dto.startAt ? new Date(dto.startAt) : null) : new Date();
-    const estimatedEndAt = dto.estimatedEndAt !== undefined ? (dto.estimatedEndAt ? new Date(dto.estimatedEndAt) : null) : previousConfig.estimatedEndAt;
+    const startAt =
+      dto.startAt !== undefined
+        ? dto.startAt
+          ? new Date(dto.startAt)
+          : null
+        : new Date();
+    const estimatedEndAt =
+      dto.estimatedEndAt !== undefined
+        ? dto.estimatedEndAt
+          ? new Date(dto.estimatedEndAt)
+          : null
+        : previousConfig.estimatedEndAt;
 
     const newStatus = dto.status || MAINTENANCE_STATUS.MAINTENANCE;
 
@@ -46,8 +74,10 @@ export class MaintenanceService {
       message: dto.message ?? previousConfig.message,
       startAt,
       estimatedEndAt,
-      bypassPermissions: (dto.bypassPermissions ?? (previousConfig.bypassPermissions as any)) as any,
-      bypassRoles: (dto.bypassRoles ?? (previousConfig.bypassRoles as any)) as any,
+      bypassPermissions: (dto.bypassPermissions ??
+        (previousConfig.bypassPermissions as any)) as any,
+      bypassRoles: (dto.bypassRoles ??
+        (previousConfig.bypassRoles as any)) as any,
       bypassIps: (dto.bypassIps ?? (previousConfig.bypassIps as any)) as any,
     });
 
@@ -55,17 +85,20 @@ export class MaintenanceService {
 
     // Broadcast SSE event
     sseManagerService.broadcast({
-      type: 'system:maintenance',
+      type: "system:maintenance",
       data: {
         enabled: updatedConfig.enabled,
         status: updatedConfig.status,
         title: updatedConfig.title,
         message: updatedConfig.message,
-        startAt: updatedConfig.startAt ? updatedConfig.startAt.toISOString() : null,
-        estimatedEndAt: updatedConfig.estimatedEndAt ? updatedConfig.estimatedEndAt.toISOString() : null,
+        startAt: updatedConfig.startAt
+          ? updatedConfig.startAt.toISOString()
+          : null,
+        estimatedEndAt: updatedConfig.estimatedEndAt
+          ? updatedConfig.estimatedEndAt.toISOString()
+          : null,
       },
     });
-
 
     // Audit log
     await this.repo.createAuditLog({
@@ -100,19 +133,35 @@ export class MaintenanceService {
   ) {
     const previousConfig = await this.repo.getOrCreateDefaultConfig();
 
-    let enabled = dto.enabled !== undefined ? dto.enabled : previousConfig.enabled;
+    let enabled =
+      dto.enabled !== undefined ? dto.enabled : previousConfig.enabled;
     let status = dto.status !== undefined ? dto.status : previousConfig.status;
 
     if (dto.status === MAINTENANCE_STATUS.ONLINE) {
       enabled = false;
-    } else if (dto.status === MAINTENANCE_STATUS.MAINTENANCE || dto.status === MAINTENANCE_STATUS.READ_ONLY) {
+    } else if (
+      dto.status === MAINTENANCE_STATUS.MAINTENANCE ||
+      dto.status === MAINTENANCE_STATUS.READ_ONLY
+    ) {
       enabled = true;
     } else if (dto.enabled !== undefined) {
-      status = dto.enabled ? MAINTENANCE_STATUS.MAINTENANCE : MAINTENANCE_STATUS.ONLINE;
+      status = dto.enabled
+        ? MAINTENANCE_STATUS.MAINTENANCE
+        : MAINTENANCE_STATUS.ONLINE;
     }
 
-    const startAt = dto.startAt !== undefined ? (dto.startAt ? new Date(dto.startAt) : null) : previousConfig.startAt;
-    const estimatedEndAt = dto.estimatedEndAt !== undefined ? (dto.estimatedEndAt ? new Date(dto.estimatedEndAt) : null) : previousConfig.estimatedEndAt;
+    const startAt =
+      dto.startAt !== undefined
+        ? dto.startAt
+          ? new Date(dto.startAt)
+          : null
+        : previousConfig.startAt;
+    const estimatedEndAt =
+      dto.estimatedEndAt !== undefined
+        ? dto.estimatedEndAt
+          ? new Date(dto.estimatedEndAt)
+          : null
+        : previousConfig.estimatedEndAt;
 
     const updatedConfig = await this.repo.updateConfig(previousConfig.key, {
       enabled,
@@ -121,8 +170,10 @@ export class MaintenanceService {
       message: dto.message ?? previousConfig.message,
       startAt,
       estimatedEndAt,
-      bypassPermissions: (dto.bypassPermissions ?? (previousConfig.bypassPermissions as any)) as any,
-      bypassRoles: (dto.bypassRoles ?? (previousConfig.bypassRoles as any)) as any,
+      bypassPermissions: (dto.bypassPermissions ??
+        (previousConfig.bypassPermissions as any)) as any,
+      bypassRoles: (dto.bypassRoles ??
+        (previousConfig.bypassRoles as any)) as any,
       bypassIps: (dto.bypassIps ?? (previousConfig.bypassIps as any)) as any,
     });
 
@@ -130,14 +181,18 @@ export class MaintenanceService {
 
     // Broadcast SSE event
     sseManagerService.broadcast({
-      type: 'system:maintenance',
+      type: "system:maintenance",
       data: {
         enabled: updatedConfig.enabled,
         status: updatedConfig.status,
         title: updatedConfig.title,
         message: updatedConfig.message,
-        startAt: updatedConfig.startAt ? updatedConfig.startAt.toISOString() : null,
-        estimatedEndAt: updatedConfig.estimatedEndAt ? updatedConfig.estimatedEndAt.toISOString() : null,
+        startAt: updatedConfig.startAt
+          ? updatedConfig.startAt.toISOString()
+          : null,
+        estimatedEndAt: updatedConfig.estimatedEndAt
+          ? updatedConfig.estimatedEndAt.toISOString()
+          : null,
       },
     });
 
@@ -168,9 +223,11 @@ export class MaintenanceService {
     return updatedConfig;
   }
 
-  async disableMaintenance(
-    context?: { actorId?: string; ipAddress?: string; userAgent?: string },
-  ) {
+  async disableMaintenance(context?: {
+    actorId?: string;
+    ipAddress?: string;
+    userAgent?: string;
+  }) {
     const previousConfig = await this.repo.getOrCreateDefaultConfig();
 
     const updatedConfig = await this.repo.updateConfig(previousConfig.key, {
@@ -182,7 +239,7 @@ export class MaintenanceService {
 
     // Broadcast SSE event
     sseManagerService.broadcast({
-      type: 'system:maintenance',
+      type: "system:maintenance",
       data: {
         enabled: false,
         status: MAINTENANCE_STATUS.ONLINE,
@@ -216,6 +273,5 @@ export class MaintenanceService {
     return updatedConfig;
   }
 }
-
 
 export const maintenanceService = new MaintenanceService();

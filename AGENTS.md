@@ -42,7 +42,7 @@ Trước khi sửa code:
   1. `pnpm exec prisma validate`
   2. `pnpm run prisma:generate`
   3. `pnpm build`
-  Xác nhận generated types thực sự chứa field/model mới; không chỉ dựa vào một lần build thành công vì TypeScript hoặc IDE có thể đang resolve client cũ/stale.
+     Xác nhận generated types thực sự chứa field/model mới; không chỉ dựa vào một lần build thành công vì TypeScript hoặc IDE có thể đang resolve client cũ/stale.
 - **Script chuẩn**: Sử dụng các script wrapper trong `package.json`:
   - `pnpm run prisma:generate`: Sinh Prisma client
   - `pnpm run db:migrate`: Tạo và áp dụng migration trong môi trường dev

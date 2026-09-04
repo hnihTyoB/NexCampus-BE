@@ -1,7 +1,10 @@
-import { Queue, QueueOptions } from 'bullmq';
-import IORedis from 'ioredis';
-import { envConfig } from '../../config/env.config';
-import { WEBHOOK_MAX_ATTEMPTS, WEBHOOK_EXPONENTIAL_DELAY_MS } from '../constants/integration.constant';
+import { Queue, QueueOptions } from "bullmq";
+import IORedis from "ioredis";
+import { envConfig } from "../../config/env.config";
+import {
+  WEBHOOK_MAX_ATTEMPTS,
+  WEBHOOK_EXPONENTIAL_DELAY_MS,
+} from "../constants/integration.constant";
 
 export interface WebhookJobData {
   deliveryId: string;
@@ -13,18 +16,22 @@ export interface WebhookJobData {
   payload: Record<string, unknown>;
 }
 
-export const WEBHOOK_QUEUE_NAME = 'webhook-delivery-queue';
+export const WEBHOOK_QUEUE_NAME = "webhook-delivery-queue";
 
 const isTestEnv =
-  process.env.NODE_ENV === 'test' ||
-  process.argv.some((arg) => arg.includes('test')) ||
-  process.env.npm_lifecycle_event === 'test';
+  process.env.NODE_ENV === "test" ||
+  process.argv.some((arg) => arg.includes("test")) ||
+  process.env.npm_lifecycle_event === "test";
 
 class WebhookQueueService {
   private queue?: Queue<WebhookJobData>;
   private redisConnection?: IORedis;
   private isRedisAvailable = false;
-  private inMemoryQueue: Array<{ id: string; data: WebhookJobData; attemptsMade: number }> = [];
+  private inMemoryQueue: Array<{
+    id: string;
+    data: WebhookJobData;
+    attemptsMade: number;
+  }> = [];
 
   constructor() {
     if (!isTestEnv && envConfig.redis.enabled) {
@@ -50,11 +57,11 @@ class WebhookQueueService {
         },
       });
 
-      this.redisConnection.on('connect', () => {
+      this.redisConnection.on("connect", () => {
         this.isRedisAvailable = true;
       });
 
-      this.redisConnection.on('error', () => {
+      this.redisConnection.on("error", () => {
         this.isRedisAvailable = false;
       });
 
@@ -63,7 +70,7 @@ class WebhookQueueService {
         defaultJobOptions: {
           attempts: envConfig.webhook.maxAttempts || WEBHOOK_MAX_ATTEMPTS,
           backoff: {
-            type: 'exponential',
+            type: "exponential",
             delay: WEBHOOK_EXPONENTIAL_DELAY_MS,
           },
           removeOnComplete: true,
@@ -83,7 +90,7 @@ class WebhookQueueService {
   async enqueue(data: WebhookJobData): Promise<{ jobId: string }> {
     if (this.isRedisAvailable && this.queue) {
       try {
-        const job = await this.queue.add('dispatch-webhook', data, {
+        const job = await this.queue.add("dispatch-webhook", data, {
           jobId: data.deliveryId,
         });
         return { jobId: job.id || data.deliveryId };

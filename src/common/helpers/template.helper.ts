@@ -8,12 +8,12 @@ export function renderTemplateString(
   template: string,
   variables: Record<string, unknown> = {},
 ): string {
-  if (!template) return '';
+  if (!template) return "";
 
   return template.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_match, key) => {
     const value = variables[key];
     if (value === undefined || value === null) {
-      return '';
+      return "";
     }
     return String(value);
   });
@@ -24,11 +24,11 @@ export function renderTemplateString(
  * trong nội dung email hoặc bất kỳ đầu ra HTML nào nhận dữ liệu từ người dùng.
  */
 export function escapeHtml(str: string | undefined | null): string {
-  if (!str) return '';
+  if (!str) return "";
   return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }

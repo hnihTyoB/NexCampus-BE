@@ -1,31 +1,31 @@
-import { openapiRegistry } from '../../config/openapi/openapi.registry';
+import { openapiRegistry } from "../../config/openapi/openapi.registry";
 import {
   findAllUserSchema,
   createUserSchema,
   updateUserSchema,
   userIdParamSchema,
-} from './user.validation';
-import { z } from 'zod';
+} from "./user.validation";
+import { z } from "zod";
 
 export function registerUserOpenApi(): void {
-  openapiRegistry.register('CreateUserRequest', createUserSchema);
-  openapiRegistry.register('UpdateUserRequest', updateUserSchema);
+  openapiRegistry.register("CreateUserRequest", createUserSchema);
+  openapiRegistry.register("UpdateUserRequest", updateUserSchema);
 
   // GET /users
   openapiRegistry.registerPath({
-    method: 'get',
-    path: '/users',
-    tags: ['Users'],
-    summary: 'Danh sách người dùng (Phân trang, tìm kiếm & lọc)',
+    method: "get",
+    path: "/users",
+    tags: ["Users"],
+    summary: "Danh sách người dùng (Phân trang, tìm kiếm & lọc)",
     security: [{ BearerAuth: [] }],
     request: {
       query: findAllUserSchema,
     },
     responses: {
       200: {
-        description: 'Lấy danh sách thành công',
+        description: "Lấy danh sách thành công",
         content: {
-          'application/json': {
+          "application/json": {
             schema: z.object({
               success: z.boolean().openapi({ example: true }),
               data: z.array(
@@ -55,25 +55,25 @@ export function registerUserOpenApi(): void {
           },
         },
       },
-      403: { description: 'Không có quyền USER_READ' },
+      403: { description: "Không có quyền USER_READ" },
     },
   });
 
   // GET /users/:id
   openapiRegistry.registerPath({
-    method: 'get',
-    path: '/users/{id}',
-    tags: ['Users'],
-    summary: 'Chi tiết thông tin người dùng theo ID',
+    method: "get",
+    path: "/users/{id}",
+    tags: ["Users"],
+    summary: "Chi tiết thông tin người dùng theo ID",
     security: [{ BearerAuth: [] }],
     request: {
       params: userIdParamSchema,
     },
     responses: {
       200: {
-        description: 'Lấy chi tiết thành công',
+        description: "Lấy chi tiết thành công",
         content: {
-          'application/json': {
+          "application/json": {
             schema: z.object({
               success: z.boolean().openapi({ example: true }),
               data: z.object({
@@ -95,29 +95,29 @@ export function registerUserOpenApi(): void {
           },
         },
       },
-      404: { description: 'Không tìm thấy người dùng' },
+      404: { description: "Không tìm thấy người dùng" },
     },
   });
 
   // POST /users
   openapiRegistry.registerPath({
-    method: 'post',
-    path: '/users',
-    tags: ['Users'],
-    summary: 'Tạo tài khoản người dùng mới (Dành cho Quản trị viên)',
+    method: "post",
+    path: "/users",
+    tags: ["Users"],
+    summary: "Tạo tài khoản người dùng mới (Dành cho Quản trị viên)",
     security: [{ BearerAuth: [] }],
     request: {
       body: {
         content: {
-          'application/json': { schema: createUserSchema },
+          "application/json": { schema: createUserSchema },
         },
       },
     },
     responses: {
       201: {
-        description: 'Tạo người dùng thành công',
+        description: "Tạo người dùng thành công",
         content: {
-          'application/json': {
+          "application/json": {
             schema: z.object({
               success: z.boolean().openapi({ example: true }),
               data: z.object({
@@ -131,30 +131,30 @@ export function registerUserOpenApi(): void {
           },
         },
       },
-      400: { description: 'Dữ liệu không hợp lệ hoặc Email đã tồn tại' },
+      400: { description: "Dữ liệu không hợp lệ hoặc Email đã tồn tại" },
     },
   });
 
   // PUT /users/:id
   openapiRegistry.registerPath({
-    method: 'put',
-    path: '/users/{id}',
-    tags: ['Users'],
-    summary: 'Cập nhật thông tin người dùng theo ID',
+    method: "put",
+    path: "/users/{id}",
+    tags: ["Users"],
+    summary: "Cập nhật thông tin người dùng theo ID",
     security: [{ BearerAuth: [] }],
     request: {
       params: userIdParamSchema,
       body: {
         content: {
-          'application/json': { schema: updateUserSchema },
+          "application/json": { schema: updateUserSchema },
         },
       },
     },
     responses: {
       200: {
-        description: 'Cập nhật thành công',
+        description: "Cập nhật thành công",
         content: {
-          'application/json': {
+          "application/json": {
             schema: z.object({
               success: z.boolean().openapi({ example: true }),
               data: z.object({
@@ -169,33 +169,35 @@ export function registerUserOpenApi(): void {
           },
         },
       },
-      404: { description: 'Không tìm thấy người dùng' },
+      404: { description: "Không tìm thấy người dùng" },
     },
   });
 
   // DELETE /users/:id
   openapiRegistry.registerPath({
-    method: 'delete',
-    path: '/users/{id}',
-    tags: ['Users'],
-    summary: 'Xóa mềm người dùng (Soft delete & vô hiệu hóa phiên đăng nhập)',
+    method: "delete",
+    path: "/users/{id}",
+    tags: ["Users"],
+    summary: "Xóa mềm người dùng (Soft delete & vô hiệu hóa phiên đăng nhập)",
     security: [{ BearerAuth: [] }],
     request: {
       params: userIdParamSchema,
     },
     responses: {
       200: {
-        description: 'Xóa người dùng thành công',
+        description: "Xóa người dùng thành công",
         content: {
-          'application/json': {
+          "application/json": {
             schema: z.object({
               success: z.boolean().openapi({ example: true }),
-              message: z.string().openapi({ example: 'Xóa người dùng thành công' }),
+              message: z
+                .string()
+                .openapi({ example: "Xóa người dùng thành công" }),
             }),
           },
         },
       },
-      404: { description: 'Không tìm thấy người dùng' },
+      404: { description: "Không tìm thấy người dùng" },
     },
   });
 }

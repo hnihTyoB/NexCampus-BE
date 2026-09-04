@@ -19,8 +19,8 @@ export interface AssignUserRoleDto {
 
 export interface RoleQueryDto {
   search?: string;
-  sortBy?: 'name' | 'createdAt';
-  order?: 'asc' | 'desc';
+  sortBy?: "name" | "createdAt";
+  order?: "asc" | "desc";
   page?: number;
   limit?: number;
 }

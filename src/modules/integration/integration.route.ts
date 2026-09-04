@@ -1,10 +1,10 @@
-import { Router } from 'express';
-import { IntegrationController } from './integration.controller';
-import { authMiddleware } from '../../middlewares/auth.middleware';
-import { apiKeyAuthMiddleware } from '../../middlewares/api-key.middleware';
-import { requirePermission } from '../../middlewares/permission.middleware';
-import { validate } from '../../middlewares/validate.middleware';
-import { PERMISSIONS } from '../../common/constants/permission.constant';
+import { Router } from "express";
+import { IntegrationController } from "./integration.controller";
+import { authMiddleware } from "../../middlewares/auth.middleware";
+import { apiKeyAuthMiddleware } from "../../middlewares/api-key.middleware";
+import { requirePermission } from "../../middlewares/permission.middleware";
+import { validate } from "../../middlewares/validate.middleware";
+import { PERMISSIONS } from "../../common/constants/permission.constant";
 import {
   createApiKeySchema,
   apiKeyIdParamSchema,
@@ -14,14 +14,14 @@ import {
   deliveryIdParamSchema,
   listDeliveriesQuerySchema,
   triggerJobSchema,
-} from './integration.validation';
+} from "./integration.validation";
 
 const router = Router();
 const controller = new IntegrationController();
 
 // ── API Key Management (User / Admin via JWT Auth) ───────────────────────────
 router.post(
-  '/api-keys',
+  "/api-keys",
   authMiddleware,
   requirePermission(PERMISSIONS.API_KEY_MANAGE),
   validate(createApiKeySchema),
@@ -29,31 +29,31 @@ router.post(
 );
 
 router.get(
-  '/api-keys',
+  "/api-keys",
   authMiddleware,
   requirePermission(PERMISSIONS.API_KEY_READ),
   controller.listApiKeys,
 );
 
 router.delete(
-  '/api-keys/:id',
+  "/api-keys/:id",
   authMiddleware,
   requirePermission(PERMISSIONS.API_KEY_MANAGE),
-  validate(apiKeyIdParamSchema, 'params'),
+  validate(apiKeyIdParamSchema, "params"),
   controller.deleteApiKey,
 );
 
 router.patch(
-  '/api-keys/:id/toggle',
+  "/api-keys/:id/toggle",
   authMiddleware,
   requirePermission(PERMISSIONS.API_KEY_MANAGE),
-  validate(apiKeyIdParamSchema, 'params'),
+  validate(apiKeyIdParamSchema, "params"),
   controller.toggleApiKey,
 );
 
 // ── Webhook Endpoint Management (User / Admin via JWT Auth) ──────────────────
 router.post(
-  '/webhooks',
+  "/webhooks",
   authMiddleware,
   requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
   validate(createWebhookSchema),
@@ -61,65 +61,65 @@ router.post(
 );
 
 router.get(
-  '/webhooks',
+  "/webhooks",
   authMiddleware,
   requirePermission(PERMISSIONS.WEBHOOK_READ),
   controller.listWebhooks,
 );
 
 router.get(
-  '/webhooks/:id',
+  "/webhooks/:id",
   authMiddleware,
   requirePermission(PERMISSIONS.WEBHOOK_READ),
-  validate(webhookIdParamSchema, 'params'),
+  validate(webhookIdParamSchema, "params"),
   controller.getWebhookById,
 );
 
 router.put(
-  '/webhooks/:id',
+  "/webhooks/:id",
   authMiddleware,
   requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
-  validate(webhookIdParamSchema, 'params'),
+  validate(webhookIdParamSchema, "params"),
   validate(updateWebhookSchema),
   controller.updateWebhook,
 );
 
 router.delete(
-  '/webhooks/:id',
+  "/webhooks/:id",
   authMiddleware,
   requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
-  validate(webhookIdParamSchema, 'params'),
+  validate(webhookIdParamSchema, "params"),
   controller.deleteWebhook,
 );
 
 router.post(
-  '/webhooks/:id/test',
+  "/webhooks/:id/test",
   authMiddleware,
   requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
-  validate(webhookIdParamSchema, 'params'),
+  validate(webhookIdParamSchema, "params"),
   controller.testPingWebhook,
 );
 
 router.get(
-  '/webhooks/:id/deliveries',
+  "/webhooks/:id/deliveries",
   authMiddleware,
   requirePermission(PERMISSIONS.WEBHOOK_READ),
-  validate(webhookIdParamSchema, 'params'),
-  validate(listDeliveriesQuerySchema, 'query'),
+  validate(webhookIdParamSchema, "params"),
+  validate(listDeliveriesQuerySchema, "query"),
   controller.listDeliveries,
 );
 
 router.post(
-  '/webhooks/deliveries/:deliveryId/retry',
+  "/webhooks/deliveries/:deliveryId/retry",
   authMiddleware,
   requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
-  validate(deliveryIdParamSchema, 'params'),
+  validate(deliveryIdParamSchema, "params"),
   controller.retryDelivery,
 );
 
 // ── Third-Party Integration Endpoint (Authenticated via API Key) ─────────────
 router.post(
-  '/jobs/trigger',
+  "/jobs/trigger",
   apiKeyAuthMiddleware,
   validate(triggerJobSchema),
   controller.triggerDemoJob,

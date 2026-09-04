@@ -1,6 +1,6 @@
-import { rbacRepository } from '../../modules/rbac/rbac.repository';
-import { userRepository } from '../../modules/users/user.repository';
-import { prisma } from '../../database/prisma.client';
+import { rbacRepository } from "../../modules/rbac/rbac.repository";
+import { userRepository } from "../../modules/users/user.repository";
+import { prisma } from "../../database/prisma.client";
 
 interface CacheEntry {
   permissions: Set<string>;
@@ -31,19 +31,22 @@ export class PermissionCacheService {
 
   constructor() {
     // Periodically clean up expired role and user caches
-    setInterval(() => {
-      const now = Date.now();
-      for (const [roleId, entry] of this.cache.entries()) {
-        if (now > entry.expiresAt) {
-          this.cache.delete(roleId);
+    setInterval(
+      () => {
+        const now = Date.now();
+        for (const [roleId, entry] of this.cache.entries()) {
+          if (now > entry.expiresAt) {
+            this.cache.delete(roleId);
+          }
         }
-      }
-      for (const [userId, entry] of this.userCache.entries()) {
-        if (now > entry.expiresAt) {
-          this.userCache.delete(userId);
+        for (const [userId, entry] of this.userCache.entries()) {
+          if (now > entry.expiresAt) {
+            this.userCache.delete(userId);
+          }
         }
-      }
-    }, 5 * 60 * 1000).unref();
+      },
+      5 * 60 * 1000,
+    ).unref();
   }
 
   async getRolePermissions(roleId: string): Promise<Set<string>> {
@@ -159,4 +162,3 @@ export class PermissionCacheService {
 }
 
 export const permissionCacheService = new PermissionCacheService();
-

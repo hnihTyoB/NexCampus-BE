@@ -1,5 +1,5 @@
-import { prisma } from '../../database/prisma.client';
-import { Prisma } from '@prisma/client';
+import { prisma } from "../../database/prisma.client";
+import { Prisma } from "@prisma/client";
 
 export class IntegrationRepository {
   async createApiKey(data: {
@@ -25,7 +25,7 @@ export class IntegrationRepository {
   async findApiKeysByUserId(userId: string) {
     return prisma.apiKey.findMany({
       where: { userId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -69,7 +69,7 @@ export class IntegrationRepository {
   async findWebhooksByUserId(userId: string) {
     return prisma.webhookEndpoint.findMany({
       where: { userId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -92,10 +92,13 @@ export class IntegrationRepository {
   ) {
     const updateData: Prisma.WebhookEndpointUpdateInput = {};
     if (data.url !== undefined) updateData.url = data.url;
-    if (data.encryptedSecret !== undefined) updateData.encryptedSecret = data.encryptedSecret;
-    if (data.events !== undefined) updateData.events = data.events as unknown as Prisma.InputJsonValue;
+    if (data.encryptedSecret !== undefined)
+      updateData.encryptedSecret = data.encryptedSecret;
+    if (data.events !== undefined)
+      updateData.events = data.events as unknown as Prisma.InputJsonValue;
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
-    if (data.description !== undefined) updateData.description = data.description;
+    if (data.description !== undefined)
+      updateData.description = data.description;
 
     return prisma.webhookEndpoint.updateMany({
       where: { id, userId },
@@ -161,14 +164,20 @@ export class IntegrationRepository {
         where,
         skip,
         take: options.limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
       }),
       prisma.webhookDelivery.count({ where }),
     ]);
 
     const totalPages = Math.ceil(total / options.limit);
 
-    return { items, total, page: options.page, limit: options.limit, totalPages };
+    return {
+      items,
+      total,
+      page: options.page,
+      limit: options.limit,
+      totalPages,
+    };
   }
 
   async findDeliveryById(deliveryId: string, userId: string) {
@@ -240,5 +249,3 @@ export class IntegrationRepository {
 }
 
 export const integrationRepository = new IntegrationRepository();
-
-
