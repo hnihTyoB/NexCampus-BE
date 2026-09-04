@@ -39,10 +39,14 @@ export async function verifyGoogleIdToken(
       headers: {
         Accept: "application/json",
       },
+      signal: AbortSignal.timeout(10000),
     });
   } catch (err: any) {
+    const isTimeout = err.name === "TimeoutError" || err.code === "ABORT_ERR";
     throw new AppError(
-      `Không thể kết nối đến máy chủ xác thực Google: ${err.message || "Lỗi mạng"}`,
+      isTimeout
+        ? "Kết nối đến máy chủ xác thực Google bị quá thời gian chờ (timeout 10s)"
+        : `Không thể kết nối đến máy chủ xác thực Google: ${err.message || "Lỗi mạng"}`,
       502,
       ERROR_CODE.INTERNAL_SERVER_ERROR,
     );
@@ -184,10 +188,14 @@ export async function exchangeGoogleCode(
         Accept: "application/json",
       },
       body: body.toString(),
+      signal: AbortSignal.timeout(10000),
     });
   } catch (err: any) {
+    const isTimeout = err.name === "TimeoutError" || err.code === "ABORT_ERR";
     throw new AppError(
-      `Không thể kết nối đến máy chủ token của Google: ${err.message || "Lỗi mạng"}`,
+      isTimeout
+        ? "Kết nối đến máy chủ token của Google bị quá thời gian chờ (timeout 10s)"
+        : `Không thể kết nối đến máy chủ token của Google: ${err.message || "Lỗi mạng"}`,
       502,
       ERROR_CODE.INTERNAL_SERVER_ERROR,
     );

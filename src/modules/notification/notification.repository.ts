@@ -231,7 +231,11 @@ export class NotificationRepository {
       SET status = 'PROCESSING', updated_at = NOW()
       WHERE id IN (
         SELECT id FROM email_notifications
-        WHERE status = 'PENDING' AND attempts < ${EMAIL_MAX_ATTEMPTS}
+        WHERE (
+          status = 'PENDING'
+          OR (status = 'PROCESSING' AND updated_at < NOW() - INTERVAL '15 minutes')
+        )
+        AND attempts < ${EMAIL_MAX_ATTEMPTS}
         ORDER BY created_at ASC
         LIMIT ${batchSize}
         FOR UPDATE SKIP LOCKED

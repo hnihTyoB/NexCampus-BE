@@ -11,7 +11,6 @@ import {
 import {
   AUDIT_ACTION,
   AUDIT_TARGET_TYPE,
-  SYSTEM_TARGET_ID,
 } from "../../common/constants/audit-log.constant";
 import {
   EMAIL_TEMPLATE_KEY,

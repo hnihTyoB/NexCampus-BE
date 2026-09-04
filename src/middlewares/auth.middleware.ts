@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import { jwtConfig } from "../config/jwt.config";
 import { AppError } from "../common/errors/app-error";
 import { ERROR_CODE } from "../common/errors/error-code";
+import { permissionCacheService } from "../common/services/permission-cache.service";
 
 export function extractTokenFromRequest(req: Request): string | undefined {
   let token = req.cookies?.accessToken;
@@ -25,11 +26,11 @@ export function extractTokenFromRequest(req: Request): string | undefined {
   return token;
 }
 
-export function authMiddleware(
+export async function authMiddleware(
   req: Request,
   res: Response,
   next: NextFunction,
-): void {
+): Promise<void> {
   const token = extractTokenFromRequest(req);
 
   if (!token) {
@@ -45,16 +46,31 @@ export function authMiddleware(
       roleId?: string;
     };
 
+    // Xác thực trạng thái người dùng (cached 60s) chống dùng JWT cũ khi tài khoản bị khóa hoặc xóa mềm
+    const userState = await permissionCacheService.getUserState(payload.id);
+    if (!userState || !userState.isActive || userState.deletedAt) {
+      next(
+        new AppError(
+          "Tài khoản của bạn đã bị vô hiệu hóa hoặc không tồn tại",
+          401,
+          ERROR_CODE.UNAUTHORIZED,
+        ),
+      );
+      return;
+    }
+
     req.user = {
       id: payload.id,
       email: payload.email,
-      role: payload.role,
-      roleId: payload.roleId,
+      role: userState.roleName || payload.role,
+      roleId: userState.roleId || payload.roleId,
     };
 
     next();
   } catch (error) {
-    if (error instanceof jwt.TokenExpiredError) {
+    if (error instanceof AppError) {
+      next(error);
+    } else if (error instanceof jwt.TokenExpiredError) {
       next(new AppError("Token expired", 401, ERROR_CODE.TOKEN_EXPIRED));
     } else {
       next(new AppError("Invalid token", 401, ERROR_CODE.TOKEN_INVALID));
@@ -67,11 +83,11 @@ export function authMiddleware(
  * Nếu có JWT hợp lệ thì gán req.user, nếu không có hoặc token sai thì bỏ qua và next()
  * không trả 401. Dùng cho các API public nhưng vẫn muốn context user nếu đã đăng nhập.
  */
-export function optionalAuthMiddleware(
+export async function optionalAuthMiddleware(
   req: Request,
   res: Response,
   next: NextFunction,
-): void {
+): Promise<void> {
   const token = extractTokenFromRequest(req);
 
   if (!token) {
@@ -87,12 +103,15 @@ export function optionalAuthMiddleware(
       roleId?: string;
     };
 
-    req.user = {
-      id: payload.id,
-      email: payload.email,
-      role: payload.role,
-      roleId: payload.roleId,
-    };
+    const userState = await permissionCacheService.getUserState(payload.id);
+    if (userState && userState.isActive && !userState.deletedAt) {
+      req.user = {
+        id: payload.id,
+        email: payload.email,
+        role: userState.roleName || payload.role,
+        roleId: userState.roleId || payload.roleId,
+      };
+    }
   } catch {
     // Bỏ qua lỗi token nếu là optional auth (xem như khách vãng lai)
   }

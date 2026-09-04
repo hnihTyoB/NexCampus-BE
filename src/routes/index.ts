@@ -18,12 +18,11 @@ router.use("/health", healthRoute);
 // Maintenance Mode Controls & Public Status
 router.use("/maintenance", maintenanceRoute);
 
-// System Configuration & Feature Flags Public Endpoints
-router.use("/system", systemConfigRoute);
-
 // Maintenance Enforcement Guard for all Business APIs below
 router.use(maintenanceGuard());
 
+// System Configuration & Feature Flags Endpoints (exempted public paths handled inside guard)
+router.use("/system", systemConfigRoute);
 router.use("/auth", authRoute);
 router.use("/users", userRoute);
 router.use("/rbac", rbacRoute);

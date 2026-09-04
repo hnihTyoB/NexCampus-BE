@@ -84,8 +84,22 @@ export class RbacController {
     next: NextFunction,
   ) => {
     try {
-      const result = await this.service.findAllPermissions();
-      res.json({ success: true, data: result });
+      const query = req.query as {
+        page?: string;
+        limit?: string;
+        resource?: string;
+      };
+      const parsedQuery = {
+        page: query.page ? parseInt(query.page, 10) : undefined,
+        limit: query.limit ? parseInt(query.limit, 10) : undefined,
+        resource: query.resource,
+      };
+      const result = await this.service.findAllPermissions(parsedQuery);
+      if (Array.isArray(result)) {
+        res.json({ success: true, data: result });
+      } else {
+        res.json({ success: true, ...result });
+      }
     } catch (error) {
       next(error);
     }

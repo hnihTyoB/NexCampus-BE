@@ -30,6 +30,8 @@ export interface AuditLogQueryDto {
   action?: string;
   targetType?: string;
   targetId?: string;
+  startDate?: string;
+  endDate?: string;
   page?: number;
   limit?: number;
 }

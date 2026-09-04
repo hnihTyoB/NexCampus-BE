@@ -33,11 +33,11 @@ import {
   GoogleAuthUrlResponseDto,
   LinkSocialAccountDto,
   SocialAccountDto,
-  UnlinkSocialAccountParamDto,
 } from "./auth.dto";
 import { MailService } from "../../common/services/mail.service";
 import { R2Service } from "../../common/services/r2.service";
 import { ROLES } from "../../common/constants/role.constant";
+import { PERMISSIONS } from "../../common/constants/permission.constant";
 import {
   AUDIT_ACTION,
   AUDIT_TARGET_TYPE,
@@ -53,17 +53,6 @@ import {
   parseUserAgent,
 } from "../../common/helpers/user-agent.helper";
 import { permissionCacheService } from "../../common/services/permission-cache.service";
-import {
-  encryptSecret,
-  decryptSecret,
-  hashToken,
-} from "../../common/helpers/crypto.helper";
-import {
-  generateTotpSecret,
-  generateOtpauthUri,
-  verifyTotpCode,
-  generateBackupCodes,
-} from "../../common/helpers/totp.helper";
 import { envConfig } from "../../config/env.config";
 import {
   verifyGoogleIdToken,
@@ -71,10 +60,13 @@ import {
   generateGoogleAuthUrl,
 } from "../../common/helpers/google-auth.helper";
 
+import { Auth2FAService } from "./services/auth-2fa.service";
+
 export class AuthService {
-  private readonly repository = new AuthRepository();
+  private repository = new AuthRepository();
   private readonly mailService = new MailService();
   private readonly r2Service = new R2Service();
+  private readonly twoFactorService = new Auth2FAService(() => this.repository);
 
   async login(
     data: LoginDto,
@@ -1107,9 +1099,20 @@ export class AuthService {
       );
     }
 
-    // Anti-lockout: Nếu user là ADMIN, kiểm tra xem có còn admin nào khác không
-    if (user.role.name === ROLES.ADMIN) {
-      const activeAdminCount = await this.repository.countActiveAdmins();
+    // Anti-lockout: Nếu user là ADMIN hoặc có quyền quản trị, kiểm tra xem có còn admin nào khác không
+    let isUserAdmin = user.role?.name === ROLES.ADMIN;
+    if (!isUserAdmin && user.roleId && /^[0-9a-fA-F-]{36}$/.test(user.roleId)) {
+      const userRolePermissions =
+        await permissionCacheService.getRolePermissions(user.roleId);
+      isUserAdmin =
+        userRolePermissions.has(PERMISSIONS.USER_ROLE_ASSIGN) ||
+        userRolePermissions.has(PERMISSIONS.ROLE_PERMISSION_ASSIGN);
+    }
+
+    if (isUserAdmin) {
+      const activeAdminCount = await this.repository.countActiveAdmins(
+        user.role?.name,
+      );
       if (activeAdminCount <= 1) {
         throw new AppError(
           "Không thể vô hiệu hóa tài khoản Quản trị viên duy nhất còn lại trong hệ thống",
@@ -1176,8 +1179,23 @@ export class AuthService {
     }
 
     // Anti-lockout lần 2 tại thời điểm confirm
-    if (record.user.role.name === ROLES.ADMIN) {
-      const activeAdminCount = await this.repository.countActiveAdmins();
+    let isRecordAdmin = record.user.role?.name === ROLES.ADMIN;
+    if (
+      !isRecordAdmin &&
+      record.user.roleId &&
+      /^[0-9a-fA-F-]{36}$/.test(record.user.roleId)
+    ) {
+      const recordRolePermissions =
+        await permissionCacheService.getRolePermissions(record.user.roleId);
+      isRecordAdmin =
+        recordRolePermissions.has(PERMISSIONS.USER_ROLE_ASSIGN) ||
+        recordRolePermissions.has(PERMISSIONS.ROLE_PERMISSION_ASSIGN);
+    }
+
+    if (isRecordAdmin) {
+      const activeAdminCount = await this.repository.countActiveAdmins(
+        record.user.role?.name,
+      );
       if (activeAdminCount <= 1) {
         throw new AppError(
           "Không thể vô hiệu hóa tài khoản Quản trị viên duy nhất còn lại trong hệ thống",
@@ -1211,28 +1229,7 @@ export class AuthService {
   // ────── Two-Factor Authentication (2FA / TOTP) ──────
 
   async setup2FA(userId: string): Promise<Setup2FAResponseDto> {
-    const user = await this.repository.findById(userId);
-    if (!user) {
-      throw new AppError("User not found", 404, ERROR_CODE.NOT_FOUND);
-    }
-
-    if (user.twoFactorEnabled) {
-      throw new AppError(
-        "Xác thực 2 bước đã được kích hoạt trên tài khoản này",
-        400,
-        ERROR_CODE.TWO_FACTOR_ALREADY_ENABLED,
-      );
-    }
-
-    const secret = generateTotpSecret(20);
-    const appName = "TemplateBE";
-    const otpauthUrl = generateOtpauthUri({
-      issuer: appName,
-      accountName: user.email || user.id,
-      secret,
-    });
-
-    return { secret, otpauthUrl };
+    return this.twoFactorService.setup2FA(userId);
   }
 
   async enable2FA(
@@ -1244,195 +1241,14 @@ export class AuthService {
       currentRefreshToken?: string;
     },
   ): Promise<Enable2FAResponseDto> {
-    const user = await this.repository.findById(userId);
-    if (!user) {
-      throw new AppError("User not found", 404, ERROR_CODE.NOT_FOUND);
-    }
-
-    if (user.twoFactorEnabled) {
-      throw new AppError(
-        "Xác thực 2 bước đã được kích hoạt trước đó",
-        400,
-        ERROR_CODE.TWO_FACTOR_ALREADY_ENABLED,
-      );
-    }
-
-    const isValid = verifyTotpCode(data.secret, data.code);
-    if (!isValid) {
-      throw new AppError(
-        "Mã xác thực TOTP không chính xác hoặc đã hết hạn",
-        400,
-        ERROR_CODE.TWO_FACTOR_INVALID_CODE,
-      );
-    }
-
-    const encryptedSecret = encryptSecret(data.secret);
-    const { plainCodes, hashedCodes } = generateBackupCodes(8);
-
-    await this.repository.enable2FA(userId, encryptedSecret, hashedCodes);
-
-    // Thu hồi toàn bộ phiên đăng nhập khác, bảo lưu phiên hiện tại đang thao tác
-    await this.repository.revokeOtherSessions(
-      userId,
-      metadata?.currentRefreshToken,
-    );
-    permissionCacheService.invalidateUser(userId);
-
-    await this.repository.createAuditLog({
-      actorId: userId,
-      action: AUDIT_ACTION.ENABLE_2FA,
-      targetType: AUDIT_TARGET_TYPE.USER,
-      targetId: userId,
-      ipAddress: metadata?.ipAddress,
-      userAgent: metadata?.userAgent,
-    });
-
-    return { backupCodes: plainCodes };
+    return this.twoFactorService.enable2FA(userId, data, metadata);
   }
 
   async verify2FALogin(
     data: Verify2FALoginDto,
     metadata?: { userAgent?: string; ipAddress?: string },
   ): Promise<LoginResponseDto> {
-    let payload: any;
-    try {
-      payload = jwt.verify(data.tempToken, jwtConfig.accessSecret);
-    } catch {
-      throw new AppError(
-        "Mã phiên xác thực 2FA không hợp lệ hoặc đã hết hạn",
-        401,
-        ERROR_CODE.TOKEN_EXPIRED,
-      );
-    }
-
-    if (payload.purpose !== "2FA_VERIFICATION" || !payload.id) {
-      throw new AppError(
-        "Token xác thực 2FA không đúng mục đích",
-        401,
-        ERROR_CODE.TOKEN_INVALID,
-      );
-    }
-
-    const user = await this.repository.findById(payload.id);
-    if (
-      !user ||
-      !user.isActive ||
-      !user.twoFactorEnabled ||
-      !user.twoFactorSecret
-    ) {
-      throw new AppError(
-        "Tài khoản không khả dụng hoặc chưa kích hoạt 2FA",
-        400,
-        ERROR_CODE.INVALID_CREDENTIALS,
-      );
-    }
-
-    const cleanCode = data.code.trim();
-    let isCodeValid = false;
-
-    // 1. Thử xác thực như mã TOTP 6 số
-    if (/^\d{6}$/.test(cleanCode)) {
-      const decryptedSecret = decryptSecret(user.twoFactorSecret);
-      isCodeValid = verifyTotpCode(decryptedSecret, cleanCode);
-    }
-
-    // 2. Nếu không khớp TOTP, thử kiểm tra Backup Code (xxxx-xxxx)
-    if (
-      !isCodeValid &&
-      user.twoFactorBackupCodes &&
-      Array.isArray(user.twoFactorBackupCodes)
-    ) {
-      const formattedCode = cleanCode.toUpperCase();
-      const hashedInput = hashToken(formattedCode);
-      const backupCodes = user.twoFactorBackupCodes as string[];
-      const matchIndex = backupCodes.findIndex((storedHash) => {
-        const bufInput = Buffer.from(hashedInput, "utf8");
-        const bufStored = Buffer.from(storedHash, "utf8");
-        return (
-          bufInput.length === bufStored.length &&
-          crypto.timingSafeEqual(bufInput, bufStored)
-        );
-      });
-
-      if (matchIndex !== -1) {
-        isCodeValid = true;
-        // Single-use: Hủy mã dự phòng đã dùng khỏi danh sách
-        const remainingBackupCodes = [...backupCodes];
-        remainingBackupCodes.splice(matchIndex, 1);
-        await this.repository.updateBackupCodes(user.id, remainingBackupCodes);
-      }
-    }
-
-    if (!isCodeValid) {
-      throw new AppError(
-        "Mã xác thực 2FA hoặc mã dự phòng không chính xác",
-        400,
-        ERROR_CODE.TWO_FACTOR_INVALID_CODE,
-      );
-    }
-
-    // Cấp Access Token + Refresh Token chính thức
-    const tokenPayload = {
-      id: user.id,
-      email: user.email,
-      role: user.role.name,
-      roleId: user.roleId,
-    };
-
-    const accessToken = jwt.sign(tokenPayload, jwtConfig.accessSecret, {
-      expiresIn: jwtConfig.accessExpiresIn as jwt.SignOptions["expiresIn"],
-    });
-
-    const refreshToken = jwt.sign(
-      { ...tokenPayload, jti: crypto.randomUUID() },
-      jwtConfig.refreshSecret,
-      { expiresIn: jwtConfig.refreshExpiresIn as jwt.SignOptions["expiresIn"] },
-    );
-
-    const decoded = jwt.decode(refreshToken) as { exp: number };
-    const expiresAt = new Date(decoded.exp * 1000);
-    await this.repository.saveRefreshToken(
-      user.id,
-      refreshToken,
-      expiresAt,
-      metadata?.userAgent,
-      metadata?.ipAddress,
-    );
-
-    if (metadata?.userAgent) {
-      const deviceHash = generateDeviceHash(metadata.userAgent);
-      await this.repository.updateUserDeviceLastLogin(
-        user.id,
-        deviceHash,
-        metadata.ipAddress,
-      );
-    }
-
-    await this.repository.createAuditLog({
-      actorId: user.id,
-      action: AUDIT_ACTION.VERIFY_2FA_LOGIN,
-      targetType: AUDIT_TARGET_TYPE.USER,
-      targetId: user.id,
-      ipAddress: metadata?.ipAddress,
-      userAgent: metadata?.userAgent,
-    });
-
-    const permissions = Array.from(
-      await permissionCacheService.getRolePermissions(user.roleId),
-    );
-
-    return {
-      accessToken,
-      refreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        role: user.role.name,
-        roleId: user.roleId,
-        permissions,
-      },
-    };
+    return this.twoFactorService.verify2FALogin(data, metadata);
   }
 
   async disable2FA(
@@ -1444,87 +1260,7 @@ export class AuthService {
       currentRefreshToken?: string;
     },
   ): Promise<void> {
-    const user = await this.repository.findById(userId);
-    if (!user) {
-      throw new AppError("User not found", 404, ERROR_CODE.NOT_FOUND);
-    }
-
-    if (!user.twoFactorEnabled || !user.twoFactorSecret) {
-      throw new AppError(
-        "Xác thực 2 bước chưa được kích hoạt",
-        400,
-        ERROR_CODE.VALIDATION_ERROR,
-      );
-    }
-
-    if (!user.password) {
-      throw new AppError(
-        "Tài khoản liên kết mạng xã hội không thể tắt 2FA bằng mật khẩu",
-        400,
-        ERROR_CODE.VALIDATION_ERROR,
-      );
-    }
-
-    const isPasswordValid = await bcrypt.compare(data.password, user.password);
-    if (!isPasswordValid) {
-      throw new AppError(
-        "Mật khẩu hiện tại không chính xác",
-        400,
-        ERROR_CODE.INVALID_CREDENTIALS,
-      );
-    }
-
-    const cleanCode = data.code.trim();
-    let isCodeValid = false;
-
-    if (/^\d{6}$/.test(cleanCode)) {
-      const decryptedSecret = decryptSecret(user.twoFactorSecret);
-      isCodeValid = verifyTotpCode(decryptedSecret, cleanCode);
-    }
-
-    if (
-      !isCodeValid &&
-      user.twoFactorBackupCodes &&
-      Array.isArray(user.twoFactorBackupCodes)
-    ) {
-      const formattedCode = cleanCode.toUpperCase();
-      const hashedInput = hashToken(formattedCode);
-      const backupCodes = user.twoFactorBackupCodes as string[];
-      isCodeValid = backupCodes.some((storedHash) => {
-        const bufInput = Buffer.from(hashedInput, "utf8");
-        const bufStored = Buffer.from(storedHash, "utf8");
-        return (
-          bufInput.length === bufStored.length &&
-          crypto.timingSafeEqual(bufInput, bufStored)
-        );
-      });
-    }
-
-    if (!isCodeValid) {
-      throw new AppError(
-        "Mã xác thực 2FA hoặc mã dự phòng không chính xác",
-        400,
-        ERROR_CODE.TWO_FACTOR_INVALID_CODE,
-      );
-    }
-
-    await this.repository.disable2FA(userId);
-
-    // Cách 1: Thu hồi toàn bộ phiên đăng nhập khác khi tắt 2FA
-    await this.repository.revokeOtherSessions(
-      userId,
-      metadata?.currentRefreshToken,
-    );
-    permissionCacheService.invalidateUser(userId);
-
-    await this.repository.createAuditLog({
-      actorId: userId,
-      action: AUDIT_ACTION.DISABLE_2FA,
-      targetType: AUDIT_TARGET_TYPE.USER,
-      targetId: userId,
-      ipAddress: metadata?.ipAddress,
-      userAgent: metadata?.userAgent,
-    });
+    return this.twoFactorService.disable2FA(userId, data, metadata);
   }
 
   async regenerateBackupCodes(
@@ -1532,82 +1268,6 @@ export class AuthService {
     data: RegenerateBackupCodesDto,
     metadata?: { ipAddress?: string; userAgent?: string },
   ): Promise<Enable2FAResponseDto> {
-    const user = await this.repository.findById(userId);
-    if (!user) {
-      throw new AppError("User not found", 404, ERROR_CODE.NOT_FOUND);
-    }
-
-    if (!user.twoFactorEnabled || !user.twoFactorSecret) {
-      throw new AppError(
-        "Xác thực 2 bước chưa được kích hoạt",
-        400,
-        ERROR_CODE.VALIDATION_ERROR,
-      );
-    }
-
-    if (!user.password) {
-      throw new AppError(
-        "Tài khoản liên kết mạng xã hội không thể tái tạo mã bằng mật khẩu",
-        400,
-        ERROR_CODE.VALIDATION_ERROR,
-      );
-    }
-
-    const isPasswordValid = await bcrypt.compare(data.password, user.password);
-    if (!isPasswordValid) {
-      throw new AppError(
-        "Mật khẩu hiện tại không chính xác",
-        400,
-        ERROR_CODE.INVALID_CREDENTIALS,
-      );
-    }
-
-    const cleanCode = data.code.trim();
-    let isCodeValid = false;
-
-    if (/^\d{6}$/.test(cleanCode)) {
-      const decryptedSecret = decryptSecret(user.twoFactorSecret);
-      isCodeValid = verifyTotpCode(decryptedSecret, cleanCode);
-    }
-
-    if (
-      !isCodeValid &&
-      user.twoFactorBackupCodes &&
-      Array.isArray(user.twoFactorBackupCodes)
-    ) {
-      const formattedCode = cleanCode.toUpperCase();
-      const hashedInput = hashToken(formattedCode);
-      const backupCodes = user.twoFactorBackupCodes as string[];
-      isCodeValid = backupCodes.some((storedHash) => {
-        const bufInput = Buffer.from(hashedInput, "utf8");
-        const bufStored = Buffer.from(storedHash, "utf8");
-        return (
-          bufInput.length === bufStored.length &&
-          crypto.timingSafeEqual(bufInput, bufStored)
-        );
-      });
-    }
-
-    if (!isCodeValid) {
-      throw new AppError(
-        "Mã xác thực 2FA hoặc mã dự phòng không chính xác",
-        400,
-        ERROR_CODE.TWO_FACTOR_INVALID_CODE,
-      );
-    }
-
-    const { plainCodes, hashedCodes } = generateBackupCodes(8);
-    await this.repository.updateBackupCodes(userId, hashedCodes);
-
-    await this.repository.createAuditLog({
-      actorId: userId,
-      action: AUDIT_ACTION.REGENERATE_2FA_BACKUP_CODES,
-      targetType: AUDIT_TARGET_TYPE.USER,
-      targetId: userId,
-      ipAddress: metadata?.ipAddress,
-      userAgent: metadata?.userAgent,
-    });
-
-    return { backupCodes: plainCodes };
+    return this.twoFactorService.regenerateBackupCodes(userId, data, metadata);
   }
 }

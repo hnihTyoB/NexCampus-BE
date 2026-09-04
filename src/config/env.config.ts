@@ -77,6 +77,17 @@ const envSchema = z
     // ── Google OAuth2 ─────────────────────────────────────────────────────────
     GOOGLE_CLIENT_ID: z.string().default(""),
     GOOGLE_CLIENT_SECRET: z.string().default(""),
+
+    // ── Application Base URL ───────────────────────────────────────────────────
+    APP_URL: z.string().default("http://localhost:7777"),
+
+    // ── Mail / SMTP ───────────────────────────────────────────────────────────
+    MAIL_HOST: z.string().default("smtp.gmail.com"),
+    MAIL_PORT: z.coerce.number().int().positive().default(587),
+    MAIL_SECURE: z.string().default("false"),
+    MAIL_USER: z.string().default(""),
+    MAIL_PASS: z.string().default(""),
+    MAIL_FROM: z.string().default("App Template <noreply@gmail.com>"),
   })
   // ── Production-only Constraints ───────────────────────────────────────────
   .refine(
@@ -122,12 +133,12 @@ const envSchema = z
   .refine(
     (env) => {
       if (env.NODE_ENV !== "production") return true;
-      const key = env.ENCRYPTION_KEY || env.APP_SECRET || env.JWT_ACCESS_SECRET;
-      return key.length > 0 && key !== "default_access_secret";
+      const key = env.ENCRYPTION_KEY || env.APP_SECRET;
+      return typeof key === "string" && key.length >= 32;
     },
     {
       message:
-        "ENCRYPTION_KEY or APP_SECRET must be securely set in production",
+        "ENCRYPTION_KEY (or APP_SECRET) must be explicitly configured with at least 32 characters in production",
       path: ["ENCRYPTION_KEY"],
     },
   );
@@ -155,10 +166,18 @@ function parseTrustProxy(val: string): boolean | number | string | string[] {
   return val;
 }
 
-/** Giải quyết encryption key theo thứ tự ưu tiên: ENCRYPTION_KEY > APP_SECRET > JWT_ACCESS_SECRET */
+/** Giải quyết encryption key theo thứ tự ưu tiên: ENCRYPTION_KEY > APP_SECRET. Tuyệt đối không fallback sang JWT_ACCESS_SECRET trong production */
 function resolveEncryptionKey(): string {
-  const key = _env.ENCRYPTION_KEY || _env.APP_SECRET || _env.JWT_ACCESS_SECRET;
-  return key || "default_32_bytes_secret_key_aes256_gcm!!";
+  const key = _env.ENCRYPTION_KEY || _env.APP_SECRET;
+  if (key && key.length >= 32) {
+    return key;
+  }
+  if (_env.NODE_ENV === "production") {
+    throw new Error(
+      "ENCRYPTION_KEY or APP_SECRET must be explicitly configured with at least 32 characters in production",
+    );
+  }
+  return key || _env.JWT_ACCESS_SECRET || "default_32_bytes_secret_key_aes256_gcm!!";
 }
 
 /** Phân giải cấu hình Redis: ưu tiên REDIS_URL (DSN) nếu có, fallback sang biến đơn */
@@ -238,5 +257,14 @@ export const envConfig = {
   google: {
     clientId: _env.GOOGLE_CLIENT_ID,
     clientSecret: _env.GOOGLE_CLIENT_SECRET,
+  },
+  appUrl: _env.APP_URL,
+  mail: {
+    host: _env.MAIL_HOST,
+    port: _env.MAIL_PORT,
+    secure: _env.MAIL_SECURE === "true",
+    user: _env.MAIL_USER,
+    pass: _env.MAIL_PASS,
+    from: _env.MAIL_FROM,
   },
 } as const;

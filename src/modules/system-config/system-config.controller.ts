@@ -38,11 +38,18 @@ export class SystemConfigController {
   ): Promise<void> => {
     try {
       const query = req.query as unknown as SystemConfigQueryDto;
-      const data = await this.service.findAll(query);
-      res.json({
-        success: true,
-        data,
-      });
+      const result = await this.service.findAll(query);
+      if (Array.isArray(result)) {
+        res.json({
+          success: true,
+          data: result,
+        });
+      } else {
+        res.json({
+          success: true,
+          ...result,
+        });
+      }
     } catch (error) {
       next(error);
     }

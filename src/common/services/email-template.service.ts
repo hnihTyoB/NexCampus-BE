@@ -14,14 +14,6 @@ export interface EmailTemplate {
 }
 
 export class EmailTemplateService {
-  private readonly appUrl: string;
-
-  constructor() {
-    this.appUrl = mailConfig.verificationUrl.replace(
-      "/api/v1/auth/verify-email",
-      "",
-    );
-  }
 
   /**
    * Render nội dung email: Ưu tiên lấy mẫu tùy biến từ Database theo templateKey/code,

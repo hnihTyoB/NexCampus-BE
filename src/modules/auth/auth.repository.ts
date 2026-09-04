@@ -4,6 +4,7 @@ import { prisma } from "../../database/prisma.client";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import { ROLES } from "../../common/constants/role.constant";
+import { PERMISSIONS } from "../../common/constants/permission.constant";
 
 /**
  * Băm token bằng SHA-256 trước khi lưu vào database.
@@ -480,12 +481,30 @@ export class AuthRepository {
     });
   }
 
-  async countActiveAdmins(): Promise<number> {
+  async countActiveAdmins(roleName: string = ROLES.ADMIN): Promise<number> {
     return prisma.user.count({
       where: {
-        role: { name: ROLES.ADMIN },
         isActive: true,
         deletedAt: null,
+        OR: [
+          { role: { name: roleName } },
+          {
+            role: {
+              permissions: {
+                some: {
+                  permission: {
+                    name: {
+                      in: [
+                        PERMISSIONS.USER_ROLE_ASSIGN,
+                        PERMISSIONS.ROLE_PERMISSION_ASSIGN,
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+          },
+        ],
       },
     });
   }

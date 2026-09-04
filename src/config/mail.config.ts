@@ -1,14 +1,14 @@
-const appUrl = process.env.APP_URL || "http://localhost:7777";
+import { envConfig } from "./env.config";
 
 export const mailConfig = {
-  host: process.env.MAIL_HOST || "smtp.gmail.com",
-  port: parseInt(process.env.MAIL_PORT || "587", 10),
-  secure: process.env.MAIL_SECURE === "true", // true for 465, false for 587
+  host: envConfig.mail.host,
+  port: envConfig.mail.port,
+  secure: envConfig.mail.secure,
   auth: {
-    user: process.env.MAIL_USER || "",
-    pass: process.env.MAIL_PASS || "",
+    user: envConfig.mail.user,
+    pass: envConfig.mail.pass,
   },
-  from: process.env.MAIL_FROM || "App Template <noreply@gmail.com>",
-  verificationUrl: `${appUrl}/api/v1/auth/verify-email`,
-  resetPasswordUrl: `${appUrl}/api/v1/auth/reset-password`,
+  from: envConfig.mail.from,
+  verificationUrl: `${envConfig.appUrl}/api/v1/auth/verify-email`,
+  resetPasswordUrl: `${envConfig.appUrl}/api/v1/auth/reset-password`,
 };

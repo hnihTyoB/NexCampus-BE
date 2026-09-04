@@ -36,9 +36,11 @@ export function createRateLimiter(options: RateLimitOptions = {}) {
   cleanupTimer.unref();
 
   return (req: Request, res: Response, next: NextFunction): void => {
+    const clientIp = req.ip || req.socket.remoteAddress || "unknown";
+    const routePrefix = req.baseUrl || req.path || "";
     const key = options.keyGenerator
       ? options.keyGenerator(req)
-      : req.ip || req.socket.remoteAddress || "unknown";
+      : `${clientIp}:${routePrefix}`;
     const now = Date.now();
 
     const record = requestCounts.get(key);

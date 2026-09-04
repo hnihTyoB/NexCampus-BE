@@ -21,6 +21,25 @@ export class SystemConfigRepository {
         : {}),
     };
 
+    if (query.page !== undefined || query.limit !== undefined) {
+      const page = query.page || 1;
+      const limit = query.limit || 20;
+      const skip = (page - 1) * limit;
+      const [data, total] = await prisma.$transaction([
+        prisma.systemConfig.findMany({
+          where,
+          orderBy: [{ category: "asc" }, { key: "asc" }],
+          skip,
+          take: limit,
+        }),
+        prisma.systemConfig.count({ where }),
+      ]);
+      return {
+        data,
+        meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+      };
+    }
+
     return prisma.systemConfig.findMany({
       where,
       orderBy: [{ category: "asc" }, { key: "asc" }],

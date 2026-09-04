@@ -6,12 +6,38 @@ import {
   AUDIT_ACTION,
   AUDIT_TARGET_TYPE,
 } from "../../common/constants/audit-log.constant";
+import { ROLES } from "../../common/constants/role.constant";
+import { PERMISSIONS } from "../../common/constants/permission.constant";
 import { parseUserAgent } from "../../common/helpers/user-agent.helper";
 import { permissionCacheService } from "../../common/services/permission-cache.service";
 import { UserQueryDto, CreateUserDto, UpdateUserDto } from "./user.dto";
 
 export class UserService {
   private readonly repository = new UserRepository();
+
+  /**
+   * Kiểm tra người dùng có giữ vai trò hoặc đặc quyền quản trị hệ thống hay không:
+   * 1. Có tên vai trò khớp với ROLES.ADMIN
+   * 2. Hoặc vai trò sở hữu các quyền quản trị then chốt (USER_ROLE_ASSIGN, ROLE_PERMISSION_ASSIGN)
+   */
+  async isAdministrativeUser(user: {
+    roleId?: string | null;
+    role?: { name: string } | null;
+  }): Promise<boolean> {
+    if (user.role?.name === ROLES.ADMIN) {
+      return true;
+    }
+    if (user.roleId) {
+      const permissions = await permissionCacheService.getRolePermissions(
+        user.roleId,
+      );
+      return (
+        permissions.has(PERMISSIONS.USER_ROLE_ASSIGN) ||
+        permissions.has(PERMISSIONS.ROLE_PERMISSION_ASSIGN)
+      );
+    }
+    return false;
+  }
 
   async findAll(query: UserQueryDto) {
     return this.repository.findAll(query);
@@ -32,7 +58,7 @@ export class UserService {
 
     if (existing) {
       throw new AppError(
-        "Email already exists",
+        "Email already in use",
         409,
         ERROR_CODE.DUPLICATE_ENTRY,
       );
@@ -51,7 +77,24 @@ export class UserService {
   }
 
   async update(id: string, data: UpdateUserDto) {
-    await this.findById(id);
+    const existing = await this.findById(id);
+
+    // Anti-lockout guard: Ngăn chặn vô hiệu hóa Quản trị viên (Admin) duy nhất
+    if (data.isActive === false && existing.isActive) {
+      const isAdmin = await this.isAdministrativeUser(existing);
+      if (isAdmin) {
+        const activeAdminsCount = await this.repository.countActiveAdmins(
+          existing.role?.name,
+        );
+        if (activeAdminsCount <= 1) {
+          throw new AppError(
+            "Không thể vô hiệu hóa Quản trị viên (Admin) duy nhất trong hệ thống",
+            400,
+            ERROR_CODE.VALIDATION_ERROR,
+          );
+        }
+      }
+    }
 
     const updatedUser = await this.repository.update(id, {
       isActive: data.isActive,
@@ -71,7 +114,25 @@ export class UserService {
         ERROR_CODE.VALIDATION_ERROR,
       );
     }
-    await this.findById(id);
+    const userToDelete = await this.findById(id);
+
+    // Anti-lockout guard: Ngăn chặn xóa tài khoản Quản trị viên (Admin) duy nhất
+    if (userToDelete.isActive) {
+      const isAdmin = await this.isAdministrativeUser(userToDelete);
+      if (isAdmin) {
+        const activeAdminsCount = await this.repository.countActiveAdmins(
+          userToDelete.role?.name,
+        );
+        if (activeAdminsCount <= 1) {
+          throw new AppError(
+            "Không thể xóa tài khoản Quản trị viên (Admin) duy nhất trong hệ thống",
+            400,
+            ERROR_CODE.VALIDATION_ERROR,
+          );
+        }
+      }
+    }
+
     const result = await this.repository.softDelete(id, adminId);
     permissionCacheService.invalidateUser(id);
     return result;

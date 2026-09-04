@@ -3,7 +3,6 @@ import IORedis from "ioredis";
 import { envConfig } from "../../config/env.config";
 import {
   CRON_QUEUE_NAME,
-  CRON_JOB_NAMES,
   CronJobName,
   DEFAULT_CRON_SCHEDULES,
 } from "../constants/cron.constant";
@@ -90,7 +89,7 @@ export class CronQueueService {
         }
         await this.queue.upsertJobScheduler(
           jobName,
-          { pattern: config.cron },
+          { pattern: config.cron, tz: "Asia/Ho_Chi_Minh" },
           {
             name: jobName,
             data: {
@@ -119,7 +118,7 @@ export class CronQueueService {
     try {
       await this.queue.upsertJobScheduler(
         jobName,
-        { pattern: config.cron },
+        { pattern: config.cron, tz: "Asia/Ho_Chi_Minh" },
         {
           name: jobName,
           data: {

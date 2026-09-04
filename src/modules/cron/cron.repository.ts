@@ -1,4 +1,6 @@
 import { prisma } from "../../database/prisma.client";
+import { ROLES } from "../../common/constants/role.constant";
+import { PERMISSIONS } from "../../common/constants/permission.constant";
 import { ActivitySummaryStatsDto } from "./cron.dto";
 
 export class CronRepository {
@@ -128,9 +130,27 @@ export class CronRepository {
         isActive: true,
         deletedAt: null,
         email: { not: null },
-        role: {
-          name: { in: ["ADMIN", "SUPER_ADMIN", "SYSTEM_ADMIN"] },
-        },
+        OR: [
+          { role: { name: ROLES.ADMIN } },
+          {
+            role: {
+              permissions: {
+                some: {
+                  permission: {
+                    name: {
+                      in: [
+                        PERMISSIONS.USER_ROLE_ASSIGN,
+                        PERMISSIONS.ROLE_PERMISSION_ASSIGN,
+                        PERMISSIONS.AUDIT_LOG_READ,
+                        PERMISSIONS.CRON_JOB_READ,
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+          },
+        ],
       },
       select: {
         id: true,

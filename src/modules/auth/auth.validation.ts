@@ -200,7 +200,7 @@ export const linkSocialAccountSchema = z
     provider: z.enum(["GOOGLE", "ZALO"]).default("GOOGLE"),
     idToken: z
       .string()
-      .min(1, "Google ID Token không được để trống")
+      .min(1, "ID Token không được để trống")
       .optional(),
     code: z
       .string()
@@ -218,6 +218,18 @@ export const linkSocialAccountSchema = z
     {
       message: "Vui lòng cung cấp idToken hoặc code",
       path: ["idToken"],
+    },
+  )
+  .refine(
+    (data) => {
+      if (data.provider === "ZALO" && (!data.code || !data.code.trim())) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: "Zalo yêu cầu cung cấp authorization code",
+      path: ["code"],
     },
   )
   .refine(

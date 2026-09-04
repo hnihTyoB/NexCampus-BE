@@ -62,4 +62,6 @@ export const querySystemConfigsSchema = z.object({
     .transform((val) => val === "true")
     .optional(),
   search: z.string().optional(),
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().max(100).optional(),
 });

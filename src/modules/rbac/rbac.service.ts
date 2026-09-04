@@ -1,4 +1,5 @@
 import { RbacRepository } from "./rbac.repository";
+import { userRepository } from "../users/user.repository";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import {
@@ -161,8 +162,12 @@ export class RbacService {
     });
   }
 
-  async findAllPermissions() {
-    return this.repository.findAllPermissions();
+  async findAllPermissions(query?: {
+    page?: number;
+    limit?: number;
+    resource?: string;
+  }) {
+    return this.repository.findAllPermissions(query);
   }
 
   async syncRolePermissions(
@@ -263,6 +268,43 @@ export class RbacService {
     if (!currentUser) {
       throw new AppError("User not found", 404, ERROR_CODE.NOT_FOUND);
     }
+
+    // Anti-lockout guard: Ngăn chặn hạ quyền Quản trị viên (Admin) duy nhất
+    if (
+      currentUser.isActive &&
+      !currentUser.deletedAt &&
+      currentUser.roleId !== targetRole.id
+    ) {
+      const currentPermissions = currentUser.roleId
+        ? await permissionCacheService.getRolePermissions(currentUser.roleId)
+        : new Set<string>();
+      const isCurrentAdmin =
+        currentUser.role?.name === ROLES.ADMIN ||
+        currentPermissions.has(PERMISSIONS.USER_ROLE_ASSIGN) ||
+        currentPermissions.has(PERMISSIONS.ROLE_PERMISSION_ASSIGN);
+
+      const targetPermissions = await permissionCacheService.getRolePermissions(
+        targetRole.id,
+      );
+      const isTargetAdmin =
+        targetRole.name === ROLES.ADMIN ||
+        targetPermissions.has(PERMISSIONS.USER_ROLE_ASSIGN) ||
+        targetPermissions.has(PERMISSIONS.ROLE_PERMISSION_ASSIGN);
+
+      if (isCurrentAdmin && !isTargetAdmin) {
+        const activeAdminsCount = await userRepository.countActiveAdmins(
+          currentUser.role?.name,
+        );
+        if (activeAdminsCount <= 1) {
+          throw new AppError(
+            "Không thể hạ quyền Quản trị viên (Admin) duy nhất trong hệ thống",
+            400,
+            ERROR_CODE.VALIDATION_ERROR,
+          );
+        }
+      }
+    }
+
     const oldRoleId = currentUser.roleId;
 
     const user = await this.repository.assignUserRole(userId, targetRole.id);

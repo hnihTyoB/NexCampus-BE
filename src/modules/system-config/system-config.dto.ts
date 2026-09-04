@@ -35,6 +35,8 @@ export interface SystemConfigQueryDto {
   category?: string;
   isPublic?: boolean;
   search?: string;
+  page?: number;
+  limit?: number;
 }
 
 export interface PublicConfigsResponseDto {

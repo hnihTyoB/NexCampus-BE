@@ -16,7 +16,6 @@ import {
   encryptSecret,
 } from "../../common/helpers/crypto.helper";
 import { webhookQueue } from "../../common/queues/webhook.queue";
-import { webhookWorker } from "../../common/workers/webhook.worker";
 import {
   WEBHOOK_STATUS,
   WEBHOOK_EVENTS,
@@ -283,33 +282,32 @@ export class IntegrationService {
       return { dispatchedCount: 0, deliveryIds: [] };
     }
 
-    const deliveryIds: string[] = [];
-    const enqueueTasks: Promise<any>[] = [];
-
-    for (const endpoint of matchedEndpoints) {
-      const delivery = await this.repository.createDelivery({
-        webhookEndpointId: endpoint.id,
-        userId,
-        event,
-        payload,
-        signature: "pending",
-        status: WEBHOOK_STATUS.PENDING,
-      });
-
-      deliveryIds.push(delivery.id);
-
-      enqueueTasks.push(
-        webhookQueue.enqueue({
-          deliveryId: delivery.id,
+    const deliveries = await Promise.all(
+      matchedEndpoints.map((endpoint) =>
+        this.repository.createDelivery({
           webhookEndpointId: endpoint.id,
           userId,
           event,
-          url: endpoint.url,
-          encryptedSecret: endpoint.encryptedSecret,
           payload,
+          signature: "pending",
+          status: WEBHOOK_STATUS.PENDING,
         }),
-      );
-    }
+      ),
+    );
+
+    const deliveryIds = deliveries.map((d) => d.id);
+
+    const enqueueTasks = matchedEndpoints.map((endpoint, index) =>
+      webhookQueue.enqueue({
+        deliveryId: deliveries[index].id,
+        webhookEndpointId: endpoint.id,
+        userId,
+        event,
+        url: endpoint.url,
+        encryptedSecret: endpoint.encryptedSecret,
+        payload,
+      }),
+    );
 
     await Promise.all(enqueueTasks);
 

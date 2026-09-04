@@ -5,7 +5,10 @@ import { permissionCacheService } from "../common/services/permission-cache.serv
 import { jwtConfig } from "../config/jwt.config";
 import { AppError } from "../common/errors/app-error";
 import { ERROR_CODE } from "../common/errors/error-code";
-import { MAINTENANCE_STATUS } from "../common/constants/maintenance.constant";
+import {
+  MAINTENANCE_STATUS,
+  DEFAULT_MAINTENANCE_CONFIG,
+} from "../common/constants/maintenance.constant";
 import { isIpInWhitelist } from "../common/helpers/ip.helper";
 import { extractTokenFromRequest } from "./auth.middleware";
 
@@ -131,12 +134,12 @@ export function maintenanceGuard(options?: MaintenanceGuardOptions) {
       // Reject non-exempt / non-bypassed requests with 503
       next(
         new AppError(
-          config.message || "The system is currently under maintenance.",
+          config.message || DEFAULT_MAINTENANCE_CONFIG.message,
           503,
           ERROR_CODE.SYSTEM_MAINTENANCE,
           {
-            title: config.title,
-            message: config.message,
+            title: config.title || DEFAULT_MAINTENANCE_CONFIG.title,
+            message: config.message || DEFAULT_MAINTENANCE_CONFIG.message,
             estimatedEndAt: config.estimatedEndAt
               ? config.estimatedEndAt.toISOString()
               : null,

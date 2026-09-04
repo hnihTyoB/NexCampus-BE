@@ -136,8 +136,36 @@ export class RbacRepository {
     });
   }
 
-  async findAllPermissions() {
+  async findAllPermissions(query?: {
+    page?: number;
+    limit?: number;
+    resource?: string;
+  }) {
+    const where: Prisma.PermissionWhereInput = {
+      ...(query?.resource ? { resource: query.resource } : {}),
+    };
+
+    if (query?.page !== undefined || query?.limit !== undefined) {
+      const page = query.page || 1;
+      const limit = query.limit || 50;
+      const skip = (page - 1) * limit;
+      const [data, total] = await prisma.$transaction([
+        prisma.permission.findMany({
+          where,
+          orderBy: [{ resource: "asc" }, { action: "asc" }],
+          skip,
+          take: limit,
+        }),
+        prisma.permission.count({ where }),
+      ]);
+      return {
+        data,
+        meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+      };
+    }
+
     return prisma.permission.findMany({
+      where,
       orderBy: [{ resource: "asc" }, { action: "asc" }],
     });
   }
@@ -211,7 +239,14 @@ export class RbacRepository {
   async findUserById(id: string) {
     return prisma.user.findUnique({
       where: { id },
-      select: { id: true, email: true, roleId: true },
+      select: {
+        id: true,
+        email: true,
+        roleId: true,
+        isActive: true,
+        deletedAt: true,
+        role: { select: { id: true, name: true } },
+      },
     });
   }
 
@@ -251,15 +286,38 @@ export class RbacRepository {
       action,
       targetType,
       targetId,
+      startDate,
+      endDate,
       page = 1,
       limit = 20,
     } = query;
+
+    const createdAtFilter: Prisma.DateTimeFilter = {};
+    if (startDate) {
+      const parsedStart = startDate.includes("T")
+        ? new Date(startDate)
+        : new Date(`${startDate}T00:00:00+07:00`);
+      if (!isNaN(parsedStart.getTime())) {
+        createdAtFilter.gte = parsedStart;
+      }
+    }
+    if (endDate) {
+      const parsedEnd = endDate.includes("T")
+        ? new Date(endDate)
+        : new Date(`${endDate}T23:59:59.999+07:00`);
+      if (!isNaN(parsedEnd.getTime())) {
+        createdAtFilter.lte = parsedEnd;
+      }
+    }
 
     const where: Prisma.AuditLogWhereInput = {
       ...(actorId ? { actorId } : {}),
       ...(action ? { action } : {}),
       ...(targetType ? { targetType } : {}),
       ...(targetId ? { targetId } : {}),
+      ...(Object.keys(createdAtFilter).length > 0
+        ? { createdAt: createdAtFilter }
+        : {}),
     };
 
     const skip = (page - 1) * limit;

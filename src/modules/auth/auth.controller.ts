@@ -48,14 +48,16 @@ export class AuthController {
       res.cookie("accessToken", result.accessToken!, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        sameSite: "lax",
+        path: "/",
         maxAge: 15 * 60 * 1000, // 15 minutes
       });
 
       res.cookie("refreshToken", result.refreshToken!, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        sameSite: "lax",
+        path: "/",
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       });
 
@@ -106,14 +108,16 @@ export class AuthController {
       res.cookie("accessToken", result.accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        sameSite: "lax",
+        path: "/",
         maxAge: 15 * 60 * 1000, // 15 minutes
       });
 
       res.cookie("refreshToken", result.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        sameSite: "lax",
+        path: "/",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
@@ -139,7 +143,8 @@ export class AuthController {
       const cookieOptions = {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict" as const,
+        sameSite: "lax" as const,
+        path: "/",
       };
       res.clearCookie("accessToken", cookieOptions);
       res.clearCookie("refreshToken", cookieOptions);
@@ -390,9 +395,15 @@ export class AuthController {
       const userAgent = req.headers["user-agent"];
       await this.service.confirmDeactivate(body, { ipAddress, userAgent });
 
-      // Xóa cookies xác thực nếu có
-      res.clearCookie("accessToken");
-      res.clearCookie("refreshToken");
+      // Xóa cookies xác thực nếu có với options đồng nhất
+      const cookieOptions = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax" as const,
+        path: "/",
+      };
+      res.clearCookie("accessToken", cookieOptions);
+      res.clearCookie("refreshToken", cookieOptions);
 
       res.json({
         success: true,
@@ -455,14 +466,16 @@ export class AuthController {
       res.cookie("accessToken", result.accessToken!, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        sameSite: "lax",
+        path: "/",
         maxAge: 15 * 60 * 1000,
       });
 
       res.cookie("refreshToken", result.refreshToken!, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        sameSite: "lax",
+        path: "/",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
@@ -553,14 +566,16 @@ export class AuthController {
       res.cookie("accessToken", result.accessToken!, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        sameSite: "lax",
+        path: "/",
         maxAge: 15 * 60 * 1000, // 15 minutes
       });
 
       res.cookie("refreshToken", result.refreshToken!, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        sameSite: "lax",
+        path: "/",
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       });
 

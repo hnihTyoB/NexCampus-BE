@@ -40,14 +40,19 @@ export const createUserSchema = z.object({
     .optional(),
 });
 
-export const updateUserSchema = z.object({
-  isActive: z.boolean().optional(),
-  fullName: z.string().trim().min(1).max(100).optional(),
-  phoneNumber: z
-    .string()
-    .regex(/^[0-9]{10,11}$/, "Invalid phone number format")
-    .optional(),
-});
+export const updateUserSchema = z
+  .object({
+    isActive: z.boolean().optional(),
+    fullName: z.string().trim().min(1).max(100).optional(),
+    phoneNumber: z
+      .string()
+      .regex(/^[0-9]{10,11}$/, "Invalid phone number format")
+      .optional(),
+  })
+  .refine(
+    (data) => Object.keys(data).length > 0,
+    "Ít nhất một trường cần được cung cấp để cập nhật",
+  );
 
 export const userSessionParamsSchema = z.object({
   id: z.string().uuid("ID người dùng phải là UUID hợp lệ"),

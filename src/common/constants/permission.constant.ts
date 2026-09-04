@@ -48,3 +48,12 @@ export const PERMISSIONS = {
 } as const;
 
 export type PermissionKey = keyof typeof PERMISSIONS;
+
+export const PERMISSION_PUBSUB_CHANNEL = "permission:events";
+
+export const PERMISSION_PUBSUB_ACTION = {
+  INVALIDATE_ROLE: "INVALIDATE_ROLE",
+  INVALIDATE_USER: "INVALIDATE_USER",
+  CLEAR: "CLEAR",
+} as const;
+
