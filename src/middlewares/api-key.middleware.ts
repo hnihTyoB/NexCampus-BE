@@ -52,7 +52,7 @@ export async function apiKeyAuthMiddleware(
       return;
     }
 
-    if (!apiKey.user || !apiKey.user.isActive) {
+    if (!apiKey.user || !apiKey.user.isActive || apiKey.user.deletedAt) {
       next(
         new AppError(
           "API Key owner account is inactive",
@@ -81,7 +81,7 @@ export async function apiKeyAuthMiddleware(
       permissions: (apiKey.permissions as string[]) || [],
     };
 
-    (req as any).apiKey = {
+    req.apiKey = {
       id: apiKey.id,
       name: apiKey.name,
       prefix: apiKey.prefix,

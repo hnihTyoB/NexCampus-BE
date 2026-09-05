@@ -90,6 +90,10 @@ class MockR2Service extends R2Service {
   override async deleteFile(key: string): Promise<void> {
     this.deletedFiles.push(key);
   }
+
+  override async deleteFiles(keys: string[]): Promise<void> {
+    this.deletedFiles.push(...keys);
+  }
 }
 
 describe("Scheduled Tasks & BullMQ Cron Jobs Engine", () => {

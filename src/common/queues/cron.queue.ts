@@ -55,6 +55,10 @@ export class CronQueueService {
         this.isRedisAvailable = false;
       });
 
+      this.redisConnection.connect().catch(() => {
+        this.isRedisAvailable = false;
+      });
+
       const queueOptions: QueueOptions = {
         connection: this.redisConnection,
         defaultJobOptions: {

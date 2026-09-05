@@ -1,6 +1,7 @@
 import {
   S3Client,
   DeleteObjectCommand,
+  DeleteObjectsCommand,
   PutObjectCommand,
   ListObjectsV2Command,
   ListObjectsV2CommandOutput,
@@ -116,4 +117,25 @@ export class R2Service {
     });
     await this.client.send(command);
   }
+
+  /**
+   * Xóa hàng loạt file khỏi R2 theo batch (tối đa 1000 files/lần gọi theo chuẩn S3).
+   * @param keys Danh sách đường dẫn file trong bucket
+   */
+  async deleteFiles(keys: string[]): Promise<void> {
+    if (!keys || keys.length === 0) return;
+    const CHUNK_SIZE = 1000;
+    for (let i = 0; i < keys.length; i += CHUNK_SIZE) {
+      const chunk = keys.slice(i, i + CHUNK_SIZE);
+      const command = new DeleteObjectsCommand({
+        Bucket: this.bucketName,
+        Delete: {
+          Objects: chunk.map((key) => ({ Key: key })),
+          Quiet: true,
+        },
+      });
+      await this.client.send(command);
+    }
+  }
 }
+

@@ -8,6 +8,7 @@ import { PERMISSIONS } from "../../common/constants/permission.constant";
 import {
   createApiKeySchema,
   apiKeyIdParamSchema,
+  toggleApiKeySchema,
   createWebhookSchema,
   updateWebhookSchema,
   webhookIdParamSchema,
@@ -48,6 +49,7 @@ router.patch(
   authMiddleware,
   requirePermission(PERMISSIONS.API_KEY_MANAGE),
   validate(apiKeyIdParamSchema, "params"),
+  validate(toggleApiKeySchema),
   controller.toggleApiKey,
 );
 

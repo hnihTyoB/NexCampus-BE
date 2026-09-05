@@ -28,6 +28,7 @@ router.use("/users", userRoute);
 router.use("/rbac", rbacRoute);
 router.use("/notifications", notificationRoute);
 router.use("/integrations", integrationRoute);
+router.use("/integration", integrationRoute);
 router.use("/cron", cronRoute);
 
 export default router;

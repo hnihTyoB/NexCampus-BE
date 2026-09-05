@@ -598,7 +598,9 @@ export class AuthService {
   ): Promise<AuthTokensDto> {
     let payload: any;
     try {
-      payload = jwt.verify(token, jwtConfig.refreshSecret);
+      payload = jwt.verify(token, jwtConfig.refreshSecret, {
+        algorithms: ["HS256"],
+      });
     } catch (error) {
       throw new AppError(
         "Invalid refresh token",

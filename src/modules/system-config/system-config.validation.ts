@@ -10,7 +10,7 @@ export const createSystemConfigSchema = z.object({
       /^[a-z0-9_.-]+$/i,
       "Key must contain only letters, numbers, dots, hyphens, and underscores",
     ),
-  value: z.any({ required_error: "Value is required" }),
+  value: z.unknown({ required_error: "Value is required" }),
   description: z.string().max(255).optional(),
   category: z
     .enum([
@@ -26,7 +26,7 @@ export const createSystemConfigSchema = z.object({
 
 export const updateSystemConfigSchema = z
   .object({
-    value: z.any().optional(),
+    value: z.unknown().optional(),
     description: z.string().max(255).optional(),
     category: z
       .enum([

@@ -5,14 +5,7 @@ import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import { ROLES } from "../../common/constants/role.constant";
 import { PERMISSIONS } from "../../common/constants/permission.constant";
-
-/**
- * Băm token bằng SHA-256 trước khi lưu vào database.
- * Plain text token chỉ trả về client 1 lần; DB chỉ lưu hash để tra cứu.
- */
-function hashToken(token: string): string {
-  return crypto.createHash("sha256").update(token).digest("hex");
-}
+import { hashToken } from "../../common/helpers/crypto.helper";
 
 export class AuthRepository {
   findByEmail(email: string) {

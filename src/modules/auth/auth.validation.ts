@@ -138,15 +138,22 @@ export const verify2FALoginSchema = z.object({
 });
 
 export const disable2FASchema = z.object({
-  password: z.string().min(1, "Mật khẩu hiện tại là bắt buộc để tắt 2FA"),
+  password: z
+    .string()
+    .min(1, "Mật khẩu hiện tại là bắt buộc để tắt 2FA")
+    .optional(),
   code: z.string().min(6, "Mã TOTP hoặc mã dự phòng là bắt buộc").max(20),
 });
 
 export const regenerateBackupCodesSchema = z.object({
   password: z
     .string()
-    .min(1, "Mật khẩu hiện tại là bắt buộc để tái tạo mã dự phòng"),
-  code: z.string().min(6, "Mã TOTP hoặc mã dự phòng là bắt buộc").max(20),
+    .min(1, "Mật khẩu hiện tại là bắt buộc để tái tạo mã dự phòng")
+    .optional(),
+  code: z
+    .string()
+    .length(6, "Mã TOTP 6 chữ số từ ứng dụng xác thực là bắt buộc")
+    .regex(/^\d{6}$/, "Mã TOTP phải là 6 chữ số"),
 });
 
 export const googleLoginSchema = z

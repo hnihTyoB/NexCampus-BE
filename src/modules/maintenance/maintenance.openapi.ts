@@ -38,6 +38,42 @@ export function registerMaintenanceOpenApi(): void {
     },
   });
 
+  // GET /maintenance/status
+  openapiRegistry.registerPath({
+    method: "get",
+    path: "/maintenance/status",
+    tags: ["Maintenance"],
+    summary:
+      "Trạng thái và cấu hình bảo trì hệ thống (Dành cho Quản trị viên)",
+    security: [{ BearerAuth: [] }],
+    responses: {
+      200: {
+        description: "Lấy trạng thái bảo trì thành công",
+        content: {
+          "application/json": {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              data: z.object({
+                id: z.string().uuid(),
+                key: z.string(),
+                enabled: z.boolean(),
+                status: z.string(),
+                title: z.string(),
+                message: z.string(),
+                startAt: z.string().datetime().nullable(),
+                estimatedEndAt: z.string().datetime().nullable(),
+                bypassPermissions: z.array(z.string()),
+                bypassRoles: z.array(z.string()),
+                bypassIps: z.array(z.string()),
+              }),
+            }),
+          },
+        },
+      },
+      403: { description: "Không có quyền MAINTENANCE_READ / MAINTENANCE_MANAGE" },
+    },
+  });
+
   // GET /maintenance/config
   openapiRegistry.registerPath({
     method: "get",

@@ -28,6 +28,16 @@ router.get(
   maintenanceController.getStatus,
 );
 
+router.get(
+  "/config",
+  authMiddleware,
+  requireAnyPermission(
+    PERMISSIONS.MAINTENANCE_READ,
+    PERMISSIONS.MAINTENANCE_MANAGE,
+  ),
+  maintenanceController.getStatus,
+);
+
 router.post(
   "/enable",
   authMiddleware,

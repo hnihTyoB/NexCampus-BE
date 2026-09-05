@@ -111,12 +111,12 @@ export interface Verify2FALoginDto {
 }
 
 export interface Disable2FADto {
-  password: string;
+  password?: string;
   code: string;
 }
 
 export interface RegenerateBackupCodesDto {
-  password: string;
+  password?: string;
   code: string;
 }
 

@@ -72,7 +72,9 @@ export function maintenanceGuard(options?: MaintenanceGuardOptions) {
 
         if (token) {
           try {
-            const payload = jwt.verify(token, jwtConfig.accessSecret) as {
+            const payload = jwt.verify(token, jwtConfig.accessSecret, {
+              algorithms: ["HS256"],
+            }) as {
               id: string;
               email: string;
               role: string;

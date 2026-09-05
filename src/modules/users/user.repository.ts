@@ -71,6 +71,19 @@ export class UserRepository {
     });
   }
 
+  findUserStateById(id: string) {
+    return prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        isActive: true,
+        deletedAt: true,
+        roleId: true,
+        role: { select: { name: true } },
+      },
+    });
+  }
+
   findByEmail(email: string) {
     return prisma.user.findFirst({
       where: { email, deletedAt: null },

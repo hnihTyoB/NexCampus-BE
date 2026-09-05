@@ -2,6 +2,7 @@ import { openapiRegistry } from "../../config/openapi/openapi.registry";
 import {
   createApiKeySchema,
   apiKeyIdParamSchema,
+  toggleApiKeySchema,
   createWebhookSchema,
   updateWebhookSchema,
   webhookIdParamSchema,
@@ -13,6 +14,7 @@ import { z } from "zod";
 
 export function registerIntegrationOpenApi(): void {
   openapiRegistry.register("CreateApiKeyRequest", createApiKeySchema);
+  openapiRegistry.register("ToggleApiKeyRequest", toggleApiKeySchema);
   openapiRegistry.register("CreateWebhookRequest", createWebhookSchema);
   openapiRegistry.register("UpdateWebhookRequest", updateWebhookSchema);
   openapiRegistry.register("TriggerJobRequest", triggerJobSchema);
@@ -124,7 +126,12 @@ export function registerIntegrationOpenApi(): void {
     tags: ["Integrations — API Keys"],
     summary: "Bật / Tắt trạng thái kích hoạt của API Key",
     security: [{ BearerAuth: [] }],
-    request: { params: apiKeyIdParamSchema },
+    request: {
+      params: apiKeyIdParamSchema,
+      body: {
+        content: { "application/json": { schema: toggleApiKeySchema } },
+      },
+    },
     responses: {
       200: {
         description: "Chuyển đổi trạng thái thành công",

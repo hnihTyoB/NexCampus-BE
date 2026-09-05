@@ -12,7 +12,10 @@ import {
   createApiKeySchema,
   createWebhookSchema,
   triggerJobSchema,
+  toggleApiKeySchema,
 } from "../src/modules/integration/integration.validation";
+import { IntegrationService } from "../src/modules/integration/integration.service";
+import { AUDIT_ACTION } from "../src/common/constants/audit-log.constant";
 import { WebhookWorker } from "../src/common/workers/webhook.worker";
 import {
   WEBHOOK_STATUS,
@@ -264,3 +267,54 @@ describe("Integration: Webhook Dispatcher & Delivery Worker Execution", () => {
     }
   });
 });
+
+describe("Integration: API Key Toggle Validation & Audit Trail", () => {
+  it("should validate toggleApiKeySchema strictly requiring boolean isActive", () => {
+    assert.equal(toggleApiKeySchema.safeParse({ isActive: true }).success, true);
+    assert.equal(toggleApiKeySchema.safeParse({ isActive: false }).success, true);
+
+    // Invalid non-boolean values must fail
+    assert.equal(toggleApiKeySchema.safeParse({ isActive: "true" }).success, false);
+    assert.equal(toggleApiKeySchema.safeParse({ isActive: 1 }).success, false);
+    assert.equal(toggleApiKeySchema.safeParse({}).success, false);
+  });
+
+  it("should toggle API key status and record AUDIT_ACTION.TOGGLE_API_KEY", async () => {
+    const service = new IntegrationService();
+    const auditLogs: any[] = [];
+    const mockApiKey = {
+      id: "ak-12345",
+      name: "Demo Key",
+      prefix: "ak_live_abc123",
+      isActive: true,
+      userId: "user-123",
+    };
+
+    (service as any).repository = {
+      findApiKeyById: async (_userId: string, id: string) => {
+        if (id === mockApiKey.id) return mockApiKey;
+        return null;
+      },
+      toggleApiKey: async (_userId: string, _id: string, isActive: boolean) => {
+        mockApiKey.isActive = isActive;
+        return { count: 1 };
+      },
+      createAuditLog: async (log: any) => {
+        auditLogs.push(log);
+        return log;
+      },
+    };
+
+    await service.toggleApiKey("user-123", "ak-12345", false, {
+      ipAddress: "127.0.0.1",
+      userAgent: "TestAgent/1.0",
+    });
+
+    assert.equal(mockApiKey.isActive, false);
+    assert.equal(auditLogs.length, 1);
+    assert.equal(auditLogs[0].action, AUDIT_ACTION.TOGGLE_API_KEY);
+    assert.equal(auditLogs[0].targetId, "ak-12345");
+    assert.equal(auditLogs[0].details.isActive, false);
+  });
+});
+

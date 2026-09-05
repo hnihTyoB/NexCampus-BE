@@ -204,7 +204,8 @@ describe("Audit & Remediation Verification Test Suite", () => {
 
       assert.equal(startOfDay.toISOString(), "2026-08-23T17:00:00.000Z");
       assert.equal(endOfDay.toISOString(), "2026-08-24T16:59:59.999Z");
-      assert.equal(formatVietnamDate(startOfDay), "2026-08-24");
+      assert.equal(formatVietnamDate(startOfDay), "24/08/2026");
+      assert.equal(formatVietnamDate(startOfDay, "YYYY-MM-DD"), "2026-08-24");
     });
   });
 
@@ -257,6 +258,34 @@ describe("Audit & Remediation Verification Test Suite", () => {
       );
       assert.equal(afterInvalidate, undefined);
     });
+
+    it("should fetch user state via userRepository.findUserStateById when cache misses", async () => {
+      const { userRepository } = require("../src/modules/users/user.repository");
+      const testUserId = "user-uncached-uuid-999";
+      let repoCalled = false;
+      const originalFindUserState = userRepository.findUserStateById;
+      userRepository.findUserStateById = async (id: string) => {
+        if (id === testUserId) {
+          repoCalled = true;
+          return {
+            id: testUserId,
+            isActive: true,
+            deletedAt: null,
+            roleId: "role-admin",
+            role: { name: "ADMIN" },
+          };
+        }
+        return null;
+      };
+
+      try {
+        const state = await permissionCacheService.getUserState(testUserId);
+        assert.equal(repoCalled, true, "Must delegate to userRepository.findUserStateById");
+        assert.equal(state?.roleName, "ADMIN");
+      } finally {
+        userRepository.findUserStateById = originalFindUserState;
+      }
+    });
   });
 
   describe("9. [P3-DEF-01] Strict Regex Validation for Vietnam Day Range", () => {
@@ -274,6 +303,7 @@ describe("Audit & Remediation Verification Test Suite", () => {
         /Invalid date format/,
       );
       assert.doesNotThrow(() => getVietnamDayRange("2026-08-24"));
+      assert.doesNotThrow(() => getVietnamDayRange("24/08/2026"));
     });
   });
 
@@ -836,8 +866,8 @@ describe("Audit & Remediation Verification Test Suite", () => {
     });
   });
 
-  describe("23. [TIME-P2-07] UTC+7 date filtering in Audit Log query schema", () => {
-    it("should accept startDate and endDate in auditLogQuerySchema", () => {
+  describe("23. [TIME-P2-07 & SEC-01 & SEC-04] UTC+7 date filtering & Query Validation Schemas", () => {
+    it("should accept valid YYYY-MM-DD startDate and endDate in auditLogQuerySchema", () => {
       const { auditLogQuerySchema } = require("../src/modules/rbac/rbac.validation");
       const result = auditLogQuerySchema.safeParse({
         startDate: "2026-09-01",
@@ -849,6 +879,51 @@ describe("Audit & Remediation Verification Test Suite", () => {
       assert.equal(result.success, true);
       assert.equal(result.data.startDate, "2026-09-01");
       assert.equal(result.data.endDate, "2026-09-05");
+    });
+
+    it("should accept valid DD/MM/YYYY Vietnamese startDate and endDate in auditLogQuerySchema", () => {
+      const { auditLogQuerySchema } = require("../src/modules/rbac/rbac.validation");
+      const result = auditLogQuerySchema.safeParse({
+        startDate: "01/09/2026",
+        endDate: "05/09/2026",
+        page: 1,
+        limit: 10,
+      });
+
+      assert.equal(result.success, true);
+      assert.equal(result.data.startDate, "01/09/2026");
+      assert.equal(result.data.endDate, "05/09/2026");
+    });
+
+    it("[SEC-01] should reject malformed date strings in auditLogQuerySchema", () => {
+      const { auditLogQuerySchema } = require("../src/modules/rbac/rbac.validation");
+      const invalidResult = auditLogQuerySchema.safeParse({
+        startDate: "not-a-valid-date",
+      });
+      assert.equal(invalidResult.success, false, "Malformed date string must be rejected");
+
+      const tooLongDate = auditLogQuerySchema.safeParse({
+        startDate: "2026-09-01".padEnd(55, "0"),
+      });
+      assert.equal(tooLongDate.success, false, "Date string exceeding 50 chars must be rejected");
+    });
+
+    it("[SEC-04] should enforce length and format constraints on resource in permissionQuerySchema", () => {
+      const { permissionQuerySchema } = require("../src/modules/rbac/rbac.validation");
+      const validResult = permissionQuerySchema.safeParse({
+        resource: "users:profile",
+      });
+      assert.equal(validResult.success, true);
+
+      const invalidChars = permissionQuerySchema.safeParse({
+        resource: "users; DROP TABLE users; --",
+      });
+      assert.equal(invalidChars.success, false, "Resource with SQL injection/special characters must be rejected");
+
+      const tooLongResource = permissionQuerySchema.safeParse({
+        resource: "a".repeat(51),
+      });
+      assert.equal(tooLongResource.success, false, "Resource exceeding 50 chars must be rejected");
     });
   });
 

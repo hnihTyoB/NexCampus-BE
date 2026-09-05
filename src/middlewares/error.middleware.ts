@@ -31,6 +31,9 @@ export function errorMiddleware(
     };
     if (error.data !== undefined) {
       payload.data = error.data;
+      if (error.code === ERROR_CODE.VALIDATION_ERROR) {
+        payload.errors = error.data;
+      }
     }
     res.status(error.statusCode).json(payload);
     return;
@@ -100,7 +103,7 @@ export function errorMiddleware(
 
   const requestId =
     (req.headers["x-request-id"] as string) ||
-    (req as any).id ||
+    req.id ||
     "no-request-id";
   console.error(`[Unhandled Error][Request-ID: ${requestId}]`, error);
 

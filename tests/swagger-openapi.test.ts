@@ -51,9 +51,11 @@ describe("Auto Swagger OpenAPI Generation via zod-to-openapi", () => {
     assert.ok(schemas.UpdateUserRequest);
     assert.ok(schemas.CreateRoleRequest);
     assert.ok(schemas.CreateApiKeyRequest);
+    assert.ok(schemas.ToggleApiKeyRequest);
     assert.ok(schemas.CreateWebhookRequest);
     assert.ok(schemas.CreateSystemConfigRequest);
     assert.ok(schemas.TriggerCronJobRequest);
+    assert.ok(schemas.TestSendTemplateRequest);
   });
 
   it("should contain all module routes across Auth, Users, RBAC, Notifications, Maintenance, Integrations, System Config, Cron, and Health", () => {
@@ -69,30 +71,41 @@ describe("Auto Swagger OpenAPI Generation via zod-to-openapi", () => {
     assert.ok(paths["/auth/sessions"]);
     assert.ok(paths["/auth/avatar/upload-url"]);
 
-    // User paths
+    // User paths (including admin session and device management)
     assert.ok(paths["/users"]);
     assert.ok(paths["/users/{id}"]);
+    assert.ok(paths["/users/{id}/sessions"]);
+    assert.ok(paths["/users/{id}/sessions/{sessionId}"]);
+    assert.ok(paths["/users/{id}/devices"]);
+    assert.ok(paths["/users/{id}/devices/{deviceId}"]);
 
     // RBAC paths
     assert.ok(paths["/rbac/roles"]);
     assert.ok(paths["/rbac/roles/{id}"]);
     assert.ok(paths["/rbac/permissions"]);
     assert.ok(paths["/rbac/audit-logs"]);
+    assert.ok(paths["/rbac/permissions"].get?.parameters);
 
-    // Notification paths
+    // Notification paths (including template test-send and email retry)
     assert.ok(paths["/notifications"]);
     assert.ok(paths["/notifications/templates"]);
+    assert.ok(paths["/notifications/templates/{id}"]);
+    assert.ok(paths["/notifications/templates/{code}/test-send"]);
     assert.ok(paths["/notifications/emails"]);
+    assert.ok(paths["/notifications/emails/{id}/retry"]);
     assert.ok(paths["/notifications/stream"]);
 
     // Maintenance paths
     assert.ok(paths["/maintenance/public"]);
+    assert.ok(paths["/maintenance/status"]);
     assert.ok(paths["/maintenance/config"]);
     assert.ok(paths["/maintenance/enable"]);
     assert.ok(paths["/maintenance/disable"]);
 
-    // Integration paths
+    // Integration paths (including toggle request body)
     assert.ok(paths["/integration/api-keys"]);
+    assert.ok(paths["/integration/api-keys/{id}/toggle"]);
+    assert.ok(paths["/integration/api-keys/{id}/toggle"].patch?.requestBody);
     assert.ok(paths["/integration/webhooks"]);
     assert.ok(paths["/integration/jobs/trigger"]);
 

@@ -39,7 +39,9 @@ export async function authMiddleware(
   }
 
   try {
-    const payload = jwt.verify(token, jwtConfig.accessSecret) as {
+    const payload = jwt.verify(token, jwtConfig.accessSecret, {
+      algorithms: ["HS256"],
+    }) as {
       id: string;
       email: string;
       role: string;
@@ -96,7 +98,9 @@ export async function optionalAuthMiddleware(
   }
 
   try {
-    const payload = jwt.verify(token, jwtConfig.accessSecret) as {
+    const payload = jwt.verify(token, jwtConfig.accessSecret, {
+      algorithms: ["HS256"],
+    }) as {
       id: string;
       email: string;
       role: string;

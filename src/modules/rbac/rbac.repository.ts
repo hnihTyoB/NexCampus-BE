@@ -1,6 +1,11 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../database/prisma.client";
 import { RoleQueryDto, AuditLogQueryDto } from "./rbac.dto";
+import { getVietnamDayRange } from "../../common/helpers/date.helper";
+import {
+  VIETNAM_DATE_REGEX,
+  ISO_DATE_REGEX,
+} from "../../common/constants/date.constant";
 
 export class RbacRepository {
   async findAllRoles(query: RoleQueryDto) {
@@ -294,19 +299,37 @@ export class RbacRepository {
 
     const createdAtFilter: Prisma.DateTimeFilter = {};
     if (startDate) {
-      const parsedStart = startDate.includes("T")
-        ? new Date(startDate)
-        : new Date(`${startDate}T00:00:00+07:00`);
-      if (!isNaN(parsedStart.getTime())) {
-        createdAtFilter.gte = parsedStart;
+      if (VIETNAM_DATE_REGEX.test(startDate) || ISO_DATE_REGEX.test(startDate)) {
+        try {
+          createdAtFilter.gte = getVietnamDayRange(startDate).startOfDay;
+        } catch {
+          const parsedStart = new Date(startDate);
+          if (!isNaN(parsedStart.getTime())) {
+            createdAtFilter.gte = parsedStart;
+          }
+        }
+      } else {
+        const parsedStart = new Date(startDate);
+        if (!isNaN(parsedStart.getTime())) {
+          createdAtFilter.gte = parsedStart;
+        }
       }
     }
     if (endDate) {
-      const parsedEnd = endDate.includes("T")
-        ? new Date(endDate)
-        : new Date(`${endDate}T23:59:59.999+07:00`);
-      if (!isNaN(parsedEnd.getTime())) {
-        createdAtFilter.lte = parsedEnd;
+      if (VIETNAM_DATE_REGEX.test(endDate) || ISO_DATE_REGEX.test(endDate)) {
+        try {
+          createdAtFilter.lte = getVietnamDayRange(endDate).endOfDay;
+        } catch {
+          const parsedEnd = new Date(endDate);
+          if (!isNaN(parsedEnd.getTime())) {
+            createdAtFilter.lte = parsedEnd;
+          }
+        }
+      } else {
+        const parsedEnd = new Date(endDate);
+        if (!isNaN(parsedEnd.getTime())) {
+          createdAtFilter.lte = parsedEnd;
+        }
       }
     }
 

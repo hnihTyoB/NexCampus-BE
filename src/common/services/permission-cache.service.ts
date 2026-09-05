@@ -1,7 +1,6 @@
 import IORedis from "ioredis";
 import { rbacRepository } from "../../modules/rbac/rbac.repository";
 import { userRepository } from "../../modules/users/user.repository";
-import { prisma } from "../../database/prisma.client";
 import { envConfig } from "../../config/env.config";
 import {
   PERMISSION_PUBSUB_CHANNEL,
@@ -194,16 +193,7 @@ export class PermissionCacheService {
 
     const fetchPromise = (async () => {
       try {
-        const user = await prisma.user.findUnique({
-          where: { id: userId },
-          select: {
-            id: true,
-            isActive: true,
-            deletedAt: true,
-            roleId: true,
-            role: { select: { name: true } },
-          },
-        });
+        const user = await userRepository.findUserStateById(userId);
 
         const userState: CachedUserState | null = user
           ? {

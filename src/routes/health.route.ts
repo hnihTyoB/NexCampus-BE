@@ -5,6 +5,26 @@ import IORedis from "ioredis";
 
 const router = Router();
 
+let healthRedisClient: IORedis | null = null;
+
+function getHealthRedisClient(): IORedis | null {
+  if (!envConfig.redis.enabled) return null;
+  if (!healthRedisClient) {
+    healthRedisClient = new IORedis({
+      host: envConfig.redis.host,
+      port: envConfig.redis.port,
+      password: envConfig.redis.password,
+      connectTimeout: 2000,
+      lazyConnect: true,
+      maxRetriesPerRequest: 1,
+      retryStrategy: () => 1000,
+    });
+    healthRedisClient.on("error", () => {});
+    healthRedisClient.connect().catch(() => {});
+  }
+  return healthRedisClient;
+}
+
 // 1. Basic Liveness Check (Kubernetes Liveness Probe / Load Balancer)
 router.get("/", (req: Request, res: Response) => {
   res.json({
@@ -60,23 +80,19 @@ router.get("/readiness", async (req: Request, res: Response) => {
   if (envConfig.redis.enabled) {
     try {
       const redisStart = Date.now();
-      const testClient = new IORedis({
-        host: envConfig.redis.host,
-        port: envConfig.redis.port,
-        password: envConfig.redis.password,
-        connectTimeout: 2000,
-        lazyConnect: true,
-        maxRetriesPerRequest: 1,
-      });
-
-      await testClient.connect();
-      await testClient.ping();
-      testClient.disconnect();
-
-      checks.redis = {
-        status: "healthy",
-        latencyMs: Date.now() - redisStart,
-      };
+      const client = getHealthRedisClient();
+      if (!client) {
+        checks.redis = { status: "skipped" };
+      } else {
+        if (client.status !== "ready" && client.status !== "connecting") {
+          await client.connect().catch(() => {});
+        }
+        await client.ping();
+        checks.redis = {
+          status: "healthy",
+          latencyMs: Date.now() - redisStart,
+        };
+      }
     } catch (err: any) {
       // Redis is an optimization layer; if unavailable, we can report degraded
       checks.redis = {

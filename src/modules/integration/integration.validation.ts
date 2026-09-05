@@ -20,6 +20,13 @@ export const apiKeyIdParamSchema = z.object({
   id: z.string().uuid("Invalid API Key ID format"),
 });
 
+export const toggleApiKeySchema = z.object({
+  isActive: z.boolean({
+    required_error: "isActive is required",
+    invalid_type_error: "isActive must be a boolean",
+  }),
+});
+
 export const createWebhookSchema = z.object({
   url: z
     .string()

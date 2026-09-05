@@ -129,13 +129,22 @@ export class CronService {
         : false;
 
       if (isOrphaned && isOldEnough) {
-        await this.r2Service.deleteFile(obj.key).catch((err) => {
+        deletedKeys.push(obj.key);
+      }
+    }
+
+    if (deletedKeys.length > 0) {
+      if (typeof this.r2Service.deleteFiles === "function") {
+        await this.r2Service.deleteFiles(deletedKeys).catch((err) => {
           console.warn(
-            `[CronService] Failed to delete orphaned file ${obj.key}:`,
+            `[CronService] Failed to batch delete orphaned files:`,
             err.message,
           );
         });
-        deletedKeys.push(obj.key);
+      } else {
+        for (const key of deletedKeys) {
+          await this.r2Service.deleteFile(key).catch(() => {});
+        }
       }
     }
 

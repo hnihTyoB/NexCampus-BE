@@ -125,7 +125,9 @@ export class Auth2FAService {
   ): Promise<LoginResponseDto> {
     let payload: any;
     try {
-      payload = jwt.verify(data.tempToken, jwtConfig.accessSecret);
+      payload = jwt.verify(data.tempToken, jwtConfig.accessSecret, {
+        algorithms: ["HS256"],
+      });
     } catch {
       throw new AppError(
         "Mã phiên xác thực 2FA không hợp lệ hoặc đã hết hạn",
@@ -286,21 +288,22 @@ export class Auth2FAService {
       );
     }
 
-    if (!user.password) {
-      throw new AppError(
-        "Tài khoản liên kết mạng xã hội không thể tắt 2FA bằng mật khẩu",
-        400,
-        ERROR_CODE.VALIDATION_ERROR,
-      );
-    }
-
-    const isPasswordValid = await bcrypt.compare(data.password, user.password);
-    if (!isPasswordValid) {
-      throw new AppError(
-        "Mật khẩu hiện tại không chính xác",
-        400,
-        ERROR_CODE.INVALID_CREDENTIALS,
-      );
+    if (user.password) {
+      if (!data.password) {
+        throw new AppError(
+          "Mật khẩu hiện tại là bắt buộc",
+          400,
+          ERROR_CODE.VALIDATION_ERROR,
+        );
+      }
+      const isPasswordValid = await bcrypt.compare(data.password, user.password);
+      if (!isPasswordValid) {
+        throw new AppError(
+          "Mật khẩu hiện tại không chính xác",
+          400,
+          ERROR_CODE.INVALID_CREDENTIALS,
+        );
+      }
     }
 
     const cleanCode = data.code.trim();
@@ -374,52 +377,39 @@ export class Auth2FAService {
       );
     }
 
-    if (!user.password) {
-      throw new AppError(
-        "Tài khoản liên kết mạng xã hội không thể tái tạo mã bằng mật khẩu",
-        400,
-        ERROR_CODE.VALIDATION_ERROR,
-      );
-    }
-
-    const isPasswordValid = await bcrypt.compare(data.password, user.password);
-    if (!isPasswordValid) {
-      throw new AppError(
-        "Mật khẩu hiện tại không chính xác",
-        400,
-        ERROR_CODE.INVALID_CREDENTIALS,
-      );
+    if (user.password) {
+      if (!data.password) {
+        throw new AppError(
+          "Mật khẩu hiện tại là bắt buộc",
+          400,
+          ERROR_CODE.VALIDATION_ERROR,
+        );
+      }
+      const isPasswordValid = await bcrypt.compare(data.password, user.password);
+      if (!isPasswordValid) {
+        throw new AppError(
+          "Mật khẩu hiện tại không chính xác",
+          400,
+          ERROR_CODE.INVALID_CREDENTIALS,
+        );
+      }
     }
 
     const cleanCode = data.code.trim();
-    let isCodeValid = false;
-
-    if (/^\d{6}$/.test(cleanCode)) {
-      const decryptedSecret = decryptSecret(user.twoFactorSecret);
-      isCodeValid = verifyTotpCode(decryptedSecret, cleanCode);
+    if (!/^\d{6}$/.test(cleanCode)) {
+      throw new AppError(
+        "Cần cung cấp mã TOTP 6 chữ số từ ứng dụng xác thực để tái tạo mã dự phòng",
+        400,
+        ERROR_CODE.TWO_FACTOR_INVALID_CODE,
+      );
     }
 
-    if (
-      !isCodeValid &&
-      user.twoFactorBackupCodes &&
-      Array.isArray(user.twoFactorBackupCodes)
-    ) {
-      const formattedCode = cleanCode.toUpperCase();
-      const hashedInput = hashToken(formattedCode);
-      const backupCodes = user.twoFactorBackupCodes as string[];
-      isCodeValid = backupCodes.some((storedHash) => {
-        const bufInput = Buffer.from(hashedInput, "utf8");
-        const bufStored = Buffer.from(storedHash, "utf8");
-        return (
-          bufInput.length === bufStored.length &&
-          crypto.timingSafeEqual(bufInput, bufStored)
-        );
-      });
-    }
+    const decryptedSecret = decryptSecret(user.twoFactorSecret);
+    const isCodeValid = verifyTotpCode(decryptedSecret, cleanCode);
 
     if (!isCodeValid) {
       throw new AppError(
-        "Mã xác thực 2FA hoặc mã dự phòng không chính xác",
+        "Mã xác thực TOTP không chính xác hoặc đã hết hạn",
         400,
         ERROR_CODE.TWO_FACTOR_INVALID_CODE,
       );

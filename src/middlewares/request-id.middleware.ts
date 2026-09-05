@@ -16,7 +16,7 @@ export function requestIdMiddleware(
   const requestId = incomingId || crypto.randomUUID();
 
   req.headers[REQUEST_ID_HEADER] = requestId;
-  (req as any).id = requestId;
+  req.id = requestId;
   res.setHeader("X-Request-Id", requestId);
 
   next();

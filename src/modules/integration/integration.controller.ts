@@ -61,8 +61,11 @@ export class IntegrationController {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      const isActive = req.body.isActive ?? false;
-      await this.service.toggleApiKey(req.user.id, req.params.id, isActive);
+      const isActive = req.body.isActive;
+      await this.service.toggleApiKey(req.user.id, req.params.id, isActive, {
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
       res.json({
         success: true,
         message: `API Key ${isActive ? "activated" : "deactivated"} successfully`,

@@ -5,6 +5,7 @@ import {
   getVietnamDayRange,
   formatVietnamDate,
   formatVietnamDateTime,
+  parseVietnamDate,
 } from "../src/common/helpers/date.helper";
 import { toSlug } from "../src/common/helpers/slug.helper";
 
@@ -58,24 +59,48 @@ describe("Decimal Invariants & Precision", () => {
 });
 
 describe("Timezone & Date Helper (Asia/Ho_Chi_Minh - UTC+7)", () => {
-  it("should correctly determine day range for Vietnam business date 2026-08-22", () => {
-    const { startOfDay, endOfDay } = getVietnamDayRange("2026-08-22");
+  it("should correctly determine day range for Vietnam business date 22/08/2026 (DD/MM/YYYY) and 2026-08-22 (YYYY-MM-DD)", () => {
+    const rangeVn = getVietnamDayRange("22/08/2026");
+    const rangeIso = getVietnamDayRange("2026-08-22");
 
-    // 2026-08-22 00:00:00+07:00 is 2026-08-21 17:00:00 UTC
-    assert.equal(startOfDay.toISOString(), "2026-08-21T17:00:00.000Z");
+    // 22/08/2026 00:00:00+07:00 is 2026-08-21 17:00:00 UTC
+    assert.equal(rangeVn.startOfDay.toISOString(), "2026-08-21T17:00:00.000Z");
+    assert.equal(rangeIso.startOfDay.toISOString(), "2026-08-21T17:00:00.000Z");
 
-    // 2026-08-22 23:59:59.999+07:00 is 2026-08-22 16:59:59.999 UTC
-    assert.equal(endOfDay.toISOString(), "2026-08-22T16:59:59.999Z");
+    // 22/08/2026 23:59:59.999+07:00 is 2026-08-22 16:59:59.999 UTC
+    assert.equal(rangeVn.endOfDay.toISOString(), "2026-08-22T16:59:59.999Z");
+    assert.equal(rangeIso.endOfDay.toISOString(), "2026-08-22T16:59:59.999Z");
   });
 
-  it("should format UTC timestamp back to correct Vietnam date string YYYY-MM-DD", () => {
+  it("should format UTC timestamp to DD/MM/YYYY by default (standard for Vietnam) and YYYY-MM-DD optionally", () => {
     // 2026-08-21 18:00:00 UTC is 2026-08-22 01:00:00 in Vietnam (early morning)
     const earlyMorning = new Date("2026-08-21T18:00:00.000Z");
-    assert.equal(formatVietnamDate(earlyMorning), "2026-08-22");
+    assert.equal(formatVietnamDate(earlyMorning), "22/08/2026");
+    assert.equal(formatVietnamDate(earlyMorning, "YYYY-MM-DD"), "2026-08-22");
 
     // 2026-08-22 16:30:00 UTC is 2026-08-22 23:30:00 in Vietnam (late night)
     const lateNight = new Date("2026-08-22T16:30:00.000Z");
-    assert.equal(formatVietnamDate(lateNight), "2026-08-22");
+    assert.equal(formatVietnamDate(lateNight), "22/08/2026");
+    assert.equal(formatVietnamDate(lateNight, "YYYY-MM-DD"), "2026-08-22");
+  });
+
+  it("should accurately parse Vietnam date with parseVietnamDate", () => {
+    const parsed = parseVietnamDate("22/08/2026");
+    assert.ok(parsed);
+    assert.equal(parsed?.toISOString(), "2026-08-21T17:00:00.000Z");
+
+    assert.equal(parseVietnamDate("invalid-date"), null);
+  });
+
+  it("should validate calendar boundaries including leap years and days per month", () => {
+    // 29/02/2024 is a leap year -> valid
+    assert.doesNotThrow(() => getVietnamDayRange("29/02/2024"));
+
+    // 29/02/2026 is NOT a leap year -> invalid
+    assert.throws(() => getVietnamDayRange("29/02/2026"), /Invalid calendar day/);
+
+    // 31/04/2026 (April has 30 days) -> invalid
+    assert.throws(() => getVietnamDayRange("31/04/2026"), /Invalid calendar day/);
   });
 
   it("should format date with formatVietnamDateTime in Asia/Ho_Chi_Minh timezone", () => {

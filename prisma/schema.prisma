@@ -130,6 +130,7 @@ model UserSocial {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerUserId])
+  @@index([userId])
   @@map("user_socials")
 }
 

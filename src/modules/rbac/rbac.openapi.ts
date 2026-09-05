@@ -8,6 +8,7 @@ import {
   rolePermissionParamsSchema,
   roleQuerySchema,
   auditLogQuerySchema,
+  permissionQuerySchema,
 } from "./rbac.validation";
 import { userIdParamSchema } from "../users/user.validation";
 import { z } from "zod";
@@ -202,6 +203,7 @@ export function registerRbacOpenApi(): void {
     tags: ["RBAC"],
     summary: "Danh sách toàn bộ các quyền (Permissions) trong hệ thống",
     security: [{ BearerAuth: [] }],
+    request: { query: permissionQuerySchema },
     responses: {
       200: {
         description: "Lấy danh sách quyền thành công",

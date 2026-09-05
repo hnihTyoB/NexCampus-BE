@@ -13,6 +13,7 @@ import {
   rolePermissionParamsSchema,
   roleQuerySchema,
   auditLogQuerySchema,
+  permissionQuerySchema,
 } from "./rbac.validation";
 import { userIdParamSchema } from "../users/user.validation";
 
@@ -66,6 +67,7 @@ router.get(
   "/permissions",
   authMiddleware,
   requirePermission(PERMISSIONS.PERMISSION_READ),
+  validate(permissionQuerySchema, "query"),
   controller.findAllPermissions,
 );
 

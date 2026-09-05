@@ -9,6 +9,7 @@ import { cronQueue } from "./common/queues/cron.queue";
 import { maintenanceCacheService } from "./common/services/maintenance-cache.service";
 import { systemConfigService } from "./modules/system-config/system-config.service";
 import { sseManagerService } from "./common/services/sse-manager.service";
+import { permissionCacheService } from "./common/services/permission-cache.service";
 import { prisma } from "./database/prisma.client";
 
 const PORT = envConfig.port;
@@ -56,6 +57,7 @@ async function handleShutdown(signal: string) {
       await cronQueue.close();
       await maintenanceCacheService.close();
       await systemConfigService.close();
+      await permissionCacheService.close();
       console.log("[Server] SSE, Redis & Queue connections closed.");
 
       // 3. Disconnect Prisma DB client

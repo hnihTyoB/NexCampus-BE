@@ -4,6 +4,8 @@ import {
   createUserSchema,
   updateUserSchema,
   userIdParamSchema,
+  userSessionParamsSchema,
+  userDeviceParamsSchema,
 } from "./user.validation";
 import { z } from "zod";
 
@@ -198,6 +200,159 @@ export function registerUserOpenApi(): void {
         },
       },
       404: { description: "Không tìm thấy người dùng" },
+    },
+  });
+
+  // ── User Sessions & Devices Management ──────────────────────────────────────
+
+  // GET /users/:id/sessions
+  openapiRegistry.registerPath({
+    method: "get",
+    path: "/users/{id}/sessions",
+    tags: ["Users"],
+    summary: "Danh sách các phiên đăng nhập hoạt động của người dùng (Admin)",
+    security: [{ BearerAuth: [] }],
+    request: { params: userIdParamSchema },
+    responses: {
+      200: {
+        description: "Lấy danh sách phiên đăng nhập thành công",
+        content: {
+          "application/json": {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              data: z.array(
+                z.object({
+                  id: z.string().uuid(),
+                  userAgent: z.string().nullable(),
+                  ipAddress: z.string().nullable(),
+                  createdAt: z.string().datetime(),
+                  expiresAt: z.string().datetime(),
+                }),
+              ),
+            }),
+          },
+        },
+      },
+      403: { description: "Không có quyền USER_READ" },
+      404: { description: "Không tìm thấy người dùng" },
+    },
+  });
+
+  // DELETE /users/:id/sessions/:sessionId
+  openapiRegistry.registerPath({
+    method: "delete",
+    path: "/users/{id}/sessions/{sessionId}",
+    tags: ["Users"],
+    summary: "Thu hồi một phiên đăng nhập cụ thể của người dùng (Admin)",
+    security: [{ BearerAuth: [] }],
+    request: { params: userSessionParamsSchema },
+    responses: {
+      200: {
+        description: "Thu hồi phiên đăng nhập thành công",
+        content: {
+          "application/json": {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              message: z
+                .string()
+                .openapi({ example: "Phiên đăng nhập đã được thu hồi" }),
+            }),
+          },
+        },
+      },
+      403: { description: "Không có quyền USER_UPDATE" },
+      404: { description: "Không tìm thấy người dùng hoặc phiên đăng nhập" },
+    },
+  });
+
+  // DELETE /users/:id/sessions
+  openapiRegistry.registerPath({
+    method: "delete",
+    path: "/users/{id}/sessions",
+    tags: ["Users"],
+    summary: "Thu hồi toàn bộ phiên đăng nhập của người dùng (Admin)",
+    security: [{ BearerAuth: [] }],
+    request: { params: userIdParamSchema },
+    responses: {
+      200: {
+        description: "Thu hồi tất cả phiên đăng nhập thành công",
+        content: {
+          "application/json": {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              message: z
+                .string()
+                .openapi({ example: "Đã thu hồi 3 phiên đăng nhập" }),
+              data: z.object({ count: z.number() }),
+            }),
+          },
+        },
+      },
+      403: { description: "Không có quyền USER_UPDATE" },
+      404: { description: "Không tìm thấy người dùng" },
+    },
+  });
+
+  // GET /users/:id/devices
+  openapiRegistry.registerPath({
+    method: "get",
+    path: "/users/{id}/devices",
+    tags: ["Users"],
+    summary: "Danh sách thiết bị đã đăng nhập của người dùng (Admin)",
+    security: [{ BearerAuth: [] }],
+    request: { params: userIdParamSchema },
+    responses: {
+      200: {
+        description: "Lấy danh sách thiết bị thành công",
+        content: {
+          "application/json": {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              data: z.array(
+                z.object({
+                  id: z.string().uuid(),
+                  deviceName: z.string().nullable(),
+                  deviceType: z.string().nullable(),
+                  os: z.string().nullable(),
+                  browser: z.string().nullable(),
+                  ipAddress: z.string().nullable(),
+                  lastActiveAt: z.string().datetime().nullable(),
+                  createdAt: z.string().datetime(),
+                }),
+              ),
+            }),
+          },
+        },
+      },
+      403: { description: "Không có quyền USER_READ" },
+      404: { description: "Không tìm thấy người dùng" },
+    },
+  });
+
+  // DELETE /users/:id/devices/:deviceId
+  openapiRegistry.registerPath({
+    method: "delete",
+    path: "/users/{id}/devices/{deviceId}",
+    tags: ["Users"],
+    summary: "Xóa một thiết bị khỏi tài khoản người dùng (Admin)",
+    security: [{ BearerAuth: [] }],
+    request: { params: userDeviceParamsSchema },
+    responses: {
+      200: {
+        description: "Xóa thiết bị thành công",
+        content: {
+          "application/json": {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              message: z
+                .string()
+                .openapi({ example: "Thiết bị đã được xóa khỏi tài khoản" }),
+            }),
+          },
+        },
+      },
+      403: { description: "Không có quyền USER_UPDATE" },
+      404: { description: "Không tìm thấy người dùng hoặc thiết bị" },
     },
   });
 }

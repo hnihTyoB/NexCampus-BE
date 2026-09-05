@@ -7,9 +7,12 @@ import {
   createNotificationTemplateSchema,
   updateNotificationTemplateSchema,
   templateCodeParamSchema,
+  templateIdParamSchema,
   previewNotificationTemplateSchema,
   listNotificationTemplatesSchema,
   listEmailsSchema,
+  emailIdParamSchema,
+  testSendNotificationTemplateSchema,
 } from "./notification.validation";
 import { z } from "zod";
 
@@ -30,6 +33,10 @@ export function registerNotificationOpenApi(): void {
   openapiRegistry.register(
     "PreviewTemplateRequest",
     previewNotificationTemplateSchema,
+  );
+  openapiRegistry.register(
+    "TestSendTemplateRequest",
+    testSendNotificationTemplateSchema,
   );
 
   // ── Web Notifications ────────────────────────────────────────────────────────
@@ -403,15 +410,15 @@ export function registerNotificationOpenApi(): void {
     },
   });
 
-  // PUT /notifications/templates/:code
+  // PUT /notifications/templates/:id
   openapiRegistry.registerPath({
     method: "put",
-    path: "/notifications/templates/{code}",
+    path: "/notifications/templates/{id}",
     tags: ["Notification Templates"],
-    summary: "Cập nhật mẫu thông báo theo code",
+    summary: "Cập nhật mẫu thông báo theo ID",
     security: [{ BearerAuth: [] }],
     request: {
-      params: templateCodeParamSchema,
+      params: templateIdParamSchema,
       body: {
         content: {
           "application/json": { schema: updateNotificationTemplateSchema },
@@ -425,22 +432,26 @@ export function registerNotificationOpenApi(): void {
           "application/json": {
             schema: z.object({
               success: z.boolean().openapi({ example: true }),
-              data: z.object({ id: z.string().uuid(), code: z.string() }),
+              message: z
+                .string()
+                .openapi({ example: "Notification template updated successfully" }),
+              data: z.record(z.unknown()),
             }),
           },
         },
       },
+      404: { description: "Không tìm thấy mẫu thông báo" },
     },
   });
 
-  // DELETE /notifications/templates/:code
+  // DELETE /notifications/templates/:id
   openapiRegistry.registerPath({
     method: "delete",
-    path: "/notifications/templates/{code}",
+    path: "/notifications/templates/{id}",
     tags: ["Notification Templates"],
-    summary: "Xóa mẫu thông báo",
+    summary: "Xóa mẫu thông báo theo ID",
     security: [{ BearerAuth: [] }],
-    request: { params: templateCodeParamSchema },
+    request: { params: templateIdParamSchema },
     responses: {
       200: {
         description: "Xóa mẫu thành công",
@@ -455,6 +466,40 @@ export function registerNotificationOpenApi(): void {
           },
         },
       },
+      404: { description: "Không tìm thấy mẫu thông báo" },
+    },
+  });
+
+  // POST /notifications/templates/:code/test-send
+  openapiRegistry.registerPath({
+    method: "post",
+    path: "/notifications/templates/{code}/test-send",
+    tags: ["Notification Templates"],
+    summary: "Gửi thử nghiệm mẫu thông báo tới email hoặc web",
+    security: [{ BearerAuth: [] }],
+    request: {
+      params: templateCodeParamSchema,
+      body: {
+        content: {
+          "application/json": { schema: testSendNotificationTemplateSchema },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: "Gửi thử nghiệm thành công",
+        content: {
+          "application/json": {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              message: z
+                .string()
+                .openapi({ example: "Test email sent successfully" }),
+            }),
+          },
+        },
+      },
+      400: { description: "Mẫu không khả dụng hoặc tham số không đúng" },
     },
   });
 
@@ -498,6 +543,32 @@ export function registerNotificationOpenApi(): void {
           },
         },
       },
+    },
+  });
+
+  // POST /notifications/emails/:id/retry
+  openapiRegistry.registerPath({
+    method: "post",
+    path: "/notifications/emails/{id}/retry",
+    tags: ["Email Notifications"],
+    summary: "Gửi lại (Retry) một email thất bại trong hàng đợi",
+    security: [{ BearerAuth: [] }],
+    request: { params: emailIdParamSchema },
+    responses: {
+      200: {
+        description: "Đã đưa email vào hàng đợi gửi lại",
+        content: {
+          "application/json": {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              message: z
+                .string()
+                .openapi({ example: "Email scheduled for retry" }),
+            }),
+          },
+        },
+      },
+      404: { description: "Không tìm thấy email" },
     },
   });
 }

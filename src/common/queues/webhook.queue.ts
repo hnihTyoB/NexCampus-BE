@@ -65,6 +65,10 @@ class WebhookQueueService {
         this.isRedisAvailable = false;
       });
 
+      this.redisConnection.connect().catch(() => {
+        this.isRedisAvailable = false;
+      });
+
       const queueOptions: QueueOptions = {
         connection: this.redisConnection,
         defaultJobOptions: {
@@ -84,6 +88,35 @@ class WebhookQueueService {
     }
   }
 
+  private activeInMemoryJobs = 0;
+  private readonly MAX_CONCURRENT_IN_MEMORY_JOBS = 5;
+
+  private triggerInMemoryProcessing(): void {
+    while (
+      this.activeInMemoryJobs < this.MAX_CONCURRENT_IN_MEMORY_JOBS &&
+      this.inMemoryQueue.length > 0
+    ) {
+      const item = this.inMemoryQueue.shift();
+      if (!item) break;
+
+      this.activeInMemoryJobs++;
+      setImmediate(async () => {
+        try {
+          const { webhookWorker } = await import("../workers/webhook.worker");
+          await webhookWorker.processJob(item.data);
+        } catch (err: any) {
+          console.warn(
+            `[WebhookQueue] In-memory job execution error for ${item.id}:`,
+            err?.message || err,
+          );
+        } finally {
+          this.activeInMemoryJobs--;
+          this.triggerInMemoryProcessing();
+        }
+      });
+    }
+  }
+
   /**
    * Đẩy job webhook vào hàng đợi BullMQ (hoặc fallback in-memory nếu không có Redis).
    */
@@ -99,8 +132,15 @@ class WebhookQueueService {
       }
     }
 
-    // In-memory fallback
+    // In-memory fallback: giới hạn dung lượng hàng đợi chống rò rỉ RAM
+    if (this.inMemoryQueue.length >= 100) {
+      this.inMemoryQueue.shift();
+    }
     this.inMemoryQueue.push({ id: data.deliveryId, data, attemptsMade: 0 });
+
+    // Kích hoạt xử lý có giới hạn đồng thời để bảo vệ outbound sockets
+    this.triggerInMemoryProcessing();
+
     return { jobId: data.deliveryId };
   }
 
@@ -113,6 +153,7 @@ class WebhookQueueService {
   }
 
   async close(): Promise<void> {
+    this.inMemoryQueue = [];
     if (this.queue) {
       await this.queue.close().catch(() => {});
     }

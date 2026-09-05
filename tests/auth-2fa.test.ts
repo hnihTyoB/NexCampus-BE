@@ -173,13 +173,20 @@ describe("Two-Factor Authentication (2FA / TOTP) Test Suite", () => {
       );
     });
 
-    it("regenerateBackupCodesSchema requires password and code", () => {
+    it("regenerateBackupCodesSchema requires password and 6-digit TOTP code, rejecting static backup codes", () => {
       assert.equal(
         regenerateBackupCodesSchema.safeParse({
           password: "Password@123",
           code: "123456",
         }).success,
         true,
+      );
+      assert.equal(
+        regenerateBackupCodesSchema.safeParse({
+          password: "Password@123",
+          code: "A1B2-C3D4",
+        }).success,
+        false,
       );
     });
   });
@@ -413,6 +420,20 @@ describe("Two-Factor Authentication (2FA / TOTP) Test Suite", () => {
       assert.equal(
         auditLogs[0].action,
         AUDIT_ACTION.REGENERATE_2FA_BACKUP_CODES,
+      );
+    });
+
+    it("regenerateBackupCodes should reject if trying to authenticate using a static backup code", async () => {
+      await assert.rejects(
+        authService.regenerateBackupCodes(mockUser.id, {
+          password: "Password@123",
+          code: plainCodes[0],
+        }),
+        (err: any) => {
+          assert.equal(err instanceof AppError, true);
+          assert.equal(err.code, ERROR_CODE.TWO_FACTOR_INVALID_CODE);
+          return true;
+        },
       );
     });
   });

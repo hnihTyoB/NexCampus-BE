@@ -105,6 +105,7 @@ export class IntegrationService {
     userId: string,
     id: string,
     isActive: boolean,
+    metadata?: { ipAddress?: string; userAgent?: string },
   ): Promise<void> {
     const existing = await this.repository.findApiKeyById(userId, id);
     if (!existing) {
@@ -112,6 +113,18 @@ export class IntegrationService {
     }
 
     await this.repository.toggleApiKey(userId, id, isActive);
+
+    await this.repository
+      .createAuditLog({
+        actorId: userId,
+        action: AUDIT_ACTION.TOGGLE_API_KEY,
+        targetType: AUDIT_TARGET_TYPE.API_KEY,
+        targetId: id,
+        details: { name: existing.name, prefix: existing.prefix, isActive },
+        ipAddress: metadata?.ipAddress,
+        userAgent: metadata?.userAgent,
+      })
+      .catch(() => {});
   }
 
   // ── Webhook Endpoint Business Logic ──────────────────────────────────────────

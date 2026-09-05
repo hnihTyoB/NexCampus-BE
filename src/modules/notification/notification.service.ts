@@ -130,17 +130,19 @@ export class NotificationService {
           title) ??
         "Thông báo từ hệ thống";
 
-      emailRecords = targetUsers.map((u) => ({
-        userId: u.id,
-        toEmail: u.email!,
-        subject,
-        templateKey,
-        templateData: (templateData || {
-          subject: title,
-          html: content,
-        }) as any,
-        status: "PENDING",
-      }));
+      emailRecords = targetUsers
+        .filter((u): u is { id: string; email: string } => Boolean(u.email))
+        .map((u) => ({
+          userId: u.id,
+          toEmail: u.email,
+          subject,
+          templateKey,
+          templateData: (templateData || {
+            subject: title,
+            html: content,
+          }) as any,
+          status: "PENDING",
+        }));
     }
 
     if (webRecords.length > 0 || emailRecords.length > 0) {

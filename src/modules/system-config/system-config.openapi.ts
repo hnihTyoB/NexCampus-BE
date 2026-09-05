@@ -1,4 +1,7 @@
-import { openapiRegistry } from "../../config/openapi/openapi.registry";
+import {
+  openapiRegistry,
+  PaginationMetaSchema,
+} from "../../config/openapi/openapi.registry";
 import {
   createSystemConfigSchema,
   updateSystemConfigSchema,
@@ -33,14 +36,7 @@ export function registerSystemConfigOpenApi(): void {
           "application/json": {
             schema: z.object({
               success: z.boolean().openapi({ example: true }),
-              data: z.array(
-                z.object({
-                  key: z.string(),
-                  value: z.unknown(),
-                  category: z.string(),
-                  description: z.string().nullable(),
-                }),
-              ),
+              data: z.record(z.unknown()),
             }),
           },
         },
@@ -76,6 +72,7 @@ export function registerSystemConfigOpenApi(): void {
                   updatedAt: z.string().datetime(),
                 }),
               ),
+              meta: PaginationMetaSchema.optional(),
             }),
           },
         },

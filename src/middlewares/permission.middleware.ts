@@ -12,7 +12,7 @@ async function resolveUserPermissions(req: Request): Promise<Set<string>> {
 
   // Xác thực trạng thái người dùng (cached 60s) để chống dùng JWT cũ khi bị khóa/hạ quyền
   // Bỏ qua khi request đã được xác thực qua API Key (đã có cơ chế kiểm tra riêng)
-  if (!(req as any).apiKey) {
+  if (!req.apiKey) {
     const currentUser = await permissionCacheService.getUserState(req.user.id);
     if (!currentUser || !currentUser.isActive || currentUser.deletedAt) {
       throw new AppError(
@@ -40,7 +40,7 @@ async function resolveUserPermissions(req: Request): Promise<Set<string>> {
     await permissionCacheService.getRolePermissions(roleId);
 
   // If request is authenticated via API Key, intersect role permissions with scoped API Key permissions
-  if ((req as any).apiKey && Array.isArray(req.user.permissions)) {
+  if (req.apiKey && Array.isArray(req.user.permissions)) {
     const apiKeyPermissions = new Set(req.user.permissions);
     const effectivePermissions = new Set<string>();
     for (const perm of userPermissions) {
