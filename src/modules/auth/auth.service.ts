@@ -52,6 +52,7 @@ import {
   generateDeviceHash,
   parseUserAgent,
 } from "../../common/helpers/user-agent.helper";
+import { parseDurationToMs } from "../../common/helpers/date.helper";
 import { permissionCacheService } from "../../common/services/permission-cache.service";
 import { envConfig } from "../../config/env.config";
 import {
@@ -143,6 +144,7 @@ export class AuthService {
       email: user.email,
       role: user.role.name,
       roleId: user.roleId,
+      purpose: "ACCESS",
     };
 
     const accessToken = jwt.sign(payload, jwtConfig.accessSecret, {
@@ -155,8 +157,10 @@ export class AuthService {
       { expiresIn: jwtConfig.refreshExpiresIn as jwt.SignOptions["expiresIn"] },
     );
 
-    const decoded = jwt.decode(refreshToken) as { exp: number };
-    const expiresAt = new Date(decoded.exp * 1000);
+    const expiresAt = new Date(
+      Date.now() +
+        parseDurationToMs(jwtConfig.refreshExpiresIn, 7 * 24 * 60 * 60 * 1000),
+    );
     await this.repository.saveRefreshToken(
       user.id,
       refreshToken,
@@ -324,8 +328,17 @@ export class AuthService {
 
         // Kích hoạt nếu user cũ chưa kích hoạt email
         if (!existingUser.isActive) {
-          await this.repository.activateUser(existingUser.id);
+          // SEC-03: Chống tấn công Pre-Account Takeover:
+          // Nếu tài khoản trước đó được đăng ký cục bộ nhưng CHƯA xác thực email,
+          // kẻ tấn công có thể đã đăng ký trước bằng email này với mật khẩu do kẻ tấn công chọn.
+          // Do đó, phải hủy bỏ mật khẩu cũ để kẻ tấn công không thể dùng mật khẩu đó đăng nhập sau này.
+          if (typeof this.repository.activateUserAndClearPassword === "function") {
+            await this.repository.activateUserAndClearPassword(existingUser.id);
+          } else {
+            await this.repository.activateUser(existingUser.id);
+          }
           existingUser.isActive = true;
+          existingUser.password = null;
         }
 
         user = existingUser;
@@ -596,12 +609,33 @@ export class AuthService {
     token: string,
     metadata?: { userAgent?: string; ipAddress?: string },
   ): Promise<AuthTokensDto> {
-    let payload: any;
+    let payload: {
+      id: string;
+      email?: string;
+      role?: string;
+      roleId?: string;
+      jti?: string;
+    };
     try {
-      payload = jwt.verify(token, jwtConfig.refreshSecret, {
+      const verified = jwt.verify(token, jwtConfig.refreshSecret, {
         algorithms: ["HS256"],
-      });
+      }) as any;
+
+      if (
+        !verified ||
+        typeof verified !== "object" ||
+        !verified.id ||
+        typeof verified.id !== "string"
+      ) {
+        throw new AppError(
+          "Invalid refresh token payload",
+          401,
+          ERROR_CODE.TOKEN_INVALID,
+        );
+      }
+      payload = verified;
     } catch (error) {
+      if (error instanceof AppError) throw error;
       throw new AppError(
         "Invalid refresh token",
         401,
@@ -641,6 +675,7 @@ export class AuthService {
       email: user.email,
       role: user.role.name,
       roleId: user.roleId,
+      purpose: "ACCESS",
     };
 
     const newAccessToken = jwt.sign(newPayload, jwtConfig.accessSecret, {
@@ -653,8 +688,10 @@ export class AuthService {
       { expiresIn: jwtConfig.refreshExpiresIn as jwt.SignOptions["expiresIn"] },
     );
 
-    const decoded = jwt.decode(newRefreshToken) as { exp: number };
-    const expiresAt = new Date(decoded.exp * 1000);
+    const expiresAt = new Date(
+      Date.now() +
+        parseDurationToMs(jwtConfig.refreshExpiresIn, 7 * 24 * 60 * 60 * 1000),
+    );
     await this.repository.rotateRefreshToken(
       user.id,
       token,
@@ -683,7 +720,9 @@ export class AuthService {
   }
 
   async getMe(userId: string): Promise<MeDto> {
-    const user = await this.repository.findById(userId);
+    const user =
+      (await this.repository.findProfileById?.(userId)) ||
+      (await this.repository.findById(userId));
 
     if (!user || !user.isActive) {
       throw new AppError("User not found", 404, ERROR_CODE.NOT_FOUND);
@@ -728,8 +767,7 @@ export class AuthService {
     }
 
     const token = crypto.randomUUID();
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24);
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     await this.repository.registerUserWithVerification(
       {
@@ -877,8 +915,7 @@ export class AuthService {
     }
 
     const token = crypto.randomUUID();
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 1);
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
     await this.repository.createPasswordResetToken(user.id, token, expiresAt);
 
@@ -940,9 +977,23 @@ export class AuthService {
       return;
     }
 
+    // P1-03: Cooldown guard (60s) to prevent email flooding / bombing
+    const activeToken =
+      await this.repository.findActiveVerificationTokenByUserId(user.id);
+    if (activeToken) {
+      const timeSinceCreated = Date.now() - activeToken.createdAt.getTime();
+      const COOLDOWN_MS = 60 * 1000;
+      if (timeSinceCreated < COOLDOWN_MS) {
+        throw new AppError(
+          "Vui lòng đợi 60 giây trước khi yêu cầu gửi lại email xác thực",
+          429,
+          ERROR_CODE.TOO_MANY_REQUESTS,
+        );
+      }
+    }
+
     const token = crypto.randomUUID();
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24);
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     await this.repository.createVerificationToken(user.id, token, expiresAt);
 
@@ -1132,10 +1183,9 @@ export class AuthService {
       );
     }
 
-    // Sinh token có hạn 15 phút
+    // Sinh token có hạn 15 phút (Timezone-safe UTC milliseconds)
     const token = crypto.randomUUID();
-    const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 15);
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
     await this.repository.createDeactivationToken(userId, token, expiresAt);
 
@@ -1177,6 +1227,14 @@ export class AuthService {
         "Mã xác nhận vô hiệu hóa đã hết hạn (chỉ có hiệu lực trong 15 phút)",
         400,
         ERROR_CODE.TOKEN_EXPIRED,
+      );
+    }
+
+    if (record.user && (record.user.isActive === false || record.user.deletedAt)) {
+      throw new AppError(
+        "Tài khoản này đã bị vô hiệu hóa hoặc không khả dụng",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
       );
     }
 

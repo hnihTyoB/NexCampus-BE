@@ -468,6 +468,12 @@ describe("Google OAuth2 Login & Account Linking Test Suite", () => {
           existingLocalUser.isActive = true;
           return existingLocalUser as any;
         },
+        activateUserAndClearPassword: async (userId: string) => {
+          activatedUsers.push(userId);
+          existingLocalUser.isActive = true;
+          existingLocalUser.password = null;
+          return existingLocalUser as any;
+        },
         saveRefreshToken: async (
           userId: string,
           token: string,
@@ -496,8 +502,9 @@ describe("Google OAuth2 Login & Account Linking Test Suite", () => {
       assert.equal(socialLinks[0].provider, AUTH_PROVIDER.GOOGLE);
       assert.equal(socialLinks[0].providerUserId, "google-sub-local-link");
 
-      // Check user was activated
+      // Check user was activated and password was cleared to prevent pre-account hijacking (SEC-03)
       assert.equal(activatedUsers.includes("local-user-id-123"), true);
+      assert.equal(existingLocalUser.password, null);
 
       // Check Audit logs for both LINK_SOCIAL_ACCOUNT and LOGIN_GOOGLE
       assert.equal(

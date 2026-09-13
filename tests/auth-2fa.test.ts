@@ -23,6 +23,10 @@ import {
   disable2FASchema,
   regenerateBackupCodesSchema,
 } from "../src/modules/auth/auth.validation";
+import {
+  authMiddleware,
+  optionalAuthMiddleware,
+} from "../src/middlewares/auth.middleware";
 
 describe("Two-Factor Authentication (2FA / TOTP) Test Suite", () => {
   let authService: AuthService;
@@ -45,6 +49,16 @@ describe("Two-Factor Authentication (2FA / TOTP) Test Suite", () => {
     const roleId = "a0000000-0000-0000-0000-000000000001";
     (permissionCacheService as any).cache.set(roleId, {
       permissions: new Set(["USER_READ", "USER_UPDATE"]),
+      expiresAt: Date.now() + 600000,
+    });
+    (permissionCacheService as any).userCache.set("user-2fa-1", {
+      user: {
+        id: "user-2fa-1",
+        isActive: true,
+        deletedAt: null,
+        roleId,
+        roleName: ROLES.USER,
+      },
       expiresAt: Date.now() + 600000,
     });
 
@@ -402,6 +416,30 @@ describe("Two-Factor Authentication (2FA / TOTP) Test Suite", () => {
       assert.equal(auditLogs[0].action, AUDIT_ACTION.DISABLE_2FA);
     });
 
+    it("disable2FA should succeed with valid password and backup code, and consume the backup code", async () => {
+      mockUser.twoFactorEnabled = true;
+      mockUser.twoFactorSecret = encryptedSecret;
+      mockUser.twoFactorBackupCodes = [...hashedCodes];
+
+      let updatedBackupCodesCall: string[] | null = null;
+      mockRepository.updateBackupCodes = async (userId: string, backupHashed: string[]) => {
+        updatedBackupCodesCall = backupHashed;
+        mockUser.twoFactorBackupCodes = backupHashed;
+        return mockUser;
+      };
+
+      const backupCodeToUse = plainCodes[0];
+      await authService.disable2FA(mockUser.id, {
+        password: "Password@123",
+        code: backupCodeToUse,
+      });
+
+      assert.ok(updatedBackupCodesCall);
+      assert.equal((updatedBackupCodesCall as string[]).length, 7);
+      assert.equal(mockUser.twoFactorEnabled, false);
+      assert.equal(mockUser.twoFactorBackupCodes, null);
+    });
+
     it("regenerateBackupCodes should invalidate old codes and return 8 new codes", async () => {
       const validCode = generateTotpCode(rawSecret);
       const result = await authService.regenerateBackupCodes(mockUser.id, {
@@ -465,6 +503,84 @@ describe("Two-Factor Authentication (2FA / TOTP) Test Suite", () => {
         swaggerSpec.paths["/auth/2fa/setup"].post.tags[0],
         "Auth - 2FA",
       );
+    });
+  });
+
+  describe("6. 2FA Temp Token Security & Isolation (SEC-01)", () => {
+    it("should reject tempToken with 401 UNAUTHORIZED in authMiddleware", async () => {
+      const tempToken = jwt.sign(
+        {
+          id: mockUser.id,
+          email: mockUser.email,
+          purpose: "2FA_VERIFICATION",
+        },
+        jwtConfig.accessSecret,
+        { expiresIn: "5m" },
+      );
+
+      const req: any = {
+        headers: { authorization: `Bearer ${tempToken}` },
+        cookies: {},
+      };
+      let caughtError: any;
+
+      await authMiddleware(req, {} as any, (err?: any) => {
+        caughtError = err;
+      });
+
+      assert.ok(caughtError instanceof AppError);
+      assert.equal(caughtError.statusCode, 401);
+      assert.equal(caughtError.code, ERROR_CODE.UNAUTHORIZED);
+      assert.equal(req.user, undefined);
+    });
+
+    it("should not authenticate user with tempToken in optionalAuthMiddleware", async () => {
+      const tempToken = jwt.sign(
+        {
+          id: mockUser.id,
+          email: mockUser.email,
+          purpose: "2FA_VERIFICATION",
+        },
+        jwtConfig.accessSecret,
+        { expiresIn: "5m" },
+      );
+
+      const req: any = {
+        headers: { authorization: `Bearer ${tempToken}` },
+        cookies: {},
+      };
+
+      await optionalAuthMiddleware(req, {} as any, () => {});
+
+      assert.equal(req.user, undefined);
+    });
+
+    it("should accept valid ACCESS token in authMiddleware", async () => {
+      const accessToken = jwt.sign(
+        {
+          id: mockUser.id,
+          email: mockUser.email,
+          role: ROLES.USER,
+          roleId: mockUser.roleId,
+          purpose: "ACCESS",
+        },
+        jwtConfig.accessSecret,
+        { expiresIn: "15m" },
+      );
+
+      const req: any = {
+        headers: { authorization: `Bearer ${accessToken}` },
+        cookies: {},
+      };
+      let caughtError: any;
+
+      await authMiddleware(req, {} as any, (err?: any) => {
+        caughtError = err;
+      });
+
+      assert.equal(caughtError, undefined);
+      assert.ok(req.user);
+      assert.equal(req.user.id, mockUser.id);
     });
   });
 });

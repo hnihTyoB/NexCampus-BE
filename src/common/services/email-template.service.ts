@@ -156,9 +156,9 @@ export class EmailTemplateService {
         <p>Chào ${safeName},</p>
         <p>Tài khoản của bạn vừa được đăng nhập từ thiết bị mới:</p>
         <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
-          <tr><td style="padding: 8px; color: #666; width: 140px;">Thiết bị:</td><td style="padding: 8px; font-weight: bold;">${deviceName || "Không xác định"}</td></tr>
-          <tr><td style="padding: 8px; color: #666;">Địa chỉ IP:</td><td style="padding: 8px; font-weight: bold;">${ipAddress || "Không xác định"}</td></tr>
-          <tr><td style="padding: 8px; color: #666;">Thời gian:</td><td style="padding: 8px; font-weight: bold;">${time || formatVietnamDateTime(new Date())}</td></tr>
+          <tr><td style="padding: 8px; color: #666; width: 140px;">Thiết bị:</td><td style="padding: 8px; font-weight: bold;">${escapeHtml(deviceName) || "Không xác định"}</td></tr>
+          <tr><td style="padding: 8px; color: #666;">Địa chỉ IP:</td><td style="padding: 8px; font-weight: bold;">${escapeHtml(ipAddress) || "Không xác định"}</td></tr>
+          <tr><td style="padding: 8px; color: #666;">Thời gian:</td><td style="padding: 8px; font-weight: bold;">${escapeHtml(time) || formatVietnamDateTime(new Date())}</td></tr>
         </table>
 
         <p>Nếu đây không phải bạn, hãy đổi mật khẩu ngay lập tức.</p>

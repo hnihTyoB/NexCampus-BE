@@ -7,15 +7,19 @@
 export function renderTemplateString(
   template: string,
   variables: Record<string, unknown> = {},
+  options: { escapeHtml?: boolean } = { escapeHtml: true },
 ): string {
   if (!template) return "";
+
+  const shouldEscape = options.escapeHtml ?? true;
 
   return template.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_match, key) => {
     const value = variables[key];
     if (value === undefined || value === null) {
       return "";
     }
-    return String(value);
+    const strVal = String(value);
+    return shouldEscape ? escapeHtml(strVal) : strVal;
   });
 }
 

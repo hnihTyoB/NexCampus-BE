@@ -24,25 +24,8 @@ import {
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import { jwtConfig } from "../../config/jwt.config";
-
-function parseDurationToMs(duration: string, fallbackMs: number): number {
-  const match = duration.match(/^(\d+)([smhd])$/);
-  if (!match) return fallbackMs;
-  const val = parseInt(match[1], 10);
-  const unit = match[2];
-  switch (unit) {
-    case "s":
-      return val * 1000;
-    case "m":
-      return val * 60 * 1000;
-    case "h":
-      return val * 60 * 60 * 1000;
-    case "d":
-      return val * 24 * 60 * 60 * 1000;
-    default:
-      return fallbackMs;
-  }
-}
+import { envConfig } from "../../config/env.config";
+import { parseDurationToMs } from "../../common/helpers/date.helper";
 
 const ACCESS_COOKIE_MAX_AGE = parseDurationToMs(
   jwtConfig.accessExpiresIn,
@@ -76,7 +59,7 @@ export class AuthController {
 
       res.cookie("accessToken", result.accessToken!, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: envConfig.nodeEnv === "production",
         sameSite: "lax",
         path: "/",
         maxAge: ACCESS_COOKIE_MAX_AGE,
@@ -84,7 +67,7 @@ export class AuthController {
 
       res.cookie("refreshToken", result.refreshToken!, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: envConfig.nodeEnv === "production",
         sameSite: "lax",
         path: "/",
         maxAge: REFRESH_COOKIE_MAX_AGE,
@@ -134,17 +117,17 @@ export class AuthController {
         ipAddress,
       });
 
-      res.cookie("accessToken", result.accessToken, {
+      res.cookie("accessToken", result.accessToken!, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: envConfig.nodeEnv === "production",
         sameSite: "lax",
         path: "/",
         maxAge: ACCESS_COOKIE_MAX_AGE,
       });
 
-      res.cookie("refreshToken", result.refreshToken, {
+      res.cookie("refreshToken", result.refreshToken!, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: envConfig.nodeEnv === "production",
         sameSite: "lax",
         path: "/",
         maxAge: REFRESH_COOKIE_MAX_AGE,
@@ -171,7 +154,7 @@ export class AuthController {
 
       const cookieOptions = {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: envConfig.nodeEnv === "production",
         sameSite: "lax" as const,
         path: "/",
       };
@@ -427,7 +410,7 @@ export class AuthController {
       // Xóa cookies xác thực nếu có với options đồng nhất
       const cookieOptions = {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: envConfig.nodeEnv === "production",
         sameSite: "lax" as const,
         path: "/",
       };
@@ -494,7 +477,7 @@ export class AuthController {
 
       res.cookie("accessToken", result.accessToken!, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: envConfig.nodeEnv === "production",
         sameSite: "lax",
         path: "/",
         maxAge: ACCESS_COOKIE_MAX_AGE,
@@ -502,7 +485,7 @@ export class AuthController {
 
       res.cookie("refreshToken", result.refreshToken!, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: envConfig.nodeEnv === "production",
         sameSite: "lax",
         path: "/",
         maxAge: REFRESH_COOKIE_MAX_AGE,
@@ -594,7 +577,7 @@ export class AuthController {
 
       res.cookie("accessToken", result.accessToken!, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: envConfig.nodeEnv === "production",
         sameSite: "lax",
         path: "/",
         maxAge: ACCESS_COOKIE_MAX_AGE,
@@ -602,7 +585,7 @@ export class AuthController {
 
       res.cookie("refreshToken", result.refreshToken!, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: envConfig.nodeEnv === "production",
         sameSite: "lax",
         path: "/",
         maxAge: REFRESH_COOKIE_MAX_AGE,

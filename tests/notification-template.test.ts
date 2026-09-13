@@ -45,6 +45,30 @@ describe("Notification Template Rendering & Helpers", () => {
   it("should return empty string when empty template is provided", () => {
     assert.equal(renderTemplateString(""), "");
   });
+
+  it("should escape HTML special characters by default in renderTemplateString (SEC-04)", () => {
+    const template = "User: {{name}} has device: {{device}}";
+    const result = renderTemplateString(template, {
+      name: '<script>alert("XSS")</script>',
+      device: 'My <Laptop> & "Phone"',
+    });
+
+    assert.equal(
+      result,
+      'User: &lt;script&gt;alert(&quot;XSS&quot;)&lt;/script&gt; has device: My &lt;Laptop&gt; &amp; &quot;Phone&quot;',
+    );
+  });
+
+  it("should allow raw HTML interpolation when escapeHtml option is explicitly false", () => {
+    const template = "Content: {{htmlContent}}";
+    const result = renderTemplateString(
+      template,
+      { htmlContent: "<b>Bold Text</b>" },
+      { escapeHtml: false },
+    );
+
+    assert.equal(result, "Content: <b>Bold Text</b>");
+  });
 });
 
 describe("Email Template Service Standards", () => {
@@ -69,6 +93,18 @@ describe("Email Template Service Standards", () => {
     assert.equal(result.subject, "Xác thực tài khoản của bạn");
     assert.match(result.html, /Nguyễn Văn B/);
     assert.match(result.html, /test-uuid-token/);
+  });
+
+  it("should escape malicious deviceName and ipAddress in newDeviceAlert (SEC-04)", () => {
+    const result = service.newDeviceAlert({
+      fullName: "Admin",
+      deviceName: '<script>fetch("http://evil.com")</script>',
+      ipAddress: "127.0.0.1",
+      time: "2026-09-14 01:00:00",
+    });
+
+    assert.equal(result.html.includes("<script>fetch"), false);
+    assert.match(result.html, /&lt;script&gt;fetch/);
   });
 });
 

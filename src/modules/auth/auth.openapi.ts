@@ -141,27 +141,41 @@ export function registerAuthOpenApi(): void {
     },
     responses: {
       200: {
-        description: "Đăng nhập thành công",
+        description: "Đăng nhập thành công hoặc yêu cầu thử thách 2FA",
         content: {
           "application/json": {
-            schema: z.object({
-              success: z.boolean().openapi({ example: true }),
-              data: z.object({
-                accessToken: z.string(),
-                refreshToken: z.string(),
-                user: z.object({
-                  id: z.string().uuid(),
-                  email: z.string().email(),
-                  fullName: z.string().nullable(),
-                  role: z.string(),
-                  permissions: z.array(z.string()),
+            schema: z.union([
+              z.object({
+                success: z.boolean().openapi({ example: true }),
+                data: z.object({
+                  accessToken: z.string(),
+                  refreshToken: z.string(),
+                  user: z.object({
+                    id: z.string().uuid(),
+                    email: z.string().email(),
+                    fullName: z.string().nullable(),
+                    role: z.string(),
+                    permissions: z.array(z.string()),
+                  }),
                 }),
               }),
-            }),
+              z.object({
+                success: z.boolean().openapi({ example: true }),
+                data: z.object({
+                  requires2FA: z.literal(true).openapi({ example: true }),
+                  tempToken: z.string().openapi({
+                    description:
+                      "Token tạm thời dùng để gọi endpoint POST /auth/2fa/verify",
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                  }),
+                }),
+              }),
+            ]),
           },
         },
       },
       401: { description: "Email hoặc mật khẩu không chính xác" },
+      429: { description: "Quá nhiều yêu cầu đăng nhập, vui lòng thử lại sau" },
     },
   });
 
@@ -415,6 +429,9 @@ export function registerAuthOpenApi(): void {
             }),
           },
         },
+      },
+      429: {
+        description: "Quá nhiều yêu cầu, vui lòng đợi 60 giây trước khi gửi lại",
       },
     },
   });

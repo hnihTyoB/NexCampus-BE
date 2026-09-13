@@ -1,4 +1,3 @@
-import crypto from "crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../database/prisma.client";
 import { AppError } from "../../common/errors/app-error";
@@ -19,6 +18,29 @@ export class AuthRepository {
     return prisma.user.findFirst({
       where: { id, deletedAt: null },
       include: { role: true },
+    });
+  }
+
+  findProfileById(id: string) {
+    return prisma.user.findFirst({
+      where: { id, deletedAt: null },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        avatarUrl: true,
+        phoneNumber: true,
+        isActive: true,
+        twoFactorEnabled: true,
+        createdAt: true,
+        roleId: true,
+        role: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
     });
   }
 
@@ -147,12 +169,13 @@ export class AuthRepository {
   ) {
     return prisma.$transaction(async (tx) => {
       await tx.verificationToken.deleteMany({
-        where: { userId },
+        where: { userId, type: "EMAIL_VERIFICATION" },
       });
       return tx.verificationToken.create({
         data: {
           userId,
           token: hashToken(token), // Lưu hash
+          type: "EMAIL_VERIFICATION",
           expiresAt,
         },
       });
@@ -166,10 +189,31 @@ export class AuthRepository {
     });
   }
 
+  async findActiveVerificationTokenByUserId(
+    userId: string,
+    type: string = "EMAIL_VERIFICATION",
+  ) {
+    return prisma.verificationToken.findFirst({
+      where: {
+        userId,
+        type,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
   async activateUser(userId: string) {
     return prisma.user.update({
       where: { id: userId },
       data: { isActive: true },
+    });
+  }
+
+  async activateUserAndClearPassword(userId: string) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: { isActive: true, password: null },
     });
   }
 
@@ -475,29 +519,41 @@ export class AuthRepository {
   }
 
   async countActiveAdmins(roleName: string = ROLES.ADMIN): Promise<number> {
-    return prisma.user.count({
+    // 1. Tìm các role IDs có tư cách Admin (theo tên hoặc theo quyền gán role/permission)
+    const adminRoles = await prisma.role.findMany({
       where: {
-        isActive: true,
-        deletedAt: null,
         OR: [
-          { role: { name: roleName } },
+          { name: roleName },
           {
-            role: {
-              permissions: {
-                some: {
-                  permission: {
-                    name: {
-                      in: [
-                        PERMISSIONS.USER_ROLE_ASSIGN,
-                        PERMISSIONS.ROLE_PERMISSION_ASSIGN,
-                      ],
-                    },
+            permissions: {
+              some: {
+                permission: {
+                  name: {
+                    in: [
+                      PERMISSIONS.USER_ROLE_ASSIGN,
+                      PERMISSIONS.ROLE_PERMISSION_ASSIGN,
+                    ],
                   },
                 },
               },
             },
           },
         ],
+      },
+      select: { id: true },
+    });
+
+    const adminRoleIds = adminRoles.map((r) => r.id);
+    if (adminRoleIds.length === 0) {
+      return 0;
+    }
+
+    // 2. Tận dụng composite index @@index([roleId, isActive, deletedAt]) trên bảng User
+    return prisma.user.count({
+      where: {
+        roleId: { in: adminRoleIds },
+        isActive: true,
+        deletedAt: null,
       },
     });
   }
@@ -510,12 +566,13 @@ export class AuthRepository {
     const hashedToken = hashToken(`deactivate:${token}`);
     return prisma.$transaction(async (tx) => {
       await tx.verificationToken.deleteMany({
-        where: { userId },
+        where: { userId, type: "DEACTIVATION" },
       });
       return tx.verificationToken.create({
         data: {
           userId,
           token: hashedToken,
+          type: "DEACTIVATION",
           expiresAt,
         },
       });

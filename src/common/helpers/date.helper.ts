@@ -97,3 +97,30 @@ export function parseVietnamDate(dateString: string): Date | null {
 export function formatVietnamDateTime(date: Date): string {
   return date.toLocaleString("vi-VN", { timeZone: VIETNAM_TIMEZONE });
 }
+
+/**
+ * Chuyển đổi chuỗi thời lượng (ví dụ: "15m", "1h", "7d", "30s") thành số milliseconds.
+ * Nếu không khớp định dạng, trả về fallbackMs.
+ */
+export function parseDurationToMs(
+  duration: string | undefined | null,
+  fallbackMs: number,
+): number {
+  if (!duration || typeof duration !== "string") return fallbackMs;
+  const match = duration.match(/^(\d+)([smhd])$/);
+  if (!match) return fallbackMs;
+  const val = parseInt(match[1], 10);
+  const unit = match[2];
+  switch (unit) {
+    case "s":
+      return val * 1000;
+    case "m":
+      return val * 60 * 1000;
+    case "h":
+      return val * 60 * 60 * 1000;
+    case "d":
+      return val * 24 * 60 * 60 * 1000;
+    default:
+      return fallbackMs;
+  }
+}

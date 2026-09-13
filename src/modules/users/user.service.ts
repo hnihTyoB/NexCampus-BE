@@ -96,11 +96,17 @@ export class UserService {
       }
     }
 
-    const updatedUser = await this.repository.update(id, {
-      isActive: data.isActive,
-      fullName: data.fullName,
-      phoneNumber: data.phoneNumber,
-    });
+    const updatePayload: {
+      isActive?: boolean;
+      fullName?: string;
+      phoneNumber?: string;
+    } = {};
+
+    if (data.isActive !== undefined) updatePayload.isActive = data.isActive;
+    if (data.fullName !== undefined) updatePayload.fullName = data.fullName;
+    if (data.phoneNumber !== undefined) updatePayload.phoneNumber = data.phoneNumber;
+
+    const updatedUser = await this.repository.update(id, updatePayload);
 
     permissionCacheService.invalidateUser(id);
     return updatedUser;

@@ -436,6 +436,32 @@ describe("Auth Deactivation Test Suite (GDPR Self-Deactivation)", () => {
       assert.equal(auditLogs[0].targetId, "user-active-1");
       assert.equal(auditLogs[0].ipAddress, "192.168.1.5");
     });
+
+    it("should reject confirmDeactivate if user is already inactive or soft-deleted", async () => {
+      mockRepository.findDeactivationToken = async (token: string) =>
+        ({
+          id: "token-uuid-inactive",
+          token,
+          userId: "user-inactive-1",
+          expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+          user: {
+            id: "user-inactive-1",
+            isActive: false,
+            deletedAt: new Date(),
+            role: { name: ROLES.USER },
+          },
+        }) as any;
+
+      await assert.rejects(
+        authService.confirmDeactivate({ token: "token-inactive-user" }),
+        (err: any) => {
+          assert.equal(err instanceof AppError, true);
+          assert.equal(err.statusCode, 400);
+          assert.equal(err.code, ERROR_CODE.VALIDATION_ERROR);
+          return true;
+        },
+      );
+    });
   });
 
   describe("4. OpenAPI Documentation Registration", () => {

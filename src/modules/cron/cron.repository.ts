@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../database/prisma.client";
 import { ROLES } from "../../common/constants/role.constant";
 import { PERMISSIONS } from "../../common/constants/permission.constant";
@@ -184,7 +185,8 @@ export class CronRepository {
         action: data.action,
         targetType: data.targetType,
         targetId: data.targetId,
-        details: (data.details as any) || null,
+        details:
+          (data.details as Prisma.InputJsonObject) || Prisma.JsonNull,
         ipAddress: data.ipAddress,
         userAgent: data.userAgent,
       },

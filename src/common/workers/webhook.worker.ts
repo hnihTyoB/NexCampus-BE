@@ -176,6 +176,7 @@ export class WebhookWorker {
       const fetchFn = customFetcher || fetch;
       const res = await fetchFn(data.url, {
         method: "POST",
+        redirect: "manual", // SEC-02: Chặn tự động chuyển hướng HTTP (chống SSRF qua 301/302 redirect sang IP nội bộ)
         headers: {
           "Content-Type": "application/json",
           "User-Agent": "App-Webhook-Dispatcher/1.0",
@@ -189,6 +190,22 @@ export class WebhookWorker {
       });
 
       statusCode = res.status;
+
+      // SEC-02: Nếu nhận mã chuyển hướng 3xx, từ chối xử lý và ghi nhận lỗi bảo mật
+      if (res.status >= 300 && res.status < 400) {
+        const redirectLocation = res.headers.get("location") || "unknown";
+        const errorMsg = `SSRF Protection: Webhook endpoint attempted disallowed redirect to '${redirectLocation}'`;
+        await integrationRepository
+          .updateDeliveryStatus(data.deliveryId, {
+            status: WEBHOOK_STATUS.FAILED,
+            statusCode: res.status,
+            attempts: currentAttempt,
+            lastError: errorMsg,
+          })
+          .catch(() => {});
+        return { success: false, statusCode: res.status, error: errorMsg };
+      }
+
       try {
         responseText = (await res.text()).slice(0, 1000);
       } catch {

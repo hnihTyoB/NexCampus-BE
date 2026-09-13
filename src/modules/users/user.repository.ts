@@ -47,11 +47,18 @@ export class UserRepository {
 
     const skip = (page - 1) * limit;
 
+    const SORT_MAP: Record<string, Prisma.UserOrderByWithRelationInput> = {
+      createdAt: { createdAt: order },
+      email: { email: order },
+      fullName: { fullName: order },
+    };
+    const orderBy = SORT_MAP[sortBy] ?? { createdAt: order };
+
     const [data, total] = await prisma.$transaction([
       prisma.user.findMany({
         where,
         select: userSelect,
-        orderBy: { [sortBy]: order },
+        orderBy,
         skip,
         take: limit,
       }),

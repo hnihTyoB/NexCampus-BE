@@ -46,7 +46,25 @@ export async function authMiddleware(
       email: string;
       role: string;
       roleId?: string;
+      purpose?: string;
+      type?: string;
     };
+
+    // SEC-01: Chặn tuyệt đối token tạm thời (2FA verification / temp token) truy cập tài nguyên bảo vệ
+    if (
+      payload.purpose === "2FA_VERIFICATION" ||
+      payload.type === "TEMP" ||
+      (payload.purpose && payload.purpose !== "ACCESS")
+    ) {
+      next(
+        new AppError(
+          "Token không hợp lệ để truy cập tài nguyên được bảo vệ",
+          401,
+          ERROR_CODE.UNAUTHORIZED,
+        ),
+      );
+      return;
+    }
 
     // Xác thực trạng thái người dùng (cached 60s) chống dùng JWT cũ khi tài khoản bị khóa hoặc xóa mềm
     const userState = await permissionCacheService.getUserState(payload.id);
@@ -105,7 +123,18 @@ export async function optionalAuthMiddleware(
       email: string;
       role: string;
       roleId?: string;
+      purpose?: string;
+      type?: string;
     };
+
+    if (
+      payload.purpose === "2FA_VERIFICATION" ||
+      payload.type === "TEMP" ||
+      (payload.purpose && payload.purpose !== "ACCESS")
+    ) {
+      next();
+      return;
+    }
 
     const userState = await permissionCacheService.getUserState(payload.id);
     if (userState && userState.isActive && !userState.deletedAt) {

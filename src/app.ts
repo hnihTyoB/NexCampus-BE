@@ -19,7 +19,18 @@ const app = express();
 app.set("trust proxy", envConfig.trustProxy);
 
 app.use(requestIdMiddleware);
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:"],
+      },
+    },
+  }),
+);
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {

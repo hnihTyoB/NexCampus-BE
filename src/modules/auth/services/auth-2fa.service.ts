@@ -208,6 +208,7 @@ export class Auth2FAService {
       email: user.email,
       role: user.role.name,
       roleId: user.roleId,
+      purpose: "ACCESS",
     };
 
     const accessToken = jwt.sign(tokenPayload, jwtConfig.accessSecret, {
@@ -322,7 +323,7 @@ export class Auth2FAService {
       const formattedCode = cleanCode.toUpperCase();
       const hashedInput = hashToken(formattedCode);
       const backupCodes = user.twoFactorBackupCodes as string[];
-      isCodeValid = backupCodes.some((storedHash) => {
+      const matchIndex = backupCodes.findIndex((storedHash) => {
         const bufInput = Buffer.from(hashedInput, "utf8");
         const bufStored = Buffer.from(storedHash, "utf8");
         return (
@@ -330,6 +331,14 @@ export class Auth2FAService {
           crypto.timingSafeEqual(bufInput, bufStored)
         );
       });
+
+      if (matchIndex !== -1) {
+        isCodeValid = true;
+        // Single-use: Tiêu thụ mã dự phòng đã dùng khỏi danh sách
+        const remainingBackupCodes = [...backupCodes];
+        remainingBackupCodes.splice(matchIndex, 1);
+        await this.repository.updateBackupCodes(user.id, remainingBackupCodes);
+      }
     }
 
     if (!isCodeValid) {

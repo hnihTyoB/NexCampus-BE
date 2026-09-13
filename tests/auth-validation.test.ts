@@ -90,4 +90,45 @@ describe("Auth & User Validation Schemas", () => {
     const result = createUserSchema.safeParse(validData);
     assert.equal(result.success, true);
   });
+
+  it("should validate reusable UUID schemas and factories in common.validation.ts", async () => {
+    const {
+      uuidSchema,
+      createUuidParamSchema,
+      standardIdParamSchema,
+      paginationQuerySchema,
+    } = await import("../src/common/validations/common.validation");
+
+    const validUuid = "123e4567-e89b-12d3-a456-426614174000";
+    const invalidUuid = "not-a-uuid";
+
+    assert.equal(uuidSchema.safeParse(validUuid).success, true);
+    assert.equal(uuidSchema.safeParse(invalidUuid).success, false);
+
+    assert.equal(standardIdParamSchema.safeParse({ id: validUuid }).success, true);
+    assert.equal(standardIdParamSchema.safeParse({ id: invalidUuid }).success, false);
+
+    const customParamSchema = createUuidParamSchema("customId");
+    assert.equal(
+      customParamSchema.safeParse({ customId: validUuid }).success,
+      true,
+    );
+    assert.equal(
+      customParamSchema.safeParse({ customId: invalidUuid }).success,
+      false,
+    );
+
+    const paginated = paginationQuerySchema.safeParse({
+      page: "2",
+      limit: "50",
+      order: "asc",
+    });
+    assert.equal(paginated.success, true);
+    if (paginated.success) {
+      assert.equal(paginated.data.page, 2);
+      assert.equal(paginated.data.limit, 50);
+      assert.equal(paginated.data.order, "asc");
+    }
+  });
 });
+

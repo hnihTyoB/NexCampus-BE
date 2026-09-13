@@ -171,6 +171,7 @@ export class RbacRepository {
 
     return prisma.permission.findMany({
       where,
+      take: 100,
       orderBy: [{ resource: "asc" }, { action: "asc" }],
     });
   }
@@ -278,7 +279,9 @@ export class RbacRepository {
         action: data.action,
         targetType: data.targetType,
         targetId: data.targetId,
-        details: (data.details as any) || null,
+        details: data.details
+          ? (data.details as Prisma.InputJsonObject)
+          : Prisma.DbNull,
         ipAddress: data.ipAddress,
         userAgent: data.userAgent,
       },

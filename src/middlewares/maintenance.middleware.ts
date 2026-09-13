@@ -65,7 +65,7 @@ export function maintenanceGuard(options?: MaintenanceGuardOptions) {
       }
 
       // Extract user if already populated or from token
-      let user = req.user;
+      let user: typeof req.user | undefined = req.user;
 
       if (!user) {
         const token = extractTokenFromRequest(req);
@@ -95,6 +95,15 @@ export function maintenanceGuard(options?: MaintenanceGuardOptions) {
       }
 
       // If user is authenticated, check bypass permissions / roles
+      if (user) {
+        // P2-08: Ensure user is still active before granting maintenance bypass
+        const userState = await permissionCacheService.getUserState(user.id);
+        if (userState && (!userState.isActive || userState.deletedAt)) {
+          user = undefined;
+          delete (req as any).user;
+        }
+      }
+
       if (user) {
         const bypassPermissions = Array.isArray(config.bypassPermissions)
           ? (config.bypassPermissions as string[])

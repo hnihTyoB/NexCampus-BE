@@ -38,7 +38,11 @@ export const sessionIdParamSchema = z.object({
 });
 
 export const verifyEmailSchema = z.object({
-  token: z.string().uuid("Invalid verification token format"),
+  token: z
+    .string()
+    .trim()
+    .min(1, "Invalid verification token format")
+    .max(256, "Token exceeds maximum length"),
 });
 
 export const updateProfileSchema = z.object({
@@ -119,7 +123,11 @@ export const requestDeactivateSchema = z.object({
 });
 
 export const confirmDeactivateSchema = z.object({
-  token: z.string().min(1, "Token xác nhận vô hiệu hóa là bắt buộc"),
+  token: z
+    .string()
+    .trim()
+    .min(1, "Mã xác nhận vô hiệu hóa không hợp lệ")
+    .max(256, "Mã xác nhận vô hiệu hóa vượt quá độ dài tối đa"),
 });
 
 export const enable2FASchema = z.object({
