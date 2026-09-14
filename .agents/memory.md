@@ -182,3 +182,39 @@
        - Tự động ghi `AuditLog` với action `UNLINK_SOCIAL_ACCOUNT`.
   - **Database Migration & Seeding**: Đã chạy triển khai toàn bộ 11 migrations qua `pnpm run db:migrate:deploy` và nạp seed dữ liệu mẫu qua `pnpm run db:seed` thành công trên môi trường Supabase PostgreSQL mới.
   - **Automated Verification**: Mở rộng `tests/auth-google.test.ts` thêm 10 bài test tích hợp và kiểm thử OpenAPI; toàn bộ 232 automated tests trên toàn dự án đều pass 100%, TypeScript build và ESLint sạch 0 warnings / 0 errors.
+- **Organization & Human Resource Management (HRM) Modules (2026-09-14)**:
+  - Hoàn thiện trọn bộ 3 module Tổ chức & Nhân sự (`departments`, `leaders`, `interns`) theo kiến trúc phân tầng chuẩn 6 file (`route`, `validation`, `controller`, `service`, `repository`, `dto`) và OpenAPI 3.0 auto-generation:
+    1. **Departments & Positions** (`src/modules/departments/`):
+       - CRUD Department: Soft-delete (`deletedAt`), đếm số lượng vị trí và TTS đang hoạt động (`positionsCount`, `internsCount`, `_count`), danh sách Leader quản lý.
+       - CRUD Position: Quản lý vị trí trực thuộc từng `departmentId`, kiểm tra liên kết phụ thuộc chống xóa nhầm.
+       - Chặn xóa phòng ban/vị trí có liên kết phụ thuộc (`ERROR_CODE.DEPENDENCY_ERROR`).
+    2. **Leaders** (`src/modules/leaders/`):
+       - Hồ sơ Leader: Quản lý tối đa 3 Department qua quan hệ nhiều-nhiều (`MAX_LEADER_DEPARTMENTS = 3`), ràng buộc `@unique` trên `LeaderDepartment.departmentId` (mỗi phòng ban chỉ do 1 Leader quản lý trực tiếp).
+       - Đồng bộ chức danh: Khi thay đổi danh sách Department của Leader, chức danh cũ (`position`) tự động được reset về `null` nếu không truyền chức danh mới theo đúng quy tắc kế thừa.
+       - Xem chi tiết Leader kèm danh sách phòng ban và toàn bộ TTS trực thuộc.
+    3. **Interns** (`src/modules/interns/`):
+       - Tìm kiếm đa tiêu chí: `internCode`, `fullName`, `university`, `major`, email; phân trang và lọc theo trạng thái (`ACTIVE`, `COMPLETED`, `DROPPED`), leader, phòng ban, vị trí.
+       - Scoped Query Authorization: Leader chỉ xem được các TTS thuộc phòng ban do mình quản lý hoặc do mình trực tiếp hướng dẫn. Admin có toàn quyền.
+       - Chi tiết TTS: Đầy đủ thông tin học vụ (`university`, `major`, `duration`, `startDate`), thông tin liên hệ và tài khoản người dùng.
+       - Tạo tài khoản trực tiếp (`POST /interns/direct`): Tự sinh mật khẩu an toàn và mã TTS `internCode` (`INT-XXXXXXXX`).
+       - Phân công/chuyển đổi Leader (`PATCH /interns/:id/assign-leader`): Xác thực vai trò và trạng thái hoạt động của Leader.
+       - Tự động hoàn thành (`completeExpiredInterns`): Lazy auto-complete chuyển trạng thái sang `COMPLETED` khi hết thời gian thực tập.
+  - **Dynamic RBAC & Validation**:
+    - Phân quyền động qua `PERMISSIONS` (`DEPARTMENT_*`, `POSITION_*`, `LEADER_*`, `INTERN_*`).
+    - Validation ở biên bằng Zod, ép kiểu số query param qua `z.coerce.number()`, kiểm tra số điện thoại VN bằng `VIETNAMESE_PHONE_REGEX` và tính duy nhất qua `validatePhoneUniqueness`.
+  - **Routing & Documentation**: Gắn toàn bộ resource routes tại `src/routes/index.ts` dưới prefix `/api/v2`, đồng bộ Swagger UI tại `/api/docs`. Bộ test tự động 292 tests pass 100%, build và lint sạch 0 errors / 0 warnings.
+- **Dynamic System Configuration for HRM & Storage (2026-09-14)**:
+  - Tích hợp cấu hình động tập trung từ module `system-config` vào toàn bộ quy trình nghiệp vụ Quản lý Tổ chức & Nhân sự và Lưu trữ:
+    1. **HRM Configuration Keys** (`HRM_CONFIG_KEYS`):
+       - `hrm.max_leader_departments` (mặc định `3`): Giới hạn số phòng ban tối đa 1 Leader có thể quản lý đồng thời, được `LeaderService.validateDepartments` truy vấn động qua `systemConfigService.get(HRM_CONFIG_KEYS.MAX_LEADER_DEPARTMENTS, 3)`.
+       - `hrm.default_intern_duration_months` (mặc định `3`): Thời hạn thực tập mặc định (tháng), tự động áp dụng khi tạo TTS mới nếu không truyền thời hạn cụ thể.
+       - `hrm.intern_code_prefix` (mặc định `'INT'`): Tiền tố sinh mã định danh TTS tự động (`INT-XXXXXXXX`).
+       - `hrm.max_active_tasks_per_intern` (mặc định `5`): Giới hạn số công việc đang xử lý tối đa cho mỗi thực tập sinh.
+       - `hrm.auto_complete_expired_interns` (mặc định `true`): Feature flag điều khiển việc tự động chuyển trạng thái TTS hết hạn sang `COMPLETED` qua `systemConfigService.isFeatureEnabled`.
+    2. **Storage Configuration Keys** (`STORAGE_CONFIG_KEYS` kế thừa từ legacy backend):
+       - `storage.avatar_max_file_size_mb` (mặc định `5 MB`).
+       - `storage.report_max_file_size_mb` (mặc định `10 MB`).
+       - `storage.submission_max_file_size_mb` (mặc định `50 MB`).
+       - `storage.task_attachment_max_file_size_mb` (mặc định `25 MB`).
+    3. **Bootstrapping & Resilience**: Toàn bộ cấu hình được định nghĩa trong `DEFAULT_SYSTEM_CONFIGS` và tự động nạp vào PostgreSQL khi khởi động server (`ensureDefaultConfigs`). Cache in-memory TTL kết hợp Redis Pub/Sub đảm bảo tốc độ phản hồi tức thì và không bị bottleneck CSDL.
+

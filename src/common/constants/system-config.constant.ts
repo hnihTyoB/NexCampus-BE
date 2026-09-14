@@ -17,6 +17,27 @@ export const FEATURE_FLAGS = {
 
 export type FeatureFlagKey = (typeof FEATURE_FLAGS)[keyof typeof FEATURE_FLAGS];
 
+export const HRM_CONFIG_KEYS = {
+  MAX_LEADER_DEPARTMENTS: "hrm.max_leader_departments",
+  DEFAULT_INTERN_DURATION_MONTHS: "hrm.default_intern_duration_months",
+  INTERN_CODE_PREFIX: "hrm.intern_code_prefix",
+  MAX_ACTIVE_TASKS_PER_INTERN: "hrm.max_active_tasks_per_intern",
+  AUTO_COMPLETE_EXPIRED_INTERNS: "hrm.auto_complete_expired_interns",
+} as const;
+
+export type HrmConfigKey =
+  (typeof HRM_CONFIG_KEYS)[keyof typeof HRM_CONFIG_KEYS];
+
+export const STORAGE_CONFIG_KEYS = {
+  AVATAR_MAX_FILE_SIZE_MB: "storage.avatar_max_file_size_mb",
+  REPORT_MAX_FILE_SIZE_MB: "storage.report_max_file_size_mb",
+  SUBMISSION_MAX_FILE_SIZE_MB: "storage.submission_max_file_size_mb",
+  TASK_ATTACHMENT_MAX_FILE_SIZE_MB: "storage.task_attachment_max_file_size_mb",
+} as const;
+
+export type StorageConfigKey =
+  (typeof STORAGE_CONFIG_KEYS)[keyof typeof STORAGE_CONFIG_KEYS];
+
 export const DEFAULT_SYSTEM_CONFIGS = [
   {
     key: "app.name",
@@ -81,6 +102,75 @@ export const DEFAULT_SYSTEM_CONFIGS = [
     value: true,
     description: "Bật tính năng đăng nhập mạng xã hội (Google, Zalo)",
     category: SYSTEM_CONFIG_CATEGORY.FEATURE_FLAG,
+    isPublic: true,
+  },
+
+  // Organization & Human Resource Management (HRM) Configs
+  {
+    key: HRM_CONFIG_KEYS.MAX_LEADER_DEPARTMENTS,
+    value: 3,
+    description:
+      "Số lượng phòng ban tối đa một Leader có thể quản lý đồng thời",
+    category: SYSTEM_CONFIG_CATEGORY.GENERAL,
+    isPublic: true,
+  },
+  {
+    key: HRM_CONFIG_KEYS.DEFAULT_INTERN_DURATION_MONTHS,
+    value: 3,
+    description: "Thời gian thực tập mặc định tính theo tháng",
+    category: SYSTEM_CONFIG_CATEGORY.GENERAL,
+    isPublic: true,
+  },
+  {
+    key: HRM_CONFIG_KEYS.INTERN_CODE_PREFIX,
+    value: "INT",
+    description: "Tiền tố sinh mã định danh thực tập sinh tự động",
+    category: SYSTEM_CONFIG_CATEGORY.GENERAL,
+    isPublic: false,
+  },
+  {
+    key: HRM_CONFIG_KEYS.MAX_ACTIVE_TASKS_PER_INTERN,
+    value: 5,
+    description: "Số lượng công việc đang xử lý tối đa cho mỗi thực tập sinh",
+    category: SYSTEM_CONFIG_CATEGORY.GENERAL,
+    isPublic: true,
+  },
+  {
+    key: HRM_CONFIG_KEYS.AUTO_COMPLETE_EXPIRED_INTERNS,
+    value: true,
+    description:
+      "Tự động chuyển trạng thái thực tập sinh sang COMPLETED khi hết hạn thời gian",
+    category: SYSTEM_CONFIG_CATEGORY.FEATURE_FLAG,
+    isPublic: false,
+  },
+
+  // Storage & Upload Limit Configs
+  {
+    key: STORAGE_CONFIG_KEYS.AVATAR_MAX_FILE_SIZE_MB,
+    value: 5,
+    description: "Kích thước tệp tối đa khi tải lên ảnh đại diện (MB)",
+    category: SYSTEM_CONFIG_CATEGORY.GENERAL,
+    isPublic: true,
+  },
+  {
+    key: STORAGE_CONFIG_KEYS.REPORT_MAX_FILE_SIZE_MB,
+    value: 10,
+    description: "Kích thước tệp tối đa khi tải lên báo cáo hàng ngày (MB)",
+    category: SYSTEM_CONFIG_CATEGORY.GENERAL,
+    isPublic: true,
+  },
+  {
+    key: STORAGE_CONFIG_KEYS.SUBMISSION_MAX_FILE_SIZE_MB,
+    value: 50,
+    description: "Kích thước tệp tối đa khi nộp bài tập / nhiệm vụ (MB)",
+    category: SYSTEM_CONFIG_CATEGORY.GENERAL,
+    isPublic: true,
+  },
+  {
+    key: STORAGE_CONFIG_KEYS.TASK_ATTACHMENT_MAX_FILE_SIZE_MB,
+    value: 25,
+    description: "Kích thước tệp đính kèm nhiệm vụ tối đa (MB)",
+    category: SYSTEM_CONFIG_CATEGORY.GENERAL,
     isPublic: true,
   },
 ] as const;

@@ -7,6 +7,9 @@ import maintenanceRoute from "../modules/maintenance/maintenance.route";
 import integrationRoute from "../modules/integration/integration.route";
 import systemConfigRoute from "../modules/system-config/system-config.route";
 import cronRoute from "../modules/cron/cron.route";
+import departmentRoute from "../modules/departments/department.route";
+import leaderRoute from "../modules/leaders/leader.route";
+import internRoute from "../modules/interns/intern.route";
 import healthRoute from "./health.route";
 import { maintenanceGuard } from "../middlewares/maintenance.middleware";
 
@@ -30,5 +33,8 @@ router.use("/notifications", notificationRoute);
 router.use("/integrations", integrationRoute);
 router.use("/integration", integrationRoute);
 router.use("/cron", cronRoute);
+router.use("/departments", departmentRoute);
+router.use("/leaders", leaderRoute);
+router.use("/interns", internRoute);
 
 export default router;
