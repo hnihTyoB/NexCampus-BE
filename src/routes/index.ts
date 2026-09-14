@@ -10,6 +10,7 @@ import cronRoute from "../modules/cron/cron.route";
 import departmentRoute from "../modules/departments/department.route";
 import leaderRoute from "../modules/leaders/leader.route";
 import internRoute from "../modules/interns/intern.route";
+import applicationRoute from "../modules/applications/application.route";
 import healthRoute from "./health.route";
 import { maintenanceGuard } from "../middlewares/maintenance.middleware";
 
@@ -36,5 +37,6 @@ router.use("/cron", cronRoute);
 router.use("/departments", departmentRoute);
 router.use("/leaders", leaderRoute);
 router.use("/interns", internRoute);
+router.use("/applications", applicationRoute);
 
 export default router;

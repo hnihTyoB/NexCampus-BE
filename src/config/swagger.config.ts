@@ -11,6 +11,7 @@ import { registerCronOpenApi } from "../modules/cron/cron.openapi";
 import { registerDepartmentOpenApi } from "../modules/departments/department.openapi";
 import { registerLeaderOpenApi } from "../modules/leaders/leader.openapi";
 import { registerInternOpenApi } from "../modules/interns/intern.openapi";
+import { registerApplicationOpenApi } from "../modules/applications/application.openapi";
 import { registerHealthOpenApi } from "../routes/health.openapi";
 
 // Tự động khởi tạo và đăng ký 100% routes & schemas từ Zod validation schemas
@@ -25,6 +26,7 @@ registerCronOpenApi();
 registerDepartmentOpenApi();
 registerLeaderOpenApi();
 registerInternOpenApi();
+registerApplicationOpenApi();
 registerHealthOpenApi();
 
 export const swaggerOptions: SwaggerUiOptions = {

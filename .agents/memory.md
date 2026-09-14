@@ -217,4 +217,28 @@
        - `storage.submission_max_file_size_mb` (mặc định `50 MB`).
        - `storage.task_attachment_max_file_size_mb` (mặc định `25 MB`).
     3. **Bootstrapping & Resilience**: Toàn bộ cấu hình được định nghĩa trong `DEFAULT_SYSTEM_CONFIGS` và tự động nạp vào PostgreSQL khi khởi động server (`ensureDefaultConfigs`). Cache in-memory TTL kết hợp Redis Pub/Sub đảm bảo tốc độ phản hồi tức thì và không bị bottleneck CSDL.
+- **Recruitment & Onboarding Module (applications) (2026-09-14)**:
+  - Hoàn thiện trọn bộ module Tuyển dụng & Tiếp nhận thực tập sinh (`src/modules/applications/`) theo kiến trúc phân tầng 6 file chuẩn (`route`, `validation`, `controller`, `service`, `repository`, `dto`) và OpenAPI 3.0:
+    1. **Application Invites (Thư mời ứng tuyển)**:
+       - Tạo link mời (`POST /applications/invites`): Sinh token bảo mật ngẫu nhiên 32 bytes hex, hạn 7 ngày, trạng thái ban đầu `UNUSED`, tự động gửi email mời qua `notificationDispatcher`.
+       - Xác thực token (`GET /applications/invites/verify/:token` & `GET /verify`): Public API kiểm tra token chưa dùng (`UNUSED`/`ACTIVE`) và chưa hết hạn trước khi hiển thị form onboarding. Tự động đánh dấu `EXPIRED` nếu quá hạn.
+       - Thu hồi thư mời (`PATCH /applications/invites/:id/revoke`).
+    2. **Public Candidate Submission (Nộp đơn trực tuyến)**:
+       - Endpoint `POST /applications/submit` (alias `POST /applications`): Nhận thông tin cá nhân, trường, ngành, nguyện vọng phòng ban/vị trí tĩnh (`Engineering`, `Design`, `Marketing`, `Data`, `QA`, `HR`, `Product`), tệp đính kèm R2.
+       - **Ràng buộc ngày bắt đầu (`startDate`)**: Kiểm tra chặt chẽ theo ngày lịch ở múi giờ `Asia/Ho_Chi_Minh`: không ở quá khứ và không rơi vào thứ Bảy hoặc Chủ Nhật (`![0, 6].includes(day)`).
+       - **Transaction Safety**: Tạo bản ghi `Application` (`PENDING`), lưu attachments, và tự động chuyển token invite sang `USED` trong cùng 1 transaction chống dùng lại.
+    3. **Admin Workflow (Phê duyệt & Phân công)**:
+       - Gán phòng ban/vị trí nội bộ (`PATCH /applications/:id/assign` & `/assignment`): Chỉ cho phép khi đơn ở trạng thái `PENDING`.
+       - Phê duyệt đơn (`POST /applications/:id/approve` & `/review`): Bắt buộc đã gán đủ phòng ban và vị trí nội bộ. Trong transaction:
+         1. Tạo tài khoản `User` (Role `INTERN`, mật khẩu ngẫu nhiên an toàn).
+         2. Tạo bản ghi `Intern` (sinh mã `internCode = INT-XXXXXXXX`, gán leader nếu có).
+         3. Cập nhật trạng thái đơn sang `APPROVED`.
+         4. Enqueue gửi email thông báo tài khoản qua `notificationDispatcher`.
+       - Từ chối đơn (`POST /applications/:id/reject`): Bắt buộc có lý do cụ thể (`rejectedReason`), cập nhật đơn `REJECTED` và gửi email thông báo kết quả.
+    4. **Cloudflare R2 File Storage**:
+       - Endpoint `GET /applications/attachments/upload-url` sinh presigned PUT URL với prefix `applications/` phục vụ upload CV/minh chứng trực tiếp từ client.
+  - **Dynamic RBAC & Verification**:
+    - Phân quyền qua `PERMISSIONS.APPLICATION_*`.
+    - Toàn bộ 315 tests pass 100%, TypeScript build và ESLint sạch 0 errors / 0 warnings.
+
 

@@ -41,6 +41,9 @@ export const EMAIL_TEMPLATE_KEY = {
   RESET_PASSWORD: "RESET_PASSWORD",
   NEW_DEVICE_ALERT: "NEW_DEVICE_ALERT",
   ACTIVITY_SUMMARY_DIGEST: "ACTIVITY_SUMMARY_DIGEST",
+  APPLICATION_INVITE: "APPLICATION_INVITE",
+  APPLICATION_APPROVED: "APPLICATION_APPROVED",
+  APPLICATION_REJECTED: "APPLICATION_REJECTED",
   CUSTOM: "CUSTOM",
 } as const;
 
@@ -62,5 +65,8 @@ export const DEFAULT_EMAIL_SUBJECTS: Record<string, string> = {
   RESET_PASSWORD: "Đặt lại mật khẩu",
   NEW_DEVICE_ALERT: "Phát hiện đăng nhập từ thiết bị mới",
   ACTIVITY_SUMMARY_DIGEST: "Báo cáo tổng kết hoạt động hệ thống",
+  APPLICATION_INVITE: "Thư mời ứng tuyển thực tập sinh — NexCampus",
+  APPLICATION_APPROVED: "Chúc mừng! Đơn ứng tuyển của bạn đã được phê duyệt — NexCampus",
+  APPLICATION_REJECTED: "Thông báo kết quả ứng tuyển — NexCampus",
   CUSTOM: "Thông báo từ hệ thống",
 };

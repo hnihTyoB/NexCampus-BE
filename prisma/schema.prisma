@@ -39,6 +39,9 @@ model User {
   intern              Intern?              @relation("InternUser")
   leadedInterns       Intern[]             @relation("LeaderInterns")
   leader              Leader?
+  approvedApplications Application[]        @relation("ApprovedApplications")
+  rejectedApplications Application[]        @relation("RejectedApplications")
+  createdInvites       ApplicationInvite[]
 
   @@index([deletedAt])
   @@index([roleId, isActive, deletedAt])
@@ -357,6 +360,7 @@ model Department {
   positions         Position[]
   interns           Intern[]
   leaderAssignments LeaderDepartment[]
+  applications      Application[]
 
   @@index([deletedAt])
   @@map("departments")
@@ -372,6 +376,7 @@ model Position {
 
   department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   interns      Intern[]
+  applications Application[]
 
   @@index([departmentId])
   @@index([deletedAt])
@@ -437,6 +442,126 @@ model Intern {
   @@index([deletedAt])
   @@map("interns")
 }
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ApplicationInviteStatus {
+  UNUSED
+  ACTIVE
+  USED
+  EXPIRED
+  REVOKED
+}
+
+model Application {
+  id                  String            @id @default(uuid()) @db.Uuid
+  fullName            String            @map("full_name")
+  email               String
+  phone               String
+  university          String?           @map("university")
+  major               String?           @map("major")
+  cvUrl               String?           @map("cv_url")
+  preferredDepartment String?           @map("preferred_department")
+  preferredPosition   String?           @map("preferred_position")
+  departmentId        String?           @map("department_id") @db.Uuid
+  positionId          String?           @map("position_id") @db.Uuid
+  startDate           DateTime          @map("start_date")
+  duration            Int               @default(3)
+  status              ApplicationStatus @default(PENDING)
+  approvedBy          String?           @map("approved_by") @db.Uuid
+  approvedAt          DateTime?         @map("approved_at")
+  rejectedBy          String?           @map("rejected_by") @db.Uuid
+  rejectedAt          DateTime?         @map("rejected_at")
+  rejectedReason      String?           @map("rejected_reason")
+  deletedAt           DateTime?         @map("deleted_at")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+
+  // Regulations fields
+  regulationId String?   @map("regulation_id") @db.Uuid
+  acceptedAt   DateTime? @map("accepted_at")
+
+  approver   User?       @relation("ApprovedApplications", fields: [approvedBy], references: [id], onDelete: SetNull)
+  rejecter   User?       @relation("RejectedApplications", fields: [rejectedBy], references: [id], onDelete: SetNull)
+  regulation Regulation? @relation(fields: [regulationId], references: [id], onDelete: SetNull)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  position   Position?   @relation(fields: [positionId], references: [id], onDelete: Restrict)
+
+  // Relations
+  applicationInvites ApplicationInvite[]
+  attachments        ApplicationAttachment[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([status])
+  @@index([approvedBy])
+  @@index([rejectedBy])
+  @@index([regulationId])
+  @@index([departmentId])
+  @@index([positionId])
+  @@index([deletedAt])
+  @@map("applications")
+}
+
+model ApplicationInvite {
+  id        String                  @id @default(uuid()) @db.Uuid
+  email     String
+  token     String                  @unique
+  status    ApplicationInviteStatus @default(UNUSED)
+  expiresAt DateTime                @map("expires_at")
+  usedAt    DateTime?               @map("used_at")
+
+  applicationId String?      @map("application_id") @db.Uuid
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+
+  createdBy String? @map("created_by") @db.Uuid
+  creator   User?   @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([email])
+  @@index([token])
+  @@index([status])
+  @@index([applicationId])
+  @@index([createdBy])
+  @@map("application_invites")
+}
+
+model ApplicationAttachment {
+  id            String   @id @default(uuid()) @db.Uuid
+  applicationId String   @map("application_id") @db.Uuid
+  fileName      String   @map("file_name")
+  fileUrl       String   @map("file_url")
+  filePath      String   @map("file_path")
+  mimeType      String   @map("mime_type")
+  fileSize      Int      @map("file_size")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@map("application_attachments")
+}
+
+model Regulation {
+  id        String   @id @default(uuid()) @db.Uuid
+  title     String
+  content   String   @db.Text
+  version   Int      @default(1)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  applications Application[]
+
+  @@map("regulations")
+}
+
 
 
 
