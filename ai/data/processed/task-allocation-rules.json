@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TaskAllocationRules",
+  "description": "Quy tắc, công thức tính điểm tương thích và phân loại rủi ro phân công công việc trong NexCampus",
+  "version": "1.0.0",
+  "compatibilityWeights": {
+    "workloadScore": {
+      "weight": 0.30,
+      "description": "Độ rảnh của ứng viên trong nhóm (còn nhiều ngày trống trong maxWorkloadDays thì điểm càng cao)"
+    },
+    "skillScore": {
+      "weight": 0.25,
+      "description": "Mức độ phù hợp về chuyên môn, vị trí (FE/BE/Fullstack) và các module đã từng làm"
+    },
+    "performanceScore": {
+      "weight": 0.25,
+      "description": "Điểm chất lượng code từ các tuần gần nhất và lịch sử hoàn thành task đúng hạn"
+    },
+    "learningScore": {
+      "weight": 0.20,
+      "description": "Tiềm năng phát triển, khả năng tiếp thu công nghệ mới hoặc cơ hội thử sức với module mới"
+    }
+  },
+  "workloadCalculation": {
+    "ownerLoadFactor": 1.0,
+    "supportLoadFactor": 0.5,
+    "formula": "candidateWorkload = currentActiveDays + (role === 'OWNER' ? task.estDays : task.estDays * 0.5)"
+  },
+  "riskLevels": {
+    "HIGH": {
+      "threshold": "candidateWorkload >= 0.8 * maxWorkloadDays",
+      "description": "Khối lượng công việc vượt 80% hạn mức tối đa, nguy cơ trễ hạn hoặc quá tải cao"
+    },
+    "MEDIUM": {
+      "threshold": "candidateWorkload >= 0.5 * maxWorkloadDays && candidateWorkload < 0.8 * maxWorkloadDays",
+      "description": "Khối lượng công việc vừa phải, vẫn còn dư địa nhưng cần theo dõi tiến độ"
+    },
+    "LOW": {
+      "threshold": "candidateWorkload < 0.5 * maxWorkloadDays",
+      "description": "Khối lượng công việc an toàn, ứng viên có đủ thời gian tập trung xử lý"
+    }
+  },
+  "roleGuidelines": {
+    "owner": {
+      "definition": "Người chịu trách nhiệm chính về tiến độ, chất lượng code, tạo PR và video demo",
+      "maxPerTask": 1
+    },
+    "support": {
+      "definition": "Người hỗ trợ kỹ thuật, review hoặc cùng nghiên cứu giải pháp",
+      "maxPerTask": 1,
+      "mentorshipPattern": "Khi Owner là Junior/chưa làm module này, khuyến khích cử Senior Intern có kinh nghiệm làm Support"
+    }
+  },
+  "crossTeamAssignment": {
+    "rule": "Leader giao việc cho TTS team khác phải nhập chính xác email của TTS; hệ thống hiển thị leader phụ trách để xác nhận",
+    "approvalWorkflow": "Phải qua bước duyệt PENDING_APPROVAL của Leader phụ trách trực tiếp"
+  },
+  "requiredOutputSchema": {
+    "type": "object",
+    "required": [
+      "recommendedOwnerId",
+      "recommendedSupportId",
+      "reasons",
+      "riskLevel",
+      "workloadAnalysis",
+      "learningOpportunity"
+    ],
+    "properties": {
+      "recommendedOwnerId": {
+        "type": "string",
+        "description": "ID của ứng viên được đề xuất làm Owner"
+      },
+      "recommendedSupportId": {
+        "type": ["string", "null"],
+        "description": "ID của ứng viên được đề xuất làm Support (hoặc null nếu không cần)"
+      },
+      "reasons": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Danh sách 2-4 lý do logic, có dẫn chứng từ điểm tương thích và workload"
+      },
+      "riskLevel": {
+        "type": "string",
+        "enum": ["LOW", "MEDIUM", "HIGH"],
+        "description": "Mức độ rủi ro quá tải"
+      },
+      "workloadAnalysis": {
+        "type": "string",
+        "description": "Phân tích ngắn gọn tình trạng tải công việc bằng tiếng Việt (1-2 câu)"
+      },
+      "learningOpportunity": {
+        "type": "string",
+        "description": "Giải thích cơ hội phát triển hoặc kèm cặp bằng tiếng Việt (1-2 câu)"
+      }
+    }
+  }
+}

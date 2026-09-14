@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TaskAllocationTestScenarios",
+  "description": "Bộ kịch bản kiểm thử chất lượng gợi ý phân công công việc của AI",
+  "version": "1.0.0",
+  "testCases": [
+    {
+      "id": "TC_ALLOC_01",
+      "name": "Cảnh báo rủi ro quá tải (Overload Risk Detection)",
+      "description": "Ứng viên có điểm tương thích cao nhất nhưng workload hiện tại đã chiếm 85% hạn mức. AI bắt buộc phải cảnh báo HIGH risk.",
+      "input": {
+        "task": {
+          "title": "Tối ưu hóa Database Queries cho Báo Cáo Ngày",
+          "module": "daily-reports",
+          "priority": "P0",
+          "estDays": 3,
+          "maxWorkloadDays": 10,
+          "deadline": "2026-09-20T17:00:00.000Z",
+          "description": "Phân tích slow queries và thêm index cho bảng DailyReport"
+        },
+        "candidates": [
+          {
+            "id": "intern_01",
+            "fullName": "Nguyễn Văn A",
+            "suggestedRole": "OWNER",
+            "position": { "name": "Backend Intern" },
+            "activeTaskDays": 8.5,
+            "latestCodingScore": 9.5,
+            "latestLearningScore": 8.5,
+            "completedModules": ["daily-reports", "auth"],
+            "compatibilityScore": 88,
+            "workloadScore": 25,
+            "skillScore": 95,
+            "performanceScore": 95,
+            "learningScore": 75
+          },
+          {
+            "id": "intern_02",
+            "fullName": "Trần Thị B",
+            "suggestedRole": "SUPPORT",
+            "position": { "name": "Backend Intern" },
+            "activeTaskDays": 2.0,
+            "latestCodingScore": 7.5,
+            "latestLearningScore": 9.0,
+            "completedModules": ["auth"],
+            "compatibilityScore": 82,
+            "workloadScore": 90,
+            "skillScore": 70,
+            "performanceScore": 75,
+            "learningScore": 90
+          }
+        ]
+      },
+      "expectedOutput": {
+        "recommendedOwnerId": "intern_01",
+        "recommendedSupportId": "intern_02",
+        "riskLevel": "HIGH",
+        "mustIncludeInWorkloadAnalysis": ["quá tải", "hạn mức", "8.5 ngày hoặc vượt 80%"],
+        "mustIncludeInReasons": ["chuyên môn", "kinh nghiệm module"]
+      },
+      "validationRules": {
+        "riskLevelMustBe": "HIGH",
+        "disallowRiskLevels": ["LOW", "MEDIUM"]
+      }
+    },
+    {
+      "id": "TC_ALLOC_02",
+      "name": "Ghép cặp Kèm Cặp (Mentorship / Learning Opportunity)",
+      "description": "Intern mới được đề xuất làm Owner để học module mới, Intern kỳ cựu được đề xuất làm Support để kèm cặp.",
+      "input": {
+        "task": {
+          "title": "Tích hợp Webhook Thông Báo Telegram",
+          "module": "notifications",
+          "priority": "P1",
+          "estDays": 2,
+          "maxWorkloadDays": 10,
+          "deadline": "2026-09-22T17:00:00.000Z",
+          "description": "Gửi thông báo khi có daily report mới qua Telegram bot"
+        },
+        "candidates": [
+          {
+            "id": "intern_junior",
+            "fullName": "Lê Văn C",
+            "suggestedRole": "OWNER",
+            "position": { "name": "Backend Intern" },
+            "activeTaskDays": 2.0,
+            "latestCodingScore": 7.0,
+            "latestLearningScore": 9.5,
+            "completedModules": ["auth"],
+            "compatibilityScore": 80,
+            "workloadScore": 85,
+            "skillScore": 70,
+            "performanceScore": 70,
+            "learningScore": 95
+          },
+          {
+            "id": "intern_senior",
+            "fullName": "Phạm Quốc D",
+            "suggestedRole": "SUPPORT",
+            "position": { "name": "Fullstack Intern" },
+            "activeTaskDays": 3.0,
+            "latestCodingScore": 9.0,
+            "latestLearningScore": 8.0,
+            "completedModules": ["notifications", "auth", "tasks"],
+            "compatibilityScore": 85,
+            "workloadScore": 75,
+            "skillScore": 95,
+            "performanceScore": 90,
+            "learningScore": 80
+          }
+        ]
+      },
+      "expectedOutput": {
+        "recommendedOwnerId": "intern_junior",
+        "recommendedSupportId": "intern_senior",
+        "riskLevel": "LOW",
+        "mustIncludeInLearningOpportunity": ["kèm cặp", "học hỏi", "hỗ trợ", "mentor"],
+        "mustIncludeInWorkloadAnalysis": ["an toàn", "dư địa"]
+      },
+      "validationRules": {
+        "riskLevelMustBe": "LOW"
+      }
+    }
+  ]
+}

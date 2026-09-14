@@ -1,0 +1,82 @@
+{
+  "traceId": "trace_eval_20260914_001",
+  "timestamp": "2026-09-14T09:30:00.000Z",
+  "module": "weekly-evaluation",
+  "agent": "weekly-evaluation-assistant",
+  "model": "gemini-2.5-flash",
+  "parameters": {
+    "temperature": 0.2,
+    "topP": 0.8
+  },
+  "executionSteps": [
+    {
+      "step": 1,
+      "name": "LoadSystemPrompt",
+      "source": "ai/prompts/system/weekly-evaluation-assistant.md",
+      "status": "SUCCESS"
+    },
+    {
+      "step": 2,
+      "name": "ExtractContextData",
+      "input": {
+        "internId": "usr_intern_101",
+        "week": 3,
+        "dailyReportsCount": 5,
+        "taskSubmissionsCount": 1
+      },
+      "status": "SUCCESS"
+    },
+    {
+      "step": 3,
+      "name": "InvokeLLM",
+      "latencyMs": 1420,
+      "promptTokens": 1850,
+      "completionTokens": 320,
+      "status": "SUCCESS"
+    },
+    {
+      "step": 4,
+      "name": "ValidateOutputSchema",
+      "validator": "ZodSchema",
+      "status": "SUCCESS",
+      "sanitizationNeeded": false
+    }
+  ],
+  "llmRawOutput": {
+    "ratings": {
+      "ruleCompliance": "TOT",
+      "workAttitude": "TOT",
+      "learningCapacity": "KHA",
+      "pressureTolerance": "KHA",
+      "communication": "TOT",
+      "knowledge": "KHA",
+      "practicalSkill": "KHA",
+      "languageProficiency": "TB",
+      "teamwork": "TOT",
+      "creativity": "KHA",
+      "contentRequirement": "TOT",
+      "progressRequirement": "TOT"
+    },
+    "comment": "Trong tuần 3, thực tập sinh Nguyễn Văn A đã duy trì tinh thần làm việc rất tích cực, nộp đầy đủ 5/5 báo cáo ngày kèm liên kết PR minh chứng rõ ràng. Bạn đã hoàn thành đúng hạn task 'Module Weekly Evaluations API' với chất lượng code sạch sẽ, giải quyết tốt bài toán transaction và xử lý lỗi biên theo đúng quy chuẩn kiến trúc của dự án. Cần tiếp tục trau dồi thêm tiếng Anh kỹ thuật khi viết commit message và mô tả PR.",
+    "strengths": [
+      "Nộp báo cáo ngày đầy đủ 5/5 ngày làm việc với nội dung chi tiết.",
+      "Hoàn thành task đúng hạn, code chuẩn kiến trúc và sạch sẽ."
+    ],
+    "weaknesses": [
+      "Commit message đôi chỗ còn dùng tiếng Việt, cần chuẩn hóa tiếng Anh."
+    ],
+    "recommendations": [
+      "Tìm hiểu thêm về BullMQ queue để chuẩn bị cho giai đoạn xử lý tác vụ nền tuần tới."
+    ]
+  },
+  "evalScorecardResult": {
+    "groundingScore": 29,
+    "completenessScore": 20,
+    "formatScore": 20,
+    "toneScore": 15,
+    "safetyScore": 15,
+    "totalScore": 99,
+    "threshold": 80,
+    "outcome": "PASS"
+  }
+}

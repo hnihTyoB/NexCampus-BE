@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WeeklyEvaluationTestScenarios",
+  "description": "Bộ kịch bản kiểm thử chất lượng gợi ý đánh giá tuần của AI",
+  "version": "1.0.0",
+  "testCases": [
+    {
+      "id": "TC_EVAL_01",
+      "name": "Thực tập sinh tích cực, thành tích xuất sắc",
+      "description": "Intern nộp đủ 5 báo cáo ngày có PR và video demo, hoàn thành task đúng hạn, được leader khen ngợi.",
+      "input": {
+        "internName": "Nguyễn Văn A",
+        "week": 3,
+        "weekRange": {
+          "from": "2026-09-07T00:00:00.000Z",
+          "to": "2026-09-13T23:59:59.999Z"
+        },
+        "dailyReports": [
+          { "createdAt": "2026-09-07T17:00:00.000Z", "content": "Hoàn thiện endpoint get weekly evaluations", "prLink": "https://github.com/nex/pr/12", "videoDemo": "https://demo.com/v1" },
+          { "createdAt": "2026-09-08T17:00:00.000Z", "content": "Viết unit test cho service tính điểm", "prLink": "https://github.com/nex/pr/13", "videoDemo": null },
+          { "createdAt": "2026-09-09T17:00:00.000Z", "content": "Sửa lỗi timezone Asia/Ho_Chi_Minh", "prLink": "https://github.com/nex/pr/14", "videoDemo": null },
+          { "createdAt": "2026-09-10T17:00:00.000Z", "content": "Tối ưu câu query Prisma include relations", "prLink": "https://github.com/nex/pr/15", "videoDemo": null },
+          { "createdAt": "2026-09-11T17:00:00.000Z", "content": "Tổng kết tuần và họp sprint review", "prLink": null, "videoDemo": null }
+        ],
+        "taskSubmissions": [
+          {
+            "attempt": 1,
+            "reviewStatus": "APPROVED",
+            "prLink": "https://github.com/nex/pr/12",
+            "videoDemo": "https://demo.com/v1",
+            "note": "Đã pass kiểm thử nội bộ",
+            "reviewComment": "Code rất sạch, xử lý transaction tốt.",
+            "assignment": {
+              "task": {
+                "title": "Module Weekly Evaluations API",
+                "description": "Xây dựng CRUD và tính điểm đánh giá",
+                "deadline": "2026-09-11T17:00:00.000Z"
+              }
+            }
+          }
+        ]
+      },
+      "expectedOutput": {
+        "allowedRatingsForCore": ["TOT", "KHA"],
+        "disallowedRatingsForCore": ["TBY", "YEU"],
+        "mustMentionInStrengths": ["chăm chỉ", "báo cáo đầy đủ", "chất lượng code"],
+        "minCommentLength": 150
+      }
+    },
+    {
+      "id": "TC_EVAL_02",
+      "name": "Tuần hoàn toàn không có dữ liệu (Zero Data Fallback)",
+      "description": "Intern không nộp báo cáo nào và không nộp task nào trong tuần. AI bắt buộc phải trả về 'TB' cho tất cả tiêu chí và giải thích rõ ràng.",
+      "input": {
+        "internName": "Trần Thị Vắng",
+        "week": 4,
+        "weekRange": {
+          "from": "2026-09-07T00:00:00.000Z",
+          "to": "2026-09-13T23:59:59.999Z"
+        },
+        "dailyReports": [],
+        "taskSubmissions": []
+      },
+      "expectedOutput": {
+        "ratingsExactValue": "TB",
+        "mustContainInComment": ["không có dữ liệu", "không nộp báo cáo", "mặc định trung bình"],
+        "forbiddenRatings": ["TOT", "KHA"]
+      },
+      "validationRules": {
+        "allRatingsMustEqual": "TB"
+      }
+    },
+    {
+      "id": "TC_EVAL_03",
+      "name": "Intern gặp sự cố kỹ thuật và nộp bài bị từ chối",
+      "description": "Intern có nộp báo cáo nhưng task bị yêu cầu sửa đổi (CHANGES_REQUESTED) do sót validate. Đánh giá cần phản ánh khách quan và định hướng cải thiện.",
+      "input": {
+        "internName": "Lê Văn C",
+        "week": 2,
+        "weekRange": {
+          "from": "2026-09-07T00:00:00.000Z",
+          "to": "2026-09-13T23:59:59.999Z"
+        },
+        "dailyReports": [
+          { "createdAt": "2026-09-08T17:00:00.000Z", "content": "Làm tính năng upload avatar", "prLink": null, "videoDemo": null },
+          { "createdAt": "2026-09-10T17:00:00.000Z", "content": "Nộp bài nhưng bị lỗi multer", "prLink": "https://github.com/nex/pr/99", "videoDemo": null }
+        ],
+        "taskSubmissions": [
+          {
+            "attempt": 1,
+            "reviewStatus": "CHANGES_REQUESTED",
+            "prLink": "https://github.com/nex/pr/99",
+            "videoDemo": null,
+            "note": "Bị vướng chỗ cleanup file tạm",
+            "reviewComment": "Chưa xử lý xóa file khi transaction bị rollback. Cần làm lại.",
+            "assignment": {
+              "task": {
+                "title": "Upload avatar lên Cloudflare R2",
+                "description": "Tích hợp presigned URL và cleanup orphaned objects",
+                "deadline": "2026-09-10T17:00:00.000Z"
+              }
+            }
+          }
+        ]
+      },
+      "expectedOutput": {
+        "maxAllowedRatingForPracticalSkill": "TB",
+        "mustIncludeInWeaknesses": ["xử lý lỗi", "cleanup", "báo cáo chưa đều"],
+        "mustIncludeInRecommendations": ["kiểm thử kỹ", "hỏi leader"]
+      }
+    }
+  ]
+}

@@ -12,9 +12,11 @@
 
 ## Express và API
 
+- Múi giờ chuẩn hệ thống: `Asia/Ho_Chi_Minh` (UTC+7) cho mọi tính toán thời gian, lịch làm việc, cron và ngày bắt đầu onboarding.
 - Response thành công giữ shape nhất quán: `{ success: true, ... }`.
-- Error đi qua `errorMiddleware` và có `message`, `code`.
-- Route mới phải xác định rõ public hay cần `authMiddleware`/`requireRole`.
+- Error đi qua `errorMiddleware` và có `{ success: false, message, code }`.
+- Query param số phải được ép kiểu rõ ràng, ưu tiên `z.coerce.number()` trước khi truyền vào `skip`, `take` hoặc phép tính.
+- Route mới phải xác định rõ public hay cần `authMiddleware`/`requirePermission`.
 - Không tin dữ liệu từ `req.body`, `req.query`, `req.params` trước validation.
 - Không ghi access token, refresh token, password hay cookie nhạy cảm vào log.
 

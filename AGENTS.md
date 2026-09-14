@@ -1,19 +1,24 @@
-# Backend Agent Guide
+# NexCampus Backend v2 Agent Guide
 
-Tài liệu này là điểm vào chính cho mọi phiên làm việc với AI Agent trong repository `template-be`.
-Mục tiêu là giữ cách phân tích, triển khai, kiểm tra và bàn giao thay đổi luôn nhất quán, an toàn và chuẩn mực.
+Tài liệu này là điểm vào chính cho mọi phiên làm việc với AI Agent trong repository `NexCampus-v2-BE/`.
+Đây là phiên bản backend được code lại từ `NexCampus-BE/`, kế thừa toàn bộ nghiệp vụ, quy tắc cốt lõi và kiến trúc của hệ thống NexCampus trên nền tảng Express, TypeScript, Prisma và Dynamic RBAC.
 
 ## Context bắt buộc
 
 Trước khi sửa code:
 
-1. Đọc `.agents/project.md` để nắm cấu trúc, công nghệ và phạm vi dự án hiện tại.
-2. Đọc các quy tắc trong `.agents/rules/` có liên quan; với thay đổi code backend, tối thiểu đọc cả ba file:
+1. Đọc `.agents/project.md` để nắm cấu trúc, công nghệ và phạm vi chuyển giao nghiệp vụ từ `NexCampus-BE`.
+2. Đọc các quy tắc trong `.agents/rules/` của repo hiện tại:
    - `.agents/rules/architecture.md` (ranh giới layer: `route -> validation -> controller -> service -> repository`)
-   - `.agents/rules/tech-defaults.md` (quy ước TypeScript, Express, Zod, Prisma, Auth & Security)
+   - `.agents/rules/tech-defaults.md` (quy ước TypeScript, Express, Zod, Prisma, Auth, Security & Timezone)
    - `.agents/rules/workflow.md` (quy trình triển khai, kiểm thử và bàn giao)
-3. Đọc `.agents/memory.md` để biết trạng thái và quyết định dài hạn hiện tại.
-4. Nếu có `.agents/local.md`, đọc file đó sau cùng. Đây là ghi chú riêng của máy cá nhân và không được commit.
+3. Tham chiếu thêm quy tắc workspace cha tại `../.agents/rules/`:
+   - `../.agents/rules/project.md` (bối cảnh tổng thể NexCampus)
+   - `../.agents/rules/backend.md` (quy ước nghiệp vụ backend NexCampus)
+   - `../.agents/rules/api-contract.md` (hợp đồng API giữa FE và BE)
+   - `../.agents/rules/quality.md` (tiêu chuẩn chất lượng kiểm thử)
+4. Đọc `.agents/memory.md` và `../.agents/memory.md` để nắm các quyết định kiến trúc và nghiệp vụ đã xác nhận (khoá task DONE, giao việc xuyên team, 12 tiêu chí đánh giá tuần, múi giờ `Asia/Ho_Chi_Minh`).
+5. Nếu có `.agents/local.md`, đọc file đó sau cùng. Đây là ghi chú riêng của máy cá nhân và không được commit.
 
 > Code và cấu hình đang chạy là nguồn sự thật cao nhất. Nếu tài liệu khác với code, hãy nêu sự khác biệt, làm theo yêu cầu hiện tại và cập nhật tài liệu khi thay đổi đã được xác nhận.
 

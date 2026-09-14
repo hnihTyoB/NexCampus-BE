@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WeeklyEvaluation12Criteria",
+  "description": "Dữ liệu chuẩn hóa 12 tiêu chí đánh giá tuần và thang điểm của NexCampus",
+  "version": "1.0.0",
+  "ratingScale": {
+    "TOT": {
+      "label": "Tốt",
+      "score": 10,
+      "description": "Hoàn thành xuất sắc nhiệm vụ, chủ động, không có lỗi nghiêm trọng"
+    },
+    "KHA": {
+      "label": "Khá",
+      "score": 8,
+      "description": "Hoàn thành tốt nhiệm vụ, đúng hạn, thái độ hợp tác tích cực"
+    },
+    "TB": {
+      "label": "Trung bình",
+      "score": 6,
+      "description": "Đáp ứng mức cơ bản, cần nhắc nhở đôi chút, tiến độ chấp nhận được"
+    },
+    "TBY": {
+      "label": "Trung bình yếu",
+      "score": 4,
+      "description": "Chưa đạt yêu cầu tối thiểu, trễ hạn nhiều lần hoặc vi phạm quy chế"
+    },
+    "YEU": {
+      "label": "Yếu",
+      "score": 2,
+      "description": "Không hoàn thành công việc, thái độ thiếu trách nhiệm hoặc không báo cáo"
+    }
+  },
+  "groups": [
+    {
+      "groupId": "DISCIPLINE_AND_ATTITUDE",
+      "groupName": "I. Kỷ luật và tư chất",
+      "criteria": [
+        {
+          "key": "ruleCompliance",
+          "name": "Thực hiện nội quy của cơ quan",
+          "description": "Tuân thủ giờ giấc, chấm công, nộp daily report đúng hạn, bảo mật thông tin",
+          "weight": 1
+        },
+        {
+          "key": "workAttitude",
+          "name": "Thái độ làm việc",
+          "description": "Nghiêm túc, tích cực, có tinh thần trách nhiệm, sẵn sàng nhận nhiệm vụ",
+          "weight": 1
+        },
+        {
+          "key": "learningCapacity",
+          "name": "Năng lực tiếp thu",
+          "description": "Khả năng nắm bắt kiến thức mới, tiếp thu phản hồi từ Leader và đồng nghiệp",
+          "weight": 1
+        },
+        {
+          "key": "pressureTolerance",
+          "name": "Khả năng vượt khó chịu áp lực",
+          "description": "Bền bỉ xử lý lỗi, chủ động tháo gỡ khi bị chặn (blocker), không bỏ cuộc",
+          "weight": 1
+        },
+        {
+          "key": "communication",
+          "name": "Giao tiếp và ứng xử",
+          "description": "Giao tiếp lịch sự, trao đổi rõ ràng trong PR review, meetings và kênh chat",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "groupId": "PROFESSIONAL_SKILLS",
+      "groupName": "II. Khả năng chuyên môn",
+      "criteria": [
+        {
+          "key": "knowledge",
+          "name": "Kiến thức",
+          "description": "Hiểu biết về stack kỹ thuật, kiến trúc dự án và quy trình phát triển phần mềm",
+          "weight": 1
+        },
+        {
+          "key": "practicalSkill",
+          "name": "Kỹ năng thực hành",
+          "description": "Chất lượng code, tuân thủ coding conventions, viết test, giải quyết bài toán cụ thể",
+          "weight": 1
+        },
+        {
+          "key": "languageProficiency",
+          "name": "Năng lực ngoại ngữ",
+          "description": "Đọc hiểu tài liệu kỹ thuật tiếng Anh, viết PR description và commit message bằng tiếng Anh",
+          "weight": 1
+        },
+        {
+          "key": "teamwork",
+          "name": "Kỹ năng làm việc nhóm",
+          "description": "Phối hợp với thành viên khác, review chéo, hỗ trợ đồng đội hoàn thành mục tiêu",
+          "weight": 1
+        },
+        {
+          "key": "creativity",
+          "name": "Tính sáng tạo",
+          "description": "Đề xuất giải pháp cải tiến, tối ưu hiệu năng hoặc quy trình làm việc",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "groupId": "PROJECT_RESULTS",
+      "groupName": "III. Kết quả thực hiện đề tài",
+      "criteria": [
+        {
+          "key": "contentRequirement",
+          "name": "Thực hiện yêu cầu về nội dung",
+          "description": "Đúng nghiệp vụ, pass acceptance criteria của task, ít lỗi phát sinh",
+          "weight": 1
+        },
+        {
+          "key": "progressRequirement",
+          "name": "Thực hiện yêu cầu về tiến độ",
+          "description": "Hoàn thành và nộp đúng deadline, không để dồn việc vào cuối tuần",
+          "weight": 1
+        }
+      ]
+    }
+  ],
+  "edgeCases": {
+    "zeroDataHandling": {
+      "condition": "Không có báo cáo hàng ngày (0 report) VÀ không có bài nộp task (0 submission) trong tuần",
+      "action": "Đặt tất cả 12 tiêu chí là 'TB', kèm ghi chú rõ ràng trong nhận xét là không có dữ liệu thực tế để đánh giá",
+      "fallbackScore": 6.0
+    },
+    "blockerHandling": {
+      "condition": "Task bị BLOCKED do yếu tố khách quan và intern đã báo cáo kịp thời",
+      "action": "Không trừ điểm tiến độ nặng, ghi nhận thái độ chủ động báo cáo trong nhận xét"
+    }
+  },
+  "requiredOutputSchema": {
+    "type": "object",
+    "required": ["ratings", "comment", "strengths", "weaknesses", "recommendations"],
+    "properties": {
+      "ratings": {
+        "type": "object",
+        "description": "Đánh giá cho cả 12 tiêu chí bằng đúng 5 giá trị: TOT, KHA, TB, TBY, YEU"
+      },
+      "comment": {
+        "type": "string",
+        "description": "Nhận xét tổng quát bằng tiếng Việt (200-500 từ), khách quan, có dẫn chứng"
+      },
+      "strengths": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Danh sách các điểm nổi bật trong tuần"
+      },
+      "weaknesses": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Danh sách các điểm cần cải thiện"
+      },
+      "recommendations": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Lời khuyên định hướng cho tuần kế tiếp"
+      }
+    }
+  }
+}

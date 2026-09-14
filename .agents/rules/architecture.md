@@ -40,7 +40,7 @@
 - Theo naming hiện tại:
   `<name>.route.ts`, `<name>.validation.ts`, `<name>.controller.ts`,
   `<name>.service.ts`, `<name>.repository.ts`, `<name>.dto.ts`.
-- Mount route ở `src/routes/index.ts`.
+- Mount route ở `src/routes/index.ts`; API public nằm dưới `/api/v1`.
 - Dùng checklist `.agents/checklists/new-module.md`.
 
 ## Database
@@ -49,4 +49,13 @@
   `onDelete`.
 - Không sửa migration cũ đã chia sẻ; tạo migration mới.
 - Không chạy `db:migrate:reset` nếu người dùng chưa yêu cầu rõ ràng.
-- Với tiền tệ, giữ Prisma `Decimal`; không âm thầm chuyển sang JavaScript float.
+- Với tiền tệ hoặc số thập phân chính xác, giữ Prisma `Decimal`; không âm thầm chuyển sang JavaScript float.
+
+## Quy tắc nghiệp vụ NexCampus kế thừa từ `NexCampus-BE`
+
+- **Khóa chỉnh sửa công việc đã hoàn thành**: Khi assignment của công việc ở trạng thái `DONE`, không cho cập nhật thông tin công việc, thay đổi hoặc huỷ phân công, hay thêm/xoá attachment. Trả về `409 Conflict` với error code `TASK_ALREADY_COMPLETED`.
+- **Giao việc xuyên team**: Leader giao hoặc chuyển việc cho TTS thuộc team khác phải nhập chính xác email của TTS; request phân công chuyển sang trạng thái chờ Leader của team nhận duyệt (`PENDING_APPROVAL`).
+- **Giới hạn năng lực và Workload**: Kiểm tra `maxWorkloadDays` và `maxActiveTasks`. Owner tính 100% `estDays`, Support tính 50% `estDays`.
+- **Quản lý phòng ban (Department)**: Một Leader có thể quản lý tối đa 3 Department qua quan hệ nhiều-nhiều.
+- **Đánh giá tuần**: Tuân thủ 12 tiêu chí chuẩn qua 3 nhóm (Kỷ luật & tư chất, Chuyên môn, Kết quả đề tài) với 5 mức điểm (`TOT`, `KHA`, `TB`, `TBY`, `YEU`).
+- **Lưu trữ tệp tin**: Dùng Cloudflare R2 / S3-compatible storage với presigned URL; tách prefix logic (`tasks`, `submissions`, `reports`, `avatars`, `applications`). Cleanup tệp mồ côi khi transaction thất bại hoặc hết hạn.

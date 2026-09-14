@@ -74,7 +74,7 @@ app.use(
   swaggerUi.setup(swaggerSpec, swaggerOptions),
 );
 
-app.use("/api/v1", rateLimitMiddleware, routes);
+app.use("/api/v2", rateLimitMiddleware, routes);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
