@@ -11,6 +11,9 @@ import departmentRoute from "../modules/departments/department.route";
 import leaderRoute from "../modules/leaders/leader.route";
 import internRoute from "../modules/interns/intern.route";
 import applicationRoute from "../modules/applications/application.route";
+import taskGroupRoute from "../modules/task-groups/task-group.route";
+import taskRoute from "../modules/tasks/task.route";
+import taskAssignmentRoute from "../modules/task-assignments/task-assignment.route";
 import healthRoute from "./health.route";
 import { maintenanceGuard } from "../middlewares/maintenance.middleware";
 
@@ -38,5 +41,8 @@ router.use("/departments", departmentRoute);
 router.use("/leaders", leaderRoute);
 router.use("/interns", internRoute);
 router.use("/applications", applicationRoute);
+router.use("/task-groups", taskGroupRoute);
+router.use("/tasks", taskRoute);
+router.use("/task-assignments", taskAssignmentRoute);
 
 export default router;

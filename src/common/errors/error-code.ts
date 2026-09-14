@@ -24,6 +24,7 @@ export const ERROR_CODE = {
   TOKEN_REVOKED: "TOKEN_REVOKED",
   TOKEN_USED: "TOKEN_USED",
   CONFLICT: "CONFLICT",
+  TASK_ALREADY_COMPLETED: "TASK_ALREADY_COMPLETED",
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_CODE;

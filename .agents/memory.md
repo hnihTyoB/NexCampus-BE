@@ -239,6 +239,27 @@
        - Endpoint `GET /applications/attachments/upload-url` sinh presigned PUT URL với prefix `applications/` phục vụ upload CV/minh chứng trực tiếp từ client.
   - **Dynamic RBAC & Verification**:
     - Phân quyền qua `PERMISSIONS.APPLICATION_*`.
-    - Toàn bộ 315 tests pass 100%, TypeScript build và ESLint sạch 0 errors / 0 warnings.
-
-
+- **Task Management & Assignment Modules (task-groups, tasks, task-assignments) (2026-09-14)**:
+  - Hoàn thiện trọn bộ 3 module Quản lý Công việc & Phân công (`task-groups`, `tasks`, `task-assignments`) theo kiến trúc phân tầng chuẩn 6 file (`route`, `validation`, `controller`, `service`, `repository`, `dto`) và OpenAPI 3.0:
+    1. **Task Groups (`src/modules/task-groups/`)**:
+       - CRUD TaskGroup: `name`, `description`, `departmentId`, `status` (`ACTIVE`, `COMPLETED`, `ARCHIVED`), `maxWorkloadDays`, `maxActiveTasks`, `requireAllMembers`.
+       - Quản lý Membership (`TaskGroupMember`): Khai báo rõ ràng danh sách TTS (`memberIds`). Validation kiểm tra TTS active và thuộc phòng ban/leader phụ trách.
+       - Thống kê tiến độ nhóm (`GET /task-groups/:id/progress`): Tổng số task, đếm theo trạng thái (`DONE`, `IN_PROGRESS`, `REVIEW`, `TODO`, `BLOCKED`, `unassigned`), tính tỷ lệ hoàn thành (`completionRate`).
+       - Danh sách công việc thuộc nhóm (`GET /task-groups/:id/tasks`).
+    2. **Tasks & Attachments (`src/modules/tasks/`)**:
+       - CRUD Task: `code` (VD `BE1-01`), `title`, `description`, `module`, `phase`, `priority` (hỗ trợ cả `P0`/`P1`/`P2` và `LOW`/`MEDIUM`/`HIGH`), `estDays`, `startDate`, `deadline`, `taskNotes`, `acceptanceCriteria`, `taskGroupId`.
+       - Ràng buộc lịch: `startDate <= deadline`.
+       - Tệp đính kèm (`/tasks/:taskId/attachments`): Presigned PUT URL lên Cloudflare R2 bucket với prefix `tasks/` (`tasks/:taskId/:uuid_filename`), xác nhận metadata sau upload, thêm link ngoài, xóa tệp khỏi R2 & DB.
+       - **RÀNG BUỘC KHÓA CÔNG VIỆC HOÀN THÀNH (`TASK_ALREADY_COMPLETED`)**: Khi assignment của task ở trạng thái `DONE`, khóa toàn bộ thao tác (sửa task, xóa task, đổi deadline, thêm/xóa attachment), trả về HTTP `409 Conflict` kèm mã lỗi `TASK_ALREADY_COMPLETED`.
+    3. **Task Assignments (`src/modules/task-assignments/`)**:
+       - Vai trò mỗi task: Tối đa 1 `OWNER` và 1 `SUPPORT` (`internId !== supportId`).
+       - Ràng buộc Task Group Membership: Nếu task thuộc Task Group, TTS nhận việc (Owner hoặc Support) bắt buộc phải thuộc danh sách thành viên của Task Group đó.
+       - Tính toán Capacity & Workload: `Owner` tính 100% `estDays`, `Support` tính 50% `estDays` (`SUPPORT_WORKLOAD_FACTOR = 0.5`). Kiểm tra không vượt `maxWorkloadDays` và `maxActiveTasks`.
+       - Phân công nội bộ: Giao trực tiếp cho TTS active thuộc quyền quản lý, chuyển thẳng sang trạng thái `TODO`.
+       - Phân công xuyên team (Cross-team Assignment Workflow): Leader bắt buộc nhập chính xác email của TTS team khác. Phân công khởi tạo ở `PENDING_APPROVAL` (tạm giữ capacity). Leader trực tiếp của TTS nhận việc có quyền duyệt (`APPROVE` -> chuyển `TODO`, kích hoạt assignment) hoặc từ chối (`REJECT` -> chuyển `BLOCKED` với lý do, giải phóng capacity).
+       - Quyền hủy/xóa phân công: Admin, Leader trực tiếp của TTS hoặc người đã giao việc (`assignedBy`). Chặn hủy nếu task đã `DONE` (HTTP 409 `TASK_ALREADY_COMPLETED`).
+       - Intern self-service: Cho phép TTS bắt đầu làm việc (`TODO` -> `IN_PROGRESS`) hoặc báo bị chặn (`IN_PROGRESS` -> `BLOCKED` kèm lý do).
+    4. **Dynamic RBAC, Routing & Documentation**:
+       - Phân quyền qua `PERMISSIONS.TASK_GROUP_*`, `TASK_*`, `TASK_ASSIGNMENT_*`.
+       - Gắn routes tại `src/routes/index.ts` dưới prefix `/api/v2/task-groups`, `/api/v2/tasks`, `/api/v2/task-assignments`.
+       - Đăng ký Swagger OpenAPI UI tại `/api/docs`. Toàn bộ 345 tests pass 100%, TypeScript build và ESLint sạch 0 errors / 0 warnings.
