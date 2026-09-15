@@ -124,3 +124,30 @@ export function parseDurationToMs(
       return fallbackMs;
   }
 }
+
+/**
+ * Returns today's calendar date at 00:00:00 UTC representing Vietnam calendar day.
+ */
+export function getVietnamToday(): Date {
+  const now = new Date();
+  const local = new Date(now.getTime() + VIETNAM_OFFSET_MS);
+  return new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), 0, 0, 0, 0));
+}
+
+/**
+ * Returns date at midnight UTC for a given calendar date string or Date in Vietnam timezone.
+ */
+export function toCalendarDate(dateInput: string | Date): Date {
+  if (typeof dateInput === "string") {
+    if (/^\d{4}-\d{2}-\d{2}/.test(dateInput)) {
+      const [y, m, d] = dateInput.slice(0, 10).split("-").map(Number);
+      return new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
+    }
+    const d = new Date(dateInput);
+    const local = new Date(d.getTime() + VIETNAM_OFFSET_MS);
+    return new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), 0, 0, 0, 0));
+  }
+  const local = new Date(dateInput.getTime() + VIETNAM_OFFSET_MS);
+  return new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), 0, 0, 0, 0));
+}
+

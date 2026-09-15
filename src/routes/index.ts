@@ -17,6 +17,8 @@ import taskAssignmentRoute from "../modules/task-assignments/task-assignment.rou
 import taskSubmissionRoute from "../modules/task-submissions/task-submission.route";
 import meetingRoute from "../modules/meetings/meeting.route";
 import absenceRoute from "../modules/absences/absence.route";
+import dailyReportRoute from "../modules/daily-reports/daily-report.route";
+import weeklyEvaluationRoute from "../modules/weekly-evaluations/weekly-evaluation.route";
 import healthRoute from "./health.route";
 import { maintenanceGuard } from "../middlewares/maintenance.middleware";
 
@@ -50,5 +52,8 @@ router.use("/task-assignments", taskAssignmentRoute);
 router.use("/task-submissions", taskSubmissionRoute);
 router.use("/meetings", meetingRoute);
 router.use("/absences", absenceRoute);
+router.use("/daily-reports", dailyReportRoute);
+router.use("/weekly-evaluations", weeklyEvaluationRoute);
+
 
 export default router;

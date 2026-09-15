@@ -18,6 +18,8 @@ import { registerTaskAssignmentOpenApi } from "../modules/task-assignments/task-
 import { registerTaskSubmissionOpenApi } from "../modules/task-submissions/task-submission.openapi";
 import { registerMeetingOpenApi } from "../modules/meetings/meeting.openapi";
 import { registerAbsenceOpenApi } from "../modules/absences/absence.openapi";
+import { registerDailyReportOpenApi } from "../modules/daily-reports/daily-report.openapi";
+import { registerWeeklyEvaluationOpenApi } from "../modules/weekly-evaluations/weekly-evaluation.openapi";
 import { registerHealthOpenApi } from "../routes/health.openapi";
 
 // Tự động khởi tạo và đăng ký 100% routes & schemas từ Zod validation schemas
@@ -39,7 +41,10 @@ registerTaskAssignmentOpenApi();
 registerTaskSubmissionOpenApi();
 registerMeetingOpenApi();
 registerAbsenceOpenApi();
+registerDailyReportOpenApi();
+registerWeeklyEvaluationOpenApi();
 registerHealthOpenApi();
+
 
 export const swaggerOptions: SwaggerUiOptions = {
   customCss: `

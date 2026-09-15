@@ -53,6 +53,9 @@ model User {
   reviewedMeetingAbsences       AbsenceRequest[]       @relation("ReviewedAbsences")
   absences                      Absence[]              @relation("InternAbsences")
   reviewedAbsences              Absence[]              @relation("ReviewedGeneralAbsences")
+  feedbackDailyReports          DailyReport[]          @relation("FeedbackDailyReports")
+  uploadedReportAttachments     ReportAttachment[]     @relation("ReportAttachmentUploader")
+  leaderEvaluations             WeeklyEvaluation[]     @relation("LeaderEvaluations")
 
   @@index([deletedAt])
   @@index([roleId, isActive, deletedAt])
@@ -449,6 +452,8 @@ model Intern {
   taskGroupMembers TaskGroupMember[]
   assignedTasks    TaskAssignment[]   @relation("TaskAssignmentOwner")
   supportTasks     TaskAssignment[]   @relation("TaskAssignmentSupport")
+  dailyReports     DailyReport[]
+  weeklyEvaluations WeeklyEvaluation[]
 
   @@index([leaderId])
   @@index([departmentId])
@@ -918,6 +923,112 @@ model Absence {
   @@index([startDate, endDate])
   @@map("absences")
 }
+
+// ─── Daily Reports & Weekly Evaluations ────────────────────────────────────
+
+enum EvaluationGrade {
+  TOT
+  KHA
+  TB
+  TBY
+  YEU
+}
+
+model DailyReport {
+  id          String   @id @default(uuid()) @db.Uuid
+  internId    String   @map("intern_id") @db.Uuid
+  date        DateTime @map("date") @db.Date
+  content     String   @db.Text
+  blockers    String?  @db.Text
+  nextPlan    String?  @map("next_plan") @db.Text
+  hoursWorked Float?   @default(8) @map("hours_worked")
+  prLink      String?  @map("pr_link")
+  videoDemo   String?  @map("video_demo")
+
+  feedback    String?   @db.Text
+  feedbackBy  String?   @map("feedback_by") @db.Uuid
+  feedbackAt  DateTime? @map("feedback_at")
+
+  deletedAt   DateTime? @map("deleted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  intern       Intern             @relation(fields: [internId], references: [id], onDelete: Cascade)
+  feedbackUser User?              @relation("FeedbackDailyReports", fields: [feedbackBy], references: [id], onDelete: SetNull)
+  attachments  ReportAttachment[]
+
+  @@unique([internId, date])
+  @@index([internId])
+  @@index([date])
+  @@index([feedbackBy])
+  @@index([deletedAt])
+  @@map("daily_reports")
+}
+
+model ReportAttachment {
+  id         String   @id @default(uuid()) @db.Uuid
+  reportId   String   @map("report_id") @db.Uuid
+  fileName   String   @map("file_name")
+  fileUrl    String   @map("file_url")
+  filePath   String   @map("file_path")
+  mimeType   String   @map("mime_type")
+  fileSize   Int      @map("file_size")
+  uploadedBy String   @map("uploaded_by") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  report   DailyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  uploader User        @relation("ReportAttachmentUploader", fields: [uploadedBy], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@index([uploadedBy])
+  @@map("report_attachments")
+}
+
+model WeeklyEvaluation {
+  id              String           @id @default(uuid()) @db.Uuid
+  internId        String           @map("intern_id") @db.Uuid
+  leaderId        String           @map("leader_id") @db.Uuid
+  week            Int
+  year            Int              @default(2026)
+  startDate       DateTime?        @map("start_date")
+  endDate         DateTime?        @map("end_date")
+
+  ratings         Json             @map("ratings")
+  aiRatings       Json?            @map("ai_ratings")
+
+  score           Float            @map("score")
+  grade           EvaluationGrade? @map("grade")
+
+  comment         String?          @map("comment") @db.Text
+  strengths       String[]         @default([])
+  weaknesses      String[]         @default([])
+  recommendations String[]         @default([])
+
+  aiScore         Float?           @map("ai_score")
+  aiComment       String?          @map("ai_comment") @db.Text
+  aiStrengths     String[]         @default([]) @map("ai_strengths")
+  aiWeaknesses    String[]         @default([]) @map("ai_weaknesses")
+  aiRecommendations String[]       @default([]) @map("ai_recommendations")
+  isAiAdjusted    Boolean          @default(false) @map("is_ai_adjusted")
+
+  viewedAt        DateTime?        @map("viewed_at")
+
+  deletedAt       DateTime?        @map("deleted_at")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  intern Intern @relation(fields: [internId], references: [id], onDelete: Cascade)
+  leader User   @relation("LeaderEvaluations", fields: [leaderId], references: [id], onDelete: Cascade)
+
+  @@unique([internId, week])
+  @@index([internId])
+  @@index([leaderId])
+  @@index([week])
+  @@index([year])
+  @@index([deletedAt])
+  @@map("weekly_evaluations")
+}
+
 
 
 
