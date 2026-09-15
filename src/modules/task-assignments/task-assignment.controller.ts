@@ -133,4 +133,45 @@ export class TaskAssignmentController {
       next(error);
     }
   };
+
+  start = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await this.service.startTask(
+        req.params.id,
+        req.user!,
+        { ipAddress: req.ip },
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  block = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { blockedReason } = req.body as { blockedReason: string };
+      const data = await this.service.blockTask(
+        req.params.id,
+        req.user!,
+        blockedReason,
+        { ipAddress: req.ip },
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  unblock = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await this.service.unblockTask(
+        req.params.id,
+        req.user!,
+        { ipAddress: req.ip },
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

@@ -14,6 +14,8 @@ const defaultSelect = {
   supportId: true,
   status: true,
   blockedReason: true,
+  startedAt: true,
+  completedAt: true,
   assignedAt: true,
   updatedAt: true,
   task: {

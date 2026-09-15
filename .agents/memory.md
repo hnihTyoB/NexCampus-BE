@@ -263,3 +263,34 @@
        - Phân quyền qua `PERMISSIONS.TASK_GROUP_*`, `TASK_*`, `TASK_ASSIGNMENT_*`.
        - Gắn routes tại `src/routes/index.ts` dưới prefix `/api/v2/task-groups`, `/api/v2/tasks`, `/api/v2/task-assignments`.
        - Đăng ký Swagger OpenAPI UI tại `/api/docs`. Toàn bộ 345 tests pass 100%, TypeScript build và ESLint sạch 0 errors / 0 warnings.
+- **Task Submissions, Lifecycle Actions & Meetings/Absence Management (2026-09-15)**:
+  - Hoàn thiện trọn bộ các module Quản lý Nộp bài (`task-submissions`), Vòng đời trạng thái công việc (`task-assignments` lifecycle actions), Đánh giá bài nộp (`review`) và Quản lý Cuộc họp / Đơn xin vắng mặt (`meetings`, `absences`) theo kiến trúc phân tầng chuẩn 6 file (`route`, `validation`, `controller`, `service`, `repository`, `dto`) và OpenAPI 3.0:
+    1. **Task Assignment Lifecycle Actions (`src/modules/task-assignments/`)**:
+       - `POST /api/v2/task-assignments/:id/start`: Chuyển từ `TODO` sang `IN_PROGRESS` (ghi nhận `startedAt: new Date()`). Chặn thao tác nếu task không ở trạng thái `TODO` hoặc đã `DONE` (`TASK_ALREADY_COMPLETED`).
+       - `POST /api/v2/task-assignments/:id/block`: Báo task bị kẹt/chặn. Bắt buộc task đang ở `IN_PROGRESS` (chặn khi `TODO` theo `INVALID_STATUS_TRANSITION`) và bắt buộc có `blockedReason`. Chuyển trạng thái sang `BLOCKED`.
+       - `POST /api/v2/task-assignments/:id/unblock`: Mở lại task bị chặn. Ràng buộc bảo mật: Chỉ Leader trực tiếp phụ trách TTS hoặc Admin mới có quyền mở lại (Intern bị cấm với mã lỗi `403 FORBIDDEN`). Tự động chuyển về `IN_PROGRESS` và xóa `blockedReason`.
+    2. **Task Submissions & Attachments (`src/modules/task-submissions/`)**:
+       - Nộp bài (`POST /api/v2/task-submissions`):
+         - **Điều kiện tiên quyết**: Assignment BẮT BUỘC đang ở trạng thái `IN_PROGRESS`. Nếu đang `TODO` (kể cả task vừa bị Leader từ chối trả về `TODO`), hệ thống từ chối request với mã lỗi HTTP 400 `TASK_NOT_IN_PROGRESS` và thông điệp hướng dẫn TTS bấm bắt đầu làm việc.
+         - Thông tin nộp: `prLink`, `videoDemo`, `note`, danh sách tệp đính kèm.
+         - Tự động tính số lần nộp (`attempt`: lần 1, lần 2,...) và chuyển trạng thái assignment sang `REVIEW` trong Prisma `$transaction`.
+         - Upload file: Lưu trữ đám mây Cloudflare R2 qua presigned PUT URL với prefix bắt buộc `submissions/` (`GET /api/v2/task-submissions/upload-url`).
+       - Đánh giá bài nộp (`POST /api/v2/task-submissions/:id/review`):
+         - Quyền đánh giá: Chỉ Leader trực tiếp hoặc Admin.
+         - Chấp thuận (`APPROVED`): Chuyển assignment sang `DONE`, ghi nhận `completedAt`. Tự động kích hoạt cơ chế khóa toàn bộ thao tác sửa đổi công việc theo mã lỗi HTTP 409 `TASK_ALREADY_COMPLETED`.
+         - Yêu cầu làm lại (`REJECTED`): Bắt buộc có nhận xét lý do cần sửa (`reviewComment`), chuyển trạng thái assignment quay lại `TODO` để TTS bấm bắt đầu và làm lại từ đầu.
+    3. **Meetings Management (`src/modules/meetings/`)**:
+       - CRUD Meeting: `title`, `description`, `minutes` (biên bản cuộc họp), `meetingType` (`ONLINE`, `OFFLINE`, `HYBRID`), `location`, `meetingLink`, `startTime`, `endTime`, `status` (`DRAFT`, `SCHEDULED`, `ONGOING`, `COMPLETED`, `CANCELLED`), `visibility` (`PRIVATE`, `TEAM`).
+       - Phân quyền tổ chức: Chỉ Admin và Leader được quyền lên lịch họp. Intern không có quyền lên lịch họp (`403 FORBIDDEN`).
+       - Kiểm tra trùng lịch (`GET /api/v2/meetings/busy-users`): Phát hiện người tham gia đang có lịch họp trùng khung giờ (`startTime < other.endTime AND endTime > other.startTime`).
+       - Quản lý người tham gia: Mời người tham gia (`MeetingParticipant`), phản hồi tham dự RSVP (`ACCEPTED`, `DECLINED`), điểm danh tham gia (`ATTENDED`).
+       - Đơn xin vắng mặt cuộc họp (`AbsenceRequest`): TTS gửi lý do xin vắng mặt; Leader/Admin phê duyệt (`APPROVED` -> tự động cập nhật RSVP sang `DECLINED` và trạng thái điểm danh sang `ABSENT`) hoặc từ chối (`REJECTED`).
+    4. **General Intern Absence Requests (`src/modules/absences/`)**:
+       - Đơn xin nghỉ phép/vắng mặt: TTS tạo đơn xin nghỉ (`startDate`, `endDate`, `reason`, `evidenceUrl`). Ràng buộc logic `startDate <= endDate`.
+       - Phê duyệt: Leader trực tiếp hoặc Admin duyệt (`APPROVED`) hoặc từ chối (`REJECTED`) kèm ghi chú `reviewNote`.
+    5. **Dynamic RBAC, Routing & Documentation**:
+       - Bổ sung permissions: `TASK_SUBMISSION_*`, `MEETING_*`, `ABSENCE_*`.
+       - Gắn routes tại `src/routes/index.ts` dưới prefix `/api/v2/task-submissions`, `/api/v2/meetings`, `/api/v2/absences`.
+       - Đăng ký Swagger OpenAPI 3.0 tại `/api/docs`.
+       - Bộ test tự động toàn dự án đạt 370 tests pass 100%, build `tsc` và `eslint` sạch 0 errors / 0 warnings.
+

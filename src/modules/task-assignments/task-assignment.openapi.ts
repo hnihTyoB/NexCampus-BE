@@ -266,4 +266,89 @@ export function registerTaskAssignmentOpenApi(): void {
       409: { description: "Công việc đã hoàn thành (TASK_ALREADY_COMPLETED)" },
     },
   });
+
+  // POST /task-assignments/:id/start
+  openapiRegistry.registerPath({
+    method: "post",
+    path: "/task-assignments/{id}/start",
+    tags: ["Task Assignments"],
+    summary: "Bắt đầu làm công việc (chuyển TODO sang IN_PROGRESS)",
+    security: [{ BearerAuth: [] }],
+    request: { params: assignmentIdParamSchema },
+    responses: {
+      200: {
+        description: "Bắt đầu làm việc thành công",
+        content: {
+          "application/json": {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              data: z.record(z.unknown()),
+            }),
+          },
+        },
+      },
+      400: { description: "Trạng thái không hợp lệ (chỉ TODO mới được bắt đầu)" },
+      403: { description: "Không có quyền thao tác" },
+    },
+  });
+
+  // POST /task-assignments/:id/block
+  openapiRegistry.registerPath({
+    method: "post",
+    path: "/task-assignments/{id}/block",
+    tags: ["Task Assignments"],
+    summary: "Báo công việc bị chặn/kẹt (IN_PROGRESS sang BLOCKED)",
+    security: [{ BearerAuth: [] }],
+    request: {
+      params: assignmentIdParamSchema,
+      body: {
+        content: {
+          "application/json": {
+            schema: z.object({
+              blockedReason: z.string().openapi({ example: "Chưa được cấp quyền API database" }),
+            }),
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: "Báo bị chặn thành công",
+        content: {
+          "application/json": {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              data: z.record(z.unknown()),
+            }),
+          },
+        },
+      },
+      400: { description: "Thiếu lý do hoặc trạng thái không phải IN_PROGRESS" },
+    },
+  });
+
+  // POST /task-assignments/:id/unblock
+  openapiRegistry.registerPath({
+    method: "post",
+    path: "/task-assignments/{id}/unblock",
+    tags: ["Task Assignments"],
+    summary: "Mở lại công việc bị chặn (Leader/Admin: BLOCKED sang IN_PROGRESS)",
+    security: [{ BearerAuth: [] }],
+    request: { params: assignmentIdParamSchema },
+    responses: {
+      200: {
+        description: "Mở lại công việc thành công",
+        content: {
+          "application/json": {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              data: z.record(z.unknown()),
+            }),
+          },
+        },
+      },
+      400: { description: "Task không ở trạng thái BLOCKED" },
+      403: { description: "Chỉ Leader trực tiếp hoặc Admin mới có quyền mở lại" },
+    },
+  });
 }

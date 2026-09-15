@@ -14,6 +14,9 @@ import applicationRoute from "../modules/applications/application.route";
 import taskGroupRoute from "../modules/task-groups/task-group.route";
 import taskRoute from "../modules/tasks/task.route";
 import taskAssignmentRoute from "../modules/task-assignments/task-assignment.route";
+import taskSubmissionRoute from "../modules/task-submissions/task-submission.route";
+import meetingRoute from "../modules/meetings/meeting.route";
+import absenceRoute from "../modules/absences/absence.route";
 import healthRoute from "./health.route";
 import { maintenanceGuard } from "../middlewares/maintenance.middleware";
 
@@ -44,5 +47,8 @@ router.use("/applications", applicationRoute);
 router.use("/task-groups", taskGroupRoute);
 router.use("/tasks", taskRoute);
 router.use("/task-assignments", taskAssignmentRoute);
+router.use("/task-submissions", taskSubmissionRoute);
+router.use("/meetings", meetingRoute);
+router.use("/absences", absenceRoute);
 
 export default router;

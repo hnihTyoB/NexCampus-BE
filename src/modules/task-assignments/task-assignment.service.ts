@@ -662,4 +662,157 @@ export class TaskAssignmentService {
 
     return result;
   }
+
+  async startTask(
+    id: string,
+    actor: UserPayload,
+    context?: { ipAddress?: string },
+  ) {
+    const assignment = await this.findById(id);
+
+    this.ensureAssignmentEditable(assignment.status);
+
+    if (assignment.status !== ASSIGNMENT_STATUS.TODO) {
+      throw new AppError(
+        "Chỉ công việc ở trạng thái Cần làm (TODO) mới có thể bắt đầu làm",
+        400,
+        ERROR_CODE.INVALID_STATUS_TRANSITION,
+      );
+    }
+
+    if (actor.role === ROLES.INTERN) {
+      const intern = await prisma.intern.findUnique({
+        where: { userId: actor.id },
+      });
+      const isOwner = intern && assignment.internId === intern.id;
+      const isSupport = intern && assignment.supportId === intern.id;
+      if (!isOwner && !isSupport) {
+        throw new AppError(
+          "Bạn chỉ có thể bắt đầu công việc được phân công cho mình",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
+      }
+    }
+
+    const now = new Date();
+    const result = await this.repository.update(id, {
+      status: ASSIGNMENT_STATUS.IN_PROGRESS,
+      startedAt: now,
+    });
+
+    await this.repository.createAuditLog({
+      actorId: actor.id,
+      action: AUDIT_ACTION.START_TASK,
+      targetType: AUDIT_TARGET_TYPE.TASK_ASSIGNMENT,
+      targetId: id,
+      details: { taskId: assignment.taskId, status: ASSIGNMENT_STATUS.IN_PROGRESS },
+      ipAddress: context?.ipAddress,
+    });
+
+    return result;
+  }
+
+  async blockTask(
+    id: string,
+    actor: UserPayload,
+    blockedReason: string,
+    context?: { ipAddress?: string },
+  ) {
+    const assignment = await this.findById(id);
+
+    this.ensureAssignmentEditable(assignment.status);
+
+    // Ràng buộc bền vững: Intern chỉ báo blocked khi IN_PROGRESS
+    if (assignment.status !== ASSIGNMENT_STATUS.IN_PROGRESS) {
+      throw new AppError(
+        "Chỉ công việc đang thực hiện (IN_PROGRESS) mới có thể báo bị chặn",
+        400,
+        ERROR_CODE.INVALID_STATUS_TRANSITION,
+      );
+    }
+
+    if (!blockedReason || !blockedReason.trim()) {
+      throw new AppError(
+        "Lý do bị chặn là bắt buộc",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    if (actor.role === ROLES.INTERN) {
+      const intern = await prisma.intern.findUnique({
+        where: { userId: actor.id },
+      });
+      const isOwner = intern && assignment.internId === intern.id;
+      const isSupport = intern && assignment.supportId === intern.id;
+      if (!isOwner && !isSupport) {
+        throw new AppError(
+          "Bạn chỉ có thể báo bị chặn cho công việc được phân công cho mình",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
+      }
+    }
+
+    const result = await this.repository.update(id, {
+      status: ASSIGNMENT_STATUS.BLOCKED,
+      blockedReason: blockedReason.trim(),
+    });
+
+    await this.repository.createAuditLog({
+      actorId: actor.id,
+      action: AUDIT_ACTION.BLOCK_TASK,
+      targetType: AUDIT_TARGET_TYPE.TASK_ASSIGNMENT,
+      targetId: id,
+      details: { taskId: assignment.taskId, blockedReason: blockedReason.trim() },
+      ipAddress: context?.ipAddress,
+    });
+
+    return result;
+  }
+
+  async unblockTask(
+    id: string,
+    actor: UserPayload,
+    context?: { ipAddress?: string },
+  ) {
+    const assignment = await this.findById(id);
+
+    this.ensureAssignmentEditable(assignment.status);
+
+    if (assignment.status !== ASSIGNMENT_STATUS.BLOCKED) {
+      throw new AppError(
+        "Chỉ công việc đang bị chặn (BLOCKED) mới có thể mở lại",
+        400,
+        ERROR_CODE.INVALID_STATUS_TRANSITION,
+      );
+    }
+
+    // Ràng buộc bền vững: Chỉ Leader trực tiếp hoặc Admin mới có quyền thao tác (Intern không được tự mở)
+    const isDirectLeader = assignment.intern?.leaderId === actor.id;
+    if (actor.role !== ROLES.ADMIN && !isDirectLeader) {
+      throw new AppError(
+        "Chỉ Leader trực tiếp hoặc Admin mới có quyền mở lại task bị chặn",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
+    }
+
+    const result = await this.repository.update(id, {
+      status: ASSIGNMENT_STATUS.IN_PROGRESS,
+      blockedReason: null,
+    });
+
+    await this.repository.createAuditLog({
+      actorId: actor.id,
+      action: AUDIT_ACTION.UNBLOCK_TASK,
+      targetType: AUDIT_TARGET_TYPE.TASK_ASSIGNMENT,
+      targetId: id,
+      details: { taskId: assignment.taskId, status: ASSIGNMENT_STATUS.IN_PROGRESS },
+      ipAddress: context?.ipAddress,
+    });
+
+    return result;
+  }
 }

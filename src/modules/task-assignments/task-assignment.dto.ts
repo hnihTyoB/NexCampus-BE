@@ -8,6 +8,8 @@ export interface TaskAssignmentDto {
   assignedBy: string;
   status: AssignmentStatus;
   blockedReason: string | null;
+  startedAt?: Date | string | null;
+  completedAt?: Date | string | null;
   assignedAt: Date | string;
   updatedAt: Date | string;
   task?: {
@@ -58,10 +60,16 @@ export type AssignTaskDto = Omit<CreateTaskAssignmentDto, "taskId">;
 
 export interface UpdateTaskAssignmentDto {
   status?: AssignmentStatus;
-  blockedReason?: string;
+  blockedReason?: string | null;
+  startedAt?: Date | null;
+  completedAt?: Date | null;
   internId?: string;
   internEmail?: string;
   supportId?: string | null;
+}
+
+export interface BlockTaskDto {
+  blockedReason: string;
 }
 
 export interface TaskAssignmentQueryDto {
@@ -79,3 +87,4 @@ export interface TaskAssignmentQueryDto {
 export interface RejectAssignmentDto {
   reason?: string;
 }
+

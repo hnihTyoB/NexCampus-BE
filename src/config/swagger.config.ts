@@ -15,6 +15,9 @@ import { registerApplicationOpenApi } from "../modules/applications/application.
 import { registerTaskGroupOpenApi } from "../modules/task-groups/task-group.openapi";
 import { registerTaskOpenApi } from "../modules/tasks/task.openapi";
 import { registerTaskAssignmentOpenApi } from "../modules/task-assignments/task-assignment.openapi";
+import { registerTaskSubmissionOpenApi } from "../modules/task-submissions/task-submission.openapi";
+import { registerMeetingOpenApi } from "../modules/meetings/meeting.openapi";
+import { registerAbsenceOpenApi } from "../modules/absences/absence.openapi";
 import { registerHealthOpenApi } from "../routes/health.openapi";
 
 // Tự động khởi tạo và đăng ký 100% routes & schemas từ Zod validation schemas
@@ -33,6 +36,9 @@ registerApplicationOpenApi();
 registerTaskGroupOpenApi();
 registerTaskOpenApi();
 registerTaskAssignmentOpenApi();
+registerTaskSubmissionOpenApi();
+registerMeetingOpenApi();
+registerAbsenceOpenApi();
 registerHealthOpenApi();
 
 export const swaggerOptions: SwaggerUiOptions = {

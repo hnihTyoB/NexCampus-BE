@@ -10,6 +10,7 @@ import {
   assignTaskSchema,
   updateAssignmentSchema,
   rejectAssignmentSchema,
+  blockTaskSchema,
   assignmentIdParamSchema,
   assignTaskIdParamSchema,
 } from "./task-assignment.validation";
@@ -90,6 +91,31 @@ router.delete(
   requirePermission(PERMISSIONS.TASK_ASSIGNMENT_DELETE),
   validate(assignmentIdParamSchema, "params"),
   controller.delete,
+);
+
+router.post(
+  "/:id/start",
+  authMiddleware,
+  requirePermission(PERMISSIONS.TASK_ASSIGNMENT_UPDATE),
+  validate(assignmentIdParamSchema, "params"),
+  controller.start,
+);
+
+router.post(
+  "/:id/block",
+  authMiddleware,
+  requirePermission(PERMISSIONS.TASK_ASSIGNMENT_UPDATE),
+  validate(assignmentIdParamSchema, "params"),
+  validate(blockTaskSchema),
+  controller.block,
+);
+
+router.post(
+  "/:id/unblock",
+  authMiddleware,
+  requirePermission(PERMISSIONS.TASK_ASSIGNMENT_UPDATE),
+  validate(assignmentIdParamSchema, "params"),
+  controller.unblock,
 );
 
 export default router;

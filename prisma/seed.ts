@@ -167,6 +167,102 @@ const SYSTEM_PERMISSIONS = [
     action: "MANAGE",
     description: "Đăng ký, cấu hình và kích hoạt retry Webhook deliveries",
   },
+
+  // Task Submissions
+  {
+    name: "TASK_SUBMISSION_READ",
+    resource: "TASK_SUBMISSION",
+    action: "READ",
+    description: "Xem bài nộp công việc",
+  },
+  {
+    name: "TASK_SUBMISSION_CREATE",
+    resource: "TASK_SUBMISSION",
+    action: "CREATE",
+    description: "Nộp bài làm công việc",
+  },
+  {
+    name: "TASK_SUBMISSION_UPDATE",
+    resource: "TASK_SUBMISSION",
+    action: "UPDATE",
+    description: "Cập nhật bài nộp công việc",
+  },
+  {
+    name: "TASK_SUBMISSION_DELETE",
+    resource: "TASK_SUBMISSION",
+    action: "DELETE",
+    description: "Xóa bài nộp công việc",
+  },
+  {
+    name: "TASK_SUBMISSION_REVIEW",
+    resource: "TASK_SUBMISSION",
+    action: "REVIEW",
+    description: "Đánh giá bài nộp công việc",
+  },
+
+  // Meetings
+  {
+    name: "MEETING_READ",
+    resource: "MEETING",
+    action: "READ",
+    description: "Xem danh sách và chi tiết cuộc họp",
+  },
+  {
+    name: "MEETING_CREATE",
+    resource: "MEETING",
+    action: "CREATE",
+    description: "Tạo lịch họp mới",
+  },
+  {
+    name: "MEETING_UPDATE",
+    resource: "MEETING",
+    action: "UPDATE",
+    description: "Cập nhật thông tin cuộc họp",
+  },
+  {
+    name: "MEETING_DELETE",
+    resource: "MEETING",
+    action: "DELETE",
+    description: "Hủy hoặc xóa cuộc họp",
+  },
+  {
+    name: "MEETING_ATTEND",
+    resource: "MEETING",
+    action: "ATTEND",
+    description: "Xác nhận tham gia và điểm danh cuộc họp",
+  },
+  {
+    name: "MEETING_ABSENCE_SUBMIT",
+    resource: "MEETING",
+    action: "ABSENCE_SUBMIT",
+    description: "Gửi yêu cầu xin vắng mặt cuộc họp",
+  },
+  {
+    name: "MEETING_ABSENCE_REVIEW",
+    resource: "MEETING",
+    action: "ABSENCE_REVIEW",
+    description: "Phê duyệt đơn xin vắng mặt cuộc họp",
+  },
+
+  // Absences
+  {
+    name: "ABSENCE_READ",
+    resource: "ABSENCE",
+    action: "READ",
+    description: "Xem đơn xin nghỉ/vắng mặt",
+  },
+  {
+    name: "ABSENCE_CREATE",
+    resource: "ABSENCE",
+    action: "CREATE",
+    description: "Tạo đơn xin nghỉ/vắng mặt",
+  },
+  {
+    name: "ABSENCE_REVIEW",
+    resource: "ABSENCE",
+    action: "REVIEW",
+    description: "Phê duyệt đơn xin nghỉ/vắng mặt",
+  },
 ];
 
 const USER_BASE_PERMISSIONS: string[] = ["NOTIFICATION_READ"];

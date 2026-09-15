@@ -116,3 +116,8 @@ export const updateAssignmentSchema = z
 export const rejectAssignmentSchema = z.object({
   reason: z.string().trim().max(1000).optional(),
 });
+
+export const blockTaskSchema = z.object({
+  blockedReason: z.string().trim().min(1, "blockedReason is required").max(2000),
+});
+

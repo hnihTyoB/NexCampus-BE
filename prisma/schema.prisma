@@ -42,9 +42,17 @@ model User {
   approvedApplications Application[]        @relation("ApprovedApplications")
   rejectedApplications Application[]        @relation("RejectedApplications")
   createdInvites       ApplicationInvite[]
-  createdTasks         Task[]                 @relation("CreatedTasks")
-  uploadedAttachments  TaskAttachment[]       @relation("TaskAttachmentUploader")
-  assignedTasks        TaskAssignment[]       @relation("AssignedTasks")
+  createdTasks                  Task[]                 @relation("CreatedTasks")
+  uploadedAttachments           TaskAttachment[]       @relation("TaskAttachmentUploader")
+  assignedTasks                 TaskAssignment[]       @relation("AssignedTasks")
+  reviewedSubmissions           TaskSubmission[]       @relation("ReviewedSubmissions")
+  uploadedSubmissionAttachments SubmissionAttachment[] @relation("SubmissionAttachmentUploader")
+  createdMeetings               Meeting[]              @relation("CreatedMeetings")
+  hostedMeetings                Meeting[]              @relation("HostedMeetings")
+  meetingParticipants           MeetingParticipant[]
+  reviewedMeetingAbsences       AbsenceRequest[]       @relation("ReviewedAbsences")
+  absences                      Absence[]              @relation("InternAbsences")
+  reviewedAbsences              Absence[]              @relation("ReviewedGeneralAbsences")
 
   @@index([deletedAt])
   @@index([roleId, isActive, deletedAt])
@@ -694,13 +702,16 @@ model TaskAssignment {
   assignedBy    String           @map("assigned_by") @db.Uuid
   status        AssignmentStatus @default(TODO)
   blockedReason String?          @map("blocked_reason") @db.Text
+  startedAt     DateTime?        @map("started_at")
+  completedAt   DateTime?        @map("completed_at")
   assignedAt    DateTime         @default(now()) @map("assigned_at")
   updatedAt     DateTime         @updatedAt @map("updated_at")
 
-  task     Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  intern   Intern? @relation("TaskAssignmentOwner", fields: [internId], references: [id], onDelete: Cascade)
-  support  Intern? @relation("TaskAssignmentSupport", fields: [supportId], references: [id], onDelete: SetNull)
-  assigner User    @relation("AssignedTasks", fields: [assignedBy], references: [id], onDelete: Cascade)
+  task        Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  intern      Intern?          @relation("TaskAssignmentOwner", fields: [internId], references: [id], onDelete: Cascade)
+  support     Intern?          @relation("TaskAssignmentSupport", fields: [supportId], references: [id], onDelete: SetNull)
+  assigner    User             @relation("AssignedTasks", fields: [assignedBy], references: [id], onDelete: Cascade)
+  submissions TaskSubmission[]
 
   @@index([internId])
   @@index([supportId])
@@ -708,6 +719,206 @@ model TaskAssignment {
   @@index([status])
   @@map("task_assignments")
 }
+
+// ─── Task Submissions ────────────────────────────────────────────────────────
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model TaskSubmission {
+  id            String       @id @default(uuid()) @db.Uuid
+  assignmentId  String       @map("assignment_id") @db.Uuid
+  attempt       Int
+  prLink        String?      @map("pr_link")
+  videoDemo     String?      @map("video_demo")
+  note          String?      @db.Text
+  reviewStatus  ReviewStatus @default(PENDING) @map("review_status")
+  reviewComment String?      @map("review_comment") @db.Text
+  reviewedBy    String?      @map("reviewed_by") @db.Uuid
+  reviewedAt    DateTime?    @map("reviewed_at")
+  submittedAt   DateTime     @default(now()) @map("submitted_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  assignment  TaskAssignment         @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  reviewer    User?                  @relation("ReviewedSubmissions", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  attachments SubmissionAttachment[]
+
+  @@index([assignmentId])
+  @@index([reviewedBy])
+  @@index([reviewStatus])
+  @@map("task_submissions")
+}
+
+model SubmissionAttachment {
+  id           String   @id @default(uuid()) @db.Uuid
+  submissionId String   @map("submission_id") @db.Uuid
+  fileName     String   @map("file_name")
+  fileUrl      String   @map("file_url")
+  filePath     String   @map("file_path")
+  mimeType     String   @map("mime_type")
+  fileSize     Int      @map("file_size")
+  uploadedBy   String   @map("uploaded_by") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  submission TaskSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  uploader   User           @relation("SubmissionAttachmentUploader", fields: [uploadedBy], references: [id], onDelete: Cascade)
+
+  @@index([submissionId])
+  @@index([uploadedBy])
+  @@map("submission_attachments")
+}
+
+// ─── Meeting & Absence Enums ────────────────────────────────────────────────
+
+enum MeetingType {
+  ONLINE
+  OFFLINE
+  HYBRID
+}
+
+enum MeetingStatus {
+  DRAFT
+  SCHEDULED
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum MeetingVisibility {
+  PRIVATE
+  TEAM
+}
+
+enum ParticipantRole {
+  HOST
+  ORGANIZER
+  PARTICIPANT
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+enum AttendanceStatus {
+  UNKNOWN
+  ATTENDED
+  ABSENT
+}
+
+enum AbsenceStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ─── Meetings & Absences Models ─────────────────────────────────────────────
+
+model Meeting {
+  id          String            @id @default(uuid()) @db.Uuid
+  title       String
+  description String?           @db.Text
+  minutes     String?           @db.Text
+  createdBy   String            @map("created_by") @db.Uuid
+  hostId      String            @map("host_id") @db.Uuid
+  location    String?
+  meetingType MeetingType       @default(ONLINE) @map("meeting_type")
+  meetingLink String?           @map("meeting_link")
+  startTime   DateTime          @map("start_time")
+  endTime     DateTime          @map("end_time")
+  status      MeetingStatus     @default(DRAFT)
+  visibility  MeetingVisibility @default(TEAM)
+  deletedAt   DateTime?         @map("deleted_at")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  creator      User                 @relation("CreatedMeetings", fields: [createdBy], references: [id], onDelete: Restrict)
+  host         User                 @relation("HostedMeetings", fields: [hostId], references: [id], onDelete: Restrict)
+  participants MeetingParticipant[]
+  absences     AbsenceRequest[]
+
+  @@index([createdBy])
+  @@index([hostId])
+  @@index([status])
+  @@index([startTime])
+  @@index([startTime, endTime])
+  @@index([deletedAt])
+  @@map("meetings")
+}
+
+model MeetingParticipant {
+  id               String           @id @default(uuid()) @db.Uuid
+  meetingId        String           @map("meeting_id") @db.Uuid
+  userId           String           @map("user_id") @db.Uuid
+  participantRole  ParticipantRole  @default(PARTICIPANT) @map("participant_role")
+  invitationStatus InvitationStatus @default(PENDING) @map("invitation_status")
+  attendanceStatus AttendanceStatus @default(UNKNOWN) @map("attendance_status")
+  responseAt       DateTime?        @map("response_at")
+  joinedAt         DateTime?        @map("joined_at")
+  leftAt           DateTime?        @map("left_at")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  meeting  Meeting          @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  absences AbsenceRequest[]
+
+  @@unique([meetingId, userId])
+  @@index([userId])
+  @@index([meetingId])
+  @@map("meeting_participants")
+}
+
+model AbsenceRequest {
+  id            String        @id @default(uuid()) @db.Uuid
+  meetingId     String        @map("meeting_id") @db.Uuid
+  participantId String        @map("participant_id") @db.Uuid
+  reason        String        @db.Text
+  attachmentUrl String?       @map("attachment_url")
+  status        AbsenceStatus @default(PENDING)
+  reviewedBy    String?       @map("reviewed_by") @db.Uuid
+  reviewedAt    DateTime?     @map("reviewed_at")
+  reviewNote    String?       @map("review_note") @db.Text
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  meeting     Meeting            @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  participant MeetingParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  reviewer    User?              @relation("ReviewedAbsences", fields: [reviewedBy], references: [id], onDelete: SetNull)
+
+  @@unique([meetingId, participantId])
+  @@index([participantId])
+  @@index([status])
+  @@map("absence_requests")
+}
+
+model Absence {
+  id          String        @id @default(uuid()) @db.Uuid
+  userId      String        @map("user_id") @db.Uuid
+  startDate   DateTime      @map("start_date")
+  endDate     DateTime      @map("end_date")
+  reason      String        @db.Text
+  evidenceUrl String?       @map("evidence_url")
+  status      AbsenceStatus @default(PENDING)
+  reviewedBy  String?       @map("reviewed_by") @db.Uuid
+  reviewedAt  DateTime?     @map("reviewed_at")
+  reviewNote  String?       @map("review_note") @db.Text
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  user     User  @relation("InternAbsences", fields: [userId], references: [id], onDelete: Cascade)
+  reviewer User? @relation("ReviewedGeneralAbsences", fields: [reviewedBy], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([status])
+  @@index([startDate, endDate])
+  @@map("absences")
+}
+
 
 
 
