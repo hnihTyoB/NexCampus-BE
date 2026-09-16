@@ -62,6 +62,8 @@ import {
 } from "../../common/helpers/google-auth.helper";
 
 import { Auth2FAService } from "./services/auth-2fa.service";
+import { dispatchEmailJob } from "../../queues";
+import { mailConfig } from "../../config/mail.config";
 
 export class AuthService {
   private repository = new AuthRepository();
@@ -919,11 +921,21 @@ export class AuthService {
 
     await this.repository.createPasswordResetToken(user.id, token, expiresAt);
 
-    await this.mailService.sendPasswordResetEmail(
-      user.email,
-      token,
-      user.fullName || undefined,
-    );
+    const resetUrl = `${mailConfig.resetPasswordUrl}?token=${token}`;
+    await dispatchEmailJob({
+      type: "RESET_PASSWORD",
+      to: user.email,
+      data: {
+        fullName: user.fullName || "bạn",
+        resetUrl,
+        expiresIn: "1 giờ",
+      },
+    }).catch((err) => {
+      console.warn(
+        `[AuthService] Failed to dispatch password reset email to ${user.email}:`,
+        err.message,
+      );
+    });
   }
 
   async resetPassword(data: ResetPasswordDto): Promise<void> {

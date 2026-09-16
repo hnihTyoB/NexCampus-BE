@@ -12,6 +12,11 @@ import { sseManagerService } from "./common/services/sse-manager.service";
 import { permissionCacheService } from "./common/services/permission-cache.service";
 import { prisma } from "./database/prisma.client";
 
+import { startEmailWorker, stopEmailWorker } from "./queues/workers/email.worker";
+import { startCleanupWorker, stopCleanupWorker } from "./queues/workers/cleanup.worker";
+import { startNotificationWorker, stopNotificationWorker } from "./queues/workers/notification.worker";
+import { scheduleCleanupRepeatableJob, closeAllQueues } from "./queues";
+
 const PORT = envConfig.port;
 
 const server = app.listen(PORT, async () => {
@@ -29,6 +34,14 @@ const server = app.listen(PORT, async () => {
   webhookWorker.start();
   cronWorker.start();
   await cronQueue.registerSchedules();
+
+  // Start BullMQ workers & schedules
+  startEmailWorker();
+  startCleanupWorker();
+  startNotificationWorker();
+  await scheduleCleanupRepeatableJob().catch((err) => {
+    console.warn("[CleanupQueue] Failed to schedule cleanup job:", err.message);
+  });
 });
 
 // Graceful Shutdown Handler
@@ -49,12 +62,16 @@ async function handleShutdown(signal: string) {
       await emailWorker.stop();
       await webhookWorker.stop();
       await cronWorker.stop();
+      await stopEmailWorker();
+      await stopCleanupWorker();
+      await stopNotificationWorker();
       console.log("[Server] Background workers stopped.");
 
       // 2. Close BullMQ queues, SSE streams & Redis connections
       await sseManagerService.close();
       await webhookQueue.close();
       await cronQueue.close();
+      await closeAllQueues();
       await maintenanceCacheService.close();
       await systemConfigService.close();
       await permissionCacheService.close();

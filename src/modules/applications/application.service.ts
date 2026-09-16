@@ -33,6 +33,7 @@ import {
   NOTIFICATION_CHANNEL,
   EMAIL_TEMPLATE_KEY,
 } from "../../common/constants/notification.constant";
+import { dispatchEmailJob } from "../../queues";
 import { R2Service } from "../../common/services/r2.service";
 import { envConfig } from "../../config/env.config";
 
@@ -76,27 +77,21 @@ export class ApplicationService {
       "http://localhost:3000";
     const applyUrl = `${baseUrl.replace(/\/$/, "")}/onboarding/${token}`;
 
-    // Enqueue invitation email
-    await notificationDispatcher
-      .send({
-        channels: [NOTIFICATION_CHANNEL.EMAIL],
-        userId: actorId,
-        email: {
-          toEmail: normalizedEmail,
-          templateKey: EMAIL_TEMPLATE_KEY.APPLICATION_INVITE,
-          templateData: {
-            applyUrl,
-            email: normalizedEmail,
-            expiresAt: expiresAt.toISOString(),
-          },
-        },
-      })
-      .catch((err) => {
-        console.warn(
-          `[ApplicationService] Failed to send invitation email to ${normalizedEmail}:`,
-          err.message,
-        );
-      });
+    // Enqueue invitation email to BullMQ emailQueue
+    await dispatchEmailJob({
+      type: "INVITE_APPLICATION",
+      to: normalizedEmail,
+      data: {
+        candidateEmail: normalizedEmail,
+        applyUrl,
+        expiresAt: expiresAt.toISOString(),
+      },
+    }).catch((err) => {
+      console.warn(
+        `[ApplicationService] Failed to dispatch invitation email to ${normalizedEmail}:`,
+        err.message,
+      );
+    });
 
     await this.repository.createAuditLog({
       actorId,
@@ -502,32 +497,31 @@ export class ApplicationService {
         },
       );
 
-    // Enqueue approval and welcome email
+    // Enqueue approval and welcome email to BullMQ emailQueue
     const loginUrl =
       envConfig.appUrl ||
       envConfig.cors.allowedOrigins[0] ||
       "http://localhost:3000";
-    await notificationDispatcher
-      .send({
-        channels: [NOTIFICATION_CHANNEL.EMAIL],
-        userId: user.id,
-        email: {
-          toEmail: normalizedEmail,
-          templateKey: EMAIL_TEMPLATE_KEY.APPLICATION_APPROVED,
-          templateData: {
-            fullName: application.fullName,
-            email: normalizedEmail,
-            password: rawPassword,
-            loginUrl,
-          },
-        },
-      })
-      .catch((err) => {
-        console.warn(
-          `[ApplicationService] Failed to send approval email to ${normalizedEmail}:`,
-          err.message,
-        );
-      });
+    await dispatchEmailJob({
+      type: "INTERN_ACCOUNT_CREATED",
+      to: normalizedEmail,
+      data: {
+        fullName: application.fullName,
+        email: normalizedEmail,
+        temporaryPassword: rawPassword,
+        loginUrl,
+        departmentName: (application as any).department?.name,
+        positionTitle: (application as any).position?.title,
+        startDate: application.startDate
+          ? new Date(application.startDate).toLocaleDateString("vi-VN")
+          : undefined,
+      },
+    }).catch((err) => {
+      console.warn(
+        `[ApplicationService] Failed to dispatch approval email to ${normalizedEmail}:`,
+        err.message,
+      );
+    });
 
     await this.repository.createAuditLog({
       actorId,
