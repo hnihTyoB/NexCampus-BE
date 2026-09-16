@@ -22,6 +22,13 @@ const defaultMeetingSelect = {
   endTime: true,
   status: true,
   visibility: true,
+  departmentId: true,
+  department: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
   deletedAt: true,
   createdAt: true,
   updatedAt: true,
@@ -80,6 +87,7 @@ export class MeetingRepository {
       status,
       meetingType,
       visibility,
+      departmentId,
       startDate,
       endDate,
       sortBy = "startTime",
@@ -93,6 +101,7 @@ export class MeetingRepository {
       ...(status ? { status } : {}),
       ...(meetingType ? { meetingType } : {}),
       ...(visibility ? { visibility } : {}),
+      ...(departmentId ? { departmentId } : {}),
       ...(startDate || endDate
         ? {
             startTime: {
@@ -179,6 +188,7 @@ export class MeetingRepository {
           minutes: data.minutes || null,
           createdBy: creatorId,
           hostId,
+          departmentId: data.departmentId || null,
           location: data.location || null,
           meetingType: data.meetingType,
           meetingLink: data.meetingLink || null,
@@ -239,6 +249,7 @@ export class MeetingRepository {
         description: data.description,
         minutes: data.minutes,
         hostId: data.hostId,
+        departmentId: data.departmentId,
         location: data.location,
         meetingType: data.meetingType,
         meetingLink: data.meetingLink,
@@ -248,6 +259,45 @@ export class MeetingRepository {
         visibility: data.visibility,
       },
       select: defaultMeetingSelect,
+    });
+  }
+
+  async updateAttendanceAndMinutes(
+    meetingId: string,
+    data: {
+      minutes?: string;
+      attendances?: Array<{ userId: string; attendanceStatus: AttendanceStatus }>;
+    },
+  ) {
+    return prisma.$transaction(async (tx) => {
+      if (data.minutes !== undefined) {
+        await tx.meeting.update({
+          where: { id: meetingId },
+          data: { minutes: data.minutes },
+        });
+      }
+
+      if (data.attendances && data.attendances.length > 0) {
+        for (const item of data.attendances) {
+          await tx.meetingParticipant.updateMany({
+            where: {
+              meetingId,
+              userId: item.userId,
+            },
+            data: {
+              attendanceStatus: item.attendanceStatus,
+              ...(item.attendanceStatus === AttendanceStatus.ATTENDED && {
+                joinedAt: new Date(),
+              }),
+            },
+          });
+        }
+      }
+
+      return tx.meeting.findUnique({
+        where: { id: meetingId },
+        select: defaultMeetingSelect,
+      });
     });
   }
 

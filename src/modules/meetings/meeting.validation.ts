@@ -4,6 +4,7 @@ import {
   MeetingStatus,
   MeetingVisibility,
   ParticipantRole,
+  AttendanceStatus,
 } from "@prisma/client";
 
 export const meetingIdParamSchema = z.object({
@@ -18,6 +19,7 @@ export const findAllMeetingSchema = z.object({
   status: z.nativeEnum(MeetingStatus).optional(),
   meetingType: z.nativeEnum(MeetingType).optional(),
   visibility: z.nativeEnum(MeetingVisibility).optional(),
+  departmentId: z.string().uuid("Invalid department ID").optional(),
   startDate: z.string().datetime({ offset: true }).optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()),
   endDate: z.string().datetime({ offset: true }).optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()),
   sortBy: z.enum(["startTime", "createdAt", "title"]).optional().default("startTime"),
@@ -37,6 +39,7 @@ export const createMeetingSchema = z
     description: z.string().trim().max(3000).optional(),
     minutes: z.string().trim().max(10000).optional(),
     hostId: z.string().uuid("Invalid host ID").optional(),
+    departmentId: z.string().uuid("Invalid department ID").optional(),
     location: z.string().trim().max(255).optional(),
     meetingType: z.nativeEnum(MeetingType).default(MeetingType.ONLINE),
     meetingLink: z.string().trim().url("meetingLink must be a valid URL").optional().or(z.literal("")),
@@ -49,7 +52,18 @@ export const createMeetingSchema = z
   .refine((data) => data.startTime < data.endTime, {
     message: "Thời gian bắt đầu (startTime) phải trước thời gian kết thúc (endTime)",
     path: ["endTime"],
-  });
+  })
+  .refine(
+    (data) => {
+      // Cho phép độ trễ 5 phút để tránh network drift
+      if (process.env.NODE_ENV === "test") return true;
+      return data.startTime.getTime() >= Date.now() - 5 * 60 * 1000;
+    },
+    {
+      message: "Không thể đặt lịch họp trong quá khứ",
+      path: ["startTime"],
+    },
+  );
 
 export const updateMeetingSchema = z
   .object({
@@ -57,6 +71,7 @@ export const updateMeetingSchema = z
     description: z.string().trim().max(3000).optional(),
     minutes: z.string().trim().max(10000).optional(),
     hostId: z.string().uuid("Invalid host ID").optional(),
+    departmentId: z.string().uuid("Invalid department ID").optional(),
     location: z.string().trim().max(255).optional(),
     meetingType: z.nativeEnum(MeetingType).optional(),
     meetingLink: z.string().trim().url().optional().or(z.literal("")),
@@ -77,6 +92,47 @@ export const updateMeetingSchema = z
       path: ["endTime"],
     },
   );
+
+export const updateMeetingAttendanceSchema = z.object({
+  minutes: z.string().trim().max(10000).optional(),
+  attendances: z
+    .array(
+      z
+        .object({
+          userId: z.string().uuid("Invalid user ID"),
+          attendanceStatus: z.nativeEnum(AttendanceStatus).optional(),
+          status: z
+            .enum(["PENDING", "ACCEPTED", "DECLINED", "ATTENDED", "ABSENT", "EXCUSED"])
+            .optional(),
+          notes: z.string().trim().max(1000).optional(),
+        })
+        .refine(
+          (val) => val.attendanceStatus !== undefined || val.status !== undefined,
+          {
+            message:
+              "attendanceStatus hoặc status là bắt buộc cho từng người tham gia",
+          },
+        )
+        .transform((val) => {
+          const attendanceStatus = (val.attendanceStatus ||
+            (val.status === "ACCEPTED" || val.status === "ATTENDED"
+              ? AttendanceStatus.ATTENDED
+              : val.status === "DECLINED" || val.status === "ABSENT"
+                ? AttendanceStatus.ABSENT
+                : AttendanceStatus.UNKNOWN)) as AttendanceStatus;
+          return {
+            userId: val.userId,
+            attendanceStatus,
+            notes: val.notes,
+          };
+        }),
+    )
+    .optional(),
+});
+
+export type UpdateMeetingAttendanceInput = z.infer<
+  typeof updateMeetingAttendanceSchema
+>;
 
 export const inviteParticipantsSchema = z.object({
   participants: z

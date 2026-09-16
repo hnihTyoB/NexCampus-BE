@@ -18,6 +18,7 @@ export interface CreateMeetingDto {
   description?: string;
   minutes?: string;
   hostId?: string;
+  departmentId?: string;
   location?: string;
   meetingType: MeetingType;
   meetingLink?: string;
@@ -33,6 +34,7 @@ export interface UpdateMeetingDto {
   description?: string;
   minutes?: string;
   hostId?: string;
+  departmentId?: string;
   location?: string;
   meetingType?: MeetingType;
   meetingLink?: string;
@@ -50,6 +52,16 @@ export interface RsvpMeetingDto {
   status: "ACCEPTED" | "DECLINED";
 }
 
+export interface ParticipantAttendanceItemDto {
+  userId: string;
+  attendanceStatus: AttendanceStatus;
+}
+
+export interface UpdateMeetingAttendanceDto {
+  minutes?: string;
+  attendances?: ParticipantAttendanceItemDto[];
+}
+
 export interface SubmitAbsenceDto {
   reason: string;
   attachmentUrl?: string;
@@ -64,6 +76,7 @@ export interface MeetingQueryDto {
   status?: MeetingStatus;
   meetingType?: MeetingType;
   visibility?: MeetingVisibility;
+  departmentId?: string;
   startDate?: string;
   endDate?: string;
   page?: number;

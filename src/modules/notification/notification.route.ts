@@ -19,11 +19,15 @@ import {
   testSendNotificationTemplateSchema,
 } from "./notification.validation";
 import { PERMISSIONS } from "../../common/constants/permission.constant";
+import notificationSettingRoute from "../notification-settings/notification-setting.route";
 
 const router = Router();
 const controller = new NotificationController();
 
 router.use(authMiddleware);
+
+// Notification Settings alias (/notifications/settings)
+router.use("/settings", notificationSettingRoute);
 
 router.get("/stream", controller.stream);
 router.get("/", validate(listNotificationsSchema, "query"), controller.list);

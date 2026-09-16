@@ -20,6 +20,8 @@ import { registerMeetingOpenApi } from "../modules/meetings/meeting.openapi";
 import { registerAbsenceOpenApi } from "../modules/absences/absence.openapi";
 import { registerDailyReportOpenApi } from "../modules/daily-reports/daily-report.openapi";
 import { registerWeeklyEvaluationOpenApi } from "../modules/weekly-evaluations/weekly-evaluation.openapi";
+import { registerNotificationSettingOpenApi } from "../modules/notification-settings/notification-setting.openapi";
+import { registerActivityLogOpenApi } from "../modules/activity-logs/activity-log.openapi";
 import { registerHealthOpenApi } from "../routes/health.openapi";
 
 // Tự động khởi tạo và đăng ký 100% routes & schemas từ Zod validation schemas
@@ -27,6 +29,7 @@ registerAuthOpenApi();
 registerUserOpenApi();
 registerRbacOpenApi();
 registerNotificationOpenApi();
+registerNotificationSettingOpenApi();
 registerMaintenanceOpenApi();
 registerIntegrationOpenApi();
 registerSystemConfigOpenApi();
@@ -43,6 +46,7 @@ registerMeetingOpenApi();
 registerAbsenceOpenApi();
 registerDailyReportOpenApi();
 registerWeeklyEvaluationOpenApi();
+registerActivityLogOpenApi();
 registerHealthOpenApi();
 
 

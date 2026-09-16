@@ -15,6 +15,7 @@ import {
   submitAbsenceSchema,
   reviewAbsenceSchema,
   getBusyUsersSchema,
+  updateMeetingAttendanceSchema,
 } from "./meeting.validation";
 
 const router = Router();
@@ -124,6 +125,15 @@ router.post(
   requirePermission(PERMISSIONS.MEETING_ATTEND),
   validate(meetingIdParamSchema, "params"),
   controller.join,
+);
+
+router.put(
+  "/:id/attendance",
+  authMiddleware,
+  requirePermission(PERMISSIONS.MEETING_UPDATE),
+  validate(meetingIdParamSchema, "params"),
+  validate(updateMeetingAttendanceSchema),
+  controller.updateAttendance,
 );
 
 // ── Meeting Absences ────────────────────────────────────────────────────────

@@ -200,4 +200,22 @@ export class MeetingController {
       next(error);
     }
   };
+
+  updateAttendance = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const data = await this.service.updateAttendance(
+        req.params.id,
+        req.body,
+        req.user!,
+        { ipAddress: req.ip },
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

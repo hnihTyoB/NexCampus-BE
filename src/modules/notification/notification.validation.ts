@@ -74,26 +74,37 @@ export const listEmailsSchema = z.object({
   toEmail: z.string().optional(),
 });
 
-export const createNotificationTemplateSchema = z.object({
-  code: z
-    .string()
-    .min(2, "Code must be at least 2 characters")
-    .max(100)
-    .regex(
-      /^[A-Z0-9_]+$/,
-      "Code must contain only uppercase letters, numbers, and underscores",
-    ),
-  name: z.string().min(1, "Name is required").max(255),
-  description: z.string().max(500).optional(),
-  channels: z
-    .array(z.enum(["WEB", "EMAIL"]))
-    .min(1, "At least one channel is required"),
-  subject: z.string().optional(),
-  title: z.string().optional(),
-  content: z.string().min(1, "Content is required"),
-  variables: z.array(z.string()).default([]),
-  isActive: z.boolean().default(true),
-});
+export const createNotificationTemplateSchema = z
+  .object({
+    code: z
+      .string()
+      .min(2, "Code must be at least 2 characters")
+      .max(100)
+      .regex(
+        /^[A-Z0-9_]+$/,
+        "Code must contain only uppercase letters, numbers, and underscores",
+      )
+      .optional(),
+    eventCode: z.string().optional(),
+    name: z.string().min(1, "Name is required").max(255),
+    description: z.string().max(500).optional(),
+    channels: z
+      .array(z.enum(["WEB", "EMAIL"]))
+      .min(1, "At least one channel is required"),
+    subject: z.string().optional(),
+    title: z.string().optional(),
+    content: z.string().min(1, "Content is required"),
+    variables: z.array(z.string()).default([]),
+    isActive: z.boolean().default(true),
+  })
+  .transform((data) => ({
+    ...data,
+    code: (data.code || data.eventCode || "") as string,
+  }))
+  .refine((data) => data.code.length >= 2, {
+    message: "Mã mẫu thông báo (code hoặc eventCode) là bắt buộc và phải có ít nhất 2 ký tự",
+    path: ["code"],
+  });
 
 export const updateNotificationTemplateSchema = z.object({
   name: z.string().min(1, "Name is required").max(255).optional(),

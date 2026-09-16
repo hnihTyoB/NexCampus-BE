@@ -5,6 +5,7 @@ import {
   MeetingQueryDto,
   CreateMeetingDto,
   UpdateMeetingDto,
+  UpdateMeetingAttendanceDto,
   ParticipantInputDto,
   SubmitAbsenceDto,
   ReviewAbsenceDto,
@@ -439,5 +440,43 @@ export class MeetingService {
     });
 
     return result;
+  }
+
+  async updateAttendance(
+    id: string,
+    data: UpdateMeetingAttendanceDto,
+    actor: UserPayload,
+    context?: { ipAddress?: string },
+  ) {
+    const meeting = await this.repository.findById(id);
+    if (!meeting) {
+      throw new AppError("Cuộc họp không tồn tại", 404, ERROR_CODE.MEETING_NOT_FOUND);
+    }
+
+    const isHostOrCreator =
+      actor.id === meeting.createdBy || actor.id === meeting.hostId;
+    if (actor.role !== ROLES.ADMIN && !isHostOrCreator) {
+      throw new AppError(
+        "Chỉ người tổ chức cuộc họp hoặc Admin mới có quyền cập nhật biên bản và điểm danh",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
+    }
+
+    const updated = await this.repository.updateAttendanceAndMinutes(id, data);
+
+    await this.repository.createAuditLog({
+      actorId: actor.id,
+      action: AUDIT_ACTION.UPDATE_MEETING_ATTENDANCE,
+      targetType: AUDIT_TARGET_TYPE.MEETING,
+      targetId: id,
+      details: {
+        minutesUpdated: data.minutes !== undefined,
+        attendanceCount: data.attendances?.length ?? 0,
+      },
+      ipAddress: context?.ipAddress,
+    });
+
+    return updated;
   }
 }

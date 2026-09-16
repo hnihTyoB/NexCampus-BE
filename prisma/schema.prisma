@@ -56,6 +56,8 @@ model User {
   feedbackDailyReports          DailyReport[]          @relation("FeedbackDailyReports")
   uploadedReportAttachments     ReportAttachment[]     @relation("ReportAttachmentUploader")
   leaderEvaluations             WeeklyEvaluation[]     @relation("LeaderEvaluations")
+  notificationSetting           NotificationSetting?
+  auditLogs                     AuditLog[]             @relation("UserAuditLogs")
 
   @@index([deletedAt])
   @@index([roleId, isActive, deletedAt])
@@ -114,6 +116,8 @@ model AuditLog {
   ipAddress  String?  @map("ip_address")
   userAgent  String?  @map("user_agent")
   createdAt  DateTime @default(now()) @map("created_at")
+
+  actor      User?    @relation("UserAuditLogs", fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([targetType, targetId])
   @@index([createdAt])
@@ -258,6 +262,30 @@ model NotificationTemplate {
   @@map("notification_templates")
 }
 
+model NotificationSetting {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @unique @map("user_id") @db.Uuid
+  emailEnabled   Boolean  @default(true) @map("email_enabled")
+  inAppEnabled   Boolean  @default(true) @map("in_app_enabled")
+  webEnabled     Boolean  @default(true) @map("web_enabled")
+
+  taskAssignedEmail        Boolean @default(true) @map("task_assigned_email")
+  taskAssignedInApp        Boolean @default(true) @map("task_assigned_in_app")
+  submissionReviewedEmail  Boolean @default(true) @map("submission_reviewed_email")
+  submissionReviewedInApp  Boolean @default(true) @map("submission_reviewed_in_app")
+  dailyReportReminderEmail Boolean @default(true) @map("daily_report_reminder_email")
+  dailyReportReminderInApp Boolean @default(true) @map("daily_report_reminder_in_app")
+  meetingScheduleEmail     Boolean @default(true) @map("meeting_schedule_email")
+  meetingScheduleInApp     Boolean @default(true) @map("meeting_schedule_in_app")
+
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_settings")
+}
+
 
 model MaintenanceConfig {
   id                String    @id @default(uuid()) @db.Uuid
@@ -376,6 +404,7 @@ model Department {
   leaderAssignments LeaderDepartment[]
   applications      Application[]
   taskGroups        TaskGroup[]
+  meetings          Meeting[]
 
   @@index([deletedAt])
   @@map("departments")
@@ -835,6 +864,7 @@ model Meeting {
   meetingLink String?           @map("meeting_link")
   startTime   DateTime          @map("start_time")
   endTime     DateTime          @map("end_time")
+  departmentId String?          @map("department_id") @db.Uuid
   status      MeetingStatus     @default(DRAFT)
   visibility  MeetingVisibility @default(TEAM)
   deletedAt   DateTime?         @map("deleted_at")
@@ -843,11 +873,13 @@ model Meeting {
 
   creator      User                 @relation("CreatedMeetings", fields: [createdBy], references: [id], onDelete: Restrict)
   host         User                 @relation("HostedMeetings", fields: [hostId], references: [id], onDelete: Restrict)
+  department   Department?          @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   participants MeetingParticipant[]
   absences     AbsenceRequest[]
 
   @@index([createdBy])
   @@index([hostId])
+  @@index([departmentId])
   @@index([status])
   @@index([startTime])
   @@index([startTime, endTime])

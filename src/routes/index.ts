@@ -19,6 +19,8 @@ import meetingRoute from "../modules/meetings/meeting.route";
 import absenceRoute from "../modules/absences/absence.route";
 import dailyReportRoute from "../modules/daily-reports/daily-report.route";
 import weeklyEvaluationRoute from "../modules/weekly-evaluations/weekly-evaluation.route";
+import notificationSettingRoute from "../modules/notification-settings/notification-setting.route";
+import activityLogRoute from "../modules/activity-logs/activity-log.route";
 import healthRoute from "./health.route";
 import { maintenanceGuard } from "../middlewares/maintenance.middleware";
 
@@ -39,6 +41,7 @@ router.use("/auth", authRoute);
 router.use("/users", userRoute);
 router.use("/rbac", rbacRoute);
 router.use("/notifications", notificationRoute);
+router.use("/notification-settings", notificationSettingRoute);
 router.use("/integrations", integrationRoute);
 router.use("/integration", integrationRoute);
 router.use("/cron", cronRoute);
@@ -54,6 +57,6 @@ router.use("/meetings", meetingRoute);
 router.use("/absences", absenceRoute);
 router.use("/daily-reports", dailyReportRoute);
 router.use("/weekly-evaluations", weeklyEvaluationRoute);
-
+router.use("/activity-logs", activityLogRoute);
 
 export default router;
