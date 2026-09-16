@@ -125,3 +125,35 @@ export const createLinkAttachmentSchema = z.object({
   fileName: z.string().trim().min(1, "fileName is required").max(255),
   fileUrl: z.string().trim().url("Invalid URL"),
 });
+
+export const aiSuggestTaskAllocationSchema = z.object({
+  task: z.object({
+    title: z.string().min(1, "Task title is required"),
+    description: z.string().optional().nullable(),
+    module: z.string().optional().nullable(),
+    priority: z.string().optional(),
+    estDays: z.coerce.number().positive("estDays must be positive"),
+    maxWorkloadDays: z.coerce.number().positive().optional().default(10),
+    deadline: z.string().optional(),
+  }),
+  candidates: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        fullName: z.string().min(1),
+        suggestedRole: z.enum(["OWNER", "SUPPORT"]).optional(),
+        position: z.object({ name: z.string() }).optional(),
+        activeTaskDays: z.coerce.number().min(0),
+        latestCodingScore: z.coerce.number().optional(),
+        latestLearningScore: z.coerce.number().optional(),
+        completedModules: z.array(z.string()).optional(),
+        compatibilityScore: z.coerce.number().optional(),
+        workloadScore: z.coerce.number().optional(),
+        skillScore: z.coerce.number().optional(),
+        performanceScore: z.coerce.number().optional(),
+        learningScore: z.coerce.number().optional(),
+      }),
+    )
+    .min(1, "At least one candidate is required"),
+});
+

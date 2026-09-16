@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "query_intern_activity",
+  "description": "Truy vấn lịch sử hoạt động của thực tập sinh trong tuần (báo cáo ngày, bài nộp task, review của leader) phục vụ trợ lý đánh giá tuần",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "internId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "ID hồ sơ thực tập sinh"
+      },
+      "week": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 52,
+        "description": "Số thứ tự tuần cần đánh giá"
+      },
+      "startDate": {
+        "type": "string",
+        "format": "date",
+        "description": "Ngày bắt đầu kỳ thực tập (YYYY-MM-DD) để tính weekRange"
+      }
+    },
+    "required": ["internId", "week"]
+  },
+  "returns": {
+    "type": "object",
+    "properties": {
+      "dailyReportsCount": { "type": "integer" },
+      "taskSubmissionsCount": { "type": "integer" },
+      "hasEvidence": { "type": "boolean" },
+      "hasBlockers": { "type": "boolean" },
+      "approvedCount": { "type": "integer" },
+      "rejectedCount": { "type": "integer" }
+    }
+  }
+}

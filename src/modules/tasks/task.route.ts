@@ -13,6 +13,7 @@ import {
   getAttachmentUploadUrlSchema,
   confirmAttachmentUploadSchema,
   createLinkAttachmentSchema,
+  aiSuggestTaskAllocationSchema,
 } from "./task.validation";
 
 const router = Router();
@@ -26,6 +27,14 @@ router.get(
   requirePermission(PERMISSIONS.TASK_READ),
   validate(findAllTaskSchema, "query"),
   controller.findAll,
+);
+
+router.post(
+  "/ai-suggest-allocation",
+  authMiddleware,
+  requirePermission(PERMISSIONS.TASK_ASSIGNMENT_CREATE),
+  validate(aiSuggestTaskAllocationSchema),
+  controller.suggestAllocation,
 );
 
 router.get(

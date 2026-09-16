@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "calculate_candidate_workload",
+  "description": "Tính toán tải công việc hiện tại và dự kiến của ứng viên khi được phân công vào task mới, đồng thời cảnh báo rủi ro quá tải (riskLevel)",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "candidateId": {
+        "type": "string",
+        "description": "ID của ứng viên (thực tập sinh)"
+      },
+      "activeTaskDays": {
+        "type": "number",
+        "minimum": 0,
+        "description": "Số ngày làm việc của các task đang thực hiện"
+      },
+      "taskEstDays": {
+        "type": "number",
+        "minimum": 0.5,
+        "description": "Số ngày ước tính của task cần phân công"
+      },
+      "role": {
+        "type": "string",
+        "enum": ["OWNER", "SUPPORT"],
+        "description": "Vai trò đề xuất (OWNER hệ số 1.0, SUPPORT hệ số 0.5)"
+      },
+      "maxWorkloadDays": {
+        "type": "number",
+        "default": 10,
+        "description": "Hạn mức tải tối đa trong kỳ (chuẩn: 10 ngày)"
+      }
+    },
+    "required": ["candidateId", "activeTaskDays", "taskEstDays", "role"]
+  },
+  "returns": {
+    "type": "object",
+    "properties": {
+      "projectedWorkload": { "type": "number" },
+      "workloadPercentage": { "type": "number" },
+      "riskLevel": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
+      "isOverloaded": { "type": "boolean" }
+    }
+  }
+}

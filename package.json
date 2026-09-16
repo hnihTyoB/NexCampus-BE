@@ -18,7 +18,8 @@
     "db:seed": "node scripts/prisma-run.js db seed -- --tsx prisma/seed.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test": "node --test --import tsx tests/*.test.ts"
+    "test": "node --test --import tsx tests/*.test.ts",
+    "test:evals": "node --test --import tsx tests/ai-evals.test.ts"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^7.3.4",

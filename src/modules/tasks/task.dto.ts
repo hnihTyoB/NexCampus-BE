@@ -108,3 +108,51 @@ export interface ConfirmAttachmentUploadDto {
   mimeType: string;
   fileSize: number;
 }
+
+export type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
+
+export interface CandidateAllocationDto {
+  id: string;
+  fullName: string;
+  suggestedRole?: "OWNER" | "SUPPORT";
+  position?: { name: string };
+  activeTaskDays: number;
+  latestCodingScore?: number;
+  latestLearningScore?: number;
+  completedModules?: string[];
+  compatibilityScore?: number;
+  workloadScore?: number;
+  skillScore?: number;
+  performanceScore?: number;
+  learningScore?: number;
+}
+
+export interface TaskAllocationInputDto {
+  task: {
+    title: string;
+    description?: string | null;
+    module?: string | null;
+    priority?: string;
+    estDays: number;
+    maxWorkloadDays?: number;
+    deadline?: string;
+  };
+  candidates: CandidateAllocationDto[];
+}
+
+export interface TaskAllocationResultDto {
+  recommendedOwnerId: string;
+  recommendedSupportId: string | null;
+  riskLevel: RiskLevel;
+  workloadAnalysis: string;
+  learningOpportunity: string;
+  reasons: string[];
+  candidateRankings?: Array<{
+    candidateId: string;
+    fullName: string;
+    estimatedWorkload: number;
+    riskLevel: RiskLevel;
+    compatibilityScore: number;
+  }>;
+}
+

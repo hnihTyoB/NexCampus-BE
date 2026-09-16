@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { TaskService } from "./task.service";
+import { taskAllocationAiService } from "./task-allocation.ai.service";
 import {
   CreateTaskDto,
   UpdateTaskDto,
@@ -158,6 +159,19 @@ export class TaskController {
         req.params.taskId,
         req.user,
       );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  suggestAllocation = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const data = taskAllocationAiService.evaluateAllocation(req.body);
       res.json({ success: true, data });
     } catch (error) {
       next(error);

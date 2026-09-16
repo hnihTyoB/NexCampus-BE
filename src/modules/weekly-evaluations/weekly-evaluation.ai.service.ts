@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { z } from "zod";
 import { EvaluationGrade } from "@prisma/client";
 import { prisma } from "../../database/prisma.client";
 import {
@@ -80,6 +81,27 @@ export function getWeekDateRange(
 
   return { from, to };
 }
+
+export const aiWeeklyEvaluationOutputSchema = z.object({
+  ratings: z.object({
+    ruleCompliance: z.enum(["TOT", "KHA", "TB", "TBY", "YEU"]).default("TB"),
+    workAttitude: z.enum(["TOT", "KHA", "TB", "TBY", "YEU"]).default("TB"),
+    learningCapacity: z.enum(["TOT", "KHA", "TB", "TBY", "YEU"]).default("TB"),
+    pressureTolerance: z.enum(["TOT", "KHA", "TB", "TBY", "YEU"]).default("TB"),
+    communication: z.enum(["TOT", "KHA", "TB", "TBY", "YEU"]).default("TB"),
+    knowledge: z.enum(["TOT", "KHA", "TB", "TBY", "YEU"]).default("TB"),
+    practicalSkill: z.enum(["TOT", "KHA", "TB", "TBY", "YEU"]).default("TB"),
+    languageProficiency: z.enum(["TOT", "KHA", "TB", "TBY", "YEU"]).default("TB"),
+    teamwork: z.enum(["TOT", "KHA", "TB", "TBY", "YEU"]).default("TB"),
+    creativity: z.enum(["TOT", "KHA", "TB", "TBY", "YEU"]).default("TB"),
+    contentRequirement: z.enum(["TOT", "KHA", "TB", "TBY", "YEU"]).default("TB"),
+    progressRequirement: z.enum(["TOT", "KHA", "TB", "TBY", "YEU"]).default("TB"),
+  }),
+  comment: z.string().trim().min(1).default("Đánh giá tuần của thực tập sinh."),
+  strengths: z.array(z.string()).default([]),
+  weaknesses: z.array(z.string()).default([]),
+  recommendations: z.array(z.string()).default([]),
+});
 
 export class WeeklyEvaluationAiService {
   async generateSuggestion(
@@ -375,37 +397,51 @@ Yêu cầu output JSON duy nhất, không markdown:
 }`;
   }
 
-  private sanitizeOutput(obj: any) {
-    const validRatings = ["TOT", "KHA", "TB", "TBY", "YEU"];
-    const sanitizeRating = (r: any): RatingLevel =>
-      typeof r === "string" && validRatings.includes(r)
-        ? (r as RatingLevel)
-        : "TB";
+  private sanitizeOutput(obj: any): {
+    ratings: EvaluationRatings;
+    comment: string;
+    strengths: string[];
+    weaknesses: string[];
+    recommendations: string[];
+  } {
+    const parsed = aiWeeklyEvaluationOutputSchema.safeParse(obj);
+    if (parsed.success) {
+      return parsed.data as {
+        ratings: EvaluationRatings;
+        comment: string;
+        strengths: string[];
+        weaknesses: string[];
+        recommendations: string[];
+      };
+    }
 
-    const r = obj.ratings || {};
+    // Safe fallback if Zod parse fails
     return {
       ratings: {
-        ruleCompliance: sanitizeRating(r.ruleCompliance),
-        workAttitude: sanitizeRating(r.workAttitude),
-        learningCapacity: sanitizeRating(r.learningCapacity),
-        pressureTolerance: sanitizeRating(r.pressureTolerance),
-        communication: sanitizeRating(r.communication),
-        knowledge: sanitizeRating(r.knowledge),
-        practicalSkill: sanitizeRating(r.practicalSkill),
-        languageProficiency: sanitizeRating(r.languageProficiency),
-        teamwork: sanitizeRating(r.teamwork),
-        creativity: sanitizeRating(r.creativity),
-        contentRequirement: sanitizeRating(r.contentRequirement),
-        progressRequirement: sanitizeRating(r.progressRequirement),
+        ruleCompliance: "TB",
+        workAttitude: "TB",
+        learningCapacity: "TB",
+        pressureTolerance: "TB",
+        communication: "TB",
+        knowledge: "TB",
+        practicalSkill: "TB",
+        languageProficiency: "TB",
+        teamwork: "TB",
+        creativity: "TB",
+        contentRequirement: "TB",
+        progressRequirement: "TB",
       },
-      comment: typeof obj.comment === "string" ? obj.comment : "Đánh giá tuần của thực tập sinh.",
-      strengths: Array.isArray(obj.strengths) ? obj.strengths.map(String) : [],
-      weaknesses: Array.isArray(obj.weaknesses) ? obj.weaknesses.map(String) : [],
-      recommendations: Array.isArray(obj.recommendations) ? obj.recommendations.map(String) : [],
+      comment:
+        typeof obj?.comment === "string" && obj.comment.trim().length > 0
+          ? obj.comment
+          : "Đánh giá tuần của thực tập sinh.",
+      strengths: Array.isArray(obj?.strengths) ? obj.strengths.map(String) : [],
+      weaknesses: Array.isArray(obj?.weaknesses) ? obj.weaknesses.map(String) : [],
+      recommendations: Array.isArray(obj?.recommendations) ? obj.recommendations.map(String) : [],
     };
   }
 
-  private evaluateHeuristic(
+  public evaluateHeuristic(
     internName: string,
     week: number,
     weekRange: { from: Date; to: Date },
@@ -418,7 +454,7 @@ Yêu cầu output JSON duy nhất, không markdown:
       (s) => s.reviewStatus === "APPROVED",
     ).length;
     const rejectedCount = taskSubmissions.filter(
-      (s) => s.reviewStatus === "REJECTED",
+      (s) => s.reviewStatus === "REJECTED" || s.reviewStatus === "CHANGES_REQUESTED",
     ).length;
 
     // Edge Case: Zero Data Handling (rule in weekly-evaluation-12-criteria.json)
@@ -442,7 +478,7 @@ Yêu cầu output JSON duy nhất, không markdown:
         ratings,
         score,
         grade: EvaluationGrade.TB,
-        comment: `AI gợi ý (Thiếu dữ liệu hoạt động tuần ${week}): Trong tuần vừa qua, Thực tập sinh ${internName} chưa nộp báo cáo hàng ngày hoặc bài nộp task nào trên hệ thống. Tất cả 12 tiêu chí được tạm xếp loại Trung bình (TB). Leader cần liên hệ trực tiếp với thực tập sinh để nắm bắt tình hình và nhắc nhở tuân thủ quy chế.`,
+        comment: `AI gợi ý (Thiếu dữ liệu hoạt động tuần ${week}): Trong tuần vừa qua, Thực tập sinh ${internName} không nộp báo cáo hàng ngày và không có bài nộp task nào trên hệ thống. Do không có dữ liệu hoạt động thực tế, tất cả 12 tiêu chí được mặc định trung bình (TB). Leader cần liên hệ trực tiếp với thực tập sinh để nắm bắt tình hình và nhắc nhở tuân thủ quy chế.`,
         strengths: ["Cần chủ động kết nối lại với Leader"],
         weaknesses: ["Chưa nộp báo cáo hàng ngày", "Chưa cập nhật tiến độ công việc"],
         recommendations: [
@@ -530,22 +566,35 @@ Yêu cầu output JSON duy nhất, không markdown:
       .join(", ");
 
     const strengths: string[] = [];
-    if (reportCount >= 4) strengths.push(`Duy trì nộp báo cáo ngày đều đặn (${reportCount} ngày)`);
-    if (hasEvidence) strengths.push("Chủ động gắn link PR/minh chứng công việc rõ ràng");
-    if (approvedCount > 0) strengths.push(`Hoàn thành tốt các bài nộp công việc (${approvedCount} task đã được duyệt)`);
-    if (strengths.length === 0) strengths.push("Có tinh thần học hỏi và tiếp thu");
+    if (reportCount >= 4) {
+      strengths.push(`Chăm chỉ, duy trì nộp báo cáo đầy đủ mỗi ngày (${reportCount} ngày)`);
+    }
+    if (hasEvidence) {
+      strengths.push("Chủ động gắn link PR và video demo minh chứng rõ ràng");
+    }
+    if (approvedCount > 0) {
+      strengths.push(`Chất lượng code sạch sẽ, hoàn thành tốt các bài nộp công việc (${approvedCount} task đã được duyệt)`);
+    }
+    if (strengths.length === 0) strengths.push("Có tinh thần học hỏi và tiếp thu ý kiến đóng góp");
 
     const weaknesses: string[] = [];
-    if (reportCount < 5) weaknesses.push(`Còn thiếu ${Math.max(0, 5 - reportCount)} ngày báo cáo làm việc trong tuần`);
-    if (rejectedCount > 0) weaknesses.push("Có task cần chỉnh sửa lại sau khi review");
-    if (!hasEvidence) weaknesses.push("Nên bổ sung thêm PR link hoặc video demo minh chứng");
+    if (reportCount < 5) {
+      weaknesses.push(`Báo cáo chưa đều, còn thiếu ${Math.max(0, 5 - reportCount)} ngày làm việc trong tuần`);
+    }
+    if (rejectedCount > 0) {
+      weaknesses.push("Cần chú ý xử lý lỗi và cleanup tài nguyên đúng quy chuẩn khi có phản hồi chỉnh sửa bài nộp");
+    }
+    if (!hasEvidence && reportCount > 0) {
+      weaknesses.push("Nên bổ sung thêm PR link hoặc video demo minh chứng");
+    }
 
     const recommendations: string[] = [
-      "Tiếp tục duy trì tính chủ động và trao đổi thường xuyên với Leader",
-      "Rà soát kỹ acceptance criteria của từng task trước khi bấm nộp bài",
+      "Kiểm thử kỹ các kịch bản lỗi biên và acceptance criteria trước khi nộp bài",
+      "Chủ động hỏi Leader hoặc Mentor khi gặp vướng mắc kỹ thuật",
+      "Tiếp tục duy trì tính chủ động và trao đổi thường xuyên trong nhóm",
     ];
 
-    const comment = `AI gợi ý đánh giá tuần ${week}: Thực tập sinh ${internName} đã hoàn thành ${reportCount} báo cáo hàng ngày và có ${subCount} lượt nộp bài${taskTitles ? ` (gồm: ${taskTitles})` : ""}. Nhìn chung, TTS thể hiện thái độ làm việc ${grade === "TOT" ? "rất tích cực và chuyên nghiệp" : "tốt, đáp ứng yêu cầu tiến độ"}. Chất lượng chuyên môn và khả năng phối hợp đạt mức ${grade}. Điểm trung bình 12 tiêu chí đề xuất là ${score.toFixed(1)} (${grade}).`;
+    const comment = `AI gợi ý đánh giá tuần ${week}: Thực tập sinh ${internName} đã hoàn thành ${reportCount} báo cáo hàng ngày và có ${subCount} lượt nộp bài${taskTitles ? ` (gồm: ${taskTitles})` : ""}. Nhìn chung, TTS thể hiện thái độ làm việc ${grade === "TOT" ? "rất tích cực, chăm chỉ và chuyên nghiệp, tuân thủ nghiêm túc các quy chế nội bộ" : "tốt, đáp ứng các yêu cầu tiến độ cơ bản"}. Chất lượng chuyên môn và khả năng phối hợp làm việc nhóm đạt mức ${grade}. Điểm trung bình 12 tiêu chí đề xuất là ${score.toFixed(1)}/10 (${grade}).`;
 
     return {
       ratings,
