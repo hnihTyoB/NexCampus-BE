@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { prisma } from "../../database/prisma.client";
 import { UserRepository } from "./user.repository";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
@@ -62,6 +63,13 @@ export class UserService {
         409,
         ERROR_CODE.DUPLICATE_ENTRY,
       );
+    }
+
+    const role = await prisma.role.findUnique({
+      where: { id: data.roleId },
+    });
+    if (!role) {
+      throw new AppError("Role not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
     const passwordHash = await bcrypt.hash(data.password, 10);

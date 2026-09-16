@@ -24,14 +24,25 @@ export function errorMiddleware(
   next: NextFunction,
 ): void {
   if (error instanceof AppError) {
+    let resolvedCode: string = error.code || "";
+    if (!resolvedCode) {
+      if (error.statusCode === 400) resolvedCode = ERROR_CODE.BAD_REQUEST;
+      else if (error.statusCode === 401) resolvedCode = ERROR_CODE.UNAUTHORIZED;
+      else if (error.statusCode === 403) resolvedCode = ERROR_CODE.FORBIDDEN;
+      else if (error.statusCode === 404) resolvedCode = ERROR_CODE.NOT_FOUND;
+      else if (error.statusCode === 409) resolvedCode = ERROR_CODE.CONFLICT;
+      else resolvedCode = ERROR_CODE.INTERNAL_SERVER_ERROR;
+    }
+
     const payload: Record<string, any> = {
       success: false,
       message: error.message,
-      code: error.code,
+      code: resolvedCode,
+      errorCode: resolvedCode,
     };
     if (error.data !== undefined) {
       payload.data = error.data;
-      if (error.code === ERROR_CODE.VALIDATION_ERROR) {
+      if (resolvedCode === ERROR_CODE.VALIDATION_ERROR) {
         payload.errors = error.data;
       }
     }
@@ -48,6 +59,7 @@ export function errorMiddleware(
       success: false,
       message: "Invalid JSON payload format",
       code: ERROR_CODE.VALIDATION_ERROR,
+      errorCode: ERROR_CODE.VALIDATION_ERROR,
     });
     return;
   }
@@ -61,6 +73,22 @@ export function errorMiddleware(
           success: false,
           message: "Đường dẫn định danh đã tồn tại. Vui lòng chọn tên khác.",
           code: ERROR_CODE.DUPLICATE_ENTRY,
+          errorCode: ERROR_CODE.DUPLICATE_ENTRY,
+        });
+        return;
+      }
+      if (
+        conflictingFields.some(
+          (f) =>
+            f.toLowerCase().includes("attempt") ||
+            f.toLowerCase().includes("assignment"),
+        )
+      ) {
+        res.status(409).json({
+          success: false,
+          message: "Lần nộp bài đã được ghi nhận, vui lòng không gửi lại.",
+          code: ERROR_CODE.DUPLICATE_ENTRY,
+          errorCode: ERROR_CODE.DUPLICATE_ENTRY,
         });
         return;
       }
@@ -69,6 +97,7 @@ export function errorMiddleware(
         message:
           "Dữ liệu đã tồn tại trong hệ thống (trùng lặp giá trị duy nhất)",
         code: ERROR_CODE.DUPLICATE_ENTRY,
+        errorCode: ERROR_CODE.DUPLICATE_ENTRY,
       });
       return;
     }
@@ -78,6 +107,7 @@ export function errorMiddleware(
         success: false,
         message: "Bản ghi không tồn tại hoặc đã bị xóa",
         code: ERROR_CODE.NOT_FOUND,
+        errorCode: ERROR_CODE.NOT_FOUND,
       });
       return;
     }
@@ -87,6 +117,7 @@ export function errorMiddleware(
         success: false,
         message: "Dữ liệu liên kết hoặc ràng buộc quan hệ không hợp lệ",
         code: ERROR_CODE.VALIDATION_ERROR,
+        errorCode: ERROR_CODE.VALIDATION_ERROR,
       });
       return;
     }
@@ -97,6 +128,7 @@ export function errorMiddleware(
       success: false,
       message: "Dữ liệu truy vấn không hợp lệ",
       code: ERROR_CODE.VALIDATION_ERROR,
+      errorCode: ERROR_CODE.VALIDATION_ERROR,
     });
     return;
   }
@@ -111,5 +143,6 @@ export function errorMiddleware(
     success: false,
     message: "Internal server error",
     code: ERROR_CODE.INTERNAL_SERVER_ERROR,
+    errorCode: ERROR_CODE.INTERNAL_SERVER_ERROR,
   });
 }

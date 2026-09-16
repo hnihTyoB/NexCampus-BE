@@ -7,6 +7,7 @@ import {
   ConfirmAttachmentUploadDto,
   CreateLinkAttachmentDto,
 } from "./task.dto";
+import { activityLogRepository } from "../activity-logs/activity-log.repository";
 
 const creatorSelect = {
   id: true,
@@ -93,6 +94,21 @@ export class TaskRepository {
       limit = 20,
     } = query;
 
+    let deadlineCondition: Prisma.DateTimeFilter | undefined;
+    if (deadlineFrom || deadlineTo) {
+      const from = deadlineFrom ? new Date(deadlineFrom) : undefined;
+      const to = deadlineTo ? new Date(deadlineTo) : undefined;
+      const validFrom = from && !isNaN(from.getTime()) ? from : undefined;
+      const validTo = to && !isNaN(to.getTime()) ? to : undefined;
+
+      if (validFrom || validTo) {
+        deadlineCondition = {
+          ...(validFrom ? { gte: validFrom } : {}),
+          ...(validTo ? { lte: validTo } : {}),
+        };
+      }
+    }
+
     const where: Prisma.TaskWhereInput = {
       deletedAt: null,
       ...(title ? { title: { contains: title, mode: "insensitive" } } : {}),
@@ -116,14 +132,7 @@ export class TaskRepository {
       ...(taskGroupId ? { taskGroupId } : {}),
       ...(status ? { assignment: { status } } : {}),
       ...(statusNot ? { NOT: { assignment: { status: statusNot } } } : {}),
-      ...(deadlineFrom || deadlineTo
-        ? {
-            deadline: {
-              ...(deadlineFrom ? { gte: new Date(deadlineFrom) } : {}),
-              ...(deadlineTo ? { lte: new Date(deadlineTo) } : {}),
-            },
-          }
-        : {}),
+      ...(deadlineCondition ? { deadline: deadlineCondition } : {}),
       ...(scope?.internId !== undefined
         ? {
             assignment: {
@@ -147,11 +156,20 @@ export class TaskRepository {
 
     const skip = (page - 1) * limit;
 
+    const SORT_MAP: Record<string, Prisma.TaskOrderByWithRelationInput> = {
+      createdAt: { createdAt: order },
+      deadline: { deadline: order },
+      title: { title: order },
+      priority: { priority: order },
+      code: { code: order },
+    };
+    const orderBy = SORT_MAP[sortBy] ?? { createdAt: order };
+
     const [data, total] = await prisma.$transaction([
       prisma.task.findMany({
         where,
         select: defaultSelect,
-        orderBy: { [sortBy]: order },
+        orderBy,
         skip,
         take: limit,
       }),
@@ -279,7 +297,7 @@ export class TaskRepository {
         taskId,
         fileName: data.fileName,
         fileUrl: data.fileUrl,
-        filePath: data.fileUrl,
+        filePath: `external:${data.fileUrl}`,
         mimeType: "text/uri-list",
         fileSize: 0,
         uploadedBy,
@@ -302,16 +320,10 @@ export class TaskRepository {
     targetId: string;
     details?: Prisma.InputJsonValue;
     ipAddress?: string;
+    userAgent?: string;
   }) {
-    return prisma.auditLog.create({
-      data: {
-        actorId: data.actorId,
-        action: data.action,
-        targetType: data.targetType,
-        targetId: data.targetId,
-        details: data.details,
-        ipAddress: data.ipAddress,
-      },
-    });
+    return activityLogRepository.create(data);
   }
 }
+
+export const taskRepository = new TaskRepository();

@@ -5,6 +5,7 @@ import {
   UpdateWeeklyEvaluationDto,
   WeeklyEvaluationQueryDto,
 } from "./weekly-evaluation.dto";
+import { activityLogRepository } from "../activity-logs/activity-log.repository";
 
 export interface WeeklyEvaluationScoping {
   internId?: string;
@@ -112,13 +113,14 @@ export class WeeklyEvaluationRepository {
     year: number;
   }) {
     const { dto, score, grade, leaderId, isAiAdjusted, startDate, endDate, year } = params;
+    const effectiveYear = year || new Date().getFullYear();
 
     return prisma.weeklyEvaluation.create({
       data: {
         internId: dto.internId,
         leaderId,
         week: dto.week,
-        year,
+        year: effectiveYear,
         startDate,
         endDate,
         ratings: dto.ratings as unknown as Prisma.InputJsonValue,
@@ -206,17 +208,23 @@ export class WeeklyEvaluationRepository {
     if (scoping.internId) {
       where.internId = scoping.internId;
     } else if (scoping.isLeader) {
-      where.intern = {
-        deletedAt: null,
-        OR: [
-          ...(scoping.directInternIds && scoping.directInternIds.length > 0
-            ? [{ id: { in: scoping.directInternIds } }]
-            : []),
-          ...(scoping.leaderDepartmentIds && scoping.leaderDepartmentIds.length > 0
-            ? [{ departmentId: { in: scoping.leaderDepartmentIds } }]
-            : []),
-        ],
-      };
+      const orConditions: Prisma.InternWhereInput[] = [
+        ...(scoping.directInternIds && scoping.directInternIds.length > 0
+          ? [{ id: { in: scoping.directInternIds } }]
+          : []),
+        ...(scoping.leaderDepartmentIds && scoping.leaderDepartmentIds.length > 0
+          ? [{ departmentId: { in: scoping.leaderDepartmentIds } }]
+          : []),
+      ];
+
+      if (orConditions.length === 0) {
+        where.internId = { in: [] };
+      } else {
+        where.intern = {
+          deletedAt: null,
+          OR: orConditions,
+        };
+      }
     }
 
     // Query filters
@@ -254,11 +262,22 @@ export class WeeklyEvaluationRepository {
     const skip = (page - 1) * limit;
     const where = this.buildWhereClause(query, scoping);
 
+    const SORT_MAP: Record<
+      string,
+      Prisma.WeeklyEvaluationOrderByWithRelationInput
+    > = {
+      week: { week: order },
+      year: { year: order },
+      score: { score: order },
+      createdAt: { createdAt: order },
+    };
+    const orderBy = SORT_MAP[sortBy] ?? { week: order };
+
     const [items, total] = await Promise.all([
       prisma.weeklyEvaluation.findMany({
         where,
         select: defaultEvaluationSelect,
-        orderBy: { [sortBy]: order },
+        orderBy,
         skip,
         take: limit,
       }),
@@ -303,18 +322,12 @@ export class WeeklyEvaluationRepository {
     targetId?: string;
     details?: Record<string, unknown>;
     ipAddress?: string;
+    userAgent?: string;
   }) {
-    return prisma.auditLog.create({
-      data: {
-        actorId: data.actorId,
-        action: data.action,
-        targetType: data.targetType,
-        targetId: data.targetId || "SYSTEM",
-        details: data.details as Prisma.InputJsonValue,
-        ipAddress: data.ipAddress,
-      },
-    });
+    return activityLogRepository.create(data);
   }
 }
+
+export const weeklyEvaluationRepository = new WeeklyEvaluationRepository();
 
 

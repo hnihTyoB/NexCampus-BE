@@ -18,7 +18,7 @@ import {
  *     startOfDay: 2026-08-21T17:00:00.000Z
  *     endOfDay:   2026-08-22T16:59:59.999Z
  */
-export function getVietnamDayRange(dateString: string): {
+export function getVietnamDayRange(dateInput: Date | string = new Date()): {
   startOfDay: Date;
   endOfDay: Date;
 } {
@@ -26,21 +26,33 @@ export function getVietnamDayRange(dateString: string): {
   let month: number;
   let day: number;
 
-  const vnMatch = dateString.match(VIETNAM_DATE_REGEX);
-  const isoMatch = dateString.match(ISO_DATE_REGEX);
+  if (dateInput instanceof Date) {
+    const vnDateStr = dateInput.toLocaleDateString("en-CA", {
+      timeZone: VIETNAM_TIMEZONE,
+    });
+    const [y, m, d] = vnDateStr.split("-").map(Number);
+    year = y;
+    month = m;
+    day = d;
+  } else if (typeof dateInput === "string") {
+    const vnMatch = dateInput.match(VIETNAM_DATE_REGEX);
+    const isoMatch = dateInput.match(ISO_DATE_REGEX);
 
-  if (vnMatch) {
-    day = Number(vnMatch[1]);
-    month = Number(vnMatch[2]);
-    year = Number(vnMatch[3]);
-  } else if (isoMatch) {
-    year = Number(isoMatch[1]);
-    month = Number(isoMatch[2]);
-    day = Number(isoMatch[3]);
+    if (vnMatch) {
+      day = Number(vnMatch[1]);
+      month = Number(vnMatch[2]);
+      year = Number(vnMatch[3]);
+    } else if (isoMatch) {
+      year = Number(isoMatch[1]);
+      month = Number(isoMatch[2]);
+      day = Number(isoMatch[3]);
+    } else {
+      throw new Error(
+        `Invalid date format for Vietnam day range: ${dateInput}. Expected DD/MM/YYYY or YYYY-MM-DD.`,
+      );
+    }
   } else {
-    throw new Error(
-      `Invalid date format for Vietnam day range: ${dateString}. Expected DD/MM/YYYY or YYYY-MM-DD.`,
-    );
+    throw new Error("Invalid dateInput for getVietnamDayRange");
   }
 
   // Validate maximum days in month (including leap years)
@@ -149,5 +161,31 @@ export function toCalendarDate(dateInput: string | Date): Date {
   }
   const local = new Date(dateInput.getTime() + VIETNAM_OFFSET_MS);
   return new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), 0, 0, 0, 0));
+}
+
+
+
+/**
+ * Tính toán khoảng thời gian đầu tuần (Thứ 2) đến cuối tuần (Chủ nhật) theo UTC+7.
+ */
+export function getVietnamWeekRange(dateInput: Date | string = new Date()): {
+  startOfWeek: Date;
+  endOfWeek: Date;
+} {
+  const { startOfDay } = getVietnamDayRange(dateInput);
+  const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
+  const d = isNaN(date.getTime()) ? new Date() : date;
+  const vnDay = new Date(
+    d.toLocaleString("en-US", { timeZone: "Asia/Ho_Chi_Minh" }),
+  ).getDay();
+  const diffToMonday = vnDay === 0 ? -6 : 1 - vnDay;
+
+  const startOfWeek = new Date(
+    startOfDay.getTime() + diffToMonday * 24 * 60 * 60 * 1000,
+  );
+  const endOfWeek = new Date(
+    startOfWeek.getTime() + (7 * 24 * 60 * 60 * 1000 - 1),
+  );
+  return { startOfWeek, endOfWeek };
 }
 

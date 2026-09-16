@@ -38,6 +38,22 @@ export class MeetingService {
     if (!meeting) {
       throw new AppError("Cuộc họp không tồn tại", 404, ERROR_CODE.MEETING_NOT_FOUND);
     }
+
+    // SEC-04: Intern chỉ được xem chi tiết cuộc họp mà mình là participant.
+    // Thông tin nhạy cảm (minutes, meetingLink, absences) không được lộ ra ngoài.
+    if (actor.role === ROLES.INTERN) {
+      const isParticipant = meeting.participants.some(
+        (p) => p.userId === actor.id,
+      );
+      if (!isParticipant) {
+        throw new AppError(
+          "Không có quyền xem cuộc họp này",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
+      }
+    }
+
     return meeting;
   }
 

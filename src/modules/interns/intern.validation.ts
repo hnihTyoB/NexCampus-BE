@@ -119,8 +119,9 @@ export const updateMeInternSchema = z.object({
     .string()
     .regex(VIETNAMESE_PHONE_REGEX, "Số điện thoại không đúng định dạng Việt Nam")
     .optional(),
-  departmentId: z.string().uuid("Invalid departmentId").optional(),
-  positionId: z.string().uuid("Invalid positionId").optional(),
+  // departmentId và positionId bị loại bỏ có chủ đích:
+  // Intern không được tự chuyển phòng ban hoặc vị trí (SEC-03).
+  // Chỉ Admin/Manager mới được thay đổi qua endpoint quản lý.
   discordUsername: z.string().nullable().optional(),
   university: z.string().trim().nullable().optional(),
   major: z.string().trim().nullable().optional(),

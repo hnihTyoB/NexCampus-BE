@@ -992,4 +992,81 @@ describe("Audit & Remediation Verification Test Suite", () => {
       assert.equal(typeof authService.regenerateBackupCodes, "function");
     });
   });
+
+  describe("27. [BUG-19] Centralized AuditLogRepository delegation", () => {
+    it("should export activityLogRepository singleton and delegate repository createAuditLog calls", async () => {
+      const { activityLogRepository } = require("../src/modules/activity-logs/activity-log.repository");
+      const { userRepository } = require("../src/modules/users/user.repository");
+      const { taskRepository } = require("../src/modules/tasks/task.repository");
+      const { taskSubmissionRepository } = require("../src/modules/task-submissions/task-submission.repository");
+
+      assert.ok(activityLogRepository, "activityLogRepository should be exported");
+      assert.equal(typeof activityLogRepository.create, "function");
+
+      // Spy on activityLogRepository.create
+      const originalCreate = activityLogRepository.create;
+      const calls: any[] = [];
+      activityLogRepository.create = async (data: any) => {
+        calls.push(data);
+        return { id: "mock-log-id", ...data } as any;
+      };
+
+      try {
+        await userRepository.createAuditLog({
+          actorId: "actor-1",
+          action: "UPDATE_USER",
+          targetType: "USER",
+          targetId: "user-1",
+        });
+
+        await taskRepository.createAuditLog({
+          actorId: "actor-2",
+          action: "CREATE_TASK",
+          targetType: "TASK",
+          targetId: "task-1",
+        });
+
+        await taskSubmissionRepository.createAuditLog({
+          actorId: "actor-3",
+          action: "SUBMIT_TASK",
+          targetType: "TASK_SUBMISSION",
+          targetId: "sub-1",
+        });
+
+        assert.equal(calls.length, 3, "All 3 repository calls should be delegated to activityLogRepository");
+        assert.equal(calls[0].action, "UPDATE_USER");
+        assert.equal(calls[1].action, "CREATE_TASK");
+        assert.equal(calls[2].action, "SUBMIT_TASK");
+      } finally {
+        activityLogRepository.create = originalCreate;
+      }
+    });
+  });
+
+  describe("28. [BUG-20] Standardized Error Codes and Messages", () => {
+    it("should ensure code and errorCode are always populated on AppError responses", () => {
+      const { AppError } = require("../src/common/errors/app-error");
+
+      // Test 404 AppError without explicit code
+      const { req: req404, res: res404 } = createMockReqRes();
+      errorMiddleware(new AppError("Item not found", 404), req404, res404, () => {});
+      assert.equal(res404.statusCode, 404);
+      assert.equal(res404.body.code, ERROR_CODE.NOT_FOUND);
+      assert.equal(res404.body.errorCode, ERROR_CODE.NOT_FOUND);
+
+      // Test 400 AppError without explicit code
+      const { req: req400, res: res400 } = createMockReqRes();
+      errorMiddleware(new AppError("Invalid data format", 400), req400, res400, () => {});
+      assert.equal(res400.statusCode, 400);
+      assert.equal(res400.body.code, ERROR_CODE.BAD_REQUEST);
+      assert.equal(res400.body.errorCode, ERROR_CODE.BAD_REQUEST);
+
+      // Test unhandled Error (500)
+      const { req: req500, res: res500 } = createMockReqRes();
+      errorMiddleware(new Error("Unexpected crash"), req500, res500, () => {});
+      assert.equal(res500.statusCode, 500);
+      assert.equal(res500.body.code, ERROR_CODE.INTERNAL_SERVER_ERROR);
+      assert.equal(res500.body.errorCode, ERROR_CODE.INTERNAL_SERVER_ERROR);
+    });
+  });
 });

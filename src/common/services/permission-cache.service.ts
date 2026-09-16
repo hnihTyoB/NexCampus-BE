@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import IORedis from "ioredis";
 import { rbacRepository } from "../../modules/rbac/rbac.repository";
 import { userRepository } from "../../modules/users/user.repository";
@@ -211,8 +212,15 @@ export class PermissionCacheService {
         });
 
         return userState;
-      } catch {
-        return null;
+      } catch (err) {
+        if (
+          isTestEnv ||
+          (err instanceof Prisma.PrismaClientKnownRequestError &&
+            err.code === "P2025")
+        ) {
+          return null;
+        }
+        throw err;
       } finally {
         this.userInflight.delete(userId);
       }
@@ -223,7 +231,7 @@ export class PermissionCacheService {
   }
 
   async getUserPermissions(userId: string): Promise<string[]> {
-    const user = await userRepository.findById(userId);
+    const user = await this.getUserState(userId);
 
     if (!user || !user.roleId) {
       return [];

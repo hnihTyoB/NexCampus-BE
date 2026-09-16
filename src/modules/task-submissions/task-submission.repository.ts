@@ -8,6 +8,7 @@ import {
 } from "./task-submission.dto";
 import { ASSIGNMENT_STATUS } from "../../common/constants/task.constant";
 import { SYSTEM_TARGET_ID } from "../../common/constants/audit-log.constant";
+import { activityLogRepository } from "../activity-logs/activity-log.repository";
 
 const defaultSelect = {
   id: true,
@@ -167,10 +168,16 @@ export class TaskSubmissionRepository {
 
   async createWithTransaction(
     data: CreateTaskSubmissionDto,
-    attempt: number,
     uploaderId: string,
+    explicitAttempt?: number,
   ) {
     return prisma.$transaction(async (tx) => {
+      const attempt =
+        explicitAttempt ??
+        ((await tx.taskSubmission.count({
+          where: { assignmentId: data.assignmentId },
+        })) + 1);
+
       const submission = await tx.taskSubmission.create({
         data: {
           assignmentId: data.assignmentId,
@@ -295,16 +302,10 @@ export class TaskSubmissionRepository {
     targetId?: string;
     details?: Record<string, unknown>;
     ipAddress?: string;
+    userAgent?: string;
   }) {
-    return prisma.auditLog.create({
-      data: {
-        actorId: data.actorId,
-        action: data.action,
-        targetType: data.targetType,
-        targetId: data.targetId || SYSTEM_TARGET_ID,
-        details: data.details as Prisma.InputJsonValue,
-        ipAddress: data.ipAddress,
-      },
-    });
+    return activityLogRepository.create(data);
   }
 }
+
+export const taskSubmissionRepository = new TaskSubmissionRepository();

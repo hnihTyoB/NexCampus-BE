@@ -708,6 +708,8 @@ model Task {
   @@index([taskGroupId])
   @@index([recreatedTaskId])
   @@index([phase])
+  @@index([deadline])
+  @@index([deletedAt, deadline])
   @@index([deletedAt])
   @@map("tasks")
 }
@@ -751,6 +753,7 @@ model TaskAssignment {
   submissions TaskSubmission[]
 
   @@index([internId])
+  @@index([internId, status])
   @@index([supportId])
   @@index([assignedBy])
   @@index([status])
@@ -783,6 +786,7 @@ model TaskSubmission {
   reviewer    User?                  @relation("ReviewedSubmissions", fields: [reviewedBy], references: [id], onDelete: SetNull)
   attachments SubmissionAttachment[]
 
+  @@unique([assignmentId, attempt])
   @@index([assignmentId])
   @@index([reviewedBy])
   @@index([reviewStatus])
@@ -1024,7 +1028,7 @@ model WeeklyEvaluation {
   internId        String           @map("intern_id") @db.Uuid
   leaderId        String           @map("leader_id") @db.Uuid
   week            Int
-  year            Int              @default(2026)
+  year            Int
   startDate       DateTime?        @map("start_date")
   endDate         DateTime?        @map("end_date")
 

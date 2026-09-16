@@ -101,3 +101,5 @@ export class ActivityLogRepository {
     });
   }
 }
+
+export const activityLogRepository = new ActivityLogRepository();

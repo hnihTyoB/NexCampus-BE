@@ -6,6 +6,7 @@ import {
   TaskGroupQueryDto,
   TaskGroupProgressDto,
 } from "./task-group.dto";
+import { activityLogRepository } from "../activity-logs/activity-log.repository";
 
 const defaultSelect = {
   id: true,
@@ -295,16 +296,8 @@ export class TaskGroupRepository {
     targetId: string;
     details?: Prisma.InputJsonValue;
     ipAddress?: string;
+    userAgent?: string;
   }) {
-    return prisma.auditLog.create({
-      data: {
-        actorId: data.actorId,
-        action: data.action,
-        targetType: data.targetType,
-        targetId: data.targetId,
-        details: data.details,
-        ipAddress: data.ipAddress,
-      },
-    });
+    return activityLogRepository.create(data);
   }
 }

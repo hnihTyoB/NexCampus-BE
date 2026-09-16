@@ -1,5 +1,6 @@
 import { prisma } from "../../database/prisma.client";
 import { SYSTEM_TARGET_ID } from "../../common/constants/audit-log.constant";
+import { activityLogRepository } from "../activity-logs/activity-log.repository";
 import { EMAIL_MAX_ATTEMPTS } from "../../common/constants/notification.constant";
 import {
   ListNotificationsDto,
@@ -397,17 +398,7 @@ export class NotificationRepository {
     ipAddress?: string;
     userAgent?: string;
   }) {
-    return prisma.auditLog.create({
-      data: {
-        actorId: data.actorId,
-        action: data.action,
-        targetType: data.targetType,
-        targetId: data.targetId || SYSTEM_TARGET_ID,
-        details: (data.details as any) || null,
-        ipAddress: data.ipAddress,
-        userAgent: data.userAgent,
-      },
-    });
+    return activityLogRepository.create(data);
   }
 }
 

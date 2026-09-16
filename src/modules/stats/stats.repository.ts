@@ -1,5 +1,9 @@
 import { prisma } from "../../database/prisma.client";
 import {
+  getVietnamDayRange,
+  getVietnamWeekRange,
+} from "../../common/helpers/date.helper";
+import {
   AdminStatsResponseDto,
   LeaderStatsResponseDto,
   InternStatsResponseDto,
@@ -15,26 +19,15 @@ export class StatsRepository {
   /**
    * Helper tính toán khoảng thời gian trong ngày theo UTC+7 (Asia/Ho_Chi_Minh)
    */
-  private getVietnamDayRange(date = new Date()): { startOfDay: Date; endOfDay: Date } {
-    const vnDateStr = date.toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }); // YYYY-MM-DD
-    const startOfDay = new Date(`${vnDateStr}T00:00:00.000+07:00`);
-    const endOfDay = new Date(`${vnDateStr}T23:59:59.999+07:00`);
-    return { startOfDay, endOfDay };
+  private getVietnamDayRange(date = new Date()) {
+    return getVietnamDayRange(date);
   }
 
   /**
    * Helper tính toán khoảng thời gian đầu tuần (Thứ 2) đến cuối tuần (Chủ nhật)
    */
-  private getVietnamWeekRange(date = new Date()): { startOfWeek: Date; endOfWeek: Date } {
-    const { startOfDay } = this.getVietnamDayRange(date);
-    // getDay: 0 = Sun, 1 = Mon, ..., 6 = Sat
-    const day = startOfDay.getUTCDay(); // Lưu ý UTC vs Local, dùng VN day:
-    const vnDay = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Ho_Chi_Minh" })).getDay();
-    const diffToMonday = vnDay === 0 ? -6 : 1 - vnDay;
-    
-    const startOfWeek = new Date(startOfDay.getTime() + diffToMonday * 24 * 60 * 60 * 1000);
-    const endOfWeek = new Date(startOfWeek.getTime() + 7 * 24 * 60 * 60 * 1000 - 1);
-    return { startOfWeek, endOfWeek };
+  private getVietnamWeekRange(date = new Date()) {
+    return getVietnamWeekRange(date);
   }
 
   /**
@@ -187,53 +180,123 @@ export class StatsRepository {
       leaderCount: d._count.leaderAssignments,
     }));
 
-    // Leader teams performance
-    const leaderTeams: LeaderTeamProgressDto[] = await Promise.all(
-      leaders.map(async (leader) => {
-        const internCount = await prisma.intern.count({
-          where: { leaderId: leader.userId, status: "ACTIVE", deletedAt: null },
-        });
+    // Leader teams performance (Batch query to eliminate N+1 - BUG-04)
+    const leaderUserIds = leaders.map((l) => l.userId);
+    let leaderTeams: LeaderTeamProgressDto[] = [];
 
-        const assignments = await prisma.taskAssignment.groupBy({
-          by: ["status"],
+    if (leaderUserIds.length > 0) {
+      const [internCounts, managedInternList] = await Promise.all([
+        prisma.intern.groupBy({
+          by: ["leaderId"],
           where: {
-            intern: { leaderId: leader.userId, deletedAt: null },
+            leaderId: { in: leaderUserIds },
+            status: "ACTIVE",
+            deletedAt: null,
           },
           _count: { _all: true },
-        });
+        }),
+        prisma.intern.findMany({
+          where: {
+            leaderId: { in: leaderUserIds },
+            deletedAt: null,
+          },
+          select: { id: true, leaderId: true },
+        }),
+      ]);
 
-        let activeCount = 0;
-        let doneCount = 0;
-        for (const a of assignments) {
-          if (a.status === "DONE") doneCount += a._count._all;
-          else if (a.status === "IN_PROGRESS" || a.status === "TODO" || a.status === "REVIEW") activeCount += a._count._all;
+      const internCountMap = new Map<string, number>();
+      for (const row of internCounts) {
+        if (row.leaderId) internCountMap.set(row.leaderId, row._count._all);
+      }
+
+      const internLeaderMap = new Map<string, string>();
+      const internIds = managedInternList.map((i) => {
+        if (i.leaderId) internLeaderMap.set(i.id, i.leaderId);
+        return i.id;
+      });
+
+      const leaderStatsMap = new Map<
+        string,
+        { active: number; done: number; overdue: number }
+      >();
+      for (const leader of leaders) {
+        leaderStatsMap.set(leader.userId, { active: 0, done: 0, overdue: 0 });
+      }
+
+      if (internIds.length > 0) {
+        const [assignmentsGrouped, overdueGrouped] = await Promise.all([
+          prisma.taskAssignment.groupBy({
+            by: ["internId", "status"],
+            where: { internId: { in: internIds } },
+            _count: { _all: true },
+          }),
+          prisma.taskAssignment.groupBy({
+            by: ["internId"],
+            where: {
+              internId: { in: internIds },
+              status: { not: "DONE" },
+              task: { deadline: { lt: now }, deletedAt: null },
+            },
+            _count: { _all: true },
+          }),
+        ]);
+
+        for (const a of assignmentsGrouped) {
+          if (!a.internId) continue;
+          const leaderId = internLeaderMap.get(a.internId);
+          if (!leaderId) continue;
+          const stats = leaderStatsMap.get(leaderId);
+          if (stats) {
+            if (a.status === "DONE") stats.done += a._count._all;
+            else if (
+              a.status === "IN_PROGRESS" ||
+              a.status === "TODO" ||
+              a.status === "REVIEW"
+            )
+              stats.active += a._count._all;
+          }
         }
 
-        const overdueCount = await prisma.taskAssignment.count({
-          where: {
-            intern: { leaderId: leader.userId, deletedAt: null },
-            status: { not: "DONE" },
-            task: { deadline: { lt: now }, deletedAt: null },
-          },
-        });
+        for (const o of overdueGrouped) {
+          if (!o.internId) continue;
+          const leaderId = internLeaderMap.get(o.internId);
+          if (!leaderId) continue;
+          const stats = leaderStatsMap.get(leaderId);
+          if (stats) {
+            stats.overdue += o._count._all;
+          }
+        }
+      }
 
+      leaderTeams = leaders.map((leader) => {
+        const internCount = internCountMap.get(leader.userId) || 0;
+        const stats = leaderStatsMap.get(leader.userId) || {
+          active: 0,
+          done: 0,
+          overdue: 0,
+        };
         const riskLevel: "HEALTHY" | "WARNING" | "DANGER" =
-          overdueCount >= 3 ? "DANGER" : overdueCount >= 1 ? "WARNING" : "HEALTHY";
-
-        const deptName = leader.departments.map((dep) => dep.department.name).join(", ") || "Chưa gán";
+          stats.overdue >= 3
+            ? "DANGER"
+            : stats.overdue >= 1
+              ? "WARNING"
+              : "HEALTHY";
+        const deptName =
+          leader.departments.map((dep) => dep.department.name).join(", ") ||
+          "Chưa gán";
 
         return {
           leaderId: leader.id,
           leaderName: leader.user?.fullName || "Leader",
           departmentName: deptName,
           internCount,
-          activeTasksCount: activeCount,
-          completedTasksCount: doneCount,
-          overdueTasksCount: overdueCount,
+          activeTasksCount: stats.active,
+          completedTasksCount: stats.done,
+          overdueTasksCount: stats.overdue,
           riskLevel,
         };
-      })
-    );
+      });
+    }
 
     // Recent Activities
     const recentActivities: RecentActivityDto[] = recentAuditLogs.map((log) => ({
@@ -376,44 +439,101 @@ export class StatsRepository {
         _count: { _all: true },
         _avg: { score: true },
       }),
-      Promise.all(
-        managedInterns.map(async (intern) => {
-          const [total, done, overdue, avgScoreData] = await Promise.all([
-            prisma.taskAssignment.count({ where: { internId: intern.id } }),
-            prisma.taskAssignment.count({ where: { internId: intern.id, status: "DONE" } }),
-            prisma.taskAssignment.count({
-              where: {
-                internId: intern.id,
-                status: { not: "DONE" },
-                task: { deadline: { lt: now }, deletedAt: null },
-              },
-            }),
-            prisma.weeklyEvaluation.aggregate({
-              where: { internId: intern.id, deletedAt: null },
-              _avg: { score: true },
-            }),
-          ]);
-
-          const completionRate = total > 0 ? Math.round((done / total) * 100) : 0;
-          const avgScore = avgScoreData._avg.score ? Number(avgScoreData._avg.score.toFixed(1)) : 0;
-          const healthStatus: "HEALTHY" | "WARNING" | "DANGER" =
-            overdue >= 2 ? "DANGER" : overdue === 1 ? "WARNING" : "HEALTHY";
-
-          return {
-            internId: intern.id,
-            fullName: intern.fullName,
-            email: intern.user.email || "",
-            avatarUrl: intern.user.avatarUrl,
-            completedTasks: done,
-            totalTasks: total,
-            completionRate,
-            avgScore,
-            overdueTasks: overdue,
-            healthStatus,
-          };
-        })
-      ),
+      Promise.all([
+        prisma.taskAssignment.groupBy({
+          by: ["internId", "status"],
+          where: { internId: { in: internIds } },
+          _count: { _all: true },
+        }),
+        prisma.taskAssignment.groupBy({
+          by: ["internId"],
+          where: {
+            internId: { in: internIds },
+            status: { not: "DONE" },
+            task: { deadline: { lt: now }, deletedAt: null },
+          },
+          _count: { _all: true },
+        }),
+        prisma.weeklyEvaluation.groupBy({
+          by: ["internId"],
+          where: { internId: { in: internIds }, deletedAt: null },
+          _avg: { score: true },
+        }),
+      ]),
     ]);
+
+    const [internAssignmentsGroup, internOverdueGroup, internEvaluationsAvg] =
+      individualInternData;
+
+    const internStatsMap = new Map<
+      string,
+      { total: number; done: number; overdue: number; avgScore: number }
+    >();
+    for (const intern of managedInterns) {
+      internStatsMap.set(intern.id, {
+        total: 0,
+        done: 0,
+        overdue: 0,
+        avgScore: 0,
+      });
+    }
+
+    for (const row of internAssignmentsGroup) {
+      if (!row.internId) continue;
+      const stats = internStatsMap.get(row.internId);
+      if (stats) {
+        stats.total += row._count._all;
+        if (row.status === "DONE") stats.done += row._count._all;
+      }
+    }
+
+    for (const row of internOverdueGroup) {
+      if (!row.internId) continue;
+      const stats = internStatsMap.get(row.internId);
+      if (stats) {
+        stats.overdue += row._count._all;
+      }
+    }
+
+    for (const row of internEvaluationsAvg) {
+      if (!row.internId) continue;
+      const stats = internStatsMap.get(row.internId);
+      if (stats && row._avg.score !== null && row._avg.score !== undefined) {
+        stats.avgScore = Number(row._avg.score.toFixed(1));
+      }
+    }
+
+    const internProgress: LeaderInternProgressDto[] = managedInterns.map(
+      (intern) => {
+        const stats = internStatsMap.get(intern.id) || {
+          total: 0,
+          done: 0,
+          overdue: 0,
+          avgScore: 0,
+        };
+        const completionRate =
+          stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : 0;
+        const healthStatus: "HEALTHY" | "WARNING" | "DANGER" =
+          stats.overdue >= 2
+            ? "DANGER"
+            : stats.overdue === 1
+              ? "WARNING"
+              : "HEALTHY";
+
+        return {
+          internId: intern.id,
+          fullName: intern.fullName,
+          email: intern.user?.email || "",
+          avatarUrl: intern.user?.avatarUrl || null,
+          completedTasks: stats.done,
+          totalTasks: stats.total,
+          completionRate,
+          avgScore: stats.avgScore,
+          overdueTasks: stats.overdue,
+          healthStatus,
+        };
+      },
+    );
 
     // Workload calculation
     let activeWorkloadDays = 0;
@@ -493,7 +613,7 @@ export class StatsRepository {
         totalEvaluations: evaluationsAggregate._count._all,
         avgScore: evaluationsAggregate._avg.score ? Number(evaluationsAggregate._avg.score.toFixed(1)) : 0,
       },
-      internProgress: individualInternData,
+      internProgress,
     };
   }
 
@@ -705,6 +825,22 @@ export class StatsRepository {
       select: { id: true },
     });
     return intern ? intern.id : null;
+  }
+
+  /**
+   * SEC-01: Kiểm tra intern có thuộc quyền quản lý của leader không.
+   * Leader chỉ được đọc thống kê intern mà mình là leaderId trực tiếp.
+   */
+  async isInternManagedByLeader(internId: string, leaderUserId: string): Promise<boolean> {
+    const intern = await prisma.intern.findFirst({
+      where: {
+        id: internId,
+        leaderId: leaderUserId,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    return intern !== null;
   }
 }
 

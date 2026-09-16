@@ -17,3 +17,16 @@ export const APPLICATION_INVITE_STATUS = {
 
 export type ApplicationInviteStatus =
   (typeof APPLICATION_INVITE_STATUS)[keyof typeof APPLICATION_INVITE_STATUS];
+
+export const ALLOWED_APPLICATION_MIME_TYPES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+] as const;
+
+export type AllowedApplicationMimeType =
+  (typeof ALLOWED_APPLICATION_MIME_TYPES)[number];
+

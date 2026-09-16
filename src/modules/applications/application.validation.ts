@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   APPLICATION_STATUS,
   APPLICATION_INVITE_STATUS,
+  ALLOWED_APPLICATION_MIME_TYPES,
 } from "../../common/constants/application.constant";
 import { VIETNAMESE_PHONE_REGEX } from "../../common/helpers/phone.helper";
 import {
@@ -249,6 +250,11 @@ export const reviewApplicationSchema = z.object({
 });
 
 export const getAttachmentUploadUrlSchema = z.object({
+  token: z.string().trim().min(1, "token is required"),
   fileName: z.string().trim().min(1, "fileName is required"),
-  contentType: z.string().trim().min(1, "contentType is required"),
+  contentType: z.enum(ALLOWED_APPLICATION_MIME_TYPES, {
+    errorMap: () => ({
+      message: `contentType must be one of: ${ALLOWED_APPLICATION_MIME_TYPES.join(", ")}`,
+    }),
+  }),
 });

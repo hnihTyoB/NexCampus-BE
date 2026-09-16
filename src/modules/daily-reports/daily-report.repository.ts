@@ -1,11 +1,13 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../database/prisma.client";
+import { getVietnamDayRange } from "../../common/helpers/date.helper";
 import {
   CreateDailyReportDto,
   CreateReportAttachmentInput,
   DailyReportQueryDto,
   UpdateDailyReportDto,
 } from "./daily-report.dto";
+import { activityLogRepository } from "../activity-logs/activity-log.repository";
 
 export interface DailyReportScoping {
   internId?: string;
@@ -254,17 +256,23 @@ export class DailyReportRepository {
     if (scoping.internId) {
       where.internId = scoping.internId;
     } else if (scoping.isLeader) {
-      where.intern = {
-        deletedAt: null,
-        OR: [
-          ...(scoping.directInternIds && scoping.directInternIds.length > 0
-            ? [{ id: { in: scoping.directInternIds } }]
-            : []),
-          ...(scoping.leaderDepartmentIds && scoping.leaderDepartmentIds.length > 0
-            ? [{ departmentId: { in: scoping.leaderDepartmentIds } }]
-            : []),
-        ],
-      };
+      const orConditions: Prisma.InternWhereInput[] = [
+        ...(scoping.directInternIds && scoping.directInternIds.length > 0
+          ? [{ id: { in: scoping.directInternIds } }]
+          : []),
+        ...(scoping.leaderDepartmentIds && scoping.leaderDepartmentIds.length > 0
+          ? [{ departmentId: { in: scoping.leaderDepartmentIds } }]
+          : []),
+      ];
+
+      if (orConditions.length === 0) {
+        where.internId = { in: [] };
+      } else {
+        where.intern = {
+          deletedAt: null,
+          OR: orConditions,
+        };
+      }
     }
 
     // Query filters
@@ -280,12 +288,26 @@ export class DailyReportRepository {
     }
 
     if (query.date) {
-      where.date = new Date(query.date);
+      const d = new Date(query.date);
+      if (!isNaN(d.getTime())) {
+        where.date = getVietnamDayRange(d).startOfDay;
+      }
     } else if (query.from || query.to) {
-      where.date = {
-        ...(query.from ? { gte: new Date(query.from) } : {}),
-        ...(query.to ? { lte: new Date(query.to) } : {}),
-      };
+      const fromDate =
+        query.from && !isNaN(new Date(query.from).getTime())
+          ? getVietnamDayRange(query.from).startOfDay
+          : undefined;
+      const toDate =
+        query.to && !isNaN(new Date(query.to).getTime())
+          ? getVietnamDayRange(query.to).endOfDay
+          : undefined;
+
+      if (fromDate || toDate) {
+        where.date = {
+          ...(fromDate ? { gte: fromDate } : {}),
+          ...(toDate ? { lte: toDate } : {}),
+        };
+      }
     }
 
     return where;
@@ -296,11 +318,18 @@ export class DailyReportRepository {
     const skip = (page - 1) * limit;
     const where = this.buildWhereClause(query, scoping);
 
+    const SORT_MAP: Record<string, Prisma.DailyReportOrderByWithRelationInput> = {
+      date: { date: order },
+      createdAt: { createdAt: order },
+      updatedAt: { updatedAt: order },
+    };
+    const orderBy = SORT_MAP[sortBy] ?? { date: order };
+
     const [items, total] = await Promise.all([
       prisma.dailyReport.findMany({
         where,
         select: defaultReportSelect,
-        orderBy: { [sortBy]: order },
+        orderBy,
         skip,
         take: limit,
       }),
@@ -375,16 +404,10 @@ export class DailyReportRepository {
     targetId?: string;
     details?: Record<string, unknown>;
     ipAddress?: string;
+    userAgent?: string;
   }) {
-    return prisma.auditLog.create({
-      data: {
-        actorId: data.actorId,
-        action: data.action,
-        targetType: data.targetType,
-        targetId: data.targetId || "SYSTEM",
-        details: data.details as Prisma.InputJsonValue,
-        ipAddress: data.ipAddress,
-      },
-    });
+    return activityLogRepository.create(data);
   }
 }
+
+export const dailyReportRepository = new DailyReportRepository();

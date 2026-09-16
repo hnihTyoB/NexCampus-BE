@@ -312,10 +312,12 @@ export class ApplicationController {
     next: NextFunction,
   ): Promise<void> => {
     try {
+      const token = req.query.token as string;
       const fileName = req.query.fileName as string;
       const contentType = req.query.contentType as string;
 
       const result = await this.service.getAttachmentUploadUrl(
+        token,
         fileName,
         contentType,
       );

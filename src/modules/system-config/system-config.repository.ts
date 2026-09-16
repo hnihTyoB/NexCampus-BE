@@ -5,6 +5,7 @@ import {
   UpdateSystemConfigDto,
   SystemConfigQueryDto,
 } from "./system-config.dto";
+import { activityLogRepository } from "../activity-logs/activity-log.repository";
 
 export class SystemConfigRepository {
   async findAll(query: SystemConfigQueryDto) {
@@ -131,17 +132,7 @@ export class SystemConfigRepository {
     ipAddress?: string;
     userAgent?: string;
   }) {
-    return prisma.auditLog.create({
-      data: {
-        actorId: data.actorId,
-        action: data.action,
-        targetType: data.targetType,
-        targetId: data.targetId,
-        details: (data.details as any) || null,
-        ipAddress: data.ipAddress,
-        userAgent: data.userAgent,
-      },
-    });
+    return activityLogRepository.create(data);
   }
 }
 

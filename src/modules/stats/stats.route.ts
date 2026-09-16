@@ -40,9 +40,12 @@ router.get(
 );
 
 // ── Intern Personal Dashboard Statistics ──
+// SEC-01: Yêu cầu role INTERN, LEADER hoặc ADMIN.
+// USER thông thường không được phép đọc thống kê của intern bất kỳ.
 router.get(
   "/intern",
   authMiddleware,
+  requireRole(ROLES.INTERN, ROLES.LEADER, ROLES.ADMIN),
   validate(internStatsQuerySchema, "query"),
   controller.getInternStats
 );
@@ -50,6 +53,7 @@ router.get(
 router.get(
   "/me",
   authMiddleware,
+  requireRole(ROLES.INTERN, ROLES.LEADER, ROLES.ADMIN),
   validate(internStatsQuerySchema, "query"),
   controller.getInternStats
 );

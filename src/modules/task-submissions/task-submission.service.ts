@@ -144,13 +144,8 @@ export class TaskSubmissionService {
       );
     }
 
-    // Tự động tính số lần nộp (attempt: lần 1, lần 2, ...)
-    const currentAttempts = await this.repository.countAttempts(dto.assignmentId);
-    const attempt = currentAttempts + 1;
-
     const submission = await this.repository.createWithTransaction(
       dto,
-      attempt,
       actor.id,
     );
 
@@ -161,7 +156,7 @@ export class TaskSubmissionService {
       targetId: submission.id,
       details: {
         assignmentId: dto.assignmentId,
-        attempt,
+        attempt: submission.attempt,
         hasPrLink: !!dto.prLink,
         hasVideoDemo: !!dto.videoDemo,
         attachmentCount: dto.attachments?.length || 0,
@@ -277,6 +272,24 @@ export class TaskSubmissionService {
         404,
         ERROR_CODE.SUBMISSION_NOT_FOUND,
       );
+    }
+
+    // SEC-02: Intern chỉ được đính kèm tệp vào bài nộp của chính mình hoặc
+    // bài nộp mà mình là support. Không được đính kèm vào bài của intern khác.
+    if (actor.role === ROLES.INTERN) {
+      const intern = await prisma.intern.findUnique({
+        where: { userId: actor.id },
+        select: { id: true },
+      });
+      const isOwner = intern && submission.assignment.internId === intern.id;
+      const isSupport = intern && submission.assignment.supportId === intern.id;
+      if (!isOwner && !isSupport) {
+        throw new AppError(
+          "Không có quyền đính kèm tệp vào bài nộp này",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
+      }
     }
 
     if (submission.reviewStatus === ReviewStatus.APPROVED) {

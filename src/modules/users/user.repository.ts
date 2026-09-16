@@ -3,6 +3,7 @@ import { prisma } from "../../database/prisma.client";
 import { ROLES } from "../../common/constants/role.constant";
 import { PERMISSIONS } from "../../common/constants/permission.constant";
 import { UserQueryDto } from "./user.dto";
+import { activityLogRepository } from "../activity-logs/activity-log.repository";
 
 const userSelect = {
   id: true,
@@ -255,17 +256,7 @@ export class UserRepository {
     ipAddress?: string;
     userAgent?: string;
   }) {
-    return prisma.auditLog.create({
-      data: {
-        actorId: data.actorId,
-        action: data.action,
-        targetType: data.targetType,
-        targetId: data.targetId ?? "SYSTEM", // AuditLog.targetId is required String in schema
-        details: data.details as any,
-        ipAddress: data.ipAddress,
-        userAgent: data.userAgent,
-      },
-    });
+    return activityLogRepository.create(data);
   }
 }
 

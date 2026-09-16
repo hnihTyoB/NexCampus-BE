@@ -309,20 +309,27 @@ export class ApplicationService {
     // 6. Create application in transaction & mark invite as USED
     const application = await this.repository.createWithInvite(data, duration);
 
-    await this.repository.createAuditLog({
-      action: AUDIT_ACTION.CREATE_APPLICATION,
-      targetType: AUDIT_TARGET_TYPE.APPLICATION,
-      targetId: application.id,
-      details: {
-        fullName: application.fullName,
-        email: application.email,
-        phone: application.phone,
-        preferredDepartment: application.preferredDepartment,
-        preferredPosition: application.preferredPosition,
-      },
-      ipAddress: context?.ipAddress,
-      userAgent: context?.userAgent,
-    });
+    try {
+      await this.repository.createAuditLog({
+        action: AUDIT_ACTION.CREATE_APPLICATION,
+        targetType: AUDIT_TARGET_TYPE.APPLICATION,
+        targetId: application.id,
+        details: {
+          fullName: application.fullName,
+          email: application.email,
+          phone: application.phone,
+          preferredDepartment: application.preferredDepartment,
+          preferredPosition: application.preferredPosition,
+        },
+        ipAddress: context?.ipAddress,
+        userAgent: context?.userAgent,
+      });
+    } catch (auditErr: any) {
+      console.warn(
+        `[ApplicationService] Failed to create audit log for application ${application.id}:`,
+        auditErr.message,
+      );
+    }
 
     return application;
   }
@@ -447,12 +454,15 @@ export class ApplicationService {
 
     await validatePhoneUniqueness(application.phone);
 
-    const role = await prisma.role.findFirst({
-      where: { name: { in: [ROLES.INTERN, "USER"] } },
-      orderBy: { name: "asc" },
+    const role = await prisma.role.findUnique({
+      where: { name: ROLES.INTERN },
     });
     if (!role) {
-      throw new AppError("Role for intern not found", 404, ERROR_CODE.NOT_FOUND);
+      throw new AppError(
+        "Vai trò thực tập sinh không tồn tại trong hệ thống",
+        500,
+        ERROR_CODE.INTERNAL_SERVER_ERROR,
+      );
     }
 
     // Verify leader if provided
@@ -502,21 +512,27 @@ export class ApplicationService {
       envConfig.appUrl ||
       envConfig.cors.allowedOrigins[0] ||
       "http://localhost:3000";
-    await dispatchEmailJob({
-      type: "INTERN_ACCOUNT_CREATED",
-      to: normalizedEmail,
-      data: {
-        fullName: application.fullName,
-        email: normalizedEmail,
-        temporaryPassword: rawPassword,
-        loginUrl,
-        departmentName: (application as any).department?.name,
-        positionTitle: (application as any).position?.title,
-        startDate: application.startDate
-          ? new Date(application.startDate).toLocaleDateString("vi-VN")
-          : undefined,
+    await dispatchEmailJob(
+      {
+        type: "INTERN_ACCOUNT_CREATED",
+        to: normalizedEmail,
+        data: {
+          fullName: application.fullName,
+          email: normalizedEmail,
+          temporaryPassword: rawPassword,
+          loginUrl,
+          departmentName: (application as any).department?.name,
+          positionTitle: (application as any).position?.title,
+          startDate: application.startDate
+            ? new Date(application.startDate).toLocaleDateString("vi-VN")
+            : undefined,
+        },
       },
-    }).catch((err) => {
+      {
+        removeOnFail: true,
+        removeOnComplete: true,
+      },
+    ).catch((err) => {
       console.warn(
         `[ApplicationService] Failed to dispatch approval email to ${normalizedEmail}:`,
         err.message,
@@ -648,9 +664,13 @@ export class ApplicationService {
   // ─── Cloudflare R2 Uploads ────────────────────────────────────────────────
 
   async getAttachmentUploadUrl(
+    token: string,
     fileName: string,
     contentType: string,
   ): Promise<{ uploadUrl: string; key: string; publicUrl: string }> {
+    // SEC-05: Xác thực invitation token hợp lệ trước khi cấp presigned URL
+    await this.verifyInvite(token);
+
     const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
     const key = `applications/${crypto.randomUUID()}_${safeFileName}`;
 

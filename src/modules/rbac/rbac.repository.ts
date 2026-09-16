@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../database/prisma.client";
 import { RoleQueryDto, AuditLogQueryDto } from "./rbac.dto";
+import { activityLogRepository } from "../activity-logs/activity-log.repository";
 import { getVietnamDayRange } from "../../common/helpers/date.helper";
 import {
   VIETNAM_DATE_REGEX,
@@ -273,19 +274,7 @@ export class RbacRepository {
     ipAddress?: string;
     userAgent?: string;
   }) {
-    return prisma.auditLog.create({
-      data: {
-        actorId: data.actorId,
-        action: data.action,
-        targetType: data.targetType,
-        targetId: data.targetId,
-        details: data.details
-          ? (data.details as Prisma.InputJsonObject)
-          : Prisma.DbNull,
-        ipAddress: data.ipAddress,
-        userAgent: data.userAgent,
-      },
-    });
+    return activityLogRepository.create(data);
   }
 
   async findAllAuditLogs(query: AuditLogQueryDto) {
