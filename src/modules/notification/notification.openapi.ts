@@ -571,4 +571,85 @@ export function registerNotificationOpenApi(): void {
       404: { description: "Không tìm thấy email" },
     },
   });
+
+  // ── Dedicated /notification-templates Routes ───────────────────────────────
+
+  openapiRegistry.registerPath({
+    method: "get",
+    path: "/notification-templates",
+    tags: ["Notification Templates"],
+    summary: "Danh sách mẫu thông báo / email (Hub route)",
+    security: [{ BearerAuth: [] }],
+    request: { query: listNotificationTemplatesSchema },
+    responses: {
+      200: {
+        description: "Lấy danh sách mẫu thành công",
+        content: {
+          "application/json": {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              data: z.array(z.record(z.unknown())),
+              meta: z.object({
+                total: z.number(),
+                page: z.number(),
+                limit: z.number(),
+                totalPages: z.number(),
+              }),
+            }),
+          },
+        },
+      },
+    },
+  });
+
+  openapiRegistry.registerPath({
+    method: "post",
+    path: "/notification-templates",
+    tags: ["Notification Templates"],
+    summary: "Tạo mẫu thông báo mới (Hub route)",
+    security: [{ BearerAuth: [] }],
+    request: {
+      body: {
+        content: {
+          "application/json": { schema: createNotificationTemplateSchema },
+        },
+      },
+    },
+    responses: {
+      201: {
+        description: "Tạo mẫu thành công",
+        content: {
+          "application/json": {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              data: z.object({ id: z.string().uuid(), code: z.string() }),
+            }),
+          },
+        },
+      },
+    },
+  });
+
+  openapiRegistry.registerPath({
+    method: "get",
+    path: "/notification-templates/{code}",
+    tags: ["Notification Templates"],
+    summary: "Chi tiết mẫu thông báo theo mã code (Hub route)",
+    security: [{ BearerAuth: [] }],
+    request: { params: templateCodeParamSchema },
+    responses: {
+      200: {
+        description: "Lấy chi tiết mẫu thành công",
+        content: {
+          "application/json": {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              data: z.record(z.unknown()),
+            }),
+          },
+        },
+      },
+    },
+  });
 }
+

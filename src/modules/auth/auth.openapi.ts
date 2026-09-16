@@ -65,7 +65,7 @@ export function registerAuthOpenApi(): void {
   openapiRegistry.registerPath({
     method: "post",
     path: "/auth/register",
-    tags: ["Auth"],
+    tags: ["Auth", "Authentication"],
     summary: "Đăng ký tài khoản người dùng mới",
     request: {
       body: {
@@ -103,7 +103,7 @@ export function registerAuthOpenApi(): void {
   openapiRegistry.registerPath({
     method: "get",
     path: "/auth/verify-email",
-    tags: ["Auth"],
+    tags: ["Auth", "Authentication"],
     summary: "Xác thực email qua token",
     request: {
       query: verifyEmailSchema,
@@ -130,7 +130,7 @@ export function registerAuthOpenApi(): void {
   openapiRegistry.registerPath({
     method: "post",
     path: "/auth/login",
-    tags: ["Auth"],
+    tags: ["Auth", "Authentication"],
     summary: "Đăng nhập người dùng",
     request: {
       body: {
@@ -183,7 +183,7 @@ export function registerAuthOpenApi(): void {
   openapiRegistry.registerPath({
     method: "get",
     path: "/auth/me",
-    tags: ["Auth"],
+    tags: ["Auth", "Authentication"],
     summary: "Lấy thông tin tài khoản hiện tại",
     security: [{ BearerAuth: [] }],
     responses: {
@@ -214,7 +214,7 @@ export function registerAuthOpenApi(): void {
   openapiRegistry.registerPath({
     method: "post",
     path: "/auth/refresh",
-    tags: ["Auth"],
+    tags: ["Auth", "Authentication"],
     summary: "Làm mới Access Token bằng Refresh Token",
     request: {
       body: {
@@ -247,7 +247,7 @@ export function registerAuthOpenApi(): void {
   openapiRegistry.registerPath({
     method: "post",
     path: "/auth/logout",
-    tags: ["Auth"],
+    tags: ["Auth", "Authentication"],
     summary: "Đăng xuất tài khoản",
     request: {
       body: {
@@ -275,7 +275,7 @@ export function registerAuthOpenApi(): void {
   openapiRegistry.registerPath({
     method: "put",
     path: "/auth/profile",
-    tags: ["Auth"],
+    tags: ["Auth", "Authentication"],
     summary: "Cập nhật thông tin cá nhân",
     security: [{ BearerAuth: [] }],
     request: {
@@ -311,7 +311,7 @@ export function registerAuthOpenApi(): void {
   openapiRegistry.registerPath({
     method: "put",
     path: "/auth/password",
-    tags: ["Auth"],
+    tags: ["Auth", "Authentication"],
     summary: "Đổi mật khẩu tài khoản",
     security: [{ BearerAuth: [] }],
     request: {
@@ -344,7 +344,7 @@ export function registerAuthOpenApi(): void {
   openapiRegistry.registerPath({
     method: "post",
     path: "/auth/forgot-password",
-    tags: ["Auth"],
+    tags: ["Auth", "Authentication"],
     summary: "Yêu cầu gửi email khôi phục mật khẩu",
     request: {
       body: {
@@ -375,7 +375,7 @@ export function registerAuthOpenApi(): void {
   openapiRegistry.registerPath({
     method: "post",
     path: "/auth/reset-password",
-    tags: ["Auth"],
+    tags: ["Auth", "Authentication"],
     summary: "Đặt lại mật khẩu qua reset token",
     request: {
       body: {
@@ -406,7 +406,7 @@ export function registerAuthOpenApi(): void {
   openapiRegistry.registerPath({
     method: "post",
     path: "/auth/resend-verification",
-    tags: ["Auth"],
+    tags: ["Auth", "Authentication"],
     summary: "Gửi lại email xác thực tài khoản",
     request: {
       body: {
@@ -440,7 +440,7 @@ export function registerAuthOpenApi(): void {
   openapiRegistry.registerPath({
     method: "get",
     path: "/auth/sessions",
-    tags: ["Auth"],
+    tags: ["Auth", "Authentication"],
     summary: "Danh sách các phiên đăng nhập hoạt động",
     security: [{ BearerAuth: [] }],
     responses: {
@@ -471,7 +471,7 @@ export function registerAuthOpenApi(): void {
   openapiRegistry.registerPath({
     method: "delete",
     path: "/auth/sessions/{id}",
-    tags: ["Auth"],
+    tags: ["Auth", "Authentication"],
     summary: "Thu hồi một phiên đăng nhập cụ thể",
     security: [{ BearerAuth: [] }],
     request: {
@@ -498,7 +498,7 @@ export function registerAuthOpenApi(): void {
   openapiRegistry.registerPath({
     method: "delete",
     path: "/auth/sessions",
-    tags: ["Auth"],
+    tags: ["Auth", "Authentication"],
     summary: "Thu hồi toàn bộ các phiên đăng nhập khác",
     security: [{ BearerAuth: [] }],
     request: {
@@ -529,7 +529,7 @@ export function registerAuthOpenApi(): void {
   openapiRegistry.registerPath({
     method: "post",
     path: "/auth/avatar/upload-url",
-    tags: ["Auth"],
+    tags: ["Auth", "Authentication"],
     summary: "Lấy Presigned URL tải lên Avatar lên Cloudflare R2 / S3",
     security: [{ BearerAuth: [] }],
     request: {
@@ -561,7 +561,7 @@ export function registerAuthOpenApi(): void {
   openapiRegistry.registerPath({
     method: "post",
     path: "/auth/avatar/confirm",
-    tags: ["Auth"],
+    tags: ["Auth", "Authentication"],
     summary: "Xác nhận hoàn tất tải lên Avatar",
     security: [{ BearerAuth: [] }],
     request: {
@@ -592,7 +592,7 @@ export function registerAuthOpenApi(): void {
   openapiRegistry.registerPath({
     method: "post",
     path: "/auth/deactivate/request",
-    tags: ["Auth"],
+    tags: ["Auth", "Authentication"],
     summary:
       "Yêu cầu vô hiệu hóa tài khoản (gửi email xác nhận kèm token 15 phút)",
     security: [{ BearerAuth: [] }],
@@ -634,7 +634,7 @@ export function registerAuthOpenApi(): void {
   openapiRegistry.registerPath({
     method: "post",
     path: "/auth/deactivate/confirm",
-    tags: ["Auth"],
+    tags: ["Auth", "Authentication"],
     summary: "Xác nhận vô hiệu hóa tài khoản bằng mã token nhận qua email",
     request: {
       body: {

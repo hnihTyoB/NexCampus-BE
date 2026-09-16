@@ -62,9 +62,11 @@ export const swaggerOptions: SwaggerUiOptions = {
   customCss: `
     .swagger-ui .topbar { background-color: #1a1a2e; }
     .swagger-ui .topbar-wrapper .link img { display: none; }
-    .swagger-ui .topbar-wrapper .link::after { content: 'Template API'; color: white; font-size: 1.2rem; font-weight: bold; }
+    .swagger-ui .topbar-wrapper .link::after { content: 'NexCampus API Documentation'; color: white; font-size: 1.2rem; font-weight: bold; }
   `,
   customSiteTitle: "API Documentation",
 };
 
 export const swaggerSpec: Record<string, any> = buildOpenApiSpec();
+
+

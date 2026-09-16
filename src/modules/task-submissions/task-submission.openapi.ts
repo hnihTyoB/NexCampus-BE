@@ -19,7 +19,7 @@ export function registerTaskSubmissionOpenApi(): void {
   openapiRegistry.registerPath({
     method: "get",
     path: "/task-submissions/upload-url",
-    tags: ["Task Submissions"],
+    tags: ["Submissions"],
     summary: "Lấy URL presigned upload file nộp bài lên Cloudflare R2",
     security: [{ BearerAuth: [] }],
     request: { query: getSubmissionUploadUrlSchema },
@@ -46,7 +46,7 @@ export function registerTaskSubmissionOpenApi(): void {
   openapiRegistry.registerPath({
     method: "get",
     path: "/task-submissions",
-    tags: ["Task Submissions"],
+    tags: ["Submissions"],
     summary: "Lấy danh sách bài nộp công việc",
     security: [{ BearerAuth: [] }],
     request: { query: findAllSubmissionSchema },
@@ -75,7 +75,7 @@ export function registerTaskSubmissionOpenApi(): void {
   openapiRegistry.registerPath({
     method: "get",
     path: "/task-submissions/{id}",
-    tags: ["Task Submissions"],
+    tags: ["Submissions"],
     summary: "Xem chi tiết bài nộp công việc",
     security: [{ BearerAuth: [] }],
     request: { params: submissionIdParamSchema },
@@ -99,7 +99,7 @@ export function registerTaskSubmissionOpenApi(): void {
   openapiRegistry.registerPath({
     method: "post",
     path: "/task-submissions",
-    tags: ["Task Submissions"],
+    tags: ["Submissions"],
     summary: "TTS nộp bài làm (Bắt buộc task đang IN_PROGRESS; tự tính attempt)",
     security: [{ BearerAuth: [] }],
     request: {
@@ -130,7 +130,7 @@ export function registerTaskSubmissionOpenApi(): void {
   openapiRegistry.registerPath({
     method: "post",
     path: "/task-submissions/{id}/review",
-    tags: ["Task Submissions"],
+    tags: ["Submissions"],
     summary: "Leader/Admin đánh giá bài nộp (APPROVED -> DONE, REJECTED -> TODO)",
     security: [{ BearerAuth: [] }],
     request: {
@@ -162,7 +162,7 @@ export function registerTaskSubmissionOpenApi(): void {
   openapiRegistry.registerPath({
     method: "post",
     path: "/task-submissions/{id}/attachments",
-    tags: ["Task Submissions"],
+    tags: ["Submissions"],
     summary: "Thêm tệp đính kèm vào bài nộp",
     security: [{ BearerAuth: [] }],
     request: {
@@ -192,7 +192,7 @@ export function registerTaskSubmissionOpenApi(): void {
   openapiRegistry.registerPath({
     method: "delete",
     path: "/task-submissions/{id}/attachments/{attachmentId}",
-    tags: ["Task Submissions"],
+    tags: ["Submissions"],
     summary: "Xóa tệp đính kèm khỏi bài nộp",
     security: [{ BearerAuth: [] }],
     request: { params: attachmentIdParamSchema },

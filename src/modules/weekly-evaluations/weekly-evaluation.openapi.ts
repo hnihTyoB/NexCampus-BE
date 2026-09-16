@@ -16,7 +16,7 @@ export function registerWeeklyEvaluationOpenApi(): void {
   openapiRegistry.registerPath({
     method: "post",
     path: "/weekly-evaluations/ai-suggest",
-    tags: ["Weekly Evaluations"],
+    tags: ["WeeklyEvaluations"],
     summary: "Trợ lý AI gợi ý xếp loại 12 tiêu chí và viết sẵn nhận xét đánh giá tuần",
     security: [{ BearerAuth: [] }],
     request: {
@@ -47,7 +47,7 @@ export function registerWeeklyEvaluationOpenApi(): void {
   openapiRegistry.registerPath({
     method: "get",
     path: "/weekly-evaluations/intern/{internId}/summary",
-    tags: ["Weekly Evaluations"],
+    tags: ["WeeklyEvaluations"],
     summary: "Tổng hợp điểm trung bình, xếp loại và lịch sử 6 tuần gần nhất của TTS",
     security: [{ BearerAuth: [] }],
     request: {
@@ -72,7 +72,7 @@ export function registerWeeklyEvaluationOpenApi(): void {
   openapiRegistry.registerPath({
     method: "get",
     path: "/weekly-evaluations",
-    tags: ["Weekly Evaluations"],
+    tags: ["WeeklyEvaluations"],
     summary: "Danh sách đánh giá tuần phân trang và lọc",
     security: [{ BearerAuth: [] }],
     request: {
@@ -101,7 +101,7 @@ export function registerWeeklyEvaluationOpenApi(): void {
   openapiRegistry.registerPath({
     method: "post",
     path: "/weekly-evaluations",
-    tags: ["Weekly Evaluations"],
+    tags: ["WeeklyEvaluations"],
     summary: "Leader tạo đánh giá tuần cho TTS (12 tiêu chí, điểm TB, nhận xét)",
     security: [{ BearerAuth: [] }],
     request: {
@@ -132,7 +132,7 @@ export function registerWeeklyEvaluationOpenApi(): void {
   openapiRegistry.registerPath({
     method: "get",
     path: "/weekly-evaluations/{id}",
-    tags: ["Weekly Evaluations"],
+    tags: ["WeeklyEvaluations"],
     summary: "Chi tiết đánh giá tuần (bảng 12 tiêu chí, nhận xét Leader, nhận xét gốc AI)",
     security: [{ BearerAuth: [] }],
     request: {
@@ -157,7 +157,7 @@ export function registerWeeklyEvaluationOpenApi(): void {
   openapiRegistry.registerPath({
     method: "put",
     path: "/weekly-evaluations/{id}",
-    tags: ["Weekly Evaluations"],
+    tags: ["WeeklyEvaluations"],
     summary: "Cập nhật đánh giá tuần",
     security: [{ BearerAuth: [] }],
     request: {
@@ -189,7 +189,7 @@ export function registerWeeklyEvaluationOpenApi(): void {
   openapiRegistry.registerPath({
     method: "delete",
     path: "/weekly-evaluations/{id}",
-    tags: ["Weekly Evaluations"],
+    tags: ["WeeklyEvaluations"],
     summary: "Xóa đánh giá tuần",
     security: [{ BearerAuth: [] }],
     request: {
@@ -214,7 +214,7 @@ export function registerWeeklyEvaluationOpenApi(): void {
   openapiRegistry.registerPath({
     method: "post",
     path: "/weekly-evaluations/{id}/confirm-view",
-    tags: ["Weekly Evaluations"],
+    tags: ["WeeklyEvaluations"],
     summary: "TTS bấm 'Đã xem đánh giá' để xác nhận đã đọc",
     security: [{ BearerAuth: [] }],
     request: {

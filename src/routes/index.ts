@@ -20,6 +20,7 @@ import absenceRoute from "../modules/absences/absence.route";
 import dailyReportRoute from "../modules/daily-reports/daily-report.route";
 import weeklyEvaluationRoute from "../modules/weekly-evaluations/weekly-evaluation.route";
 import notificationSettingRoute from "../modules/notification-settings/notification-setting.route";
+import notificationTemplateRoute from "../modules/notification/notification-template.route";
 import activityLogRoute from "../modules/activity-logs/activity-log.route";
 import statsRoute from "../modules/stats/stats.route";
 import pdfExportRoute from "../modules/pdf-export/pdf-export.route";
@@ -36,35 +37,51 @@ router.use("/health", healthRoute);
 // Maintenance Mode Controls & Public Status
 router.use("/maintenance", maintenanceRoute);
 
+
 // Maintenance Enforcement Guard for all Business APIs below
 router.use(maintenanceGuard());
 
-// System Configuration & Feature Flags Endpoints (exempted public paths handled inside guard)
-router.use("/system", systemConfigRoute);
+// Core Module Routes
 router.use("/auth", authRoute);
 router.use("/users", userRoute);
 router.use("/rbac", rbacRoute);
-router.use("/notifications", notificationRoute);
-router.use("/notification-settings", notificationSettingRoute);
-router.use("/integrations", integrationRoute);
-router.use("/integration", integrationRoute);
-router.use("/cron", cronRoute);
+router.use("/system", systemConfigRoute);
+router.use("/system-config", systemConfigRoute);
+router.use("/activity-logs", activityLogRoute);
+
+// Organization & Recruitment Routes
 router.use("/departments", departmentRoute);
 router.use("/leaders", leaderRoute);
 router.use("/interns", internRoute);
 router.use("/applications", applicationRoute);
+router.use("/regulations", regulationRoute);
+
+// Work & Task Management Routes
 router.use("/task-groups", taskGroupRoute);
 router.use("/tasks", taskRoute);
 router.use("/task-assignments", taskAssignmentRoute);
 router.use("/task-submissions", taskSubmissionRoute);
-router.use("/meetings", meetingRoute);
-router.use("/absences", absenceRoute);
+
+// Progress, Evaluation & Collaboration Routes
 router.use("/daily-reports", dailyReportRoute);
 router.use("/weekly-evaluations", weeklyEvaluationRoute);
-router.use("/activity-logs", activityLogRoute);
+router.use("/meetings", meetingRoute);
+router.use("/absences", absenceRoute);
+
+// Auxiliary, Communication & Analytics Routes
+router.use("/notifications", notificationRoute);
+router.use("/notification-settings", notificationSettingRoute);
+router.use("/notification-templates", notificationTemplateRoute);
 router.use("/stats", statsRoute);
 router.use("/pdf-export", pdfExportRoute);
+router.use("/pdf-exports", pdfExportRoute); // Legacy NexCampus-BE compatibility
 router.use("/system-settings", systemSettingRoute);
-router.use("/regulations", regulationRoute);
+router.use("/settings", systemSettingRoute); // Legacy NexCampus-BE compatibility
+
+// Background & Integration Utilities
+router.use("/integrations", integrationRoute);
+router.use("/integration", integrationRoute);
+router.use("/cron", cronRoute);
 
 export default router;
+

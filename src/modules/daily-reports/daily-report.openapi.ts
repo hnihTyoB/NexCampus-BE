@@ -19,7 +19,7 @@ export function registerDailyReportOpenApi(): void {
   openapiRegistry.registerPath({
     method: "post",
     path: "/daily-reports/upload-url",
-    tags: ["Daily Reports"],
+    tags: ["DailyReports"],
     summary: "Lấy link presigned upload tệp đính kèm báo cáo ngày (Cloudflare R2 prefix reports/)",
     security: [{ BearerAuth: [] }],
     request: {
@@ -54,7 +54,7 @@ export function registerDailyReportOpenApi(): void {
   openapiRegistry.registerPath({
     method: "get",
     path: "/daily-reports/calendar",
-    tags: ["Daily Reports"],
+    tags: ["DailyReports"],
     summary: "Lấy dữ liệu lịch nộp báo cáo theo tháng và thống kê",
     security: [{ BearerAuth: [] }],
     request: {
@@ -88,7 +88,7 @@ export function registerDailyReportOpenApi(): void {
   openapiRegistry.registerPath({
     method: "get",
     path: "/daily-reports",
-    tags: ["Daily Reports"],
+    tags: ["DailyReports"],
     summary: "Danh sách báo cáo ngày phân trang và lọc",
     security: [{ BearerAuth: [] }],
     request: {
@@ -117,7 +117,7 @@ export function registerDailyReportOpenApi(): void {
   openapiRegistry.registerPath({
     method: "post",
     path: "/daily-reports",
-    tags: ["Daily Reports"],
+    tags: ["DailyReports"],
     summary: "TTS nộp báo cáo ngày (upsert 1 báo cáo/ngày theo giờ VN)",
     security: [{ BearerAuth: [] }],
     request: {
@@ -148,7 +148,7 @@ export function registerDailyReportOpenApi(): void {
   openapiRegistry.registerPath({
     method: "get",
     path: "/daily-reports/{id}",
-    tags: ["Daily Reports"],
+    tags: ["DailyReports"],
     summary: "Chi tiết báo cáo ngày",
     security: [{ BearerAuth: [] }],
     request: {
@@ -173,7 +173,7 @@ export function registerDailyReportOpenApi(): void {
   openapiRegistry.registerPath({
     method: "put",
     path: "/daily-reports/{id}",
-    tags: ["Daily Reports"],
+    tags: ["DailyReports"],
     summary: "Chỉnh sửa báo cáo ngày",
     security: [{ BearerAuth: [] }],
     request: {
@@ -205,7 +205,7 @@ export function registerDailyReportOpenApi(): void {
   openapiRegistry.registerPath({
     method: "delete",
     path: "/daily-reports/{id}",
-    tags: ["Daily Reports"],
+    tags: ["DailyReports"],
     summary: "Xóa báo cáo ngày",
     security: [{ BearerAuth: [] }],
     request: {
@@ -230,7 +230,7 @@ export function registerDailyReportOpenApi(): void {
   openapiRegistry.registerPath({
     method: "post",
     path: "/daily-reports/{id}/feedback",
-    tags: ["Daily Reports"],
+    tags: ["DailyReports"],
     summary: "Leader/Admin gửi nhận xét, phản hồi cho báo cáo ngày",
     security: [{ BearerAuth: [] }],
     request: {
@@ -262,7 +262,7 @@ export function registerDailyReportOpenApi(): void {
   openapiRegistry.registerPath({
     method: "delete",
     path: "/daily-reports/attachments/{attachmentId}",
-    tags: ["Daily Reports"],
+    tags: ["DailyReports"],
     summary: "Xóa tệp đính kèm của báo cáo ngày",
     security: [{ BearerAuth: [] }],
     request: {
