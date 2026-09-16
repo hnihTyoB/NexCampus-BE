@@ -21,6 +21,10 @@ import dailyReportRoute from "../modules/daily-reports/daily-report.route";
 import weeklyEvaluationRoute from "../modules/weekly-evaluations/weekly-evaluation.route";
 import notificationSettingRoute from "../modules/notification-settings/notification-setting.route";
 import activityLogRoute from "../modules/activity-logs/activity-log.route";
+import statsRoute from "../modules/stats/stats.route";
+import pdfExportRoute from "../modules/pdf-export/pdf-export.route";
+import systemSettingRoute from "../modules/system-settings/system-setting.route";
+import regulationRoute from "../modules/regulations/regulation.route";
 import healthRoute from "./health.route";
 import { maintenanceGuard } from "../middlewares/maintenance.middleware";
 
@@ -58,5 +62,9 @@ router.use("/absences", absenceRoute);
 router.use("/daily-reports", dailyReportRoute);
 router.use("/weekly-evaluations", weeklyEvaluationRoute);
 router.use("/activity-logs", activityLogRoute);
+router.use("/stats", statsRoute);
+router.use("/pdf-export", pdfExportRoute);
+router.use("/system-settings", systemSettingRoute);
+router.use("/regulations", regulationRoute);
 
 export default router;

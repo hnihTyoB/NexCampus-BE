@@ -58,6 +58,7 @@ model User {
   leaderEvaluations             WeeklyEvaluation[]     @relation("LeaderEvaluations")
   notificationSetting           NotificationSetting?
   auditLogs                     AuditLog[]             @relation("UserAuditLogs")
+  exports                       ExportHistory[]        @relation("UserExports")
 
   @@index([deletedAt])
   @@index([roleId, isActive, deletedAt])
@@ -474,15 +475,16 @@ model Intern {
   createdAt          DateTime     @default(now()) @map("created_at")
   updatedAt          DateTime     @updatedAt @map("updated_at")
 
-  user       User        @relation("InternUser", fields: [userId], references: [id], onDelete: Cascade)
-  leader     User?       @relation("LeaderInterns", fields: [leaderId], references: [id], onDelete: SetNull)
-  department Department? @relation(fields: [departmentId], references: [id], onDelete: Restrict)
-  position   Position?   @relation(fields: [positionId], references: [id], onDelete: Restrict)
-  taskGroupMembers TaskGroupMember[]
-  assignedTasks    TaskAssignment[]   @relation("TaskAssignmentOwner")
-  supportTasks     TaskAssignment[]   @relation("TaskAssignmentSupport")
-  dailyReports     DailyReport[]
-  weeklyEvaluations WeeklyEvaluation[]
+  user                      User                     @relation("InternUser", fields: [userId], references: [id], onDelete: Cascade)
+  leader                    User?                    @relation("LeaderInterns", fields: [leaderId], references: [id], onDelete: SetNull)
+  department                Department?              @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  position                  Position?                @relation(fields: [positionId], references: [id], onDelete: Restrict)
+  taskGroupMembers          TaskGroupMember[]
+  assignedTasks             TaskAssignment[]         @relation("TaskAssignmentOwner")
+  supportTasks              TaskAssignment[]         @relation("TaskAssignmentSupport")
+  dailyReports              DailyReport[]
+  weeklyEvaluations         WeeklyEvaluation[]
+  regulationAcknowledgments RegulationAcknowledgment[]
 
   @@index([leaderId])
   @@index([departmentId])
@@ -607,6 +609,7 @@ model Regulation {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   applications Application[]
+  acknowledgments RegulationAcknowledgment[]
 
   @@map("regulations")
 }
@@ -1061,8 +1064,58 @@ model WeeklyEvaluation {
   @@map("weekly_evaluations")
 }
 
+// ─── Export History & PDF Generation ────────────────────────────────────────
 
+model ExportHistory {
+  id          String   @id @default(uuid()) @db.Uuid
+  type        String   // WEEKLY_EVALUATION, INTERNSHIP_SUMMARY, TASK_REPORT, DASHBOARD_SUMMARY
+  entityType  String   @map("entity_type")
+  entityId    String   @map("entity_id") @db.Uuid
+  fileName    String   @map("file_name")
+  storagePath String   @map("storage_path")
+  fileUrl     String   @map("file_url")
+  createdById String   @map("created_by_id") @db.Uuid
+  expiresAt   DateTime @map("expires_at")
+  createdAt   DateTime @default(now()) @map("created_at")
 
+  creator User @relation("UserExports", fields: [createdById], references: [id], onDelete: Cascade)
 
+  @@index([createdById])
+  @@index([entityId])
+  @@index([type])
+  @@map("export_histories")
+}
 
+// ─── Regulation Acknowledgments ─────────────────────────────────────────────
 
+model RegulationAcknowledgment {
+  id             String   @id @default(uuid()) @db.Uuid
+  regulationId   String   @map("regulation_id") @db.Uuid
+  internId       String   @map("intern_id") @db.Uuid
+  acknowledgedAt DateTime @default(now()) @map("acknowledged_at")
+  ipAddress      String?  @map("ip_address")
+  userAgent      String?  @map("user_agent")
+
+  regulation Regulation @relation(fields: [regulationId], references: [id], onDelete: Cascade)
+  intern     Intern     @relation(fields: [internId], references: [id], onDelete: Cascade)
+
+  @@unique([regulationId, internId])
+  @@index([regulationId])
+  @@index([internId])
+  @@map("regulation_acknowledgments")
+}
+
+// ─── System Settings (Operational Configs) ──────────────────────────────────
+
+model SystemSetting {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique
+  value       String
+  description String?
+  category    String   @default("GENERAL")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@map("system_settings")
+}

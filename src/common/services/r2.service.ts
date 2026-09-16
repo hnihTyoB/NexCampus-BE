@@ -3,6 +3,7 @@ import {
   DeleteObjectCommand,
   DeleteObjectsCommand,
   PutObjectCommand,
+  GetObjectCommand,
   ListObjectsV2Command,
   ListObjectsV2CommandOutput,
 } from "@aws-sdk/client-s3";
@@ -53,6 +54,56 @@ export class R2Service {
   getPublicUrl(key: string): string {
     const base = r2Config.publicBaseUrl.replace(/\/$/, "");
     return `${base}/${key}`;
+  }
+
+  /**
+   * Tải trực tiếp Buffer lên R2 bucket (dùng cho server-generated files như PDF exports).
+   */
+  async uploadFile(
+    key: string,
+    buffer: Buffer,
+    contentType = "application/pdf",
+    contentDisposition?: string,
+  ): Promise<string> {
+    try {
+      const command = new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+        ContentDisposition: contentDisposition,
+      });
+      await this.client.send(command);
+      return this.getPublicUrl(key);
+    } catch (err: any) {
+      console.warn("[R2Service] Direct buffer upload failed or offline:", err.message);
+      return this.getPublicUrl(key);
+    }
+  }
+
+  /**
+   * Tạo presigned GET URL để client tải file an toàn với thời hạn hết hạn.
+   */
+  async getPresignedDownloadUrl(
+    key: string,
+    expiresInSeconds = 3600,
+    downloadFileName?: string,
+  ): Promise<string> {
+    try {
+      const command = new GetObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+        ResponseContentDisposition: downloadFileName
+          ? `attachment; filename="${downloadFileName}"`
+          : undefined,
+      });
+      return await getSignedUrl(this.client, command, {
+        expiresIn: expiresInSeconds,
+      });
+    } catch (err: any) {
+      console.warn("[R2Service] getPresignedDownloadUrl fallback to public URL:", err.message);
+      return this.getPublicUrl(key);
+    }
   }
 
   /**
