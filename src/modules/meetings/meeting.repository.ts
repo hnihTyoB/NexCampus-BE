@@ -81,6 +81,7 @@ export class MeetingRepository {
     scope?: {
       userId?: string;
       role?: string;
+      isParticipantScope?: boolean;
     },
   ) {
     const {
@@ -110,7 +111,7 @@ export class MeetingRepository {
             },
           }
         : {}),
-      ...(scope?.role === "INTERN" && scope?.userId
+      ...(((scope?.isParticipantScope ?? false) || scope?.role === "INTERN") && scope?.userId
         ? {
             OR: [
               { participants: { some: { userId: scope.userId } } },

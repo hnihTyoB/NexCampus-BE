@@ -11,7 +11,8 @@ import {
 } from "./weekly-evaluation.dto";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
-import { ROLES } from "../../common/constants/role.constant";
+import { PERMISSIONS } from "../../common/constants/permission.constant";
+import { permissionCacheService } from "../../common/services/permission-cache.service";
 import {
   formatVietnamDate,
   formatVietnamDateTime,
@@ -125,7 +126,14 @@ export class WeeklyEvaluationAiService {
       );
     }
 
-    if (actor.role === ROLES.LEADER) {
+    const callerPerms = new Set(
+      await permissionCacheService.getUserPermissions(actor.id),
+    );
+    const hasGlobalAccess =
+      callerPerms.has(PERMISSIONS.WEEKLY_EVALUATION_DELETE) ||
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+
+    if (!hasGlobalAccess) {
       const isDirect = intern.leaderId === actor.id;
       const leaderProfile = await prisma.leader.findUnique({
         where: { userId: actor.id },

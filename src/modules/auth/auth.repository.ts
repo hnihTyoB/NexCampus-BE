@@ -523,7 +523,8 @@ export class AuthRepository {
     const adminRoles = await prisma.role.findMany({
       where: {
         OR: [
-          { name: roleName },
+          ...(roleName ? [{ name: roleName }] : []),
+          { isSystem: true, name: ROLES.ADMIN },
           {
             permissions: {
               some: {

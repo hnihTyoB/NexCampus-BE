@@ -4,14 +4,14 @@ import {
   SystemSettingController,
 } from "./system-setting.controller";
 import { authMiddleware } from "../../middlewares/auth.middleware";
-import { requireRole } from "../../middlewares/role.middleware";
+import { requirePermission } from "../../middlewares/permission.middleware";
 import { validate } from "../../middlewares/validate.middleware";
 import {
   settingKeyParamSchema,
   updateSystemSettingSchema,
   batchUpdateSystemSettingsSchema,
 } from "./system-setting.validation";
-import { ROLES } from "../../common/constants/role.constant";
+import { PERMISSIONS } from "../../common/constants/permission.constant";
 
 const router = Router();
 const controller: SystemSettingController = systemSettingController;
@@ -26,11 +26,11 @@ router.get(
   controller.getByKey
 );
 
-// ── Admin-Only Modification Endpoints ──
+// ── Modification Endpoints (Yêu cầu quyền SYSTEM_CONFIG_MANAGE) ──
 router.put(
   "/:key",
   authMiddleware,
-  requireRole(ROLES.ADMIN),
+  requirePermission(PERMISSIONS.SYSTEM_CONFIG_MANAGE),
   validate(settingKeyParamSchema, "params"),
   validate(updateSystemSettingSchema, "body"),
   controller.updateSetting
@@ -39,7 +39,7 @@ router.put(
 router.patch(
   "/:key",
   authMiddleware,
-  requireRole(ROLES.ADMIN),
+  requirePermission(PERMISSIONS.SYSTEM_CONFIG_MANAGE),
   validate(settingKeyParamSchema, "params"),
   validate(updateSystemSettingSchema, "body"),
   controller.updateSetting
@@ -48,7 +48,7 @@ router.patch(
 router.post(
   "/batch",
   authMiddleware,
-  requireRole(ROLES.ADMIN),
+  requirePermission(PERMISSIONS.SYSTEM_CONFIG_MANAGE),
   validate(batchUpdateSystemSettingsSchema, "body"),
   controller.batchUpdate
 );

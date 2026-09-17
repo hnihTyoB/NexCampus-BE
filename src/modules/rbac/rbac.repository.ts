@@ -252,7 +252,7 @@ export class RbacRepository {
         roleId: true,
         isActive: true,
         deletedAt: true,
-        role: { select: { id: true, name: true } },
+        role: { select: { id: true, name: true, isSystem: true } },
       },
     });
   }

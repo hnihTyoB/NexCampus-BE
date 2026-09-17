@@ -17,6 +17,7 @@ const userSelect = {
     select: {
       id: true,
       name: true,
+      isSystem: true,
     },
   },
   createdAt: true,
@@ -150,8 +151,9 @@ export class UserRepository {
 
   /**
    * Đếm số lượng người dùng đang hoạt động có đặc quyền quản trị hệ thống:
-   * 1. Vai trò khớp với roleName (mặc định ROLES.ADMIN)
-   * 2. Hoặc vai trò sở hữu các quyền quản trị then chốt (USER_ROLE_ASSIGN, ROLE_PERMISSION_ASSIGN)
+   * 1. Vai trò khớp với roleName (nếu được chỉ định)
+   * 2. Vai trò hệ thống ADMIN (isSystem = true)
+   * 3. Hoặc vai trò sở hữu các quyền quản trị then chốt (USER_ROLE_ASSIGN, ROLE_PERMISSION_ASSIGN)
    */
   async countActiveAdmins(roleName: string = ROLES.ADMIN): Promise<number> {
     return prisma.user.count({
@@ -159,7 +161,8 @@ export class UserRepository {
         deletedAt: null,
         isActive: true,
         OR: [
-          { role: { name: roleName } },
+          ...(roleName ? [{ role: { name: roleName } }] : []),
+          { role: { isSystem: true, name: ROLES.ADMIN } },
           {
             role: {
               permissions: {

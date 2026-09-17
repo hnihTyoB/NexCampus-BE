@@ -35,7 +35,7 @@ export function registerSystemSettingOpenApi(): void {
     method: "put",
     path: "/system-settings/{key}",
     tags: ["System Settings"],
-    summary: "Cập nhật tham số cài đặt vận hành (Chỉ dành cho Admin)",
+    summary: "Cập nhật tham số cài đặt vận hành (Yêu cầu quyền SYSTEM_CONFIG_MANAGE)",
     security: [{ BearerAuth: [] }],
     request: {
       params: settingKeyParamSchema,
@@ -71,7 +71,7 @@ export function registerSystemSettingOpenApi(): void {
     method: "post",
     path: "/system-settings/batch",
     tags: ["System Settings"],
-    summary: "Cập nhật hàng loạt tham số cài đặt (Chỉ dành cho Admin)",
+    summary: "Cập nhật hàng loạt tham số cài đặt (Yêu cầu quyền SYSTEM_CONFIG_MANAGE)",
     security: [{ BearerAuth: [] }],
     request: {
       body: {

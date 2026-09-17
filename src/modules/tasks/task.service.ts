@@ -9,7 +9,8 @@ import {
   CreateLinkAttachmentDto,
 } from "./task.dto";
 import { ASSIGNMENT_STATUS } from "../../common/constants/task.constant";
-import { ROLES } from "../../common/constants/role.constant";
+import { PERMISSIONS } from "../../common/constants/permission.constant";
+import { permissionCacheService } from "../../common/services/permission-cache.service";
 import {
   AUDIT_ACTION,
   AUDIT_TARGET_TYPE,
@@ -62,24 +63,33 @@ export class TaskService {
   }
 
   async findAll(query: TaskQueryDto, user?: UserPayload) {
-    if (user?.role === ROLES.INTERN) {
-      const intern = await prisma.intern.findUnique({
-        where: { userId: user.id },
-        select: { id: true },
-      });
-      if (!intern) {
-        throw new AppError("Intern profile not found", 404, ERROR_CODE.NOT_FOUND);
-      }
-      return this.repository.findAll(query, { internId: intern.id });
-    }
+    if (user) {
+      const callerPerms = new Set(
+        await permissionCacheService.getUserPermissions(user.id),
+      );
+      const hasGlobalAccess =
+        callerPerms.has(PERMISSIONS.TASK_DELETE) ||
+        callerPerms.has(PERMISSIONS.ROLE_READ) ||
+        callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
 
-    if (user?.role === ROLES.LEADER) {
-      const leader = await prisma.leader.findFirst({
-        where: { userId: user.id },
-        select: { departments: { select: { departmentId: true } } },
-      });
-      const departmentIds = leader?.departments.map((d) => d.departmentId) ?? [];
-      return this.repository.findAll(query, { departmentIds });
+      if (!hasGlobalAccess) {
+        const intern = await prisma.intern.findUnique({
+          where: { userId: user.id },
+          select: { id: true },
+        });
+        if (intern) {
+          return this.repository.findAll(query, { internId: intern.id });
+        }
+
+        const leader = await prisma.leader.findFirst({
+          where: { userId: user.id },
+          select: { departments: { select: { departmentId: true } } },
+        });
+        if (leader) {
+          const departmentIds = leader.departments.map((d) => d.departmentId) ?? [];
+          return this.repository.findAll(query, { departmentIds });
+        }
+      }
     }
 
     return this.repository.findAll(query);
@@ -91,19 +101,31 @@ export class TaskService {
       throw new AppError("Task not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
-    if (user?.role === ROLES.INTERN) {
-      const intern = await prisma.intern.findUnique({
-        where: { userId: user.id },
-        select: { id: true },
-      });
-      const isOwner = task.assignment?.internId === intern?.id;
-      const isSupport = task.assignment?.supportId === intern?.id;
-      if (!isOwner && !isSupport) {
-        throw new AppError(
-          "You are not authorized to view this task",
-          403,
-          ERROR_CODE.FORBIDDEN,
-        );
+    if (user) {
+      const callerPerms = new Set(
+        await permissionCacheService.getUserPermissions(user.id),
+      );
+      const hasGlobalAccess =
+        callerPerms.has(PERMISSIONS.TASK_DELETE) ||
+        callerPerms.has(PERMISSIONS.ROLE_READ) ||
+        callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+
+      if (!hasGlobalAccess) {
+        const intern = await prisma.intern.findUnique({
+          where: { userId: user.id },
+          select: { id: true },
+        });
+        if (intern) {
+          const isOwner = task.assignment?.internId === intern.id;
+          const isSupport = task.assignment?.supportId === intern.id;
+          if (!isOwner && !isSupport) {
+            throw new AppError(
+              "You are not authorized to view this task",
+              403,
+              ERROR_CODE.FORBIDDEN,
+            );
+          }
+        }
       }
     }
 
@@ -302,7 +324,15 @@ export class TaskService {
       throw new AppError("Attachment not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
-    if (actorRole !== ROLES.ADMIN && attachment.uploadedBy !== actorId) {
+    const callerPerms = new Set(
+      await permissionCacheService.getUserPermissions(actorId),
+    );
+    const hasGlobalDelete =
+      callerPerms.has(PERMISSIONS.TASK_ATTACHMENT_DELETE) ||
+      callerPerms.has(PERMISSIONS.TASK_DELETE) ||
+      callerPerms.has(PERMISSIONS.ROLE_READ);
+
+    if (!hasGlobalDelete && attachment.uploadedBy !== actorId) {
       throw new AppError(
         "Bạn không có quyền xóa tệp đính kèm này",
         403,
@@ -348,8 +378,21 @@ export class TaskService {
       user: { isActive: true },
     };
 
-    if (actor.role === ROLES.LEADER) {
-      whereIntern.leaderId = actor.id;
+    const callerPerms = new Set(
+      await permissionCacheService.getUserPermissions(actor.id),
+    );
+    const hasGlobalAccess =
+      callerPerms.has(PERMISSIONS.TASK_DELETE) ||
+      callerPerms.has(PERMISSIONS.ROLE_READ);
+
+    if (!hasGlobalAccess) {
+      const leader = await prisma.leader.findFirst({
+        where: { userId: actor.id },
+        select: { id: true },
+      });
+      if (leader) {
+        whereIntern.leaderId = actor.id;
+      }
     }
 
     if (task.taskGroup?.departmentId) {

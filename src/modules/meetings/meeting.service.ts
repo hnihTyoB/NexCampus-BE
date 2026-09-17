@@ -10,7 +10,9 @@ import {
   SubmitAbsenceDto,
   ReviewAbsenceDto,
 } from "./meeting.dto";
-import { ROLES } from "../../common/constants/role.constant";
+import { PERMISSIONS } from "../../common/constants/permission.constant";
+import { permissionCacheService } from "../../common/services/permission-cache.service";
+import { prisma } from "../../database/prisma.client";
 import {
   AUDIT_ACTION,
   AUDIT_TARGET_TYPE,
@@ -26,10 +28,33 @@ interface UserPayload {
 export class MeetingService {
   private readonly repository = new MeetingRepository();
 
+  private async hasGlobalAccess(actorId: string): Promise<boolean> {
+    const callerPerms = new Set(
+      await permissionCacheService.getUserPermissions(actorId),
+    );
+    return (
+      callerPerms.has(PERMISSIONS.MEETING_DELETE) ||
+      callerPerms.has(PERMISSIONS.ROLE_READ) ||
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN)
+    );
+  }
+
   async findAll(query: MeetingQueryDto, actor: UserPayload) {
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    let isParticipantScope = false;
+    if (!hasGlobal) {
+      const intern = await prisma.intern.findUnique({
+        where: { userId: actor.id },
+        select: { id: true },
+      });
+      if (intern) {
+        isParticipantScope = true;
+      }
+    }
+
     return this.repository.findAll(query, {
       userId: actor.id,
-      role: actor.role,
+      isParticipantScope,
     });
   }
 
@@ -39,18 +64,23 @@ export class MeetingService {
       throw new AppError("Cuộc họp không tồn tại", 404, ERROR_CODE.MEETING_NOT_FOUND);
     }
 
-    // SEC-04: Intern chỉ được xem chi tiết cuộc họp mà mình là participant.
-    // Thông tin nhạy cảm (minutes, meetingLink, absences) không được lộ ra ngoài.
-    if (actor.role === ROLES.INTERN) {
-      const isParticipant = meeting.participants.some(
-        (p) => p.userId === actor.id,
-      );
-      if (!isParticipant) {
-        throw new AppError(
-          "Không có quyền xem cuộc họp này",
-          403,
-          ERROR_CODE.FORBIDDEN,
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal) {
+      const intern = await prisma.intern.findUnique({
+        where: { userId: actor.id },
+        select: { id: true },
+      });
+      if (intern) {
+        const isParticipant = meeting.participants.some(
+          (p) => p.userId === actor.id,
         );
+        if (!isParticipant) {
+          throw new AppError(
+            "Không có quyền xem cuộc họp này",
+            403,
+            ERROR_CODE.FORBIDDEN,
+          );
+        }
       }
     }
 
@@ -62,15 +92,6 @@ export class MeetingService {
     actor: UserPayload,
     context?: { ipAddress?: string },
   ) {
-    // Intern không được quyền tổ chức họp
-    if (actor.role === ROLES.INTERN) {
-      throw new AppError(
-        "Thực tập sinh không có quyền lên lịch họp",
-        403,
-        ERROR_CODE.FORBIDDEN,
-      );
-    }
-
     const meeting = await this.repository.create(data, actor.id);
 
     await this.repository.createAuditLog({
@@ -114,7 +135,8 @@ export class MeetingService {
 
     const isHostOrCreator =
       actor.id === meeting.createdBy || actor.id === meeting.hostId;
-    if (actor.role !== ROLES.ADMIN && !isHostOrCreator) {
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal && !isHostOrCreator) {
       throw new AppError(
         "Bạn không có quyền chỉnh sửa cuộc họp này",
         403,
@@ -148,7 +170,8 @@ export class MeetingService {
 
     const isHostOrCreator =
       actor.id === meeting.createdBy || actor.id === meeting.hostId;
-    if (actor.role !== ROLES.ADMIN && !isHostOrCreator) {
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal && !isHostOrCreator) {
       throw new AppError(
         "Bạn không có quyền xóa hoặc hủy cuộc họp này",
         403,
@@ -183,7 +206,8 @@ export class MeetingService {
 
     const isHostOrCreator =
       actor.id === meeting.createdBy || actor.id === meeting.hostId;
-    if (actor.role !== ROLES.ADMIN && !isHostOrCreator) {
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal && !isHostOrCreator) {
       throw new AppError(
         "Bạn không có quyền mời người tham gia cuộc họp này",
         403,
@@ -387,7 +411,17 @@ export class MeetingService {
   }
 
   async getPendingAbsences(actor: UserPayload) {
-    const scope = actor.role === ROLES.LEADER ? { leaderUserId: actor.id } : undefined;
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    let scope: { leaderUserId?: string } | undefined;
+    if (!hasGlobal) {
+      const leader = await prisma.leader.findFirst({
+        where: { userId: actor.id },
+        select: { id: true },
+      });
+      if (leader) {
+        scope = { leaderUserId: actor.id };
+      }
+    }
     return this.repository.findPendingAbsences(scope);
   }
 
@@ -416,9 +450,10 @@ export class MeetingService {
 
     const isHostOrCreator =
       actor.id === absence.meeting.createdBy || actor.id === absence.meeting.hostId;
-    if (actor.role !== ROLES.ADMIN && !isHostOrCreator) {
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal && !isHostOrCreator) {
       throw new AppError(
-        "Chỉ người tổ chức cuộc họp hoặc Admin mới có quyền phê duyệt đơn xin vắng mặt",
+        "Chỉ người tổ chức cuộc họp hoặc Quản trị viên mới có quyền phê duyệt đơn xin vắng mặt",
         403,
         ERROR_CODE.FORBIDDEN,
       );
@@ -471,9 +506,10 @@ export class MeetingService {
 
     const isHostOrCreator =
       actor.id === meeting.createdBy || actor.id === meeting.hostId;
-    if (actor.role !== ROLES.ADMIN && !isHostOrCreator) {
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal && !isHostOrCreator) {
       throw new AppError(
-        "Chỉ người tổ chức cuộc họp hoặc Admin mới có quyền cập nhật biên bản và điểm danh",
+        "Chỉ người tổ chức cuộc họp hoặc Quản trị viên mới có quyền cập nhật biên bản và điểm danh",
         403,
         ERROR_CODE.FORBIDDEN,
       );

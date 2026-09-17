@@ -9,7 +9,8 @@ import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import { envConfig } from "../../config/env.config";
 import { getRedisConnectionOptions } from "../../config/redis.config";
-import { ROLES } from "../../common/constants/role.constant";
+import { PERMISSIONS } from "../../common/constants/permission.constant";
+import { permissionCacheService } from "../../common/services/permission-cache.service";
 
 interface AuthUser {
   id: string;
@@ -128,40 +129,42 @@ export class StatsService {
 
   /**
    * Lấy thống kê cá nhân cho Thực tập sinh
-   * SEC-01: INTERN chỉ thấy thống kê của chính mình.
-   *         LEADER chỉ thấy thống kê intern thuộc quyền quản lý của mình.
-   *         ADMIN thấy tất cả.
+   * SEC-01: TTS chỉ thấy thống kê của chính mình.
+   *         Leader chỉ thấy thống kê intern thuộc quyền quản lý của mình.
+   *         Admin / Quản trị viên thấy tất cả.
    */
   async getInternStats(user: AuthUser, requestedInternId?: string): Promise<InternStatsResponseDto> {
     let targetInternId: string;
 
-    if (user.role === ROLES.INTERN) {
-      // Intern chỉ được xem thống kê của chính mình — bỏ qua internId query param
-      const selfInternId = await this.repository.findInternIdByUserId(user.id);
-      if (!selfInternId) {
-        throw new AppError("Intern profile not found for user", 404, ERROR_CODE.NOT_FOUND);
+    const selfInternId = await this.repository.findInternIdByUserId(user.id);
+
+    if (!requestedInternId) {
+      if (selfInternId) {
+        targetInternId = selfInternId;
+      } else {
+        throw new AppError("internId query parameter is required", 400, ERROR_CODE.VALIDATION_ERROR);
       }
+    } else if (selfInternId && requestedInternId === selfInternId) {
       targetInternId = selfInternId;
-    } else if (user.role === ROLES.LEADER) {
-      // Leader phải cung cấp internId và intern đó phải thuộc quyền quản lý
-      if (!requestedInternId) {
-        throw new AppError("internId query parameter is required for Leader", 400, ERROR_CODE.VALIDATION_ERROR);
-      }
-      const isManaged = await this.repository.isInternManagedByLeader(requestedInternId, user.id);
-      if (!isManaged) {
-        throw new AppError(
-          "Không có quyền xem thống kê của thực tập sinh này",
-          403,
-          ERROR_CODE.FORBIDDEN,
-        );
-      }
-      targetInternId = requestedInternId;
     } else {
-      // ADMIN: xem tất cả
-      if (!requestedInternId) {
-        throw new AppError("internId query parameter is required for Admin", 400, ERROR_CODE.VALIDATION_ERROR);
+      const callerPerms = new Set(await permissionCacheService.getUserPermissions(user.id));
+      const hasGlobalStatsAccess =
+        callerPerms.has(PERMISSIONS.STATS_ADMIN_READ) ||
+        callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+
+      if (hasGlobalStatsAccess) {
+        targetInternId = requestedInternId;
+      } else {
+        const isManaged = await this.repository.isInternManagedByLeader(requestedInternId, user.id);
+        if (!isManaged) {
+          throw new AppError(
+            "Không có quyền xem thống kê của thực tập sinh này",
+            403,
+            ERROR_CODE.FORBIDDEN,
+          );
+        }
+        targetInternId = requestedInternId;
       }
-      targetInternId = requestedInternId;
     }
 
     const redisKey = `stats:intern:${targetInternId}`;

@@ -4,7 +4,7 @@ import {
   RegulationController,
 } from "./regulation.controller";
 import { authMiddleware } from "../../middlewares/auth.middleware";
-import { requireRole } from "../../middlewares/role.middleware";
+import { requirePermission } from "../../middlewares/permission.middleware";
 import { validate } from "../../middlewares/validate.middleware";
 import {
   createRegulationSchema,
@@ -12,41 +12,49 @@ import {
   regulationQuerySchema,
   regulationIdParamSchema,
 } from "./regulation.validation";
-import { ROLES } from "../../common/constants/role.constant";
+import { PERMISSIONS } from "../../common/constants/permission.constant";
 
 const router = Router();
 const controller: RegulationController = regulationController;
 
-// ── Tra cứu nội quy dành cho người dùng đã xác thực ──
+// ── Tra cứu nội quy dành cho người dùng có quyền REGULATION_READ ──
 router.get(
   "/",
   authMiddleware,
+  requirePermission(PERMISSIONS.REGULATION_READ),
   validate(regulationQuerySchema, "query"),
   controller.findAll
 );
 
-router.get("/active", authMiddleware, controller.findActive);
+router.get(
+  "/active",
+  authMiddleware,
+  requirePermission(PERMISSIONS.REGULATION_READ),
+  controller.findActive
+);
 
 router.get(
   "/:id",
   authMiddleware,
+  requirePermission(PERMISSIONS.REGULATION_READ),
   validate(regulationIdParamSchema, "params"),
   controller.findById
 );
 
-// ── Thực tập sinh xác nhận tuân thủ nội quy ──
+// ── Thực tập sinh xác nhận tuân thủ nội quy (Yêu cầu quyền REGULATION_ACKNOWLEDGE) ──
 router.post(
   "/:id/acknowledge",
   authMiddleware,
+  requirePermission(PERMISSIONS.REGULATION_ACKNOWLEDGE),
   validate(regulationIdParamSchema, "params"),
   controller.acknowledge
 );
 
-// ── Quản trị viên (Admin) quản lý nội quy cơ quan ──
+// ── Quản lý nội quy cơ quan (Yêu cầu permissions) ──
 router.post(
   "/",
   authMiddleware,
-  requireRole(ROLES.ADMIN),
+  requirePermission(PERMISSIONS.REGULATION_CREATE),
   validate(createRegulationSchema, "body"),
   controller.create
 );
@@ -54,7 +62,7 @@ router.post(
 router.put(
   "/:id",
   authMiddleware,
-  requireRole(ROLES.ADMIN),
+  requirePermission(PERMISSIONS.REGULATION_UPDATE),
   validate(regulationIdParamSchema, "params"),
   validate(updateRegulationSchema, "body"),
   controller.update
@@ -63,7 +71,7 @@ router.put(
 router.delete(
   "/:id",
   authMiddleware,
-  requireRole(ROLES.ADMIN),
+  requirePermission(PERMISSIONS.REGULATION_DELETE),
   validate(regulationIdParamSchema, "params"),
   controller.delete
 );
@@ -71,7 +79,7 @@ router.delete(
 router.patch(
   "/:id/activate",
   authMiddleware,
-  requireRole(ROLES.ADMIN),
+  requirePermission(PERMISSIONS.REGULATION_UPDATE),
   validate(regulationIdParamSchema, "params"),
   controller.activate
 );

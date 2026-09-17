@@ -7,7 +7,8 @@ import {
   AssignTaskDto,
   UpdateTaskAssignmentDto,
 } from "./task-assignment.dto";
-import { ROLES } from "../../common/constants/role.constant";
+import { PERMISSIONS } from "../../common/constants/permission.constant";
+import { permissionCacheService } from "../../common/services/permission-cache.service";
 import {
   ASSIGNMENT_STATUS,
   ACTIVE_CAPACITY_STATUSES,
@@ -132,27 +133,36 @@ export class TaskAssignmentService {
   }
 
   async findAll(query: TaskAssignmentQueryDto, user?: UserPayload) {
-    if (user?.role === ROLES.INTERN) {
-      const intern = await prisma.intern.findUnique({
-        where: { userId: user.id },
-        select: { id: true },
-      });
-      if (!intern) {
-        throw new AppError("Intern profile not found", 404, ERROR_CODE.NOT_FOUND);
-      }
-      return this.repository.findAll(query, { internId: intern.id });
-    }
+    if (user) {
+      const callerPerms = new Set(
+        await permissionCacheService.getUserPermissions(user.id),
+      );
+      const hasGlobalAccess =
+        callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_DELETE) ||
+        callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
 
-    if (user?.role === ROLES.LEADER) {
-      const leader = await prisma.leader.findFirst({
-        where: { userId: user.id },
-        select: { departments: { select: { departmentId: true } } },
-      });
-      const departmentIds = leader?.departments.map((d) => d.departmentId) ?? [];
-      return this.repository.findAll(query, {
-        departmentIds,
-        leaderUserId: user.id,
-      });
+      if (!hasGlobalAccess) {
+        const intern = await prisma.intern.findUnique({
+          where: { userId: user.id },
+          select: { id: true },
+        });
+        if (intern) {
+          return this.repository.findAll(query, { internId: intern.id });
+        }
+
+        const leader = await prisma.leader.findFirst({
+          where: { userId: user.id },
+          select: { departments: { select: { departmentId: true } } },
+        });
+        if (leader) {
+          const departmentIds =
+            leader.departments.map((d) => d.departmentId) ?? [];
+          return this.repository.findAll(query, {
+            departmentIds,
+            leaderUserId: user.id,
+          });
+        }
+      }
     }
 
     return this.repository.findAll(query);
@@ -164,30 +174,39 @@ export class TaskAssignmentService {
       throw new AppError("Task assignment not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
-    if (user && user.role !== ROLES.ADMIN) {
-      if (user.role === ROLES.INTERN) {
+    if (user) {
+      const callerPerms = new Set(
+        await permissionCacheService.getUserPermissions(user.id),
+      );
+      const hasGlobalAccess =
+        callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_DELETE) ||
+        callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+
+      if (!hasGlobalAccess) {
         const intern = await prisma.intern.findUnique({
           where: { userId: user.id },
           select: { id: true },
         });
-        const isOwner = intern && assignment.internId === intern.id;
-        const isSupport = intern && assignment.supportId === intern.id;
-        if (!isOwner && !isSupport) {
-          throw new AppError(
-            "You are not authorized to view this assignment",
-            403,
-            ERROR_CODE.FORBIDDEN,
-          );
-        }
-      } else if (user.role === ROLES.LEADER) {
-        const isAssigner = assignment.assignedBy === user.id;
-        const isLeader = assignment.intern?.leaderId === user.id;
-        if (!isAssigner && !isLeader) {
-          throw new AppError(
-            "You are not authorized to view this assignment",
-            403,
-            ERROR_CODE.FORBIDDEN,
-          );
+        if (intern) {
+          const isOwner = assignment.internId === intern.id;
+          const isSupport = assignment.supportId === intern.id;
+          if (!isOwner && !isSupport) {
+            throw new AppError(
+              "You are not authorized to view this assignment",
+              403,
+              ERROR_CODE.FORBIDDEN,
+            );
+          }
+        } else {
+          const isAssigner = assignment.assignedBy === user.id;
+          const isLeader = assignment.intern?.leaderId === user.id;
+          if (!isAssigner && !isLeader) {
+            throw new AppError(
+              "You are not authorized to view this assignment",
+              403,
+              ERROR_CODE.FORBIDDEN,
+            );
+          }
         }
       }
     }
@@ -248,9 +267,16 @@ export class TaskAssignmentService {
       );
     }
 
-    // 5. Cross-team check for Leader
+    // 5. Cross-team check for non-admin assigners
+    const callerPerms = new Set(
+      await permissionCacheService.getUserPermissions(assignedBy),
+    );
+    const hasApprovePerm =
+      callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_APPROVE) ||
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+
     const isCrossTeam = intern.leaderId !== assignedBy;
-    if (actorRole === ROLES.LEADER && isCrossTeam) {
+    if (!hasApprovePerm && isCrossTeam) {
       const confirmedEmail = data.internEmail?.toLowerCase().trim();
       if (!confirmedEmail || confirmedEmail !== intern.user.email?.toLowerCase().trim()) {
         throw new AppError(
@@ -290,7 +316,7 @@ export class TaskAssignmentService {
 
     // 8. Determine status
     let status: AssignmentStatus = ASSIGNMENT_STATUS.TODO;
-    if (actorRole !== ROLES.ADMIN && isCrossTeam) {
+    if (!hasApprovePerm && isCrossTeam) {
       status = ASSIGNMENT_STATUS.PENDING_APPROVAL;
     }
 
@@ -382,7 +408,14 @@ export class TaskAssignmentService {
     }
 
     // Only Admin or the direct Leader of the intern is allowed to approve
-    if (actorRole !== ROLES.ADMIN && assignment.intern.leaderId !== actorId) {
+    const callerPerms = new Set(
+      await permissionCacheService.getUserPermissions(actorId),
+    );
+    const hasApprovePerm =
+      callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_APPROVE) ||
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+
+    if (!hasApprovePerm && assignment.intern.leaderId !== actorId) {
       throw new AppError(
         "Bạn không có quyền duyệt yêu cầu giao việc này",
         403,
@@ -455,7 +488,14 @@ export class TaskAssignmentService {
     }
 
     // Only Admin or direct Leader can reject
-    if (actorRole !== ROLES.ADMIN && assignment.intern.leaderId !== actorId) {
+    const callerPerms = new Set(
+      await permissionCacheService.getUserPermissions(actorId),
+    );
+    const hasApprovePerm =
+      callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_APPROVE) ||
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+
+    if (!hasApprovePerm && assignment.intern.leaderId !== actorId) {
       throw new AppError(
         "Bạn không có quyền từ chối yêu cầu giao việc này",
         403,
@@ -499,23 +539,28 @@ export class TaskAssignmentService {
     // Lock check: DONE assignments cannot be modified!
     this.ensureAssignmentEditable(assignment.status);
 
-    if (actorRole === ROLES.INTERN) {
-      const isOwnAssignment = assignment.intern?.userId === actorId;
+    const callerPerms = new Set(
+      await permissionCacheService.getUserPermissions(actorId),
+    );
+    const hasGlobalUpdateAccess =
+      callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_DELETE) ||
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+
+    const isOwnAssignment = assignment.intern?.userId === actorId;
+    if (isOwnAssignment) {
       const canStartOwn =
-        isOwnAssignment &&
         data.status === ASSIGNMENT_STATUS.IN_PROGRESS &&
         assignment.status === ASSIGNMENT_STATUS.TODO &&
         data.internId === undefined &&
         data.supportId === undefined;
       const canBlockOwn =
-        isOwnAssignment &&
         data.status === ASSIGNMENT_STATUS.BLOCKED &&
         assignment.status === ASSIGNMENT_STATUS.IN_PROGRESS &&
         data.blockedReason !== undefined &&
         data.internId === undefined &&
         data.supportId === undefined;
 
-      if (!canStartOwn && !canBlockOwn) {
+      if (!canStartOwn && !canBlockOwn && !hasGlobalUpdateAccess) {
         throw new AppError(
           "Intern can only start their own TODO assignment or block their own IN_PROGRESS assignment",
           403,
@@ -523,7 +568,7 @@ export class TaskAssignmentService {
         );
       }
     } else if (
-      actorRole !== ROLES.ADMIN &&
+      !hasGlobalUpdateAccess &&
       (assignment.intern
         ? assignment.intern.leaderId !== actorId && assignment.assignedBy !== actorId
         : assignment.assignedBy !== actorId)
@@ -557,7 +602,10 @@ export class TaskAssignmentService {
       }
 
       const isCrossTeam = newIntern.leaderId !== actorId;
-      if (actorRole === ROLES.LEADER && isCrossTeam) {
+      const hasApprovePerm =
+        callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_APPROVE) ||
+        callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+      if (!hasApprovePerm && isCrossTeam) {
         const confirmedEmail = data.internEmail?.toLowerCase().trim();
         if (!confirmedEmail || confirmedEmail !== newIntern.user.email?.toLowerCase().trim()) {
           throw new AppError(
@@ -567,7 +615,7 @@ export class TaskAssignmentService {
           );
         }
         data.status = ASSIGNMENT_STATUS.PENDING_APPROVAL;
-      } else if (actorRole !== ROLES.INTERN) {
+      } else {
         data.status = ASSIGNMENT_STATUS.TODO;
       }
 
@@ -632,10 +680,17 @@ export class TaskAssignmentService {
   ) {
     const assignment = await this.findById(id);
 
+    const callerPerms = new Set(
+      await permissionCacheService.getUserPermissions(actorId),
+    );
+    const hasDeletePerm =
+      callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_DELETE) ||
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+
     const isDirectLeader = assignment.intern?.leaderId === actorId;
     const isAssignmentRequester = assignment.assignedBy === actorId;
     if (
-      actorRole !== ROLES.ADMIN &&
+      !hasDeletePerm &&
       !isDirectLeader &&
       !isAssignmentRequester
     ) {
@@ -680,12 +735,12 @@ export class TaskAssignmentService {
       );
     }
 
-    if (actor.role === ROLES.INTERN) {
-      const intern = await prisma.intern.findUnique({
-        where: { userId: actor.id },
-      });
-      const isOwner = intern && assignment.internId === intern.id;
-      const isSupport = intern && assignment.supportId === intern.id;
+    const intern = await prisma.intern.findUnique({
+      where: { userId: actor.id },
+    });
+    if (intern) {
+      const isOwner = assignment.internId === intern.id;
+      const isSupport = assignment.supportId === intern.id;
       if (!isOwner && !isSupport) {
         throw new AppError(
           "Bạn chỉ có thể bắt đầu công việc được phân công cho mình",
@@ -740,12 +795,12 @@ export class TaskAssignmentService {
       );
     }
 
-    if (actor.role === ROLES.INTERN) {
-      const intern = await prisma.intern.findUnique({
-        where: { userId: actor.id },
-      });
-      const isOwner = intern && assignment.internId === intern.id;
-      const isSupport = intern && assignment.supportId === intern.id;
+    const intern = await prisma.intern.findUnique({
+      where: { userId: actor.id },
+    });
+    if (intern) {
+      const isOwner = assignment.internId === intern.id;
+      const isSupport = assignment.supportId === intern.id;
       if (!isOwner && !isSupport) {
         throw new AppError(
           "Bạn chỉ có thể báo bị chặn cho công việc được phân công cho mình",
@@ -791,7 +846,15 @@ export class TaskAssignmentService {
 
     // Ràng buộc bền vững: Chỉ Leader trực tiếp hoặc Admin mới có quyền thao tác (Intern không được tự mở)
     const isDirectLeader = assignment.intern?.leaderId === actor.id;
-    if (actor.role !== ROLES.ADMIN && !isDirectLeader) {
+    const callerPerms = new Set(
+      await permissionCacheService.getUserPermissions(actor.id),
+    );
+    const hasAdminPerm =
+      callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_DELETE) ||
+      callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_APPROVE) ||
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+
+    if (!hasAdminPerm && !isDirectLeader) {
       throw new AppError(
         "Chỉ Leader trực tiếp hoặc Admin mới có quyền mở lại task bị chặn",
         403,

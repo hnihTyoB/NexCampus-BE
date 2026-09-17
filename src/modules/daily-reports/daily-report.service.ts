@@ -15,7 +15,8 @@ import { R2Service } from "../../common/services/r2.service";
 import { prisma } from "../../database/prisma.client";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
-import { ROLES } from "../../common/constants/role.constant";
+import { PERMISSIONS } from "../../common/constants/permission.constant";
+import { permissionCacheService } from "../../common/services/permission-cache.service";
 import {
   AUDIT_ACTION,
   AUDIT_TARGET_TYPE,
@@ -35,6 +36,17 @@ export class DailyReportService {
   private readonly repository = new DailyReportRepository();
   private readonly r2Service = new R2Service();
 
+  private async hasGlobalAccess(userId: string): Promise<boolean> {
+    const callerPerms = new Set(
+      await permissionCacheService.getUserPermissions(userId),
+    );
+    return (
+      callerPerms.has(PERMISSIONS.DAILY_REPORT_DELETE) ||
+      callerPerms.has(PERMISSIONS.ROLE_READ) ||
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN)
+    );
+  }
+
   async submitReport(
     dto: CreateDailyReportDto,
     actor: UserPayload,
@@ -42,42 +54,30 @@ export class DailyReportService {
   ) {
     let internId: string;
 
-    if (actor.role === ROLES.INTERN) {
-      const intern = await prisma.intern.findUnique({
-        where: { userId: actor.id },
-      });
-      if (!intern) {
-        throw new AppError(
-          "Hồ sơ thực tập sinh không tồn tại",
-          404,
-          ERROR_CODE.NOT_FOUND,
-        );
-      }
+    const intern = await prisma.intern.findUnique({
+      where: { userId: actor.id },
+    });
+    if (intern && !dto.internId) {
       internId = intern.id;
-    } else if (actor.role === ROLES.ADMIN || actor.role === ROLES.LEADER) {
-      if (!dto.internId) {
-        throw new AppError(
-          "Cần truyền internId khi nộp báo cáo hộ",
-          400,
-          ERROR_CODE.BAD_REQUEST,
-        );
-      }
-      const intern = await prisma.intern.findUnique({
+    } else if (dto.internId) {
+      const targetIntern = await prisma.intern.findUnique({
         where: { id: dto.internId },
       });
-      if (!intern) {
+      if (!targetIntern) {
         throw new AppError(
           "Hồ sơ thực tập sinh không tồn tại",
           404,
           ERROR_CODE.NOT_FOUND,
         );
       }
+      internId = targetIntern.id;
+    } else if (intern) {
       internId = intern.id;
     } else {
       throw new AppError(
-        "Bạn không có quyền nộp báo cáo ngày",
-        403,
-        ERROR_CODE.FORBIDDEN,
+        "Cần truyền internId khi nộp báo cáo hộ",
+        400,
+        ERROR_CODE.BAD_REQUEST,
       );
     }
 
@@ -117,15 +117,14 @@ export class DailyReportService {
     input: UploadReportAttachmentUrlInput,
     actor: UserPayload,
   ): Promise<UploadReportAttachmentUrlResponseDto> {
+    const fileExt = input.fileName.includes(".")
+      ? input.fileName.slice(input.fileName.lastIndexOf("."))
+      : "";
     const baseName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
     const uniqueId = crypto.randomUUID();
-    // Prefix reports/ on Cloudflare R2 as required
-    const key = `reports/${uniqueId}_${baseName}`;
+    const key = `daily-reports/${uniqueId}_${baseName}`;
 
-    const uploadUrl = await this.r2Service.getPresignedUploadUrl(
-      key,
-      input.mimeType,
-    );
+    const uploadUrl = await this.r2Service.getPresignedUploadUrl(key, input.mimeType);
     const fileUrl = this.r2Service.getPublicUrl(key);
 
     return {
@@ -136,39 +135,34 @@ export class DailyReportService {
   }
 
   async findAll(query: DailyReportQueryDto, actor: UserPayload) {
-    if (actor.role === ROLES.INTERN) {
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal) {
       const intern = await prisma.intern.findUnique({
         where: { userId: actor.id },
       });
-      if (!intern) {
-        throw new AppError(
-          "Hồ sơ thực tập sinh không tồn tại",
-          404,
-          ERROR_CODE.NOT_FOUND,
-        );
+      if (intern) {
+        return this.repository.findAll(query, { internId: intern.id });
       }
-      return this.repository.findAll(query, { internId: intern.id });
-    }
 
-    if (actor.role === ROLES.LEADER) {
       const leaderProfile = await prisma.leader.findUnique({
         where: { userId: actor.id },
         include: { departments: true },
       });
+      if (leaderProfile) {
+        const leaderDepartmentIds =
+          leaderProfile.departments.map((d: { departmentId: string }) => d.departmentId) || [];
+        const directInterns = await prisma.intern.findMany({
+          where: { leaderId: actor.id, deletedAt: null },
+          select: { id: true },
+        });
+        const directInternIds = directInterns.map((i: { id: string }) => i.id);
 
-      const leaderDepartmentIds =
-        leaderProfile?.departments.map((d: { departmentId: string }) => d.departmentId) || [];
-      const directInterns = await prisma.intern.findMany({
-        where: { leaderId: actor.id, deletedAt: null },
-        select: { id: true },
-      });
-      const directInternIds = directInterns.map((i: { id: string }) => i.id);
-
-      return this.repository.findAll(query, {
-        isLeader: true,
-        leaderDepartmentIds,
-        directInternIds,
-      });
+        return this.repository.findAll(query, {
+          isLeader: true,
+          leaderDepartmentIds,
+          directInternIds,
+        });
+      }
     }
 
     return this.repository.findAll(query, { isAdmin: true });
@@ -184,37 +178,40 @@ export class DailyReportService {
       );
     }
 
-    if (actor.role === ROLES.INTERN) {
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal) {
       const intern = await prisma.intern.findUnique({
         where: { userId: actor.id },
       });
-      if (!intern || report.internId !== intern.id) {
-        throw new AppError(
-          "Bạn không có quyền xem báo cáo này",
-          403,
-          ERROR_CODE.FORBIDDEN,
+      if (intern) {
+        if (report.internId !== intern.id) {
+          throw new AppError(
+            "Bạn không có quyền xem báo cáo này",
+            403,
+            ERROR_CODE.FORBIDDEN,
+          );
+        }
+      } else {
+        const isDirect = report.intern?.user?.id === actor.id || report.intern?.id === actor.id;
+        const leaderProfile = await prisma.leader.findUnique({
+          where: { userId: actor.id },
+          include: { departments: true },
+        });
+        const inDepartment = leaderProfile?.departments.some(
+          (d: { departmentId: string }) => d.departmentId === report.intern?.departmentId,
         );
-      }
-    } else if (actor.role === ROLES.LEADER) {
-      const isDirect = report.intern?.user?.id === actor.id || report.intern?.id === actor.id;
-      const leaderProfile = await prisma.leader.findUnique({
-        where: { userId: actor.id },
-        include: { departments: true },
-      });
-      const inDepartment = leaderProfile?.departments.some(
-        (d: { departmentId: string }) => d.departmentId === report.intern?.departmentId,
-      );
 
-      const directIntern = await prisma.intern.findFirst({
-        where: { id: report.internId, leaderId: actor.id },
-      });
+        const directIntern = await prisma.intern.findFirst({
+          where: { id: report.internId, leaderId: actor.id },
+        });
 
-      if (!isDirect && !inDepartment && !directIntern) {
-        throw new AppError(
-          "Bạn không có quyền xem báo cáo của thực tập sinh này",
-          403,
-          ERROR_CODE.FORBIDDEN,
-        );
+        if (!isDirect && !inDepartment && !directIntern) {
+          throw new AppError(
+            "Bạn không có quyền xem báo cáo của thực tập sinh này",
+            403,
+            ERROR_CODE.FORBIDDEN,
+          );
+        }
       }
     }
 
@@ -229,11 +226,12 @@ export class DailyReportService {
   ) {
     const report = await this.findById(id, actor);
 
-    if (actor.role === ROLES.INTERN) {
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal) {
       const intern = await prisma.intern.findUnique({
         where: { userId: actor.id },
       });
-      if (!intern || report.internId !== intern.id) {
+      if (intern && report.internId !== intern.id) {
         throw new AppError(
           "Bạn chỉ được chỉnh sửa báo cáo của mình",
           403,
@@ -266,11 +264,12 @@ export class DailyReportService {
   ) {
     const report = await this.findById(id, actor);
 
-    if (actor.role === ROLES.INTERN) {
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal) {
       const intern = await prisma.intern.findUnique({
         where: { userId: actor.id },
       });
-      if (!intern || report.internId !== intern.id) {
+      if (intern && report.internId !== intern.id) {
         throw new AppError(
           "Bạn chỉ được xóa báo cáo của mình",
           403,
@@ -301,14 +300,6 @@ export class DailyReportService {
     actor: UserPayload,
     context?: { ipAddress?: string },
   ) {
-    if (actor.role !== ROLES.ADMIN && actor.role !== ROLES.LEADER) {
-      throw new AppError(
-        "Chỉ Leader và Admin mới có quyền phản hồi báo cáo ngày",
-        403,
-        ERROR_CODE.FORBIDDEN,
-      );
-    }
-
     const report = await this.findById(id, actor);
 
     const result = await this.repository.addFeedback(id, feedback, actor.id);
@@ -334,34 +325,30 @@ export class DailyReportService {
   ): Promise<DailyReportCalendarResponseDto> {
     let internId: string;
 
-    if (actor.role === ROLES.INTERN) {
-      const intern = await prisma.intern.findUnique({
-        where: { userId: actor.id },
-      });
-      if (!intern) {
-        throw new AppError(
-          "Hồ sơ thực tập sinh không tồn tại",
-          404,
-          ERROR_CODE.NOT_FOUND,
-        );
-      }
+    const intern = await prisma.intern.findUnique({
+      where: { userId: actor.id },
+    });
+    if (intern && !query.internId) {
       internId = intern.id;
     } else {
       if (!query.internId) {
-        throw new AppError(
-          "Vui lòng cung cấp internId cần xem lịch",
-          400,
-          ERROR_CODE.BAD_REQUEST,
-        );
-      }
-      internId = query.internId;
+        if (intern) {
+          internId = intern.id;
+        } else {
+          throw new AppError(
+            "Vui lòng cung cấp internId cần xem lịch",
+            400,
+            ERROR_CODE.BAD_REQUEST,
+          );
+        }
+      } else {
+        internId = query.internId;
 
-      if (actor.role === ROLES.LEADER) {
-        const intern = await prisma.intern.findUnique({
+        const targetIntern = await prisma.intern.findUnique({
           where: { id: internId },
           include: { department: true },
         });
-        if (!intern) {
+        if (!targetIntern) {
           throw new AppError(
             "Hồ sơ thực tập sinh không tồn tại",
             404,
@@ -369,31 +356,34 @@ export class DailyReportService {
           );
         }
 
-        const isDirect = intern.leaderId === actor.id;
-        const leaderProfile = await prisma.leader.findUnique({
-          where: { userId: actor.id },
-          include: { departments: true },
-        });
-        const inDept = leaderProfile?.departments.some(
-          (d: { departmentId: string }) => d.departmentId === intern.departmentId,
-        );
-
-        if (!isDirect && !inDept) {
-          throw new AppError(
-            "Bạn không có quyền xem lịch của thực tập sinh này",
-            403,
-            ERROR_CODE.FORBIDDEN,
+        const hasGlobal = await this.hasGlobalAccess(actor.id);
+        if (!hasGlobal) {
+          const isDirect = targetIntern.leaderId === actor.id;
+          const leaderProfile = await prisma.leader.findUnique({
+            where: { userId: actor.id },
+            include: { departments: true },
+          });
+          const inDept = leaderProfile?.departments.some(
+            (d: { departmentId: string }) => d.departmentId === targetIntern.departmentId,
           );
+
+          if (!isDirect && !inDept) {
+            throw new AppError(
+              "Bạn không có quyền xem lịch của thực tập sinh này",
+              403,
+              ERROR_CODE.FORBIDDEN,
+            );
+          }
         }
       }
     }
 
-    const intern = await prisma.intern.findUnique({
+    const internProfile = await prisma.intern.findUnique({
       where: { id: internId },
       select: { startDate: true },
     });
 
-    if (!intern) {
+    if (!internProfile) {
       throw new AppError(
         "Hồ sơ thực tập sinh không tồn tại",
         404,
@@ -423,7 +413,7 @@ export class DailyReportService {
     }
 
     const todayVN = getVietnamToday();
-    const internStartVN = toCalendarDate(intern.startDate);
+    const internStartVN = toCalendarDate(internProfile.startDate);
 
     const days: CalendarDayDto[] = [];
     let reportedDays = 0;
@@ -490,7 +480,8 @@ export class DailyReportService {
       );
     }
 
-    if (actor.role === ROLES.INTERN) {
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal) {
       if (attachment.report.intern?.userId !== actor.id) {
         throw new AppError(
           "Bạn chỉ được xóa tệp đính kèm thuộc báo cáo của mình",

@@ -16,6 +16,8 @@ import {
   AUDIT_TARGET_TYPE,
 } from "../../common/constants/audit-log.constant";
 import { ROLES } from "../../common/constants/role.constant";
+import { PERMISSIONS } from "../../common/constants/permission.constant";
+import { permissionCacheService } from "../../common/services/permission-cache.service";
 import { systemConfigService } from "../system-config/system-config.service";
 import { HRM_CONFIG_KEYS } from "../../common/constants/system-config.constant";
 
@@ -109,9 +111,19 @@ export class LeaderService {
       );
     }
 
-    if (user.role.name !== ROLES.LEADER && user.role.name !== ROLES.ADMIN) {
+    const userPerms = new Set(
+      await permissionCacheService.getUserPermissions(user.id),
+    );
+    const isEligibleLeader =
+      userPerms.has(PERMISSIONS.DAILY_REPORT_FEEDBACK) ||
+      userPerms.has(PERMISSIONS.WEEKLY_EVALUATION_CREATE) ||
+      userPerms.has(PERMISSIONS.ROLE_READ) ||
+      user.role?.name === ROLES.LEADER ||
+      user.role?.name === ROLES.ADMIN;
+
+    if (!isEligibleLeader) {
       throw new AppError(
-        "Người dùng không có vai trò LEADER",
+        "Người dùng không có vai trò Leader",
         400,
         ERROR_CODE.VALIDATION_ERROR,
       );

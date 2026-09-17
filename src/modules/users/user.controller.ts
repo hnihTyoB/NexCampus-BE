@@ -32,7 +32,7 @@ export class UserController {
   create = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = req.body as CreateUserDto;
-      const result = await this.service.create(body);
+      const result = await this.service.create(body, req.user?.id);
 
       res.status(201).json({
         success: true,

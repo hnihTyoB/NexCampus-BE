@@ -153,6 +153,18 @@ const SYSTEM_PERMISSIONS: PermissionDef[] = [
   { name: "WEEKLY_EVALUATION_UPDATE", resource: "WEEKLY_EVALUATION", action: "UPDATE", description: "Cập nhật nhận xét và điểm đánh giá tuần" },
   { name: "WEEKLY_EVALUATION_DELETE", resource: "WEEKLY_EVALUATION", action: "DELETE", description: "Xóa bảng đánh giá tuần" },
   { name: "WEEKLY_EVALUATION_CONFIRM", resource: "WEEKLY_EVALUATION", action: "CONFIRM", description: "Xác nhận đã xem đánh giá tuần" },
+
+  // Regulations & Policies
+  { name: "REGULATION_READ", resource: "REGULATION", action: "READ", description: "Xem danh sách và chi tiết nội quy" },
+  { name: "REGULATION_CREATE", resource: "REGULATION", action: "CREATE", description: "Tạo nội quy mới" },
+  { name: "REGULATION_UPDATE", resource: "REGULATION", action: "UPDATE", description: "Cập nhật nội quy cơ quan" },
+  { name: "REGULATION_DELETE", resource: "REGULATION", action: "DELETE", description: "Xóa nội quy cơ quan" },
+  { name: "REGULATION_ACKNOWLEDGE", resource: "REGULATION", action: "ACKNOWLEDGE", description: "Xác nhận đã đọc và cam kết tuân thủ nội quy" },
+
+  // Statistics & Dashboards
+  { name: "STATS_ADMIN_READ", resource: "STATS", action: "ADMIN_READ", description: "Xem thống kê tổng quan toàn hệ thống" },
+  { name: "STATS_LEADER_READ", resource: "STATS", action: "LEADER_READ", description: "Xem thống kê hiệu suất quản lý nhóm" },
+  { name: "STATS_INTERN_READ", resource: "STATS", action: "INTERN_READ", description: "Xem thống kê tiến độ cá nhân thực tập sinh" },
 ];
 
 // ── 2. Phân Quyền Theo Vai Trò (Role-Permission Matrix) ───────────────────────
@@ -204,6 +216,10 @@ const LEADER_PERMISSIONS: string[] = [
   "NOTIFICATION_TEMPLATE_READ",
   "MAINTENANCE_READ",
   "AUDIT_LOG_READ",
+  "REGULATION_READ",
+  "REGULATION_ACKNOWLEDGE",
+  "STATS_LEADER_READ",
+  "STATS_INTERN_READ",
 ];
 
 const INTERN_PERMISSIONS: string[] = [
@@ -229,6 +245,9 @@ const INTERN_PERMISSIONS: string[] = [
   "NOTIFICATION_READ",
   "NOTIFICATION_SETTING_READ",
   "NOTIFICATION_SETTING_UPDATE",
+  "REGULATION_READ",
+  "REGULATION_ACKNOWLEDGE",
+  "STATS_INTERN_READ",
 ];
 
 const MANAGER_PERMISSIONS: string[] = [
@@ -249,6 +268,12 @@ const MANAGER_PERMISSIONS: string[] = [
   "AUDIT_LOG_READ",
   "API_KEY_READ",
   "WEBHOOK_READ",
+  "REGULATION_READ",
+  "REGULATION_CREATE",
+  "REGULATION_UPDATE",
+  "STATS_ADMIN_READ",
+  "STATS_LEADER_READ",
+  "STATS_INTERN_READ",
 ];
 
 const USER_BASE_PERMISSIONS: string[] = [

@@ -14,7 +14,8 @@ import {
   AUDIT_ACTION,
   AUDIT_TARGET_TYPE,
 } from "../../common/constants/audit-log.constant";
-import { ROLES } from "../../common/constants/role.constant";
+import { PERMISSIONS } from "../../common/constants/permission.constant";
+import { permissionCacheService } from "../../common/services/permission-cache.service";
 
 export class DepartmentService {
   private readonly repository = new DepartmentRepository();
@@ -23,13 +24,24 @@ export class DepartmentService {
     user?: { id: string; role?: string },
     filters?: DepartmentQueryDto,
   ): Promise<DepartmentDto[]> {
-    if (user?.role === ROLES.LEADER) {
-      const departmentIds =
-        await this.repository.findDepartmentIdsByLeaderUserId(user.id);
-      if (departmentIds.length === 0) {
-        return [];
+    if (user) {
+      const callerPerms = new Set(
+        await permissionCacheService.getUserPermissions(user.id),
+      );
+      const hasGlobalAccess =
+        callerPerms.has(PERMISSIONS.DEPARTMENT_CREATE) ||
+        callerPerms.has(PERMISSIONS.DEPARTMENT_DELETE) ||
+        callerPerms.has(PERMISSIONS.ROLE_READ) ||
+        callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+
+      if (!hasGlobalAccess) {
+        const departmentIds =
+          await this.repository.findDepartmentIdsByLeaderUserId(user.id);
+        if (departmentIds.length === 0) {
+          return [];
+        }
+        return this.repository.findAll(departmentIds, filters);
       }
-      return this.repository.findAll(departmentIds, filters);
     }
 
     return this.repository.findAll(undefined, filters);

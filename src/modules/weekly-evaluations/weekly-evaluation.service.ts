@@ -17,7 +17,8 @@ import {
 import { prisma } from "../../database/prisma.client";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
-import { ROLES } from "../../common/constants/role.constant";
+import { PERMISSIONS } from "../../common/constants/permission.constant";
+import { permissionCacheService } from "../../common/services/permission-cache.service";
 import {
   AUDIT_ACTION,
   AUDIT_TARGET_TYPE,
@@ -33,6 +34,17 @@ interface UserPayload {
 export class WeeklyEvaluationService {
   private readonly repository = new WeeklyEvaluationRepository();
   private readonly aiService = new WeeklyEvaluationAiService();
+
+  private async hasGlobalEvaluationAccess(userId: string): Promise<boolean> {
+    const callerPerms = new Set(
+      await permissionCacheService.getUserPermissions(userId),
+    );
+    return (
+      callerPerms.has(PERMISSIONS.WEEKLY_EVALUATION_DELETE) ||
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN) ||
+      callerPerms.has(PERMISSIONS.ROLE_PERMISSION_ASSIGN)
+    );
+  }
 
   async create(
     dto: CreateWeeklyEvaluationDto,
@@ -57,7 +69,8 @@ export class WeeklyEvaluationService {
     }
 
     // 2. Authorization check: Leader must manage this intern
-    if (actor.role === ROLES.LEADER) {
+    const hasGlobalAccess = await this.hasGlobalEvaluationAccess(actor.id);
+    if (!hasGlobalAccess) {
       const isDirect = intern.leaderId === actor.id;
       const leaderProfile = await prisma.leader.findUnique({
         where: { userId: actor.id },
@@ -74,12 +87,6 @@ export class WeeklyEvaluationService {
           ERROR_CODE.FORBIDDEN,
         );
       }
-    } else if (actor.role !== ROLES.ADMIN) {
-      throw new AppError(
-        "Chỉ Leader và Admin mới có quyền tạo đánh giá tuần",
-        403,
-        ERROR_CODE.FORBIDDEN,
-      );
     }
 
     // 3. Week calculation in Asia/Ho_Chi_Minh timezone
@@ -130,7 +137,7 @@ export class WeeklyEvaluationService {
     // 4. Current week window constraint
     // For the current active week, evaluations open from Saturday 11:00 AM VN time through Sunday 23:59:59 VN time
     if (
-      actor.role !== ROLES.ADMIN &&
+      !(await this.hasGlobalEvaluationAccess(actor.id)) &&
       process.env.NODE_ENV !== "test" &&
       dto.week === maxAllowedWeek
     ) {
@@ -214,7 +221,8 @@ export class WeeklyEvaluationService {
       );
     }
 
-    if (actor.role === ROLES.LEADER && evaluation.leaderId !== actor.id) {
+    const hasGlobalAccess = await this.hasGlobalEvaluationAccess(actor.id);
+    if (!hasGlobalAccess && evaluation.leaderId !== actor.id) {
       throw new AppError(
         "Bạn chỉ được chỉnh sửa bản đánh giá do chính mình tạo",
         403,
@@ -274,7 +282,8 @@ export class WeeklyEvaluationService {
       );
     }
 
-    if (actor.role === ROLES.LEADER && evaluation.leaderId !== actor.id) {
+    const hasGlobalAccess = await this.hasGlobalEvaluationAccess(actor.id);
+    if (!hasGlobalAccess && evaluation.leaderId !== actor.id) {
       throw new AppError(
         "Bạn chỉ được xóa bản đánh giá do chính mình tạo",
         403,
@@ -303,28 +312,25 @@ export class WeeklyEvaluationService {
   }
 
   async findAll(query: WeeklyEvaluationQueryDto, actor: UserPayload) {
-    if (actor.role === ROLES.INTERN) {
-      const intern = await prisma.intern.findUnique({
-        where: { userId: actor.id },
-      });
-      if (!intern) {
-        throw new AppError(
-          "Hồ sơ thực tập sinh không tồn tại",
-          404,
-          ERROR_CODE.NOT_FOUND,
-        );
-      }
+    const hasGlobalAccess = await this.hasGlobalEvaluationAccess(actor.id);
+    if (hasGlobalAccess) {
+      return this.repository.findAll(query, { isAdmin: true });
+    }
+
+    const intern = await prisma.intern.findUnique({
+      where: { userId: actor.id },
+    });
+    if (intern) {
       return this.repository.findAll(query, { internId: intern.id });
     }
 
-    if (actor.role === ROLES.LEADER) {
-      const leaderProfile = await prisma.leader.findUnique({
-        where: { userId: actor.id },
-        include: { departments: true },
-      });
-
+    const leaderProfile = await prisma.leader.findUnique({
+      where: { userId: actor.id },
+      include: { departments: true },
+    });
+    if (leaderProfile) {
       const leaderDepartmentIds =
-        leaderProfile?.departments.map((d: { departmentId: string }) => d.departmentId) || [];
+        leaderProfile.departments.map((d: { departmentId: string }) => d.departmentId);
       const directInterns = await prisma.intern.findMany({
         where: { leaderId: actor.id, deletedAt: null },
         select: { id: true },
@@ -352,39 +358,42 @@ export class WeeklyEvaluationService {
       );
     }
 
-    if (actor.role === ROLES.INTERN) {
+    const hasGlobalAccess = await this.hasGlobalEvaluationAccess(actor.id);
+    if (!hasGlobalAccess) {
       const intern = await prisma.intern.findUnique({
         where: { userId: actor.id },
       });
-      if (!intern || evaluation.internId !== intern.id) {
-        throw new AppError(
-          "Bạn không có quyền xem đánh giá này",
-          403,
-          ERROR_CODE.FORBIDDEN,
+      if (intern) {
+        if (evaluation.internId !== intern.id) {
+          throw new AppError(
+            "Bạn không có quyền xem đánh giá này",
+            403,
+            ERROR_CODE.FORBIDDEN,
+          );
+        }
+      } else {
+        const isDirect =
+          evaluation.leaderId === actor.id ||
+          evaluation.intern?.user?.id === actor.id;
+        const leaderProfile = await prisma.leader.findUnique({
+          where: { userId: actor.id },
+          include: { departments: true },
+        });
+        const inDepartment = leaderProfile?.departments.some(
+          (d: { departmentId: string }) => d.departmentId === evaluation.intern?.departmentId,
         );
-      }
-    } else if (actor.role === ROLES.LEADER) {
-      const isDirect =
-        evaluation.leaderId === actor.id ||
-        evaluation.intern?.user?.id === actor.id;
-      const leaderProfile = await prisma.leader.findUnique({
-        where: { userId: actor.id },
-        include: { departments: true },
-      });
-      const inDepartment = leaderProfile?.departments.some(
-        (d: { departmentId: string }) => d.departmentId === evaluation.intern?.departmentId,
-      );
 
-      const directIntern = await prisma.intern.findFirst({
-        where: { id: evaluation.internId, leaderId: actor.id },
-      });
+        const directIntern = await prisma.intern.findFirst({
+          where: { id: evaluation.internId, leaderId: actor.id },
+        });
 
-      if (!isDirect && !inDepartment && !directIntern) {
-        throw new AppError(
-          "Bạn không có quyền xem đánh giá của thực tập sinh này",
-          403,
-          ERROR_CODE.FORBIDDEN,
-        );
+        if (!isDirect && !inDepartment && !directIntern) {
+          throw new AppError(
+            "Bạn không có quyền xem đánh giá của thực tập sinh này",
+            403,
+            ERROR_CODE.FORBIDDEN,
+          );
+        }
       }
     }
 
@@ -457,30 +466,27 @@ export class WeeklyEvaluationService {
       );
     }
 
-    if (actor.role === ROLES.INTERN) {
-      if (intern.userId !== actor.id) {
-        throw new AppError(
-          "Bạn chỉ được xem tổng kết của chính mình",
-          403,
-          ERROR_CODE.FORBIDDEN,
+    const hasGlobalAccess = await this.hasGlobalEvaluationAccess(actor.id);
+    if (!hasGlobalAccess) {
+      if (intern.userId === actor.id) {
+        // TTS xem chính mình
+      } else {
+        const isDirect = intern.leaderId === actor.id;
+        const leaderProfile = await prisma.leader.findUnique({
+          where: { userId: actor.id },
+          include: { departments: true },
+        });
+        const inDept = leaderProfile?.departments.some(
+          (d: { departmentId: string }) => d.departmentId === intern.departmentId,
         );
-      }
-    } else if (actor.role === ROLES.LEADER) {
-      const isDirect = intern.leaderId === actor.id;
-      const leaderProfile = await prisma.leader.findUnique({
-        where: { userId: actor.id },
-        include: { departments: true },
-      });
-      const inDept = leaderProfile?.departments.some(
-        (d: { departmentId: string }) => d.departmentId === intern.departmentId,
-      );
 
-      if (!isDirect && !inDept) {
-        throw new AppError(
-          "Bạn không có quyền xem tổng kết của thực tập sinh này",
-          403,
-          ERROR_CODE.FORBIDDEN,
-        );
+        if (!isDirect && !inDept) {
+          throw new AppError(
+            "Bạn không có quyền xem tổng kết của thực tập sinh này",
+            403,
+            ERROR_CODE.FORBIDDEN,
+          );
+        }
       }
     }
 
@@ -587,7 +593,7 @@ export class WeeklyEvaluationService {
     }
 
     if (
-      actor.role !== ROLES.ADMIN &&
+      !(await this.hasGlobalEvaluationAccess(actor.id)) &&
       process.env.NODE_ENV !== "test" &&
       dto.week === maxAllowedWeek
     ) {

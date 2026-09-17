@@ -14,6 +14,8 @@ import {
 import { prisma } from "../../database/prisma.client";
 import { INTERN_STATUS } from "../../common/constants/intern.constant";
 import { ROLES } from "../../common/constants/role.constant";
+import { PERMISSIONS } from "../../common/constants/permission.constant";
+import { permissionCacheService } from "../../common/services/permission-cache.service";
 import { validatePhoneUniqueness } from "../../common/helpers/phone.helper";
 import {
   AUDIT_ACTION,
@@ -49,22 +51,33 @@ export class InternService {
   }> {
     await this.handleLazyAutoComplete();
 
-    // Data-level authorization: Leader only views interns in their departments or directly assigned
-    if (user?.role === ROLES.LEADER) {
-      const leaderRecord = await prisma.leader.findFirst({
-        where: { userId: user.id },
-        select: {
-          departments: { select: { departmentId: true } },
-        },
-      });
+    if (user) {
+      const callerPerms = new Set(
+        await permissionCacheService.getUserPermissions(user.id),
+      );
+      const hasGlobalAccess =
+        callerPerms.has(PERMISSIONS.INTERN_DELETE) ||
+        callerPerms.has(PERMISSIONS.ROLE_READ) ||
+        callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
 
-      const departmentIds =
-        leaderRecord?.departments.map((d) => d.departmentId) ?? [];
+      if (!hasGlobalAccess) {
+        const leaderRecord = await prisma.leader.findFirst({
+          where: { userId: user.id },
+          select: {
+            departments: { select: { departmentId: true } },
+          },
+        });
 
-      return this.repository.findAll(query, {
-        departmentIds,
-        leaderUserId: user.id,
-      });
+        if (leaderRecord) {
+          const departmentIds =
+            leaderRecord.departments.map((d) => d.departmentId) ?? [];
+
+          return this.repository.findAll(query, {
+            departmentIds,
+            leaderUserId: user.id,
+          });
+        }
+      }
     }
 
     return this.repository.findAll(query);
@@ -85,27 +98,39 @@ export class InternService {
       );
     }
 
-    // Data-level check for Leader
-    if (user?.role === ROLES.LEADER) {
-      const leaderRecord = await prisma.leader.findFirst({
-        where: { userId: user.id },
-        select: {
-          departments: { select: { departmentId: true } },
-        },
-      });
-      const leaderDeptIds =
-        leaderRecord?.departments.map((d) => d.departmentId) ?? [];
+    if (user) {
+      const callerPerms = new Set(
+        await permissionCacheService.getUserPermissions(user.id),
+      );
+      const hasGlobalAccess =
+        callerPerms.has(PERMISSIONS.INTERN_DELETE) ||
+        callerPerms.has(PERMISSIONS.ROLE_READ) ||
+        callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
 
-      const inLeaderDept =
-        profile.departmentId && leaderDeptIds.includes(profile.departmentId);
-      const isDirectLeader = profile.leaderId === user.id;
+      if (!hasGlobalAccess) {
+        const leaderRecord = await prisma.leader.findFirst({
+          where: { userId: user.id },
+          select: {
+            departments: { select: { departmentId: true } },
+          },
+        });
 
-      if (!inLeaderDept && !isDirectLeader) {
-        throw new AppError(
-          "Forbidden: Bạn không có quyền truy cập thông tin thực tập sinh này",
-          403,
-          ERROR_CODE.FORBIDDEN,
-        );
+        if (leaderRecord) {
+          const leaderDeptIds =
+            leaderRecord.departments.map((d) => d.departmentId) ?? [];
+
+          const inLeaderDept =
+            profile.departmentId && leaderDeptIds.includes(profile.departmentId);
+          const isDirectLeader = profile.leaderId === user.id;
+
+          if (!inLeaderDept && !isDirectLeader) {
+            throw new AppError(
+              "Forbidden: Bạn không có quyền truy cập thông tin thực tập sinh này",
+              403,
+              ERROR_CODE.FORBIDDEN,
+            );
+          }
+        }
       }
     }
 
@@ -430,12 +455,23 @@ export class InternService {
         throw new AppError("Không tìm thấy Leader", 404, ERROR_CODE.NOT_FOUND);
       }
 
-      if (
-        leaderUser.role.name !== ROLES.LEADER &&
-        leaderUser.role.name !== ROLES.ADMIN
-      ) {
+      const leaderRecord = await prisma.leader.findFirst({
+        where: { userId: leaderUser.id },
+      });
+      const leaderPerms = new Set(
+        await permissionCacheService.getUserPermissions(leaderUser.id),
+      );
+      const isEligibleLeader =
+        !!leaderRecord ||
+        leaderPerms.has(PERMISSIONS.DAILY_REPORT_FEEDBACK) ||
+        leaderPerms.has(PERMISSIONS.WEEKLY_EVALUATION_CREATE) ||
+        leaderPerms.has(PERMISSIONS.ROLE_READ) ||
+        leaderUser.role?.name === ROLES.LEADER ||
+        leaderUser.role?.name === ROLES.ADMIN;
+
+      if (!isEligibleLeader) {
         throw new AppError(
-          "Người dùng được chọn không phải là LEADER",
+          "Người dùng được chọn không có vai trò Leader",
           400,
           ERROR_CODE.VALIDATION_ERROR,
         );

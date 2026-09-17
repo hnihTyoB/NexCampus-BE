@@ -26,7 +26,7 @@ export class RegulationService {
 
   async findAll(query: RegulationQueryDto, userId?: string, userRole?: string) {
     let internId: string | undefined = undefined;
-    if (userRole === "INTERN" && userId) {
+    if (userId) {
       internId = (await this.repository.findInternIdByUserId(userId)) || undefined;
     }
 
@@ -35,7 +35,7 @@ export class RegulationService {
 
   async findById(id: string, userId?: string, userRole?: string) {
     let internId: string | undefined = undefined;
-    if (userRole === "INTERN" && userId) {
+    if (userId) {
       internId = (await this.repository.findInternIdByUserId(userId)) || undefined;
     }
 
@@ -48,7 +48,7 @@ export class RegulationService {
 
   async findActive(userId?: string, userRole?: string) {
     let internId: string | undefined = undefined;
-    if (userRole === "INTERN" && userId) {
+    if (userId) {
       internId = (await this.repository.findInternIdByUserId(userId)) || undefined;
     }
 

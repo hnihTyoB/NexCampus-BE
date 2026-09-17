@@ -3,7 +3,8 @@ import { AppError } from "../common/errors/app-error";
 import { ERROR_CODE } from "../common/errors/error-code";
 
 /**
- * Middleware kiểm tra vai trò người dùng (Role-based access control)
+ * @deprecated KHÔNG ĐƯỢC DÙNG: Toàn bộ hệ thống đã chuyển sang Dynamic RBAC & Permission-based Access Control.
+ * Sử dụng `requirePermission` hoặc `requireAnyPermission` từ `permission.middleware.ts`.
  */
 export function requireRole(...allowedRoles: string[]) {
   return (req: Request, res: Response, next: NextFunction): void => {

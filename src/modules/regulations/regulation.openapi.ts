@@ -85,7 +85,7 @@ export function registerRegulationOpenApi(): void {
     method: "post",
     path: "/regulations",
     tags: ["Regulations"],
-    summary: "Tạo nội quy mới (Chỉ dành cho Admin)",
+    summary: "Tạo nội quy mới (Yêu cầu quyền REGULATION_CREATE)",
     security: [{ BearerAuth: [] }],
     request: {
       body: {

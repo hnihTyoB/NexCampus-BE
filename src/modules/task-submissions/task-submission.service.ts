@@ -7,7 +7,8 @@ import {
   ReviewSubmissionDto,
   CreateAttachmentInput,
 } from "./task-submission.dto";
-import { ROLES } from "../../common/constants/role.constant";
+import { PERMISSIONS } from "../../common/constants/permission.constant";
+import { permissionCacheService } from "../../common/services/permission-cache.service";
 import { ASSIGNMENT_STATUS } from "../../common/constants/task.constant";
 import {
   AUDIT_ACTION,
@@ -28,21 +29,40 @@ export class TaskSubmissionService {
   private readonly repository = new TaskSubmissionRepository();
   private readonly r2Service = new R2Service();
 
+  private async hasGlobalAccess(actorId: string): Promise<boolean> {
+    const callerPerms = new Set(
+      await permissionCacheService.getUserPermissions(actorId),
+    );
+    return (
+      callerPerms.has(PERMISSIONS.TASK_SUBMISSION_DELETE) ||
+      callerPerms.has(PERMISSIONS.ROLE_READ) ||
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN)
+    );
+  }
+
   async findAll(
     query: TaskSubmissionQueryDto,
     actor: UserPayload,
   ) {
     let scope: { internId?: string; leaderUserId?: string } | undefined;
 
-    if (actor.role === ROLES.INTERN) {
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal) {
       const intern = await prisma.intern.findUnique({
         where: { userId: actor.id },
+        select: { id: true },
       });
       if (intern) {
         scope = { internId: intern.id };
+      } else {
+        const leader = await prisma.leader.findFirst({
+          where: { userId: actor.id },
+          select: { id: true },
+        });
+        if (leader) {
+          scope = { leaderUserId: actor.id };
+        }
       }
-    } else if (actor.role === ROLES.LEADER) {
-      scope = { leaderUserId: actor.id };
     }
 
     return this.repository.findAll(query, scope);
@@ -58,21 +78,24 @@ export class TaskSubmissionService {
       );
     }
 
-    // Permission check
-    if (actor.role === ROLES.INTERN) {
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal) {
       const intern = await prisma.intern.findUnique({
         where: { userId: actor.id },
+        select: { id: true },
       });
-      const isOwner = intern && submission.assignment.internId === intern.id;
-      const isSupport = intern && submission.assignment.supportId === intern.id;
-      if (!isOwner && !isSupport) {
-        throw new AppError("Forbidden", 403, ERROR_CODE.FORBIDDEN);
-      }
-    } else if (actor.role === ROLES.LEADER) {
-      const isLeaderOfOwner = submission.assignment.intern?.leaderId === actor.id;
-      const isLeaderOfSupport = submission.assignment.support?.leaderId === actor.id;
-      if (!isLeaderOfOwner && !isLeaderOfSupport) {
-        throw new AppError("Forbidden", 403, ERROR_CODE.FORBIDDEN);
+      if (intern) {
+        const isOwner = submission.assignment.internId === intern.id;
+        const isSupport = submission.assignment.supportId === intern.id;
+        if (!isOwner && !isSupport) {
+          throw new AppError("Forbidden", 403, ERROR_CODE.FORBIDDEN);
+        }
+      } else {
+        const isLeaderOfOwner = submission.assignment.intern?.leaderId === actor.id;
+        const isLeaderOfSupport = submission.assignment.support?.leaderId === actor.id;
+        if (!isLeaderOfOwner && !isLeaderOfSupport) {
+          throw new AppError("Forbidden", 403, ERROR_CODE.FORBIDDEN);
+        }
       }
     }
 
@@ -110,8 +133,9 @@ export class TaskSubmissionService {
       );
     }
 
-    // Permission check: only assigned intern (or admin) can submit
-    if (actor.role === ROLES.INTERN) {
+    // Permission check: only assigned intern (or admin/manager) can submit
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal) {
       const intern = await prisma.intern.findUnique({
         where: { userId: actor.id },
       });
@@ -190,14 +214,15 @@ export class TaskSubmissionService {
       );
     }
 
-    // Phân quyền: Quyền Leader trực tiếp hoặc Admin đánh giá
+    // Phân quyền: Quyền Leader trực tiếp hoặc Quản trị viên đánh giá
     const isDirectLeader =
       submission.assignment?.intern?.leaderId === actor.id ||
       submission.assignment?.support?.leaderId === actor.id;
 
-    if (actor.role !== ROLES.ADMIN && !isDirectLeader) {
+    const hasGlobalReviewAccess = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobalReviewAccess && !isDirectLeader) {
       throw new AppError(
-        "Chỉ Leader trực tiếp quản lý TTS hoặc Admin mới có quyền đánh giá bài nộp",
+        "Chỉ Leader trực tiếp quản lý TTS hoặc Quản trị viên mới có quyền đánh giá bài nộp",
         403,
         ERROR_CODE.FORBIDDEN,
       );
@@ -276,7 +301,8 @@ export class TaskSubmissionService {
 
     // SEC-02: Intern chỉ được đính kèm tệp vào bài nộp của chính mình hoặc
     // bài nộp mà mình là support. Không được đính kèm vào bài của intern khác.
-    if (actor.role === ROLES.INTERN) {
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal) {
       const intern = await prisma.intern.findUnique({
         where: { userId: actor.id },
         select: { id: true },
@@ -341,7 +367,8 @@ export class TaskSubmissionService {
       );
     }
 
-    if (actor.role === ROLES.INTERN && attachment.uploadedBy !== actor.id) {
+    const hasGlobalDelete = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobalDelete && attachment.uploadedBy !== actor.id) {
       throw new AppError("Forbidden", 403, ERROR_CODE.FORBIDDEN);
     }
 

@@ -18,14 +18,14 @@ export class UserService {
 
   /**
    * Kiểm tra người dùng có giữ vai trò hoặc đặc quyền quản trị hệ thống hay không:
-   * 1. Có tên vai trò khớp với ROLES.ADMIN
+   * 1. Có vai trò hệ thống ADMIN (isSystem = true)
    * 2. Hoặc vai trò sở hữu các quyền quản trị then chốt (USER_ROLE_ASSIGN, ROLE_PERMISSION_ASSIGN)
    */
   async isAdministrativeUser(user: {
     roleId?: string | null;
-    role?: { name: string } | null;
+    role?: { name: string; isSystem?: boolean } | null;
   }): Promise<boolean> {
-    if (user.role?.name === ROLES.ADMIN) {
+    if (user.role?.isSystem && user.role.name === ROLES.ADMIN) {
       return true;
     }
     if (user.roleId) {
@@ -54,7 +54,7 @@ export class UserService {
     return user;
   }
 
-  async create(data: CreateUserDto) {
+  async create(data: CreateUserDto, actorId?: string) {
     const existing = await this.repository.findByEmail(data.email);
 
     if (existing) {
@@ -70,6 +70,36 @@ export class UserService {
     });
     if (!role) {
       throw new AppError("Role not found", 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    // SEC-P0: Chống leo thang đặc quyền khi tạo người dùng và gán roleId
+    if (actorId) {
+      const actor = await this.repository.findById(actorId);
+      const isSuperAdmin =
+        actor?.role?.isSystem && actor?.role?.name === ROLES.ADMIN;
+      if (!isSuperAdmin) {
+        const actorPerms = new Set(
+          await permissionCacheService.getUserPermissions(actorId),
+        );
+        if (!actorPerms.has(PERMISSIONS.USER_ROLE_ASSIGN)) {
+          throw new AppError(
+            "Forbidden: Quyền USER_ROLE_ASSIGN là bắt buộc để chỉ định vai trò khi tạo người dùng",
+            403,
+            ERROR_CODE.FORBIDDEN,
+          );
+        }
+        const targetPermissions =
+          await permissionCacheService.getRolePermissions(data.roleId);
+        for (const perm of targetPermissions) {
+          if (!actorPerms.has(perm)) {
+            throw new AppError(
+              `Privilege Escalation: Bạn không thể tạo người dùng với vai trò có quyền '${perm}' vượt quá đặc quyền của bạn`,
+              403,
+              ERROR_CODE.FORBIDDEN,
+            );
+          }
+        }
+      }
     }
 
     const passwordHash = await bcrypt.hash(data.password, 10);

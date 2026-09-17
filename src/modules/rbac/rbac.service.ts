@@ -60,6 +60,33 @@ export class RbacService {
           ERROR_CODE.VALIDATION_ERROR,
         );
       }
+
+      // SEC-P0: Ngăn chặn leo thang đặc quyền (Privilege Escalation)
+      if (context?.actorId) {
+        const caller = await this.repository.findUserById(context.actorId);
+        const isSuperAdmin = caller?.role?.isSystem && caller.role.name === ROLES.ADMIN;
+        if (!isSuperAdmin) {
+          const callerPerms = new Set(
+            await permissionCacheService.getUserPermissions(context.actorId),
+          );
+          if (!callerPerms.has(PERMISSIONS.ROLE_PERMISSION_ASSIGN)) {
+            throw new AppError(
+              "Forbidden: Cần có quyền ROLE_PERMISSION_ASSIGN để gán quyền khi tạo vai trò",
+              403,
+              ERROR_CODE.FORBIDDEN,
+            );
+          }
+          for (const perm of validPermissions) {
+            if (!callerPerms.has(perm.name)) {
+              throw new AppError(
+                `Privilege Escalation: Bạn không thể cấp quyền '${perm.name}' cho vai trò mới vì chính bạn không sở hữu quyền này`,
+                403,
+                ERROR_CODE.FORBIDDEN,
+              );
+            }
+          }
+        }
+      }
     }
 
     const role = await this.repository.createRole(data);
@@ -91,7 +118,7 @@ export class RbacService {
     if (data.name && data.name !== role.name) {
       if (role.isSystem) {
         throw new AppError(
-          "Cannot rename system roles (ADMIN, MANAGER, USER)",
+          "Cannot rename system role",
           400,
           ERROR_CODE.VALIDATION_ERROR,
         );
@@ -134,7 +161,7 @@ export class RbacService {
 
     if (role.isSystem) {
       throw new AppError(
-        "Cannot delete system roles (ADMIN, MANAGER, USER)",
+        "Cannot delete system role",
         400,
         ERROR_CODE.VALIDATION_ERROR,
       );
@@ -187,8 +214,28 @@ export class RbacService {
       );
     }
 
+    // SEC-P0: Chống leo thang đặc quyền khi gán permissions vào role
+    if (context?.actorId) {
+      const caller = await this.repository.findUserById(context.actorId);
+      const isSuperAdmin = caller?.role?.isSystem && caller.role.name === ROLES.ADMIN;
+      if (!isSuperAdmin) {
+        const callerPerms = new Set(
+          await permissionCacheService.getUserPermissions(context.actorId),
+        );
+        for (const perm of validPermissions) {
+          if (!callerPerms.has(perm.name)) {
+            throw new AppError(
+              `Privilege Escalation: Bạn không thể cấp quyền '${perm.name}' cho vai trò vì chính bạn không sở hữu quyền này`,
+              403,
+              ERROR_CODE.FORBIDDEN,
+            );
+          }
+        }
+      }
+    }
+
     // Anti-lockout protection: ADMIN role must retain ROLE_PERMISSION_ASSIGN
-    if (role.name === ROLES.ADMIN) {
+    if (role.isSystem && (role.name === ROLES.ADMIN || role.name === "ADMIN")) {
       const assignPerm = await this.repository.findPermissionByName(
         PERMISSIONS.ROLE_PERMISSION_ASSIGN,
       );
@@ -267,6 +314,38 @@ export class RbacService {
     const currentUser = await this.repository.findUserById(userId);
     if (!currentUser) {
       throw new AppError("User not found", 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    // SEC-P0: Chống tự phong quyền (Self-role assignment)
+    if (context?.actorId && context.actorId === userId) {
+      throw new AppError(
+        "Security Violation: Không được phép tự gán hoặc thay đổi vai trò của chính mình",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    // SEC-P0: Chống leo thang đặc quyền khi gán vai trò người dùng
+    if (context?.actorId) {
+      const caller = await this.repository.findUserById(context.actorId);
+      const isSuperAdmin = caller?.role?.isSystem && caller.role.name === ROLES.ADMIN;
+      if (!isSuperAdmin) {
+        const callerPerms = new Set(
+          await permissionCacheService.getUserPermissions(context.actorId),
+        );
+        const targetPermissions = await permissionCacheService.getRolePermissions(
+          targetRole.id,
+        );
+        for (const perm of targetPermissions) {
+          if (!callerPerms.has(perm)) {
+            throw new AppError(
+              `Privilege Escalation: Bạn không thể gán vai trò '${targetRole.name}' vì vai trò này sở hữu quyền '${perm}' vượt quá đặc quyền của bạn`,
+              403,
+              ERROR_CODE.FORBIDDEN,
+            );
+          }
+        }
+      }
     }
 
     // Anti-lockout guard: Ngăn chặn hạ quyền Quản trị viên (Admin) duy nhất

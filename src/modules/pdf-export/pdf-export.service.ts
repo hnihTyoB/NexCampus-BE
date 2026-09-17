@@ -13,6 +13,9 @@ import { puppeteerManager, PuppeteerManager } from "../../common/services/puppet
 import { R2Service } from "../../common/services/r2.service";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
+import { PERMISSIONS } from "../../common/constants/permission.constant";
+import { permissionCacheService } from "../../common/services/permission-cache.service";
+import { prisma } from "../../database/prisma.client";
 
 interface ActorPayload {
   id: string;
@@ -24,6 +27,16 @@ export class PdfExportService {
   private readonly repository: PdfExportRepository = pdfExportRepository;
   private readonly puppeteer: PuppeteerManager = puppeteerManager;
   private readonly r2Service: R2Service = new R2Service();
+
+  private async hasGlobalAccess(actorId: string): Promise<boolean> {
+    const callerPerms = new Set(
+      await permissionCacheService.getUserPermissions(actorId),
+    );
+    return (
+      callerPerms.has(PERMISSIONS.ROLE_READ) ||
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN)
+    );
+  }
 
   constructor() {
     this.registerHandlebarsHelpers();
@@ -119,13 +132,22 @@ export class PdfExportService {
     // - Intern chỉ được xuất báo cáo của chính mình
     // - Leader chỉ được xuất của TTS mình phụ trách
     // - Admin được xuất toàn bộ
-    if (actor.role === "INTERN") {
-      if (evaluation.intern.userId !== actor.id) {
-        throw new AppError("Forbidden: You can only export your own weekly evaluations", 403, ERROR_CODE.FORBIDDEN);
-      }
-    } else if (actor.role === "LEADER") {
-      if (evaluation.leaderId !== actor.id && evaluation.intern.leaderId !== actor.id) {
-        throw new AppError("Forbidden: You can only export evaluations for your assigned interns", 403, ERROR_CODE.FORBIDDEN);
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal) {
+      const intern = await prisma.intern.findUnique({
+        where: { userId: actor.id },
+        select: { id: true },
+      });
+      if (intern) {
+        if (evaluation.intern.userId !== actor.id) {
+          throw new AppError("Forbidden: You can only export your own weekly evaluations", 403, ERROR_CODE.FORBIDDEN);
+        }
+      } else {
+        const isLeaderOfIntern =
+          evaluation.leaderId === actor.id || evaluation.intern.leaderId === actor.id;
+        if (!isLeaderOfIntern) {
+          throw new AppError("Forbidden: You can only export evaluations for your assigned interns", 403, ERROR_CODE.FORBIDDEN);
+        }
       }
     }
 
@@ -186,14 +208,20 @@ export class PdfExportService {
 
     const { intern, evaluations, taskStats, reportCount } = data;
 
-    // RBAC Check
-    if (actor.role === "INTERN") {
-      if (intern.userId !== actor.id) {
-        throw new AppError("Forbidden: You can only export your own internship summary", 403, ERROR_CODE.FORBIDDEN);
-      }
-    } else if (actor.role === "LEADER") {
-      if (intern.leaderId !== actor.id) {
-        throw new AppError("Forbidden: You can only export summary for your assigned interns", 403, ERROR_CODE.FORBIDDEN);
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal) {
+      const internRecord = await prisma.intern.findUnique({
+        where: { userId: actor.id },
+        select: { id: true },
+      });
+      if (internRecord) {
+        if (intern.userId !== actor.id) {
+          throw new AppError("Forbidden: You can only export your own internship summary", 403, ERROR_CODE.FORBIDDEN);
+        }
+      } else {
+        if (intern.leaderId !== actor.id) {
+          throw new AppError("Forbidden: You can only export summary for your assigned interns", 403, ERROR_CODE.FORBIDDEN);
+        }
       }
     }
 

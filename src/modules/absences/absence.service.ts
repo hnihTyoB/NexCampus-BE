@@ -6,7 +6,9 @@ import {
   CreateAbsenceDto,
   ReviewAbsenceDto,
 } from "./absence.dto";
-import { ROLES } from "../../common/constants/role.constant";
+import { PERMISSIONS } from "../../common/constants/permission.constant";
+import { permissionCacheService } from "../../common/services/permission-cache.service";
+import { prisma } from "../../database/prisma.client";
 import {
   AUDIT_ACTION,
   AUDIT_TARGET_TYPE,
@@ -22,13 +24,36 @@ interface UserPayload {
 export class AbsenceService {
   private readonly repository = new AbsenceRepository();
 
+  private async hasGlobalAccess(actorId: string): Promise<boolean> {
+    const callerPerms = new Set(
+      await permissionCacheService.getUserPermissions(actorId),
+    );
+    return (
+      callerPerms.has(PERMISSIONS.ROLE_READ) ||
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN)
+    );
+  }
+
   async findAll(query: AbsenceQueryDto, actor: UserPayload) {
     let scope: { userId?: string; leaderUserId?: string } | undefined;
 
-    if (actor.role === ROLES.INTERN) {
-      scope = { userId: actor.id };
-    } else if (actor.role === ROLES.LEADER) {
-      scope = { leaderUserId: actor.id };
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal) {
+      const intern = await prisma.intern.findUnique({
+        where: { userId: actor.id },
+        select: { id: true },
+      });
+      if (intern) {
+        scope = { userId: actor.id };
+      } else {
+        const leader = await prisma.leader.findFirst({
+          where: { userId: actor.id },
+          select: { id: true },
+        });
+        if (leader) {
+          scope = { leaderUserId: actor.id };
+        }
+      }
     }
 
     return this.repository.findAll(query, scope);
@@ -40,15 +65,23 @@ export class AbsenceService {
       throw new AppError("Đơn xin vắng mặt không tồn tại", 404, ERROR_CODE.ABSENCE_NOT_FOUND);
     }
 
-    if (actor.role === ROLES.INTERN && absence.userId !== actor.id) {
-      throw new AppError("Forbidden", 403, ERROR_CODE.FORBIDDEN);
-    }
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal) {
+      const intern = await prisma.intern.findUnique({
+        where: { userId: actor.id },
+        select: { id: true },
+      });
+      if (intern && absence.userId !== actor.id) {
+        throw new AppError("Forbidden", 403, ERROR_CODE.FORBIDDEN);
+      }
 
-    if (
-      actor.role === ROLES.LEADER &&
-      absence.user?.intern?.leaderId !== actor.id
-    ) {
-      throw new AppError("Forbidden", 403, ERROR_CODE.FORBIDDEN);
+      const leader = await prisma.leader.findFirst({
+        where: { userId: actor.id },
+        select: { id: true },
+      });
+      if (leader && absence.user?.intern?.leaderId !== actor.id) {
+        throw new AppError("Forbidden", 403, ERROR_CODE.FORBIDDEN);
+      }
     }
 
     return absence;
@@ -108,9 +141,10 @@ export class AbsenceService {
     }
 
     const isDirectLeader = absence.user?.intern?.leaderId === actor.id;
-    if (actor.role !== ROLES.ADMIN && !isDirectLeader) {
+    const hasGlobalReview = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobalReview && !isDirectLeader) {
       throw new AppError(
-        "Chỉ Leader trực tiếp hoặc Admin mới có quyền phê duyệt đơn xin vắng mặt",
+        "Chỉ Leader trực tiếp hoặc Quản trị viên mới có quyền phê duyệt đơn xin vắng mặt",
         403,
         ERROR_CODE.FORBIDDEN,
       );

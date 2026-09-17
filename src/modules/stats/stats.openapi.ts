@@ -8,7 +8,7 @@ export function registerStatsOpenApi(): void {
     method: "get",
     path: "/stats/admin",
     tags: ["Dashboard & Stats"],
-    summary: "Thống kê tổng quan toàn hệ thống cho Admin",
+    summary: "Thống kê tổng quan toàn hệ thống (Yêu cầu quyền STATS_ADMIN_READ)",
     security: [{ BearerAuth: [] }],
     responses: {
       200: {
@@ -31,7 +31,7 @@ export function registerStatsOpenApi(): void {
     method: "get",
     path: "/stats/leader",
     tags: ["Dashboard & Stats"],
-    summary: "Thống kê hiệu suất quản lý cho Leader",
+    summary: "Thống kê hiệu suất quản lý (Yêu cầu quyền STATS_LEADER_READ)",
     security: [{ BearerAuth: [] }],
     responses: {
       200: {
@@ -54,7 +54,7 @@ export function registerStatsOpenApi(): void {
     method: "get",
     path: "/stats/intern",
     tags: ["Dashboard & Stats"],
-    summary: "Thống kê cá nhân cho Thực tập sinh",
+    summary: "Thống kê cá nhân (Yêu cầu quyền STATS_INTERN_READ)",
     security: [{ BearerAuth: [] }],
     request: { query: internStatsQuerySchema },
     responses: {
