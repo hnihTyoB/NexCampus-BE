@@ -46,6 +46,9 @@ export function getRedisConnectionOptions(): RedisOptions {
   if (envConfig.redis.password) {
     baseOptions.password = envConfig.redis.password;
   }
+  if (envConfig.redis.tls) {
+    baseOptions.tls = envConfig.redis.tls;
+  }
 
   return baseOptions;
 }

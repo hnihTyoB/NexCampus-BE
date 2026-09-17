@@ -2,7 +2,12 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { SseManagerService } from "../src/common/services/sse-manager.service";
-import { extractTokenFromRequest } from "../src/middlewares/auth.middleware";
+import { sseTicketService } from "../src/common/services/sse-ticket.service";
+import {
+  authMiddleware,
+  extractTokenFromRequest,
+} from "../src/middlewares/auth.middleware";
+import { permissionCacheService } from "../src/common/services/permission-cache.service";
 
 function createMockResponse() {
   const headers: Record<string, string> = {};
@@ -190,5 +195,71 @@ describe("Server-Sent Events (SSE) Real-Time Push Module", () => {
     assert.equal(sseService.getActiveConnectionCount(), 0);
     assert.equal(resUser1.writableEnded, true);
     assert.equal(resUser2.writableEnded, true);
+  });
+
+  it("8. SseTicketService should generate and consume one-time ticket atomically", async () => {
+    const userPayload = {
+      id: "user-ticket-test-1",
+      email: "test@nexcampus.com",
+      role: "INTERN",
+    };
+
+    const ticket = await sseTicketService.createTicket(userPayload);
+    assert.ok(ticket);
+    assert.equal(typeof ticket, "string");
+
+    // First consumption must succeed
+    const consumed = await sseTicketService.validateAndConsumeTicket(ticket);
+    assert.ok(consumed);
+    assert.equal(consumed?.id, userPayload.id);
+    assert.equal(consumed?.email, userPayload.email);
+
+    // Replay consumption must return null (one-time ticket)
+    const replay = await sseTicketService.validateAndConsumeTicket(ticket);
+    assert.equal(replay, null);
+  });
+
+  it("9. authMiddleware should authenticate SSE stream requests via valid one-time ticket", async () => {
+    const userPayload = {
+      id: "user-ticket-test-2",
+      email: "intern2@nexcampus.com",
+      role: "INTERN",
+    };
+
+    // Mock user state in permissionCacheService
+    const origGetUserState = permissionCacheService.getUserState;
+    permissionCacheService.getUserState = async (userId: string) => {
+      if (userId === "user-ticket-test-2") {
+        return {
+          id: userId,
+          isActive: true,
+          deletedAt: null,
+          roleId: "role-1",
+          roleName: "INTERN",
+        };
+      }
+      return null;
+    };
+
+    try {
+      const ticket = await sseTicketService.createTicket(userPayload);
+      const req = createMockRequest({
+        path: "/api/v2/notifications/stream",
+        query: { ticket },
+      });
+      const res = createMockResponse();
+
+      let nextCalled = false;
+      await authMiddleware(req as any, res as any, (err?: any) => {
+        assert.equal(err, undefined);
+        nextCalled = true;
+      });
+
+      assert.equal(nextCalled, true);
+      assert.equal(req.user?.id, userPayload.id);
+      assert.equal(req.user?.email, userPayload.email);
+    } finally {
+      permissionCacheService.getUserState = origGetUserState;
+    }
   });
 });

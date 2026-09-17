@@ -1,7 +1,13 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: process.env.DIRECT_URL || process.env.DATABASE_URL,
+    },
+  },
+});
 
 // ── 1. Danh Mục Quyền Hệ Thống Chuẩn Hóa (Permissions Matrix) ───────────────
 interface PermissionDef {
@@ -321,21 +327,22 @@ async function main() {
     USER: USER_BASE_PERMISSIONS,
   };
 
+  const rolePermBatch: { roleId: string; permissionId: string }[] = [];
   for (const [roleName, permList] of Object.entries(rolePermissionAssignments)) {
     const roleId = roleMap[roleName];
     if (!roleId) continue;
     for (const permName of permList) {
       const permissionId = permissionMap[permName];
       if (roleId && permissionId) {
-        await prisma.rolePermission.upsert({
-          where: {
-            roleId_permissionId: { roleId, permissionId },
-          },
-          update: {},
-          create: { roleId, permissionId },
-        });
+        rolePermBatch.push({ roleId, permissionId });
       }
     }
+  }
+  if (rolePermBatch.length > 0) {
+    await prisma.rolePermission.createMany({
+      data: rolePermBatch,
+      skipDuplicates: true,
+    });
   }
   console.log("  ✓ Đã hoàn tất gán ma trận quyền hạn cho tất cả các vai trò hệ thống.");
 

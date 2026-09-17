@@ -52,6 +52,8 @@ export class StatsRepository {
       departments,
       leaders,
       recentAuditLogs,
+      totalUsers,
+      rawOverdueAssignments,
     ] = await Promise.all([
       prisma.intern.count({ where: { status: "ACTIVE", deletedAt: null } }),
       prisma.intern.count({ where: { status: "COMPLETED", deletedAt: null } }),
@@ -102,7 +104,7 @@ export class StatsRepository {
         select: {
           id: true,
           userId: true,
-          user: { select: { fullName: true } },
+          user: { select: { fullName: true, email: true } },
           departments: {
             select: {
               department: { select: { name: true } },
@@ -119,6 +121,26 @@ export class StatsRepository {
           targetType: true,
           details: true,
           createdAt: true,
+        },
+      }),
+      prisma.user.count({ where: { deletedAt: null } }),
+      prisma.taskAssignment.findMany({
+        where: {
+          status: { not: "DONE" },
+          task: { deadline: { lt: now }, deletedAt: null },
+        },
+        take: 20,
+        select: {
+          id: true,
+          status: true,
+          task: { select: { title: true, priority: true, deadline: true } },
+          intern: {
+            select: {
+              fullName: true,
+              user: { select: { fullName: true, email: true } },
+            },
+          },
+          assigner: { select: { fullName: true } },
         },
       }),
     ]);
@@ -288,11 +310,23 @@ export class StatsRepository {
         return {
           leaderId: leader.id,
           leaderName: leader.user?.fullName || "Leader",
+          leaderEmail: leader.user?.email || "",
           departmentName: deptName,
           internCount,
+          totalInterns: internCount,
           activeTasksCount: stats.active,
           completedTasksCount: stats.done,
           overdueTasksCount: stats.overdue,
+          overdueCount: stats.overdue,
+          totalAssignments: stats.active + stats.done,
+          assignments: {
+            pendingApproval: 0,
+            todo: 0,
+            inProgress: stats.active,
+            review: 0,
+            done: stats.done,
+            blocked: 0,
+          },
           riskLevel,
         };
       });
@@ -310,8 +344,43 @@ export class StatsRepository {
       createdAt: log.createdAt.toISOString(),
     }));
 
+    const overdueAssignments = (rawOverdueAssignments || []).map((a: any) => {
+      const deadline = a.task?.deadline ? new Date(a.task.deadline) : null;
+      return {
+        id: a.id,
+        status: a.status,
+        taskTitle: a.task?.title ?? "Untitled Task",
+        taskPriority: a.task?.priority ?? "MEDIUM",
+        taskDeadline: deadline ? deadline.toISOString() : null,
+        isOverdue: Boolean(deadline && deadline < now && a.status !== "DONE"),
+        internName: a.intern?.user?.fullName ?? a.intern?.fullName ?? "N/A",
+        internEmail: a.intern?.user?.email ?? "N/A",
+        leaderName: a.assigner?.fullName ?? "N/A",
+      };
+    });
+
+    const assignmentStatusCounts: Record<string, number> = {
+      pendingApproval: 0,
+      todo: 0,
+      inProgress: 0,
+      review: 0,
+      done: 0,
+      blocked: 0,
+    };
+    for (const item of tasksByStatusRaw) {
+      if (item.status === "PENDING_APPROVAL") assignmentStatusCounts.pendingApproval = item._count._all;
+      else if (item.status === "TODO") assignmentStatusCounts.todo = item._count._all;
+      else if (item.status === "IN_PROGRESS") assignmentStatusCounts.inProgress = item._count._all;
+      else if (item.status === "REVIEW") assignmentStatusCounts.review = item._count._all;
+      else if (item.status === "DONE") assignmentStatusCounts.done = item._count._all;
+      else if (item.status === "BLOCKED") assignmentStatusCounts.blocked = item._count._all;
+    }
+
     return {
       system: {
+        leaders: activeLeaders,
+        departments: activeDepartments,
+        users: totalUsers,
         activeInterns,
         totalInterns,
         completedInterns,
@@ -320,7 +389,15 @@ export class StatsRepository {
         activeLeaders,
         activeDepartments,
       },
+      interns: {
+        total: totalInterns,
+        active: activeInterns,
+        completed: completedInterns,
+        dropped: droppedInterns,
+      },
       tasks: {
+        total: totalTasks,
+        overdue: overdueTasks,
         activeTasks,
         completedTasks,
         overdueTasks,
@@ -329,16 +406,28 @@ export class StatsRepository {
         byPriority,
       },
       submissions: {
+        total: totalSubmissions,
+        pending: pendingSubmissions,
+        approved: approvedSubmissions,
+        rejected: rejectedSubmissions,
         pendingSubmissions,
         approvedSubmissions,
         rejectedSubmissions,
         totalSubmissions,
       },
       applications: {
+        total: totalApplications,
+        pending: pendingApplications,
+        approved: approvedApplications,
+        rejected: rejectedApplications,
         pendingApplications,
         approvedApplications,
         rejectedApplications,
         totalApplications,
+      },
+      assignments: {
+        total: totalAssignments,
+        byStatus: assignmentStatusCounts,
       },
       departmentDistribution,
       leaderTeams,
@@ -348,6 +437,9 @@ export class StatsRepository {
         droppedInternsCount: droppedInterns,
       },
       recentActivities,
+      overdueAssignments,
+      retentionRate,
+      systemCompletionRate,
     };
   }
 

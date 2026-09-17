@@ -4,6 +4,7 @@ import { jwtConfig } from "../config/jwt.config";
 import { AppError } from "../common/errors/app-error";
 import { ERROR_CODE } from "../common/errors/error-code";
 import { permissionCacheService } from "../common/services/permission-cache.service";
+import { sseTicketService } from "../common/services/sse-ticket.service";
 
 export function extractTokenFromRequest(req: Request): string | undefined {
   let token = req.cookies?.accessToken;
@@ -31,6 +32,60 @@ export async function authMiddleware(
   res: Response,
   next: NextFunction,
 ): Promise<void> {
+  const path = req.path || req.originalUrl || "";
+  const isStreamRoute =
+    path.endsWith("/stream") || path.split("?")[0].endsWith("/stream");
+
+  // Xử lý xác thực qua One-Time Ticket đối với SSE stream connection
+  if (
+    isStreamRoute &&
+    req.query?.ticket &&
+    typeof req.query.ticket === "string"
+  ) {
+    try {
+      const ticketUser = await sseTicketService.validateAndConsumeTicket(
+        req.query.ticket,
+      );
+      if (!ticketUser) {
+        next(
+          new AppError(
+            "Ticket không hợp lệ hoặc đã hết hạn",
+            401,
+            ERROR_CODE.UNAUTHORIZED,
+          ),
+        );
+        return;
+      }
+
+      const userState = await permissionCacheService.getUserState(
+        ticketUser.id,
+      );
+      if (!userState || !userState.isActive || userState.deletedAt) {
+        next(
+          new AppError(
+            "Tài khoản của bạn đã bị vô hiệu hóa hoặc không tồn tại",
+            401,
+            ERROR_CODE.UNAUTHORIZED,
+          ),
+        );
+        return;
+      }
+
+      req.user = {
+        id: ticketUser.id,
+        email: ticketUser.email,
+        role: userState.roleName || ticketUser.role,
+        roleId: userState.roleId || ticketUser.roleId,
+      };
+
+      next();
+      return;
+    } catch (err) {
+      next(err);
+      return;
+    }
+  }
+
   const token = extractTokenFromRequest(req);
 
   if (!token) {

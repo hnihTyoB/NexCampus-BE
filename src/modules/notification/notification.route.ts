@@ -29,6 +29,7 @@ router.use(authMiddleware);
 // Notification Settings alias (/notifications/settings)
 router.use("/settings", notificationSettingRoute);
 
+router.get("/ticket", controller.getTicket);
 router.get("/stream", controller.stream);
 router.get("/", validate(listNotificationsSchema, "query"), controller.list);
 router.get("/unread-count", controller.unreadCount);
@@ -38,6 +39,12 @@ router.patch(
   "/:id/read",
   validate(notificationIdParamSchema, "params"),
   controller.markAsRead,
+);
+router.delete("/clear-read", controller.clearRead);
+router.get(
+  "/:id",
+  validate(notificationIdParamSchema, "params"),
+  controller.getById,
 );
 router.delete(
   "/:id",
@@ -50,6 +57,16 @@ router.post(
   requirePermission(PERMISSIONS.NOTIFICATION_CREATE),
   validate(sendNotificationSchema),
   controller.send,
+);
+router.post(
+  "/send-custom",
+  requirePermission(PERMISSIONS.NOTIFICATION_CREATE),
+  controller.sendCustom,
+);
+router.post(
+  "/",
+  requirePermission(PERMISSIONS.NOTIFICATION_CREATE),
+  controller.createLegacyNotification,
 );
 router.post(
   "/broadcast",

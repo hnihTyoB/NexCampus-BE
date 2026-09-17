@@ -1,6 +1,7 @@
 import { Queue, QueueOptions } from "bullmq";
 import IORedis from "ioredis";
 import { envConfig } from "../../config/env.config";
+import { getRedisConnectionOptions } from "../../config/redis.config";
 import {
   CRON_QUEUE_NAME,
   CronJobName,
@@ -31,10 +32,9 @@ export class CronQueueService {
 
   private init(): void {
     try {
+      const baseOptions = getRedisConnectionOptions();
       this.redisConnection = new IORedis({
-        host: envConfig.redis.host,
-        port: envConfig.redis.port,
-        password: envConfig.redis.password,
+        ...baseOptions,
         maxRetriesPerRequest: null,
         enableReadyCheck: false,
         lazyConnect: true,

@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import IORedis from "ioredis";
 import { envConfig } from "../../config/env.config";
+import { getRedisConnectionOptions } from "../../config/redis.config";
 
 export interface SseEvent<T = unknown> {
   type: string;
@@ -38,13 +39,9 @@ export class SseManagerService {
 
   private initRedisPubSub(): void {
     try {
+      const baseOptions = getRedisConnectionOptions();
       const redisOptions = {
-        host: envConfig.redis.host,
-        port: envConfig.redis.port,
-        password: envConfig.redis.password,
-        maxRetriesPerRequest: null,
-        enableReadyCheck: false,
-        lazyConnect: true,
+        ...baseOptions,
         retryStrategy: (times: number) => {
           if (times > 2) {
             this.isRedisAvailable = false;

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import IORedis from "ioredis";
 import { ERROR_CODE } from "../common/errors/error-code";
 import { envConfig } from "../config/env.config";
+import { getRedisConnectionOptions } from "../config/redis.config";
 
 export interface RateLimitOptions {
   windowMs?: number;
@@ -25,10 +26,9 @@ export function getSharedRateLimitRedisClient(): IORedis | null {
     return null;
   }
   if (!sharedRedisClient) {
+    const baseOptions = getRedisConnectionOptions();
     sharedRedisClient = new IORedis({
-      host: envConfig.redis.host,
-      port: envConfig.redis.port,
-      password: envConfig.redis.password,
+      ...baseOptions,
       lazyConnect: true,
       maxRetriesPerRequest: 1,
       enableOfflineQueue: false,

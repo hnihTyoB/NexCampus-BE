@@ -20,6 +20,7 @@ import {
   AUDIT_TARGET_TYPE,
 } from "../../common/constants/audit-log.constant";
 import { envConfig } from "../../config/env.config";
+import { getRedisConnectionOptions } from "../../config/redis.config";
 import { sseManagerService } from "../../common/services/sse-manager.service";
 import IORedis from "ioredis";
 
@@ -52,13 +53,9 @@ export class SystemConfigService {
 
   private initRedisPubSub(): void {
     try {
+      const baseOptions = getRedisConnectionOptions();
       const redisOptions = {
-        host: envConfig.redis.host,
-        port: envConfig.redis.port,
-        password: envConfig.redis.password,
-        maxRetriesPerRequest: null,
-        enableReadyCheck: false,
-        lazyConnect: true,
+        ...baseOptions,
         retryStrategy: (times: number) => {
           if (times > 2) {
             this.isRedisAvailable = false;

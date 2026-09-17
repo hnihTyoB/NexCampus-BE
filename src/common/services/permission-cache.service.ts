@@ -3,6 +3,7 @@ import IORedis from "ioredis";
 import { rbacRepository } from "../../modules/rbac/rbac.repository";
 import { userRepository } from "../../modules/users/user.repository";
 import { envConfig } from "../../config/env.config";
+import { getRedisConnectionOptions } from "../../config/redis.config";
 import {
   PERMISSION_PUBSUB_CHANNEL,
   PERMISSION_PUBSUB_ACTION,
@@ -70,13 +71,9 @@ export class PermissionCacheService {
 
   private initRedisPubSub(): void {
     try {
+      const baseOptions = getRedisConnectionOptions();
       const redisOptions = {
-        host: envConfig.redis.host,
-        port: envConfig.redis.port,
-        password: envConfig.redis.password,
-        maxRetriesPerRequest: null,
-        enableReadyCheck: false,
-        lazyConnect: true,
+        ...baseOptions,
         retryStrategy: (times: number) => {
           if (times > 2) {
             this.isRedisAvailable = false;

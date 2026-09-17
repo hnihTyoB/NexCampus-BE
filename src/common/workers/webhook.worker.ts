@@ -1,6 +1,7 @@
 import { Worker, Job } from "bullmq";
 import IORedis from "ioredis";
 import { envConfig } from "../../config/env.config";
+import { getRedisConnectionOptions } from "../../config/redis.config";
 import { WEBHOOK_QUEUE_NAME, WebhookJobData } from "../queues/webhook.queue";
 import { decryptSecret, signHmacSha256 } from "../helpers/crypto.helper";
 import { isPublicHttpUrl, resolveAndValidateDns } from "../helpers/url.helper";
@@ -31,10 +32,9 @@ export class WebhookWorker {
     }
 
     try {
+      const baseOptions = getRedisConnectionOptions();
       this.redisConnection = new IORedis({
-        host: envConfig.redis.host,
-        port: envConfig.redis.port,
-        password: envConfig.redis.password,
+        ...baseOptions,
         maxRetriesPerRequest: null,
         enableReadyCheck: false,
         retryStrategy: (times) => {

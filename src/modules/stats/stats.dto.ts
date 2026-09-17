@@ -45,11 +45,23 @@ export interface DepartmentDistributionDto {
 export interface LeaderTeamProgressDto {
   leaderId: string;
   leaderName: string;
+  leaderEmail?: string;
   departmentName: string;
   internCount: number;
+  totalInterns?: number;
   activeTasksCount: number;
   completedTasksCount: number;
   overdueTasksCount: number;
+  overdueCount?: number;
+  totalAssignments?: number;
+  assignments?: {
+    pendingApproval: number;
+    todo: number;
+    inProgress: number;
+    review: number;
+    done: number;
+    blocked: number;
+  };
   riskLevel: "HEALTHY" | "WARNING" | "DANGER";
 }
 
@@ -67,15 +79,56 @@ export interface RecentActivityDto {
   createdAt: string;
 }
 
+export interface InternStatsDto {
+  total: number;
+  active: number;
+  completed: number;
+  dropped: number;
+}
+
 export interface AdminStatsResponseDto {
-  system: AdminSystemStatsDto;
-  tasks: AdminTaskStatsDto;
-  submissions: AdminSubmissionStatsDto;
-  applications: AdminApplicationStatsDto;
+  system: AdminSystemStatsDto & {
+    leaders?: number;
+    departments?: number;
+    users?: number;
+  };
+  interns?: InternStatsDto;
+  tasks: AdminTaskStatsDto & { overdue?: number };
+  submissions: AdminSubmissionStatsDto & {
+    pending?: number;
+    approved?: number;
+    rejected?: number;
+    total?: number;
+  };
+  applications: AdminApplicationStatsDto & {
+    pending?: number;
+    approved?: number;
+    rejected?: number;
+    total?: number;
+  };
+  assignments?: {
+    total: number;
+    byStatus: Record<string, number>;
+  };
+  dailyReports?: {
+    last30Days: number;
+    avgPerDay: number;
+  };
+  weeklyEvaluations?: {
+    total: number;
+    avgScore: number;
+  };
+  notifications?: {
+    total: number;
+    unread: number;
+  };
+  retentionRate?: number;
+  systemCompletionRate?: number;
   departmentDistribution: DepartmentDistributionDto[];
   leaderTeams: LeaderTeamProgressDto[];
   actionAlerts: ActionAlertsDto;
   recentActivities: RecentActivityDto[];
+  overdueAssignments?: any[];
 }
 
 export interface LeaderInternStatsDto {

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { NotificationService } from "./notification.service";
 import { sseManagerService } from "../../common/services/sse-manager.service";
+import { sseTicketService } from "../../common/services/sse-ticket.service";
 import {
   ListNotificationsDto,
   SendNotificationDto,
@@ -12,9 +13,27 @@ import {
   PreviewNotificationTemplateDto,
   TestSendNotificationTemplateDto,
 } from "./notification.dto";
+import {
+  NOTIFICATION_CHANNEL,
+  NOTIFICATION_TYPE,
+} from "../../common/constants/notification.constant";
 
 export class NotificationController {
   private readonly service = new NotificationService();
+
+  getTicket = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const ticket = await sseTicketService.createTicket({
+        id: req.user.id,
+        email: req.user.email,
+        role: req.user.role,
+        roleId: req.user.roleId,
+      });
+      res.json({ success: true, ticket });
+    } catch (error) {
+      next(error);
+    }
+  };
 
   stream = (req: Request, res: Response): void => {
     sseManagerService.registerClient(req.user.id, res, req);
@@ -37,10 +56,23 @@ export class NotificationController {
     }
   };
 
+  getById = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const item = await this.service.getById(req.user.id, req.params.id);
+      res.json({ success: true, data: item });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   unreadCount = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const result = await this.service.getUnreadCount(req.user.id);
-      res.json({ success: true, data: result });
+      res.json({
+        success: true,
+        data: result,
+        count: result.unreadCount,
+      });
     } catch (error) {
       next(error);
     }
@@ -68,6 +100,55 @@ export class NotificationController {
     try {
       await this.service.delete(req.user.id, req.params.id);
       res.json({ success: true, message: "Notification deleted" });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  clearRead = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await this.service.clearRead(req.user.id);
+      res.json({
+        success: true,
+        message: "Read notifications cleared successfully",
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  sendCustom = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.service.sendCustom(req.body);
+      res.status(201).json({
+        success: true,
+        message: "Custom notification dispatched successfully",
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  createLegacyNotification = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const { userId, title, content, type } = req.body;
+      const result = await this.service.send({
+        userIds: [userId],
+        channels: [NOTIFICATION_CHANNEL.WEB],
+        title,
+        content,
+        type: type || NOTIFICATION_TYPE.INFO,
+      });
+      res.status(201).json({
+        success: true,
+        message: "Notification created successfully",
+        data: result,
+      });
     } catch (error) {
       next(error);
     }

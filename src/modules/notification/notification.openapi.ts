@@ -41,6 +41,31 @@ export function registerNotificationOpenApi(): void {
 
   // ── Web Notifications ────────────────────────────────────────────────────────
 
+  // GET /notifications/ticket
+  openapiRegistry.registerPath({
+    method: "get",
+    path: "/notifications/ticket",
+    tags: ["Notifications"],
+    summary: "Lấy One-Time Ticket ngắn hạn để kết nối luồng SSE thời gian thực",
+    security: [{ BearerAuth: [] }],
+    responses: {
+      200: {
+        description: "Tạo vé thành công",
+        content: {
+          "application/json": {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              ticket: z.string().openapi({ example: "550e8400-e29b-41d4-a716-446655440000" }),
+            }),
+          },
+        },
+      },
+      401: {
+        description: "Chưa xác thực",
+      },
+    },
+  });
+
   // GET /notifications/stream
   openapiRegistry.registerPath({
     method: "get",

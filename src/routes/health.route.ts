@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { prisma } from "../database/prisma.client";
 import { envConfig } from "../config/env.config";
+import { getRedisConnectionOptions } from "../config/redis.config";
 import IORedis from "ioredis";
 
 const router = Router();
@@ -10,10 +11,9 @@ let healthRedisClient: IORedis | null = null;
 function getHealthRedisClient(): IORedis | null {
   if (!envConfig.redis.enabled) return null;
   if (!healthRedisClient) {
+    const baseOptions = getRedisConnectionOptions();
     healthRedisClient = new IORedis({
-      host: envConfig.redis.host,
-      port: envConfig.redis.port,
-      password: envConfig.redis.password,
+      ...baseOptions,
       connectTimeout: 2000,
       lazyConnect: true,
       maxRetriesPerRequest: 1,

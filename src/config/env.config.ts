@@ -185,6 +185,7 @@ function resolveRedisConfig() {
   let host = _env.REDIS_HOST;
   let port = _env.REDIS_PORT;
   let password: string | undefined = _env.REDIS_PASSWORD || undefined;
+  let tls: Record<string, unknown> | undefined = undefined;
 
   if (_env.REDIS_URL) {
     try {
@@ -198,6 +199,9 @@ function resolveRedisConfig() {
       if (parsed.password) {
         password = decodeURIComponent(parsed.password);
       }
+      if (parsed.protocol === "rediss:") {
+        tls = {};
+      }
     } catch {
       // URL không hợp lệ - fallback về biến đơn đã được parse ở trên
     }
@@ -207,6 +211,7 @@ function resolveRedisConfig() {
     host,
     port,
     password,
+    tls,
     enabled: _env.REDIS_ENABLED !== "false",
   };
 }

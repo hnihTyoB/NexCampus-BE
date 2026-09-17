@@ -87,6 +87,66 @@ export class NotificationService {
     await this.repository.delete(notificationId, userId);
   }
 
+  async getById(userId: string, notificationId: string) {
+    const notification = await this.repository.findOne(notificationId, userId);
+    if (!notification) {
+      throw new AppError("Notification not found", 404, ERROR_CODE.NOT_FOUND);
+    }
+    return notification;
+  }
+
+  async clearRead(userId: string): Promise<void> {
+    await this.repository.clearRead(userId);
+  }
+
+  async sendCustom(dto: {
+    email: string;
+    title: string;
+    content: string;
+    emailSubject?: string;
+    emailContent?: string;
+    sendWeb?: boolean;
+    sendEmail?: boolean;
+    params?: Record<string, unknown>;
+  }) {
+    const { prisma } = await import("../../database/prisma.client");
+    const recipient = await prisma.user.findFirst({
+      where: { email: dto.email.toLowerCase().trim(), deletedAt: null },
+    });
+
+    if (dto.sendWeb !== false && !recipient) {
+      throw new AppError(
+        "A registered user account is required to send Web notifications.",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
+
+    const channels: NotificationChannel[] = [];
+    if (dto.sendWeb !== false && recipient) {
+      channels.push(NOTIFICATION_CHANNEL.WEB);
+    }
+    if (dto.sendEmail) {
+      channels.push(NOTIFICATION_CHANNEL.EMAIL);
+    }
+
+    if (channels.length === 0) {
+      channels.push(NOTIFICATION_CHANNEL.WEB);
+    }
+
+    return this.send({
+      userIds: recipient ? [recipient.id] : [],
+      channels,
+      title: dto.title,
+      content: dto.content,
+      type: NOTIFICATION_TYPE.INFO,
+      templateData: {
+        subject: dto.emailSubject || dto.title,
+        html: dto.emailContent || dto.content,
+      },
+    });
+  }
+
   async send(dto: SendNotificationDto): Promise<{ sentCount: number }> {
     const {
       userIds,

@@ -1,6 +1,7 @@
 import { Queue, QueueOptions } from "bullmq";
 import IORedis from "ioredis";
 import { envConfig } from "../../config/env.config";
+import { getRedisConnectionOptions } from "../../config/redis.config";
 import {
   WEBHOOK_MAX_ATTEMPTS,
   WEBHOOK_EXPONENTIAL_DELAY_MS,
@@ -41,10 +42,9 @@ class WebhookQueueService {
 
   private init() {
     try {
+      const baseOptions = getRedisConnectionOptions();
       this.redisConnection = new IORedis({
-        host: envConfig.redis.host,
-        port: envConfig.redis.port,
-        password: envConfig.redis.password,
+        ...baseOptions,
         maxRetriesPerRequest: null,
         enableReadyCheck: false,
         lazyConnect: true,

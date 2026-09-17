@@ -85,6 +85,12 @@ export class NotificationRepository {
     return prisma.notification.deleteMany({ where: { id, userId } });
   }
 
+  clearRead(userId: string) {
+    return prisma.notification.deleteMany({
+      where: { userId, isRead: true },
+    });
+  }
+
   getAllActiveUsers() {
     return prisma.user.findMany({
       where: { isActive: true, deletedAt: null },

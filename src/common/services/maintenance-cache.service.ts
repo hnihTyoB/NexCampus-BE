@@ -1,6 +1,7 @@
 import { MaintenanceConfig } from "@prisma/client";
 import IORedis from "ioredis";
 import { envConfig } from "../../config/env.config";
+import { getRedisConnectionOptions } from "../../config/redis.config";
 import { MAINTENANCE_PUBSUB_CHANNEL } from "../constants/maintenance.constant";
 import { maintenanceRepository } from "../../modules/maintenance/maintenance.repository";
 
@@ -29,13 +30,9 @@ export class MaintenanceCacheService {
 
   private initRedisPubSub(): void {
     try {
+      const baseOptions = getRedisConnectionOptions();
       const redisOptions = {
-        host: envConfig.redis.host,
-        port: envConfig.redis.port,
-        password: envConfig.redis.password,
-        maxRetriesPerRequest: null,
-        enableReadyCheck: false,
-        lazyConnect: true,
+        ...baseOptions,
         retryStrategy: (times: number) => {
           if (times > 2) {
             this.isRedisAvailable = false;
