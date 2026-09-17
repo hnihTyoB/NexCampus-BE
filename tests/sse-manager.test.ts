@@ -262,4 +262,34 @@ describe("Server-Sent Events (SSE) Real-Time Push Module", () => {
       permissionCacheService.getUserState = origGetUserState;
     }
   });
+
+  it("10. NotificationController.getTicket should return a fresh ticket for authenticated user", async () => {
+    const { NotificationController } = await import(
+      "../src/modules/notification/notification.controller"
+    );
+    const controller = new NotificationController();
+    const req: any = {
+      user: {
+        id: "user-controller-ticket-1",
+        email: "controller@nexcampus.com",
+        role: "INTERN",
+      },
+    };
+    let jsonResult: any = null;
+    const res: any = {
+      json: (data: any) => {
+        jsonResult = data;
+      },
+    };
+    await controller.getTicket(req, res, () => {});
+    assert.ok(jsonResult);
+    assert.equal(jsonResult.success, true);
+    assert.ok(jsonResult.ticket);
+    assert.equal(typeof jsonResult.ticket, "string");
+
+    // Verify the returned ticket is immediately valid and consumable
+    const validatedUser = await sseTicketService.validateAndConsumeTicket(jsonResult.ticket);
+    assert.ok(validatedUser);
+    assert.equal(validatedUser?.id, "user-controller-ticket-1");
+  });
 });

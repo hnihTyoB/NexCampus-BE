@@ -30,6 +30,7 @@ router.use(authMiddleware);
 router.use("/settings", notificationSettingRoute);
 
 router.get("/ticket", controller.getTicket);
+router.post("/ticket", controller.getTicket);
 router.get("/stream", controller.stream);
 router.get("/", validate(listNotificationsSchema, "query"), controller.list);
 router.get("/unread-count", controller.unreadCount);
