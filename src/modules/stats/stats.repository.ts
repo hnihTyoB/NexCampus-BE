@@ -879,6 +879,7 @@ export class StatsRepository {
     }));
 
     return {
+      internId: intern.id,
       internName: intern.fullName,
       internCode: intern.internCode,
       departmentName: intern.department?.name || "Chưa gán",

@@ -237,6 +237,7 @@ export interface RecentTaskItemDto {
 }
 
 export interface InternStatsResponseDto {
+  internId?: string;
   internName: string;
   internCode: string | null;
   departmentName: string;
