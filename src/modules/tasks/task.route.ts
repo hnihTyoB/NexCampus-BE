@@ -37,6 +37,14 @@ router.post(
   controller.suggestAllocation,
 );
 
+router.post(
+  "/:id/ai-recommendation",
+  authMiddleware,
+  requirePermission(PERMISSIONS.TASK_ASSIGNMENT_CREATE),
+  validate(taskIdParamSchema, "params"),
+  controller.getAiRecommendation,
+);
+
 router.get(
   "/:id",
   authMiddleware,

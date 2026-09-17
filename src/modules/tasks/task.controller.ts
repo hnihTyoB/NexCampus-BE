@@ -177,4 +177,20 @@ export class TaskController {
       next(error);
     }
   };
+
+  getAiRecommendation = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const data = await this.service.getAiRecommendation(
+        req.params.id,
+        req.user!,
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
