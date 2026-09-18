@@ -21,6 +21,7 @@ const positionSelect = {
 const departmentWithRelationsSelect = {
   id: true,
   name: true,
+  description: true,
   createdAt: true,
   updatedAt: true,
   positions: {
@@ -148,6 +149,7 @@ export class DepartmentRepository {
     const department = await prisma.department.create({
       data: {
         name: data.name,
+        description: data.description ?? null,
         positions: hasPositions
           ? {
               create: data.positions!.map((posName) => ({ name: posName })),
@@ -165,6 +167,7 @@ export class DepartmentRepository {
       where: { id },
       data: {
         ...(data.name !== undefined ? { name: data.name } : {}),
+        ...(data.description !== undefined ? { description: data.description } : {}),
       },
       select: departmentWithRelationsSelect,
     });

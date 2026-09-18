@@ -395,11 +395,12 @@ enum InternStatus {
 }
 
 model Department {
-  id        String    @id @default(uuid()) @db.Uuid
-  name      String    @unique
-  deletedAt DateTime? @map("deleted_at")
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @unique
+  description String?   @db.Text
+  deletedAt   DateTime? @map("deleted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   positions         Position[]
   interns           Intern[]

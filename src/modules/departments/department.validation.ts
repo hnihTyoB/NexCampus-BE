@@ -2,11 +2,13 @@ import { z } from "zod";
 
 export const createDepartmentSchema = z.object({
   name: z.string().trim().min(1, "Department name is required").max(100),
+  description: z.string().trim().max(500).optional().nullable(),
   positions: z.array(z.string().trim().min(1)).optional(),
 });
 
 export const updateDepartmentSchema = z.object({
   name: z.string().trim().min(1, "Department name cannot be empty").max(100).optional(),
+  description: z.string().trim().max(500).optional().nullable(),
 });
 
 export const findAllDepartmentSchema = z.object({

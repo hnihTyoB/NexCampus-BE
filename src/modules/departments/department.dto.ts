@@ -19,6 +19,7 @@ export interface DepartmentLeaderDto {
 export interface DepartmentDto {
   id: string;
   name: string;
+  description?: string | null;
   positions: PositionDto[];
   positionsCount?: number;
   internsCount?: number;
@@ -33,11 +34,13 @@ export interface DepartmentDto {
 
 export interface CreateDepartmentDto {
   name: string;
+  description?: string | null;
   positions?: string[];
 }
 
 export interface UpdateDepartmentDto {
   name?: string;
+  description?: string | null;
 }
 
 export interface DepartmentQueryDto {
