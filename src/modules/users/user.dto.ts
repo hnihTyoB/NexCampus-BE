@@ -2,6 +2,7 @@ export interface UserQueryDto {
   email?: string;
   fullName?: string;
   roleName?: string;
+  excludeRoles?: string;
   isActive?: boolean;
   sortBy?: "createdAt" | "email" | "fullName";
   order?: "asc" | "desc";

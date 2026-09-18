@@ -30,6 +30,7 @@ export class UserRepository {
       email,
       fullName,
       roleName,
+      excludeRoles,
       isActive,
       sortBy = "createdAt",
       order = "desc",
@@ -44,7 +45,20 @@ export class UserRepository {
         ? { fullName: { contains: fullName, mode: "insensitive" } }
         : {}),
       ...(isActive !== undefined ? { isActive } : {}),
-      ...(roleName ? { role: { name: roleName } } : {}),
+      ...(roleName
+        ? { role: { name: roleName } }
+        : excludeRoles
+          ? {
+              role: {
+                name: {
+                  notIn: excludeRoles
+                    .split(",")
+                    .map((r) => r.trim())
+                    .filter(Boolean),
+                },
+              },
+            }
+          : {}),
     };
 
     const skip = (page - 1) * limit;

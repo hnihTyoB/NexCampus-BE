@@ -4,6 +4,7 @@ export const findAllUserSchema = z.object({
   email: z.string().optional(),
   fullName: z.string().optional(),
   roleName: z.string().optional(),
+  excludeRoles: z.string().optional(),
   isActive: z
     .enum(["true", "false"])
     .transform((v) => v === "true")

@@ -293,4 +293,8 @@
        - Gắn routes tại `src/routes/index.ts` dưới prefix `/api/v2/task-submissions`, `/api/v2/meetings`, `/api/v2/absences`.
        - Đăng ký Swagger OpenAPI 3.0 tại `/api/docs`.
        - Bộ test tự động toàn dự án đạt 370 tests pass 100%, build `tsc` và `eslint` sạch 0 errors / 0 warnings.
-
+- **User Query Filtering by Role Exclusion (`excludeRoles`) (2026-09-18)**:
+  - Hỗ trợ loại trừ vai trò khi truy vấn danh sách người dùng (`GET /api/v1/users`):
+    - `UserQueryDto` và `findAllUserSchema` (`user.validation.ts`) bổ sung `excludeRoles: z.string().optional()` (chuỗi tên vai trò phân tách bằng dấu phẩy, ví dụ: `"LEADER,INTERN"`).
+    - `UserRepository.findAll` phân giải chuỗi và áp dụng bộ lọc Prisma `role: { name: { notIn: excludeRoles.split(",").map(r => r.trim()).filter(Boolean) } }` khi không có `roleName` cụ thể.
+    - Cập nhật tài liệu OpenAPI Swagger tại `user.openapi.ts`.
