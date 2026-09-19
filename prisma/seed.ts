@@ -1,13 +1,61 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { uuidv7 } from "uuidv7";
 
-const prisma = new PrismaClient({
+// ─── UUIDv7 Seed Extension ───────────────────────────────────────────────────
+// Models that use a composite primary key and do NOT have an `id` field.
+// For these models we must skip id injection to avoid Prisma validation errors.
+const COMPOSITE_PK_MODELS = new Set([
+  "LeaderDepartment",
+  "TaskGroupMember",
+]);
+
+const uuidv7Extension = {
+  name: "uuidv7",
+  query: {
+    $allModels: {
+      // prisma.model.create() — Prisma pre-populates `id` from @default(uuid())
+      // before calling this hook, so `'id' in args.data` is always true for
+      // models that have an id field.
+      async create({ model, args, query }: any) {
+        if (!COMPOSITE_PK_MODELS.has(model) && args.data) {
+          args.data.id = uuidv7();
+        }
+        return query(args);
+      },
+      async createMany({ model, args, query }: any) {
+        if (!COMPOSITE_PK_MODELS.has(model)) {
+          if (Array.isArray(args.data)) {
+            args.data = args.data.map((item: any) => ({ ...item, id: uuidv7() }));
+          } else if (args.data) {
+            args.data.id = uuidv7();
+          }
+        }
+        return query(args);
+      },
+      // For upsert, Prisma does NOT pre-populate id in args.create, so we use
+      // the model name check to know whether to inject.
+      async upsert({ model, args, query }: any) {
+        if (!COMPOSITE_PK_MODELS.has(model) && args.create) {
+          args.create.id = uuidv7();
+        }
+        return query(args);
+      },
+    },
+  },
+};
+
+
+const baseClient = new PrismaClient({
   datasources: {
     db: {
       url: process.env.DIRECT_URL || process.env.DATABASE_URL,
     },
   },
 });
+
+const prisma = baseClient.$extends(uuidv7Extension) as unknown as PrismaClient;
+
 
 // ── 1. Danh Mục Quyền Hệ Thống Chuẩn Hóa (Permissions Matrix) ───────────────
 interface PermissionDef {
@@ -835,5 +883,5 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect();
+    await baseClient.$disconnect();
   });
