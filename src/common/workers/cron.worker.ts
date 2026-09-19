@@ -60,6 +60,12 @@ export class CronWorker {
         );
       });
 
+      this.worker.on("error", (err) => {
+        if (envConfig.nodeEnv !== "production") {
+          console.warn("[CronWorker] Worker connection issue:", err.message);
+        }
+      });
+
       console.log("[CronWorker] Background worker started successfully");
     } catch (err: any) {
       console.error("[CronWorker] Failed to start BullMQ worker:", err.message);
@@ -68,7 +74,7 @@ export class CronWorker {
 
   async stop(): Promise<void> {
     if (this.worker) {
-      await this.worker.close();
+      await this.worker.close().catch(() => {});
       this.worker = undefined;
     }
     if (this.redisConnection) {

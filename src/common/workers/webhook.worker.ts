@@ -65,6 +65,12 @@ export class WebhookWorker {
           `[WebhookWorker] ❌ Webhook delivery ${job?.data.deliveryId} failed attempt ${(job?.attemptsMade || 0) + 1}: ${err.message}`,
         );
       });
+
+      this.worker.on("error", (err) => {
+        if (envConfig.nodeEnv !== "production") {
+          console.warn("[WebhookWorker] Worker connection issue:", err.message);
+        }
+      });
     } catch (err: any) {
       console.warn(
         "[WebhookWorker] Could not connect to Redis for Webhook Worker:",

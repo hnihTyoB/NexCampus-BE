@@ -83,6 +83,15 @@ export function startNotificationWorker():
     console.warn(`[NotificationWorker] Job #${job?.id} failed: ${err.message}`);
   });
 
+  notificationWorkerInstance.on("error", (err) => {
+    if (envConfig.nodeEnv !== "production") {
+      console.warn("[NotificationWorker] Worker connection issue:", err.message);
+    }
+  });
+
+  console.log(
+    `[NotificationWorker] Worker started and listening on ${QUEUE_NAMES.NOTIFICATION}`,
+  );
   return notificationWorkerInstance;
 }
 

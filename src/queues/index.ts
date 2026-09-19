@@ -97,7 +97,14 @@ function createQueue<T>(name: string): Queue<T> | undefined {
     defaultJobOptions,
   };
 
-  return new Queue<T>(name, queueOptions);
+  const queue = new Queue<T>(name, queueOptions);
+  queue.on("error", (err) => {
+    if (envConfig.nodeEnv !== "production") {
+      console.warn(`[BullMQ:${name}] Queue connection error:`, err.message);
+    }
+  });
+
+  return queue;
 }
 
 // Khởi tạo các hàng đợi cốt lõi

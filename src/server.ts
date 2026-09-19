@@ -59,22 +59,26 @@ async function handleShutdown(signal: string) {
 
     try {
       // 1. Stop background workers
-      await emailWorker.stop();
-      await webhookWorker.stop();
-      await cronWorker.stop();
-      await stopEmailWorker();
-      await stopCleanupWorker();
-      await stopNotificationWorker();
+      await Promise.allSettled([
+        emailWorker.stop(),
+        webhookWorker.stop(),
+        cronWorker.stop(),
+        stopEmailWorker(),
+        stopCleanupWorker(),
+        stopNotificationWorker(),
+      ]);
       console.log("[Server] Background workers stopped.");
 
       // 2. Close BullMQ queues, SSE streams & Redis connections
-      await sseManagerService.close();
-      await webhookQueue.close();
-      await cronQueue.close();
-      await closeAllQueues();
-      await maintenanceCacheService.close();
-      await systemConfigService.close();
-      await permissionCacheService.close();
+      await Promise.allSettled([
+        sseManagerService.close(),
+        webhookQueue.close(),
+        cronQueue.close(),
+        closeAllQueues(),
+        maintenanceCacheService.close(),
+        systemConfigService.close(),
+        permissionCacheService.close(),
+      ]);
       console.log("[Server] SSE, Redis & Queue connections closed.");
 
       // 3. Disconnect Prisma DB client

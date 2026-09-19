@@ -83,6 +83,11 @@ class WebhookQueueService {
       };
 
       this.queue = new Queue<WebhookJobData>(WEBHOOK_QUEUE_NAME, queueOptions);
+      this.queue.on("error", (err) => {
+        if (envConfig.nodeEnv !== "production") {
+          console.warn("[WebhookQueue] Queue connection issue:", err.message);
+        }
+      });
     } catch {
       this.isRedisAvailable = false;
     }

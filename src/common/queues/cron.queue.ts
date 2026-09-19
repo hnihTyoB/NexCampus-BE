@@ -73,6 +73,11 @@ export class CronQueueService {
       };
 
       this.queue = new Queue<CronJobData>(CRON_QUEUE_NAME, queueOptions);
+      this.queue.on("error", (err) => {
+        if (envConfig.nodeEnv !== "production") {
+          console.warn("[CronQueue] Queue connection issue:", err.message);
+        }
+      });
     } catch {
       this.isRedisAvailable = false;
     }
