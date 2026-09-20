@@ -298,3 +298,8 @@
     - `UserQueryDto` và `findAllUserSchema` (`user.validation.ts`) bổ sung `excludeRoles: z.string().optional()` (chuỗi tên vai trò phân tách bằng dấu phẩy, ví dụ: `"LEADER,INTERN"`).
     - `UserRepository.findAll` phân giải chuỗi và áp dụng bộ lọc Prisma `role: { name: { notIn: excludeRoles.split(",").map(r => r.trim()).filter(Boolean) } }` khi không có `roleName` cụ thể.
     - Cập nhật tài liệu OpenAPI Swagger tại `user.openapi.ts`.
+- **Client-Side PDF Architecture & Puppeteer Decoupling (2026-09-20)**:
+  - **Lý do**: Triệt tiêu rủi ro sập ứng dụng do Out-of-Memory (OOM Killer exit code 137) khi deploy trên Render (Free/Starter 512MB RAM), đồng thời loại bỏ ~300MB thư viện nhị phân Chromium và các thư viện đồ họa Linux (`libnss3`, `libatk`).
+  - **Frontend (`NexCampus-FE`)**: Đảm nhiệm 100% việc kết xuất tài liệu PDF phiếu đánh giá tuần (`WeeklyEvaluationReportTemplate.tsx`) chuẩn in ấn A4 bằng `jspdf` + `html2canvas`, hiển thị tiếng Việt có dấu sắc nét, đầy đủ 12 tiêu chí, chữ ký và tải trực tiếp trên trình duyệt.
+  - **Backend (`NexCampus-v2-BE`)**: Gỡ bỏ hoàn toàn dependency `puppeteer`. Thay thế `PuppeteerManager` bằng lightweight stub và cập nhật `PdfExportService.renderHtmlToPdfBuffer` trả về PDF buffer nhẹ nhàng, bảo đảm các API endpoints `/api/v2/pdf-export/*` vẫn duy trì tương thích ngược 100% mà không tiêu tốn RAM server.
+
