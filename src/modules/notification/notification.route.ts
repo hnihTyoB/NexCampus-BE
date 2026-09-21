@@ -49,6 +49,7 @@ router.get(
 );
 router.delete(
   "/:id",
+  requirePermission(PERMISSIONS.NOTIFICATION_DELETE),
   validate(notificationIdParamSchema, "params"),
   controller.delete,
 );

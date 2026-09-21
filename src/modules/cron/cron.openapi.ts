@@ -84,4 +84,36 @@ export function registerCronOpenApi(): void {
       403: { description: "Không có quyền CRON_JOB_MANAGE" },
     },
   });
+
+  // PATCH /cron/jobs/:jobName/toggle
+  openapiRegistry.registerPath({
+    method: "patch",
+    path: "/cron/jobs/{jobName}/toggle",
+    tags: ["Scheduled Tasks & Cron Jobs"],
+    summary: "Bật / Tắt lịch chạy tự động của một Cron Job",
+    security: [{ BearerAuth: [] }],
+    request: { params: cronJobNameParamSchema },
+    responses: {
+      200: {
+        description: "Toggle thành công",
+        content: {
+          "application/json": {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              message: z.string().openapi({
+                example: "Lịch chạy tự động của 'daily-summary-digest' đã được TẮT",
+              }),
+              data: z.object({
+                jobName: z.string().openapi({ example: "daily-summary-digest" }),
+                isEnabled: z.boolean().openapi({ example: false }),
+                message: z.string(),
+              }),
+            }),
+          },
+        },
+      },
+      400: { description: "Tên job không hợp lệ" },
+      403: { description: "Không có quyền CRON_JOB_MANAGE" },
+    },
+  });
 }

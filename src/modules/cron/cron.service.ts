@@ -20,9 +20,16 @@ import {
   formatVietnamDate,
   getVietnamDayRange,
 } from "../../common/helpers/date.helper";
-import { CronJobExecutionResultDto, CronJobItemDto } from "./cron.dto";
+import { CronJobExecutionResultDto, CronJobItemDto, ToggleCronJobResponseDto } from "./cron.dto";
+import { cronQueue } from "../../common/queues/cron.queue";
 
 export class CronService {
+  /**
+   * Tập hợp các job đang bị vô hiệu hóa (lưu in-memory, reset khi restart server)
+   * Nếu muốn bền vững hơn, có thể đưa vào Redis hoặc DB sau.
+   */
+  private readonly disabledJobs = new Set<CronJobName>();
+
   constructor(
     private readonly repository: CronRepository = cronRepository,
     private readonly r2Service: R2Service = new R2Service(),
@@ -37,6 +44,7 @@ export class CronService {
         name: name as CronJobName,
         cron: config.cron,
         description: config.description,
+        isEnabled: !this.disabledJobs.has(name as CronJobName),
         lastStatus: "READY",
       }),
     );
@@ -51,6 +59,46 @@ export class CronService {
     }
 
     return jobs;
+  }
+
+  /**
+   * Bật / Tắt lịch chạy tự động của một Cron Job
+   */
+  async toggleJob(
+    jobName: CronJobName,
+    actorContext?: { actorId?: string; ipAddress?: string; userAgent?: string },
+  ): Promise<ToggleCronJobResponseDto> {
+    const wasDisabled = this.disabledJobs.has(jobName);
+
+    if (wasDisabled) {
+      // Đang tắt → Bật lên
+      this.disabledJobs.delete(jobName);
+      await cronQueue.enableJobScheduler(jobName);
+    } else {
+      // Đang bật → Tắt đi
+      this.disabledJobs.add(jobName);
+      await cronQueue.disableJobScheduler(jobName);
+    }
+
+    const isEnabled = !this.disabledJobs.has(jobName);
+
+    await this.repository.createAuditLog({
+      actorId: actorContext?.actorId,
+      action: isEnabled ? AUDIT_ACTION.ENABLE_CRON_JOB : AUDIT_ACTION.DISABLE_CRON_JOB,
+      targetType: AUDIT_TARGET_TYPE.CRON_JOB,
+      targetId: jobName,
+      details: { isEnabled },
+      ipAddress: actorContext?.ipAddress,
+      userAgent: actorContext?.userAgent,
+    });
+
+    return {
+      jobName,
+      isEnabled,
+      message: isEnabled
+        ? `Lịch chạy tự động của '${jobName}' đã được BẬT`
+        : `Lịch chạy tự động của '${jobName}' đã được TẮT`,
+    };
   }
 
   /**

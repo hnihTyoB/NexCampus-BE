@@ -29,4 +29,12 @@ router.post(
   cronController.triggerJob,
 );
 
+router.patch(
+  "/jobs/:jobName/toggle",
+  requirePermission(PERMISSIONS.CRON_JOB_MANAGE),
+  validate(cronJobNameParamSchema, "params"),
+  cronController.toggleJob,
+);
+
 export default router;
+
