@@ -213,6 +213,10 @@ const SYSTEM_PERMISSIONS: PermissionDef[] = [
   { name: "STATS_ADMIN_READ", resource: "STATS", action: "ADMIN_READ", description: "Xem thống kê tổng quan toàn hệ thống" },
   { name: "STATS_LEADER_READ", resource: "STATS", action: "LEADER_READ", description: "Xem thống kê hiệu suất quản lý nhóm" },
   { name: "STATS_INTERN_READ", resource: "STATS", action: "INTERN_READ", description: "Xem thống kê tiến độ cá nhân thực tập sinh" },
+
+  // PDF Export
+  { name: "PDF_EXPORT_SUMMARY", resource: "PDF_EXPORT", action: "SUMMARY", description: "Xuất bảng tổng hợp kết quả thực tập (PDF)" },
+  { name: "PDF_EXPORT_WEEKLY_EVALUATION", resource: "PDF_EXPORT", action: "WEEKLY_EVALUATION", description: "Xuất phiếu đánh giá tuần (PDF)" },
 ];
 
 // ── 2. Phân Quyền Theo Vai Trò (Role-Permission Matrix) ───────────────────────
@@ -268,6 +272,8 @@ const LEADER_PERMISSIONS: string[] = [
   "REGULATION_ACKNOWLEDGE",
   "STATS_LEADER_READ",
   "STATS_INTERN_READ",
+  "PDF_EXPORT_SUMMARY",
+  "PDF_EXPORT_WEEKLY_EVALUATION",
 ];
 
 const INTERN_PERMISSIONS: string[] = [
@@ -296,6 +302,7 @@ const INTERN_PERMISSIONS: string[] = [
   "REGULATION_READ",
   "REGULATION_ACKNOWLEDGE",
   "STATS_INTERN_READ",
+  "PDF_EXPORT_WEEKLY_EVALUATION",
 ];
 
 const MANAGER_PERMISSIONS: string[] = [

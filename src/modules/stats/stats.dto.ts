@@ -236,6 +236,20 @@ export interface RecentTaskItemDto {
   isOverdue: boolean;
 }
 
+export interface InternActivityDayDto {
+  count: number;
+  reports: number;
+  submissions: number;
+}
+
+export interface InternActivityStatsDto {
+  currentStreak: number;
+  longestStreak: number;
+  totalActiveDays: number;
+  totalActivities: number;
+  history: Record<string, InternActivityDayDto>;
+}
+
 export interface InternStatsResponseDto {
   internId?: string;
   internName: string;
@@ -246,4 +260,5 @@ export interface InternStatsResponseDto {
   evaluations: InternEvaluationStatsDto;
   needsRework: ReworkSubmissionDto[];
   recentTasks: RecentTaskItemDto[];
+  activity?: InternActivityStatsDto;
 }

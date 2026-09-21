@@ -714,6 +714,7 @@ export class StatsRepository {
     const now = new Date();
     const { startOfDay, endOfDay } = this.getVietnamDayRange(now);
     const { startOfWeek, endOfWeek } = this.getVietnamWeekRange(now);
+    const oneYearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
 
     const intern = await prisma.intern.findUnique({
       where: { id: internId },
@@ -732,7 +733,8 @@ export class StatsRepository {
       todayReport,
       weeklyReportsCount,
       evaluations,
-      recentReports,
+      yearReports,
+      yearSubmissions,
       rejectedSubmissions,
       recentAssignments,
     ] = await Promise.all([
@@ -768,10 +770,16 @@ export class StatsRepository {
         select: { score: true, week: true },
       }),
       prisma.dailyReport.findMany({
-        where: { internId, deletedAt: null },
+        where: { internId, deletedAt: null, date: { gte: oneYearAgo } },
         orderBy: { date: "desc" },
-        take: 30,
         select: { date: true },
+      }),
+      prisma.taskSubmission.findMany({
+        where: {
+          assignment: { internId },
+          submittedAt: { gte: oneYearAgo },
+        },
+        select: { submittedAt: true },
       }),
       prisma.taskSubmission.findMany({
         where: {
@@ -818,26 +826,50 @@ export class StatsRepository {
     }
     const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-    // Report streak calculation
+    // Activity history calculation (365 days)
+    const historyMap: Record<string, { count: number; reports: number; submissions: number }> = {};
+    let totalActivities = 0;
+
+    for (const r of yearReports) {
+      const dStr = new Date(r.date).toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
+      if (!historyMap[dStr]) {
+        historyMap[dStr] = { count: 0, reports: 0, submissions: 0 };
+      }
+      historyMap[dStr].reports += 1;
+      historyMap[dStr].count += 1;
+      totalActivities += 1;
+    }
+
+    for (const s of yearSubmissions) {
+      const dStr = new Date(s.submittedAt).toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
+      if (!historyMap[dStr]) {
+        historyMap[dStr] = { count: 0, reports: 0, submissions: 0 };
+      }
+      historyMap[dStr].submissions += 1;
+      historyMap[dStr].count += 1;
+      totalActivities += 1;
+    }
+
+    const totalActiveDays = Object.keys(historyMap).length;
+
+    // Report streak calculation (consecutive working days with reports)
     let reportStreak = 0;
     const reportDateSet = new Set(
-      recentReports.map((r) =>
+      yearReports.map((r) =>
         new Date(r.date).toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" })
       )
     );
 
     let checkDate = new Date();
-    // Nếu hôm nay chưa nộp, bắt đầu kiểm tra từ hôm qua để không làm mất streak
     const todayStr = checkDate.toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
     if (!reportDateSet.has(todayStr)) {
       checkDate = new Date(checkDate.getTime() - 24 * 60 * 60 * 1000);
     }
 
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 365; i++) {
       const dStr = checkDate.toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
       const dayOfWeek = new Date(checkDate.toLocaleString("en-US", { timeZone: "Asia/Ho_Chi_Minh" })).getDay();
-      
-      // Bỏ qua Thứ 7 (6) và Chủ Nhật (0) nếu không làm việc
+
       if (dayOfWeek === 0 || dayOfWeek === 6) {
         checkDate = new Date(checkDate.getTime() - 24 * 60 * 60 * 1000);
         continue;
@@ -849,6 +881,29 @@ export class StatsRepository {
       } else {
         break;
       }
+    }
+
+    // Longest streak calculation
+    let longestStreak = 0;
+    let tempStreak = 0;
+    let scanDate = new Date(oneYearAgo);
+    while (scanDate <= now) {
+      const dStr = scanDate.toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
+      const dayOfWeek = new Date(scanDate.toLocaleString("en-US", { timeZone: "Asia/Ho_Chi_Minh" })).getDay();
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        if (reportDateSet.has(dStr) || historyMap[dStr]) {
+          tempStreak++;
+          if (tempStreak > longestStreak) {
+            longestStreak = tempStreak;
+          }
+        } else {
+          tempStreak = 0;
+        }
+      }
+      scanDate = new Date(scanDate.getTime() + 24 * 60 * 60 * 1000);
+    }
+    if (reportStreak > longestStreak) {
+      longestStreak = reportStreak;
     }
 
     // Evaluations calculation
@@ -895,7 +950,14 @@ export class StatsRepository {
         dailyReportTodaySubmitted: Boolean(todayReport),
         reportStreak,
         weeklyReportsSubmitted: weeklyReportsCount,
-        workingDaysCount: 5,
+        workingDaysCount: totalActiveDays > 0 ? totalActiveDays : 5,
+      },
+      activity: {
+        currentStreak: reportStreak,
+        longestStreak,
+        totalActiveDays,
+        totalActivities,
+        history: historyMap,
       },
       evaluations: {
         lastWeekScore,

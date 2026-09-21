@@ -18,6 +18,8 @@ import {
   exportWeeklyEvaluationParamSchema,
   exportInternshipSummaryParamSchema,
 } from "../src/modules/pdf-export/pdf-export.validation";
+import pdfExportRouter from "../src/modules/pdf-export/pdf-export.route";
+import { PERMISSIONS } from "../src/common/constants/permission.constant";
 import {
   settingKeyParamSchema,
   updateSystemSettingSchema,
@@ -236,6 +238,24 @@ describe("2. Module Xuất Báo Cáo PDF (pdf-export)", () => {
 
     assert.ok(htmlOutput.includes("BẢNG TỔNG HỢP KẾT QUẢ THỰC TẬP"));
     assert.ok(htmlOutput.includes("Test Intern"));
+  });
+
+  it("định nghĩa quyền PERMISSIONS và gắn middleware phân quyền vào routes pdf-export", () => {
+    assert.equal(PERMISSIONS.PDF_EXPORT_SUMMARY, "PDF_EXPORT_SUMMARY");
+    assert.equal(PERMISSIONS.PDF_EXPORT_WEEKLY_EVALUATION, "PDF_EXPORT_WEEKLY_EVALUATION");
+
+    const routes = (pdfExportRouter as any).stack.filter((layer: any) => layer.route);
+    assert.equal(routes.length, 2);
+
+    const weeklyLayer = routes.find((r: any) => r.route.path === "/weekly-evaluation/:id");
+    assert.ok(weeklyLayer, "Route /weekly-evaluation/:id phải tồn tại");
+    // Weekly evaluation route must have at least auth, requirePermission, validate, controller (4 handlers)
+    assert.ok(weeklyLayer.route.stack.length >= 4);
+
+    const summaryLayer = routes.find((r: any) => r.route.path === "/internship-summary/:internId");
+    assert.ok(summaryLayer, "Route /internship-summary/:internId phải tồn tại");
+    // Summary route must have at least auth, requirePermission, validate, controller (4 handlers)
+    assert.ok(summaryLayer.route.stack.length >= 4);
   });
 });
 
