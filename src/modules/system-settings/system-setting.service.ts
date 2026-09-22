@@ -5,6 +5,7 @@ import {
 import { SystemSettingsResponseDto } from "./system-setting.dto";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
+import { VIETNAM_TIMEZONE } from "../../common/constants/date.constant";
 
 interface CacheEntry {
   value: any;
@@ -13,6 +14,7 @@ interface CacheEntry {
 
 const DEFAULT_SETTINGS: SystemSettingsResponseDto = {
   DAILY_REPORT_DEADLINE_TIME: "17:30",
+  WORKING_DAYS_PER_WEEK: 6,
   MAX_ACTIVE_TASKS: 5,
   MAX_WORKLOAD_DAYS: 14,
   MAX_LEADER_DEPARTMENTS: 3,
@@ -26,10 +28,71 @@ const DEFAULT_SETTINGS: SystemSettingsResponseDto = {
 };
 
 export class SystemSettingService {
-  private readonly repository: SystemSettingRepository = systemSettingRepository;
   private cache = new Map<string, CacheEntry>();
   private allSettingsCache: { data: SystemSettingsResponseDto; expiresAt: number } | null = null;
   private readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 phút
+
+  constructor(
+    private readonly repository: SystemSettingRepository = systemSettingRepository,
+    private readonly getCurrentTimeFn: () => { now: Date } = () => ({ now: new Date() })
+  ) {}
+
+  /**
+   * Helper lấy ngày và giờ hiện tại theo múi giờ Việt Nam (Asia/Ho_Chi_Minh)
+   */
+  getVietnamNow(): { dateStr: string; timeStr: string; tomorrowStr: string; dayOfWeek: number; now: Date } {
+    const { now } = this.getCurrentTimeFn();
+    const dateStr = new Intl.DateTimeFormat("en-CA", {
+      timeZone: VIETNAM_TIMEZONE,
+    }).format(now); // "YYYY-MM-DD"
+    const timeStr = new Intl.DateTimeFormat("en-GB", {
+      timeZone: VIETNAM_TIMEZONE,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(now); // "HH:mm"
+
+    // Tính ngày mai theo múi giờ Việt Nam
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const tomorrowStr = new Intl.DateTimeFormat("en-CA", {
+      timeZone: VIETNAM_TIMEZONE,
+    }).format(tomorrow); // "YYYY-MM-DD"
+
+    const vnDate = new Date(now.toLocaleString("en-US", { timeZone: VIETNAM_TIMEZONE }));
+    const dayOfWeek = vnDate.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+
+    return { dateStr, timeStr, tomorrowStr, dayOfWeek, now };
+  }
+
+  /**
+   * Tự động kiểm tra và luân chuyển mốc giờ ngày mai thành mốc giờ chính thức nếu đã sang ngày mới
+   */
+  async promotePendingNextDayDeadlineIfNeeded(): Promise<boolean> {
+    try {
+      const nextDeadlineItem = await this.repository.getByKey("NEXT_DAILY_REPORT_DEADLINE_TIME");
+      const effectiveDateItem = await this.repository.getByKey("DAILY_REPORT_DEADLINE_EFFECTIVE_DATE");
+
+      if (nextDeadlineItem && effectiveDateItem) {
+        const { dateStr } = this.getVietnamNow();
+        // Nếu ngày hiện tại >= effectiveDate thì kích hoạt mốc mới
+        if (dateStr >= effectiveDateItem.value) {
+          await this.repository.upsert(
+            "DAILY_REPORT_DEADLINE_TIME",
+            nextDeadlineItem.value,
+            "GENERAL",
+            "Thời gian chốt nộp báo cáo ngày"
+          );
+          await this.repository.delete("NEXT_DAILY_REPORT_DEADLINE_TIME").catch(() => {});
+          await this.repository.delete("DAILY_REPORT_DEADLINE_EFFECTIVE_DATE").catch(() => {});
+          this.clearCache();
+          return true;
+        }
+      }
+    } catch {
+      // Bỏ qua lỗi dọn dẹp nếu có
+    }
+    return false;
+  }
 
   /**
    * Helper parse string value sang type tương ứng (number, boolean, string)
@@ -56,11 +119,19 @@ export class SystemSettingService {
       return this.allSettingsCache.data;
     }
 
+    await this.promotePendingNextDayDeadlineIfNeeded();
+
     const items = await this.repository.getAll();
     const result: any = { ...DEFAULT_SETTINGS };
 
     for (const item of items) {
       result[item.key] = this.parseValue(item.key, item.value);
+    }
+
+    if (result.NEXT_DAILY_REPORT_DEADLINE_TIME && result.DAILY_REPORT_DEADLINE_EFFECTIVE_DATE) {
+      result.DAILY_REPORT_DEADLINE_APPLIES_NEXT_DAY = true;
+    } else {
+      result.DAILY_REPORT_DEADLINE_APPLIES_NEXT_DAY = false;
     }
 
     this.allSettingsCache = { data: result, expiresAt: now + this.CACHE_TTL_MS };
@@ -112,6 +183,31 @@ export class SystemSettingService {
       }
     }
 
+    if (key === "WORKING_DAYS_PER_WEEK") {
+      const days = Number(value);
+      if (isNaN(days) || !Number.isInteger(days) || days < 1 || days > 7) {
+        throw new AppError(
+          "Số ngày làm việc trong tuần phải là số nguyên từ 1 đến 7",
+          400,
+          ERROR_CODE.VALIDATION_ERROR
+        );
+      }
+
+      const currentItem = await this.repository.getByKey("WORKING_DAYS_PER_WEEK");
+      const currentDays = currentItem ? Number(currentItem.value) : (DEFAULT_SETTINGS.WORKING_DAYS_PER_WEEK ?? 6);
+
+      if (days !== currentDays) {
+        const { dayOfWeek } = this.getVietnamNow();
+        if (dayOfWeek !== 0) {
+          throw new AppError(
+            "Số ngày làm việc trong tuần chỉ được phép thay đổi vào ngày Chủ nhật",
+            400,
+            ERROR_CODE.VALIDATION_ERROR
+          );
+        }
+      }
+    }
+
     if (key === "MAX_ACTIVE_TASKS") {
       const tasks = Number(value);
       if (isNaN(tasks) || tasks < 1 || tasks > 50) {
@@ -131,6 +227,74 @@ export class SystemSettingService {
           400,
           ERROR_CODE.VALIDATION_ERROR
         );
+      }
+
+      const { timeStr, tomorrowStr } = this.getVietnamNow();
+      // Lấy mốc giờ chốt hiện tại đang áp dụng của hôm nay
+      const currentItem = await this.repository.getByKey("DAILY_REPORT_DEADLINE_TIME");
+      const currentActiveDeadline = currentItem?.value || "17:30";
+
+      // Nếu đã đến hạn hoặc qua hạn chốt cũ, HOẶC mốc mới đã nằm trong quá khứ của hôm nay
+      const isPastCutoff = timeStr >= currentActiveDeadline || timeStr >= value;
+
+      if (isPastCutoff) {
+        // Đảm bảo DAILY_REPORT_DEADLINE_TIME của hôm nay vẫn giữ nguyên mốc cũ
+        await this.repository.upsert(
+          "DAILY_REPORT_DEADLINE_TIME",
+          currentActiveDeadline,
+          category || "GENERAL",
+          description || "Thời gian chốt nộp báo cáo ngày"
+        );
+
+        // Lưu mốc mới vào NEXT_DAILY_REPORT_DEADLINE_TIME và ngày có hiệu lực
+        const nextUpdated = await this.repository.upsert(
+          "NEXT_DAILY_REPORT_DEADLINE_TIME",
+          value,
+          category || "GENERAL",
+          "Giờ chốt nộp báo cáo ngày áp dụng từ ngày mai"
+        );
+        await this.repository.upsert(
+          "DAILY_REPORT_DEADLINE_EFFECTIVE_DATE",
+          tomorrowStr,
+          category || "GENERAL",
+          "Ngày bắt đầu áp dụng giờ chốt nộp báo cáo mới"
+        );
+
+        this.clearCache();
+
+        return {
+          key: "DAILY_REPORT_DEADLINE_TIME",
+          value: currentActiveDeadline,
+          nextValue: value,
+          effectiveDate: tomorrowStr,
+          appliesNextDay: true,
+          description: nextUpdated.description,
+          category: nextUpdated.category,
+          updatedAt: nextUpdated.updatedAt,
+        };
+      } else {
+        // Hôm nay chưa đến hạn và mốc giờ mới vẫn ở tương lai hôm nay -> Áp dụng ngay hôm nay!
+        const updated = await this.repository.upsert(
+          key,
+          value,
+          category || "GENERAL",
+          description
+        );
+
+        // Dọn dẹp mốc pending nếu có trước đó
+        await this.repository.delete("NEXT_DAILY_REPORT_DEADLINE_TIME").catch(() => {});
+        await this.repository.delete("DAILY_REPORT_DEADLINE_EFFECTIVE_DATE").catch(() => {});
+
+        this.clearCache();
+
+        return {
+          key: updated.key,
+          value: updated.value,
+          appliesNextDay: false,
+          description: updated.description,
+          category: updated.category,
+          updatedAt: updated.updatedAt,
+        };
       }
     }
 
@@ -179,7 +343,12 @@ export class SystemSettingService {
   // ── Helper Getters phục vụ các module nghiệp vụ ──
 
   async getDailyReportDeadline(): Promise<string> {
+    await this.promotePendingNextDayDeadlineIfNeeded();
     return this.getSetting<string>("DAILY_REPORT_DEADLINE_TIME", "17:30");
+  }
+
+  async getWorkingDaysPerWeek(): Promise<number> {
+    return this.getSetting<number>("WORKING_DAYS_PER_WEEK", 6);
   }
 
   async getMaxActiveTasks(): Promise<number> {

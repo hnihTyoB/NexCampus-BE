@@ -25,6 +25,7 @@ import {
   getVietnamToday,
   toCalendarDate,
 } from "../../common/helpers/date.helper";
+import { systemSettingService } from "../system-settings/system-setting.service";
 
 interface UserPayload {
   id: string;
@@ -414,6 +415,7 @@ export class DailyReportService {
 
     const todayVN = getVietnamToday();
     const internStartVN = toCalendarDate(internProfile.startDate);
+    const workingDaysPerWeek = await systemSettingService.getWorkingDaysPerWeek();
 
     const days: CalendarDayDto[] = [];
     let reportedDays = 0;
@@ -422,6 +424,8 @@ export class DailyReportService {
     for (let d = 1; d <= daysInMonth; d++) {
       const dayDate = new Date(Date.UTC(year, month - 1, d, 0, 0, 0, 0));
       const dayOfWeek = dayDate.getUTCDay(); // 0 = Sunday, 1 = Monday, ...
+      const isoDay = dayOfWeek === 0 ? 7 : dayOfWeek; // 1 = Monday, ..., 7 = Sunday
+      const isWeekend = isoDay > workingDaysPerWeek;
       const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
       const report = reportMap.get(dateStr);
 
@@ -429,7 +433,7 @@ export class DailyReportService {
 
       if (dayDate.getTime() < internStartVN.getTime()) {
         status = "OUT_OF_RANGE";
-      } else if (dayOfWeek === 0) {
+      } else if (isWeekend) {
         status = "WEEKEND";
       } else if (dayDate.getTime() > todayVN.getTime()) {
         status = "FUTURE";

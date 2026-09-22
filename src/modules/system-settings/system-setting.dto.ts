@@ -18,6 +18,10 @@ export interface BatchUpdateSystemSettingsDto {
 
 export interface SystemSettingsResponseDto {
   DAILY_REPORT_DEADLINE_TIME: string;
+  NEXT_DAILY_REPORT_DEADLINE_TIME?: string;
+  DAILY_REPORT_DEADLINE_EFFECTIVE_DATE?: string;
+  DAILY_REPORT_DEADLINE_APPLIES_NEXT_DAY?: boolean;
+  WORKING_DAYS_PER_WEEK: number;
   MAX_ACTIVE_TASKS: number;
   MAX_WORKLOAD_DAYS: number;
   MAX_LEADER_DEPARTMENTS: number;
@@ -28,5 +32,5 @@ export interface SystemSettingsResponseDto {
   APPLICATION_MAX_FILE_SIZE_MB: number;
   ALLOW_CROSS_DEPARTMENT_ASSIGNMENT: boolean;
   AUTO_EVALUATION_ENABLED: boolean;
-  [key: string]: string | number | boolean;
+  [key: string]: string | number | boolean | undefined;
 }
