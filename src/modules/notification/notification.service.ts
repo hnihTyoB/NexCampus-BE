@@ -15,6 +15,7 @@ import {
   PreviewNotificationTemplateDto,
   PreviewNotificationTemplateResponseDto,
   TestSendNotificationTemplateDto,
+  ActionCountsResponseDto,
 } from "./notification.dto";
 import { NotificationRepository } from "./notification.repository";
 import { notificationDispatcher } from "../../common/services/notification-dispatcher.service";
@@ -57,6 +58,17 @@ export class NotificationService {
   async getUnreadCount(userId: string): Promise<UnreadCountResponseDto> {
     const unreadCount = await this.repository.countUnread(userId);
     return { unreadCount };
+  }
+
+  async getActionCounts(userId: string): Promise<ActionCountsResponseDto> {
+    const { prisma } = await import("../../database/prisma.client");
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: { select: { name: true } } },
+    });
+    const roleName = user?.role?.name ?? "";
+    const counts = await this.repository.countActionItems(userId, roleName);
+    return counts;
   }
 
   async markAsRead(userId: string, notificationId: string): Promise<void> {

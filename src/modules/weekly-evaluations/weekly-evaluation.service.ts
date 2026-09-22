@@ -24,6 +24,7 @@ import {
   AUDIT_TARGET_TYPE,
 } from "../../common/constants/audit-log.constant";
 import { VIETNAM_OFFSET_MS } from "../../common/constants/date.constant";
+import { getVietnamWeekRange } from "../../common/helpers/date.helper";
 
 interface UserPayload {
   id: string;
@@ -134,13 +135,22 @@ export class WeeklyEvaluationService {
       );
     }
 
-    // 4. Current week window constraint
-    // For the current active week, evaluations open from Saturday 11:00 AM VN time through Sunday 23:59:59 VN time
+    // 4. Current week window constraint & mid-week assignment check
     if (
       !(await this.hasGlobalEvaluationAccess(actor.id)) &&
       process.env.NODE_ENV !== "test" &&
       dto.week === maxAllowedWeek
     ) {
+      // Thực tập sinh mới được giao giữa tuần không tính vào WeeklyEvaluation tuần này
+      const isMidWeek = await this.isAssignedMidWeekThisWeek(intern, now, actor.id);
+      if (isMidWeek) {
+        throw new AppError(
+          "Thực tập sinh mới được giao giữa tuần, không áp dụng đánh giá cho tuần này",
+          400,
+          ERROR_CODE.BAD_REQUEST,
+        );
+      }
+
       const dayOfWeek = todayLocal.getUTCDay(); // 0 = Sunday, 6 = Saturday
       const hours = todayLocal.getUTCHours();
       const isSaturdayAllowed = dayOfWeek === 6 && hours >= 11;
@@ -597,6 +607,16 @@ export class WeeklyEvaluationService {
       process.env.NODE_ENV !== "test" &&
       dto.week === maxAllowedWeek
     ) {
+      // Thực tập sinh mới được giao giữa tuần không tính vào WeeklyEvaluation tuần này
+      const isMidWeek = await this.isAssignedMidWeekThisWeek(intern, now, actor.id);
+      if (isMidWeek) {
+        throw new AppError(
+          "Thực tập sinh mới được giao giữa tuần, không áp dụng đánh giá cho tuần này",
+          400,
+          ERROR_CODE.BAD_REQUEST,
+        );
+      }
+
       const dayOfWeek = todayLocal.getUTCDay(); // 0 = Sunday, 6 = Saturday
       const hours = todayLocal.getUTCHours();
       const isSaturdayAllowed = dayOfWeek === 6 && hours >= 11;
@@ -623,6 +643,36 @@ export class WeeklyEvaluationService {
 
     if (dto.aiComment && dto.comment && dto.aiComment.trim() !== dto.comment.trim()) {
       return true;
+    }
+
+    return false;
+  }
+
+  private async isAssignedMidWeekThisWeek(
+    intern: { id: string; startDate: Date; createdAt: Date },
+    now: Date,
+    leaderUserId?: string,
+  ): Promise<boolean> {
+    const { startOfWeek, endOfWeek } = getVietnamWeekRange(now);
+    const endOfMonday = new Date(startOfWeek.getTime() + 24 * 3600 * 1000 - 1);
+
+    if (intern.startDate > endOfMonday && intern.startDate <= endOfWeek) return true;
+    if (intern.createdAt > endOfMonday && intern.createdAt <= endOfWeek) return true;
+
+    const reassignedLog = await prisma.auditLog.findFirst({
+      where: {
+        action: AUDIT_ACTION.ASSIGN_LEADER,
+        targetType: AUDIT_TARGET_TYPE.INTERN,
+        targetId: intern.id,
+        createdAt: { gt: endOfMonday, lte: endOfWeek },
+      },
+    });
+
+    if (reassignedLog) {
+      const details = reassignedLog.details as { leaderId?: string } | null;
+      if (!leaderUserId || details?.leaderId === leaderUserId) {
+        return true;
+      }
     }
 
     return false;

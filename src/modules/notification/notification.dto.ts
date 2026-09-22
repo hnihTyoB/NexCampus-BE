@@ -160,3 +160,21 @@ export interface TestSendNotificationTemplateDto {
   variables: Record<string, unknown>;
   channels?: NotificationChannel[];
 }
+
+// ─────────────────────────────────────────────
+// Action Counts (Action-Required Badge) DTOs
+// ─────────────────────────────────────────────
+
+export interface ActionCountsResponseDto {
+  // Intern
+  pendingTasks?: number;
+  missedReports?: number;
+  unviewedEvaluations?: number;
+  pendingMeetingRsvp?: number;
+  // Leader
+  pendingSubmissions?: number;
+  unreviewedReports?: number;
+  pendingEvaluations?: number;
+  // Admin / chung
+  pendingApplications?: number;
+}

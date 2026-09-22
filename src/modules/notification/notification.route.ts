@@ -34,6 +34,7 @@ router.post("/ticket", controller.getTicket);
 router.get("/stream", controller.stream);
 router.get("/", validate(listNotificationsSchema, "query"), controller.list);
 router.get("/unread-count", controller.unreadCount);
+router.get("/action-counts", controller.getActionCounts);
 
 router.patch("/read-all", controller.markAllAsRead);
 router.patch(

@@ -1,5 +1,14 @@
 import { prisma } from "../../database/prisma.client";
-import { SYSTEM_TARGET_ID } from "../../common/constants/audit-log.constant";
+import {
+  AUDIT_ACTION,
+  AUDIT_TARGET_TYPE,
+  SYSTEM_TARGET_ID,
+} from "../../common/constants/audit-log.constant";
+import { VIETNAM_OFFSET_MS } from "../../common/constants/date.constant";
+import {
+  getVietnamToday,
+  getVietnamWeekRange,
+} from "../../common/helpers/date.helper";
 import { activityLogRepository } from "../activity-logs/activity-log.repository";
 import { EMAIL_MAX_ATTEMPTS } from "../../common/constants/notification.constant";
 import {
@@ -406,6 +415,259 @@ export class NotificationRepository {
   }) {
     return activityLogRepository.create(data);
   }
+
+  // ─────────────────────────────────────────────
+  // Action Counts (Action-Required Badge)
+  // ─────────────────────────────────────────────
+
+  async countActionItems(userId: string, roleName: string) {
+    const now = new Date();
+
+    if (roleName === "INTERN") {
+      // Lấy intern profile từ userId
+      const intern = await prisma.intern.findFirst({
+        where: { userId, deletedAt: null },
+        select: { id: true, startDate: true },
+      });
+      if (!intern) return {};
+
+      // Ngày hôm nay theo lịch Việt Nam (UTC 00:00:00 tương ứng ngày VN)
+      const today = getVietnamToday();
+      const nowVn = new Date(now.getTime() + VIETNAM_OFFSET_MS);
+      const dayOfWeek = nowVn.getUTCDay(); // 0 = Chủ Nhật, 1 = T2, ..., 5 = T6, 6 = T7
+      const isWorkday = dayOfWeek >= 1 && dayOfWeek <= 5;
+      const hasStarted = new Date(intern.startDate).getTime() <= today.getTime();
+
+      const [
+        pendingTasks,
+        todayReportCount,
+        unviewedEvaluations,
+        pendingMeetingRsvp,
+      ] = await prisma.$transaction([
+        // Tasks đang hoạt động (chưa DONE)
+        prisma.taskAssignment.count({
+          where: {
+            internId: intern.id,
+            status: { in: ["TODO", "IN_PROGRESS", "BLOCKED", "REVIEW"] },
+          },
+        }),
+        // Báo cáo ngày hôm nay (nếu là ngày làm việc T2–T6 và đã bắt đầu)
+        isWorkday && hasStarted
+          ? prisma.dailyReport.count({
+              where: {
+                internId: intern.id,
+                date: today,
+                deletedAt: null,
+              },
+            })
+          : prisma.dailyReport.count({
+              where: { id: "00000000-0000-0000-0000-000000000000" },
+            }),
+        // Đánh giá tuần chưa xem
+        prisma.weeklyEvaluation.count({
+          where: {
+            internId: intern.id,
+            viewedAt: null,
+            deletedAt: null,
+          },
+        }),
+        // Lời mời họp chưa xác nhận
+        prisma.meetingParticipant.count({
+          where: {
+            userId,
+            invitationStatus: "PENDING",
+            meeting: { deletedAt: null },
+          },
+        }),
+      ]);
+
+      // Do intern không thể đánh giá/nộp ngày đã qua nên badge CHỈ báo cho ngày hôm nay
+      const missedReports =
+        isWorkday && hasStarted && todayReportCount === 0 ? 1 : 0;
+
+      return {
+        pendingTasks,
+        missedReports,
+        unviewedEvaluations,
+        pendingMeetingRsvp,
+      };
+    }
+
+    if (roleName === "LEADER") {
+      // Tuần hiện tại theo giờ Việt Nam
+      const { startOfWeek, endOfWeek } = getVietnamWeekRange(now);
+      // Hết ngày Thứ Hai của tuần hiện tại (23:59:59.999 VN)
+      const endOfMonday = new Date(startOfWeek.getTime() + 24 * 3600 * 1000 - 1);
+
+      // 1. Lấy danh sách intern ACTIVE dưới quyền leader
+      const activeInterns = await prisma.intern.findMany({
+        where: {
+          leaderId: userId,
+          status: "ACTIVE",
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          startDate: true,
+          createdAt: true,
+        },
+      });
+
+      // 2. Kiểm tra log phân công leader giữa tuần (sau Thứ Hai tuần này)
+      const internIds = activeInterns.map((i) => i.id);
+      const midWeekAssignedIds = new Set<string>();
+
+      if (internIds.length > 0) {
+        const assignmentLogs = await prisma.auditLog.findMany({
+          where: {
+            action: AUDIT_ACTION.ASSIGN_LEADER,
+            targetType: AUDIT_TARGET_TYPE.INTERN,
+            targetId: { in: internIds },
+            createdAt: { gt: endOfMonday, lte: endOfWeek },
+          },
+          select: {
+            targetId: true,
+            details: true,
+          },
+        });
+
+        for (const log of assignmentLogs) {
+          const details = log.details as { leaderId?: string } | null;
+          if (details?.leaderId === userId) {
+            midWeekAssignedIds.add(log.targetId);
+          }
+        }
+      }
+
+      // 3. Loại bỏ intern vừa được giao giữa tuần khỏi WeeklyEvaluation:
+      // Không tính intern bắt đầu sau T2, tạo sau T2, hoặc được gán cho leader sau T2 tuần này
+      const eligibleInterns = activeInterns.filter((intern) => {
+        if (intern.startDate > endOfMonday) return false;
+        if (intern.createdAt > endOfMonday) return false;
+        if (midWeekAssignedIds.has(intern.id)) return false;
+        return true;
+      });
+
+      const eligibleInternIds = eligibleInterns.map((i) => i.id);
+
+      const [
+        pendingSubmissions,
+        unreviewedReports,
+        evaluationsThisWeek,
+        pendingMeetingRsvp,
+      ] = await prisma.$transaction([
+        // Bài nộp chờ duyệt từ các intern dưới quyền
+        prisma.taskSubmission.count({
+          where: {
+            reviewStatus: "PENDING",
+            assignment: {
+              intern: { leaderId: userId, deletedAt: null },
+            },
+          },
+        }),
+        // Báo cáo ngày chưa có feedback từ các intern dưới quyền
+        prisma.dailyReport.count({
+          where: {
+            feedbackBy: null,
+            deletedAt: null,
+            intern: { leaderId: userId, deletedAt: null },
+          },
+        }),
+        // Đánh giá tuần đã làm trong tuần này cho các intern đủ điều kiện
+        eligibleInternIds.length > 0
+          ? prisma.weeklyEvaluation.findMany({
+              where: {
+                internId: { in: eligibleInternIds },
+                deletedAt: null,
+                OR: [
+                  { createdAt: { gte: startOfWeek, lte: endOfWeek } },
+                  { startDate: { gte: startOfWeek, lte: endOfWeek } },
+                ],
+              },
+              select: { internId: true },
+            })
+          : prisma.weeklyEvaluation.findMany({
+              where: { id: "00000000-0000-0000-0000-000000000000" },
+              select: { internId: true },
+            }),
+        // Lời mời họp chưa xác nhận
+        prisma.meetingParticipant.count({
+          where: {
+            userId,
+            invitationStatus: "PENDING",
+            meeting: { deletedAt: null },
+          },
+        }),
+      ]);
+
+      const evaluatedSet = new Set(evaluationsThisWeek.map((e) => e.internId));
+      const pendingEvaluations = eligibleInterns.filter(
+        (i) => !evaluatedSet.has(i.id),
+      ).length;
+
+      return {
+        pendingSubmissions,
+        unreviewedReports,
+        pendingEvaluations,
+        pendingMeetingRsvp,
+      };
+    }
+
+    // Admin và các role khác
+    const [pendingApplications, pendingMeetingRsvp] = await prisma.$transaction(
+      [
+        prisma.application.count({
+          where: { status: "PENDING", deletedAt: null },
+        }),
+        prisma.meetingParticipant.count({
+          where: {
+            userId,
+            invitationStatus: "PENDING",
+            meeting: { deletedAt: null },
+          },
+        }),
+      ],
+    );
+
+    return { pendingApplications, pendingMeetingRsvp };
+  }
+}
+
+// ─────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────
+
+/** Đếm số ngày làm việc (T2–T6) trong khoảng [start, end] */
+function countWorkdays(start: Date, end: Date): number {
+  let count = 0;
+  const cur = new Date(start);
+  cur.setHours(0, 0, 0, 0);
+  const endDay = new Date(end);
+  endDay.setHours(0, 0, 0, 0);
+  while (cur <= endDay) {
+    const day = cur.getDay(); // 0=CN, 6=T7
+    if (day !== 0 && day !== 6) count++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
+}
+
+/** Lấy ISO week number và năm */
+function getIsoWeekAndYear(date: Date): { isoWeek: number; isoYear: number } {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  // Đặt về thứ Năm trong tuần ISO (để xác định năm)
+  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+  const jan4 = new Date(d.getFullYear(), 0, 4);
+  const isoWeek =
+    1 +
+    Math.round(
+      ((d.getTime() - jan4.getTime()) / 86400000 -
+        3 +
+        ((jan4.getDay() + 6) % 7)) /
+        7,
+    );
+  return { isoWeek, isoYear: d.getFullYear() };
 }
 
 export const notificationRepository = new NotificationRepository();

@@ -78,6 +78,15 @@ export class NotificationController {
     }
   };
 
+  getActionCounts = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await this.service.getActionCounts(req.user.id);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   markAsRead = async (req: Request, res: Response, next: NextFunction) => {
     try {
       await this.service.markAsRead(req.user.id, req.params.id);
