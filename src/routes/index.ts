@@ -16,7 +16,6 @@ import taskRoute from "../modules/tasks/task.route";
 import taskAssignmentRoute from "../modules/task-assignments/task-assignment.route";
 import taskSubmissionRoute from "../modules/task-submissions/task-submission.route";
 import meetingRoute from "../modules/meetings/meeting.route";
-import absenceRoute from "../modules/absences/absence.route";
 import dailyReportRoute from "../modules/daily-reports/daily-report.route";
 import weeklyEvaluationRoute from "../modules/weekly-evaluations/weekly-evaluation.route";
 import notificationSettingRoute from "../modules/notification-settings/notification-setting.route";
@@ -66,7 +65,6 @@ router.use("/task-submissions", taskSubmissionRoute);
 router.use("/daily-reports", dailyReportRoute);
 router.use("/weekly-evaluations", weeklyEvaluationRoute);
 router.use("/meetings", meetingRoute);
-router.use("/absences", absenceRoute);
 
 // Auxiliary, Communication & Analytics Routes
 router.use("/notifications", notificationRoute);

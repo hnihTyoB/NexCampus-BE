@@ -53,7 +53,7 @@ describe("Submissions, Lifecycle Actions & Meetings/Absences Suite", () => {
       assert.equal(ERROR_CODE.INVALID_DATE_RANGE, "INVALID_DATE_RANGE");
     });
 
-    it("should export permissions for task submissions, meetings and absences", () => {
+    it("should export permissions for task submissions and meetings", () => {
       assert.equal(PERMISSIONS.TASK_SUBMISSION_READ, "TASK_SUBMISSION_READ");
       assert.equal(PERMISSIONS.TASK_SUBMISSION_CREATE, "TASK_SUBMISSION_CREATE");
       assert.equal(PERMISSIONS.TASK_SUBMISSION_REVIEW, "TASK_SUBMISSION_REVIEW");
@@ -63,9 +63,6 @@ describe("Submissions, Lifecycle Actions & Meetings/Absences Suite", () => {
       assert.equal(PERMISSIONS.MEETING_ATTEND, "MEETING_ATTEND");
       assert.equal(PERMISSIONS.MEETING_ABSENCE_SUBMIT, "MEETING_ABSENCE_SUBMIT");
       assert.equal(PERMISSIONS.MEETING_ABSENCE_REVIEW, "MEETING_ABSENCE_REVIEW");
-      assert.equal(PERMISSIONS.ABSENCE_READ, "ABSENCE_READ");
-      assert.equal(PERMISSIONS.ABSENCE_CREATE, "ABSENCE_CREATE");
-      assert.equal(PERMISSIONS.ABSENCE_REVIEW, "ABSENCE_REVIEW");
     });
 
     it("should export audit action and target types", () => {
