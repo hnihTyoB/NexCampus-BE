@@ -33,7 +33,6 @@ export class MeetingService {
       await permissionCacheService.getUserPermissions(actorId),
     );
     return (
-      callerPerms.has(PERMISSIONS.MEETING_DELETE) ||
       callerPerms.has(PERMISSIONS.ROLE_READ) ||
       callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN)
     );
@@ -41,16 +40,7 @@ export class MeetingService {
 
   async findAll(query: MeetingQueryDto, actor: UserPayload) {
     const hasGlobal = await this.hasGlobalAccess(actor.id);
-    let isParticipantScope = false;
-    if (!hasGlobal) {
-      const intern = await prisma.intern.findUnique({
-        where: { userId: actor.id },
-        select: { id: true },
-      });
-      if (intern) {
-        isParticipantScope = true;
-      }
-    }
+    const isParticipantScope = !hasGlobal;
 
     return this.repository.findAll(query, {
       userId: actor.id,
@@ -66,21 +56,16 @@ export class MeetingService {
 
     const hasGlobal = await this.hasGlobalAccess(actor.id);
     if (!hasGlobal) {
-      const intern = await prisma.intern.findUnique({
-        where: { userId: actor.id },
-        select: { id: true },
-      });
-      if (intern) {
-        const isParticipant = meeting.participants.some(
-          (p) => p.userId === actor.id,
+      const isParticipant =
+        meeting.createdBy === actor.id ||
+        meeting.hostId === actor.id ||
+        meeting.participants.some((p) => p.userId === actor.id);
+      if (!isParticipant) {
+        throw new AppError(
+          "Không có quyền xem cuộc họp này",
+          403,
+          ERROR_CODE.FORBIDDEN,
         );
-        if (!isParticipant) {
-          throw new AppError(
-            "Không có quyền xem cuộc họp này",
-            403,
-            ERROR_CODE.FORBIDDEN,
-          );
-        }
       }
     }
 

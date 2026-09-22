@@ -97,17 +97,21 @@ export class MeetingRepository {
       limit = 20,
     } = query;
 
+    const startRange = startDate || (query as any).startTimeFrom;
+    const endRange = endDate || (query as any).startTimeTo;
+    const participantId = (query as any).participantId;
+
     const where: Prisma.MeetingWhereInput = {
       deletedAt: null,
       ...(status ? { status } : {}),
       ...(meetingType ? { meetingType } : {}),
       ...(visibility ? { visibility } : {}),
       ...(departmentId ? { departmentId } : {}),
-      ...(startDate || endDate
+      ...(startRange || endRange
         ? {
             startTime: {
-              ...(startDate ? { gte: new Date(startDate) } : {}),
-              ...(endDate ? { lte: new Date(endDate) } : {}),
+              ...(startRange ? { gte: new Date(startRange) } : {}),
+              ...(endRange ? { lte: new Date(endRange) } : {}),
             },
           }
         : {}),
@@ -115,7 +119,17 @@ export class MeetingRepository {
         ? {
             OR: [
               { participants: { some: { userId: scope.userId } } },
-              { visibility: MeetingVisibility.TEAM },
+              { hostId: scope.userId },
+              { createdBy: scope.userId },
+            ],
+          }
+        : {}),
+      ...(participantId
+        ? {
+            OR: [
+              { participants: { some: { userId: participantId } } },
+              { hostId: participantId },
+              { createdBy: participantId },
             ],
           }
         : {}),
