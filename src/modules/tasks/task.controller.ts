@@ -18,7 +18,7 @@ export class TaskController {
         req.query as unknown as TaskQueryDto,
         req.user,
       );
-      res.json({ success: true, data });
+      res.json({ success: true, data: data.data, meta: data.meta });
     } catch (error) {
       next(error);
     }

@@ -44,44 +44,79 @@ export class TaskGroupRepository {
   async findAll(
     query: TaskGroupQueryDto,
     scope?: {
-      departmentIds?: string[];
+      leaderScope?: {
+        departmentIds: string[];
+        leaderUserId: string;
+      };
       internId?: string;
     },
   ) {
     const { departmentId, status, search, page = 1, limit = 20 } = query;
 
-    const where: Prisma.TaskGroupWhereInput = {
-      ...(status ? { status } : {}),
-      ...(departmentId ? { departmentId } : {}),
-      ...(search
-        ? {
-            OR: [
-              { name: { contains: search, mode: "insensitive" } },
-              { description: { contains: search, mode: "insensitive" } },
-            ],
-          }
-        : {}),
-      ...(scope?.departmentIds !== undefined
-        ? {
-            OR: [
-              { departmentId: { in: scope.departmentIds } },
-              { departmentId: null },
-            ],
-          }
-        : {}),
-      ...(scope?.internId !== undefined
-        ? {
-            members: {
-              some: { internId: scope.internId },
+    const conditions: Prisma.TaskGroupWhereInput[] = [];
+
+    if (status) {
+      conditions.push({ status });
+    }
+
+    if (departmentId) {
+      conditions.push({ departmentId });
+    }
+
+    if (search) {
+      conditions.push({
+        OR: [
+          { name: { contains: search, mode: "insensitive" } },
+          { description: { contains: search, mode: "insensitive" } },
+        ],
+      });
+    }
+
+    if (scope?.leaderScope) {
+      const leaderOr: Prisma.TaskGroupWhereInput[] = [];
+      if (scope.leaderScope.departmentIds.length > 0) {
+        leaderOr.push({ departmentId: { in: scope.leaderScope.departmentIds } });
+      }
+      if (scope.leaderScope.leaderUserId) {
+        leaderOr.push({
+          members: {
+            some: {
+              intern: { leaderId: scope.leaderScope.leaderUserId },
             },
-          }
-        : {}),
-    };
+          },
+        });
+      }
+      if (leaderOr.length > 0) {
+        conditions.push({ OR: leaderOr });
+      } else {
+        return {
+          data: [],
+          meta: {
+            total: 0,
+            page,
+            limit,
+            totalPages: 1,
+          },
+        };
+      }
+    }
+
+    if (scope?.internId) {
+      conditions.push({
+        members: {
+          some: { internId: scope.internId },
+        },
+      });
+    }
+
+    const where: Prisma.TaskGroupWhereInput =
+      conditions.length > 0 ? { AND: conditions } : {};
 
     const skip = (page - 1) * limit;
 
-    const [data, total] = await prisma.$transaction([
-      prisma.taskGroup.findMany({
+    const [data, total] = await Promise.all([
+      (prisma.taskGroup.findMany as any)({
+        relationLoadStrategy: "join",
         where,
         select: defaultSelect,
         orderBy: { name: "asc" },

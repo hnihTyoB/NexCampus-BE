@@ -24,11 +24,86 @@ interface UserPayload {
   id: string;
   email?: string | null;
   role?: string;
+  roleId?: string;
+  permissions?: string[];
 }
+
+interface UserScope {
+  internId?: string;
+  departmentIds?: string[];
+}
+
+const userScopeCache = new Map<string, { scope: UserScope; expiresAt: number }>();
+const userScopeInflight = new Map<string, Promise<UserScope>>();
+const SCOPE_CACHE_TTL_MS = 60 * 1000; // 1 minute
 
 export class TaskService {
   private readonly repository = new TaskRepository();
   private readonly r2Service = new R2Service();
+
+  private async resolveUserScope(user: UserPayload): Promise<UserScope> {
+    const cached = userScopeCache.get(user.id);
+    if (cached && Date.now() < cached.expiresAt) {
+      return cached.scope;
+    }
+
+    const inflight = userScopeInflight.get(user.id);
+    if (inflight) {
+      return inflight;
+    }
+
+    const fetchPromise = (async () => {
+      try {
+        const scope: UserScope = {};
+
+        // If role is known, optimize query by querying only the relevant table
+        if (user.role === "INTERN") {
+          const intern = await prisma.intern.findUnique({
+            where: { userId: user.id },
+            select: { id: true },
+          });
+          if (intern) scope.internId = intern.id;
+        } else if (user.role === "LEADER") {
+          const leader = await prisma.leader.findFirst({
+            where: { userId: user.id },
+            select: { departments: { select: { departmentId: true } } },
+          });
+          if (leader) {
+            scope.departmentIds = leader.departments.map((d) => d.departmentId) ?? [];
+          }
+        } else {
+          // Unknown / generic role fallback
+          const intern = await prisma.intern.findUnique({
+            where: { userId: user.id },
+            select: { id: true },
+          });
+          if (intern) {
+            scope.internId = intern.id;
+          } else {
+            const leader = await prisma.leader.findFirst({
+              where: { userId: user.id },
+              select: { departments: { select: { departmentId: true } } },
+            });
+            if (leader) {
+              scope.departmentIds = leader.departments.map((d) => d.departmentId) ?? [];
+            }
+          }
+        }
+
+        userScopeCache.set(user.id, {
+          scope,
+          expiresAt: Date.now() + SCOPE_CACHE_TTL_MS,
+        });
+
+        return scope;
+      } finally {
+        userScopeInflight.delete(user.id);
+      }
+    })();
+
+    userScopeInflight.set(user.id, fetchPromise);
+    return fetchPromise;
+  }
 
   private validateSchedule(
     startDate: string | Date | null | undefined,
@@ -65,29 +140,24 @@ export class TaskService {
   async findAll(query: TaskQueryDto, user?: UserPayload) {
     if (user) {
       const callerPerms = new Set(
-        await permissionCacheService.getUserPermissions(user.id),
+        user.permissions ?? (await permissionCacheService.getUserPermissions(user.id)),
       );
       const hasGlobalAccess =
-        callerPerms.has(PERMISSIONS.TASK_DELETE) ||
         callerPerms.has(PERMISSIONS.ROLE_READ) ||
         callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
 
       if (!hasGlobalAccess) {
-        const intern = await prisma.intern.findUnique({
-          where: { userId: user.id },
-          select: { id: true },
-        });
-        if (intern) {
-          return this.repository.findAll(query, { internId: intern.id });
+        const scope = await this.resolveUserScope(user);
+        if (scope.internId) {
+          return this.repository.findAll(query, { internId: scope.internId });
         }
-
-        const leader = await prisma.leader.findFirst({
-          where: { userId: user.id },
-          select: { departments: { select: { departmentId: true } } },
-        });
-        if (leader) {
-          const departmentIds = leader.departments.map((d) => d.departmentId) ?? [];
-          return this.repository.findAll(query, { departmentIds });
+        if (scope.departmentIds) {
+          return this.repository.findAll(query, {
+            leaderScope: {
+              departmentIds: scope.departmentIds,
+              leaderUserId: user.id,
+            },
+          });
         }
       }
     }
@@ -103,22 +173,37 @@ export class TaskService {
 
     if (user) {
       const callerPerms = new Set(
-        await permissionCacheService.getUserPermissions(user.id),
+        user.permissions ?? (await permissionCacheService.getUserPermissions(user.id)),
       );
       const hasGlobalAccess =
-        callerPerms.has(PERMISSIONS.TASK_DELETE) ||
         callerPerms.has(PERMISSIONS.ROLE_READ) ||
         callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
 
       if (!hasGlobalAccess) {
-        const intern = await prisma.intern.findUnique({
-          where: { userId: user.id },
-          select: { id: true },
-        });
-        if (intern) {
-          const isOwner = task.assignment?.internId === intern.id;
-          const isSupport = task.assignment?.supportId === intern.id;
+        const scope = await this.resolveUserScope(user);
+        if (scope.internId) {
+          const isOwner = task.assignment?.internId === scope.internId;
+          const isSupport = task.assignment?.supportId === scope.internId;
           if (!isOwner && !isSupport) {
+            throw new AppError(
+              "You are not authorized to view this task",
+              403,
+              ERROR_CODE.FORBIDDEN,
+            );
+          }
+        } else if (scope.departmentIds) {
+          const isDeptTask = Boolean(
+            task.taskGroup?.departmentId &&
+            scope.departmentIds.includes(task.taskGroup.departmentId),
+          );
+          const isCreator = task.createdBy === user.id;
+          const isLeaderOfAssignee = Boolean(
+            (task.assignment?.intern as any)?.leaderId === user.id,
+          );
+          const isLeaderOfSupport = Boolean(
+            (task.assignment?.support as any)?.leaderId === user.id,
+          );
+          if (!isDeptTask && !isCreator && !isLeaderOfAssignee && !isLeaderOfSupport) {
             throw new AppError(
               "You are not authorized to view this task",
               403,
@@ -382,8 +467,8 @@ export class TaskService {
       await permissionCacheService.getUserPermissions(actor.id),
     );
     const hasGlobalAccess =
-      callerPerms.has(PERMISSIONS.TASK_DELETE) ||
-      callerPerms.has(PERMISSIONS.ROLE_READ);
+      callerPerms.has(PERMISSIONS.ROLE_READ) ||
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
 
     if (!hasGlobalAccess) {
       const leader = await prisma.leader.findFirst({

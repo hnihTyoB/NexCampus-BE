@@ -47,8 +47,8 @@ const defaultSelect = {
       blockedReason: true,
       assignedAt: true,
       updatedAt: true,
-      intern: { select: { id: true, fullName: true } },
-      support: { select: { id: true, fullName: true } },
+      intern: { select: { id: true, fullName: true, leaderId: true } },
+      support: { select: { id: true, fullName: true, leaderId: true } },
     },
   },
   attachments: {
@@ -67,12 +67,38 @@ const defaultSelect = {
   },
 };
 
+const detailSelect = {
+  ...defaultSelect,
+  recreatedTask: {
+    select: {
+      id: true,
+      code: true,
+      title: true,
+      assignment: {
+        select: {
+          intern: { select: { fullName: true } },
+        },
+      },
+    },
+  },
+  dependsOn: {
+    select: { id: true, code: true, title: true },
+  },
+  dependencies: {
+    select: { id: true, code: true, title: true },
+  },
+};
+
 export class TaskRepository {
   async findAll(
     query: TaskQueryDto,
     scope?: {
       internId?: string;
       departmentIds?: string[];
+      leaderScope?: {
+        departmentIds: string[];
+        leaderUserId: string;
+      };
     },
   ) {
     const {
@@ -143,12 +169,22 @@ export class TaskRepository {
             },
           }
         : {}),
-      ...(scope?.departmentIds !== undefined
+      ...(scope?.leaderScope
+        ? {
+            OR: [
+              ...(scope.leaderScope.departmentIds.length > 0
+                ? [{ taskGroup: { departmentId: { in: scope.leaderScope.departmentIds } } }]
+                : []),
+              { createdBy: scope.leaderScope.leaderUserId },
+              { assignment: { intern: { leaderId: scope.leaderScope.leaderUserId } } },
+              { assignment: { support: { leaderId: scope.leaderScope.leaderUserId } } },
+              { taskGroup: { members: { some: { intern: { leaderId: scope.leaderScope.leaderUserId } } } } },
+            ],
+          }
+        : scope?.departmentIds !== undefined
         ? {
             OR: [
               { taskGroup: { departmentId: { in: scope.departmentIds } } },
-              { taskGroup: { departmentId: null } },
-              { taskGroupId: null },
             ],
           }
         : {}),
@@ -165,8 +201,9 @@ export class TaskRepository {
     };
     const orderBy = SORT_MAP[sortBy] ?? { createdAt: order };
 
-    const [data, total] = await prisma.$transaction([
-      prisma.task.findMany({
+    const [data, total] = await Promise.all([
+      (prisma.task.findMany as any)({
+        relationLoadStrategy: "join",
         where,
         select: defaultSelect,
         orderBy,
@@ -183,16 +220,18 @@ export class TaskRepository {
   }
 
   findById(id: string) {
-    return prisma.task.findFirst({
+    return (prisma.task.findFirst as any)({
+      relationLoadStrategy: "join",
       where: { id, deletedAt: null },
-      select: defaultSelect,
+      select: detailSelect,
     });
   }
 
   findByCode(code: string, taskGroupId: string | null = null) {
-    return prisma.task.findFirst({
+    return (prisma.task.findFirst as any)({
+      relationLoadStrategy: "join",
       where: { code, taskGroupId, deletedAt: null },
-      select: defaultSelect,
+      select: detailSelect,
     });
   }
 
