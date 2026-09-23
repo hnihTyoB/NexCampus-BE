@@ -33,6 +33,7 @@ import { WeeklyEvaluationService } from "../src/modules/weekly-evaluations/weekl
 import { EvaluationGrade } from "@prisma/client";
 import { swaggerSpec } from "../src/config/swagger.config";
 import { getVietnamToday, toCalendarDate } from "../src/common/helpers/date.helper";
+import { systemSettingService } from "../src/modules/system-settings/system-setting.service";
 
 describe("Daily Reports & Weekly Evaluations Test Suite", () => {
   // ─── 1. Constants, Permissions & Error Codes ──────────────────────────────
@@ -388,6 +389,8 @@ describe("Daily Reports & Weekly Evaluations Test Suite", () => {
   describe("6. Service Logic & Scoping", () => {
     it("DailyReportService getUploadUrl should generate R2 key with reports/ prefix", async () => {
       const service = new DailyReportService();
+      (service as any).r2Service.getPresignedUploadUrl = async (key: string) => `https://mock-upload.r2.cloud/${key}`;
+      (service as any).r2Service.getPublicUrl = (key: string) => `https://mock-public.r2.cloud/${key}`;
 
       const res = await service.getUploadUrl(
         { fileName: "my_report_doc.pdf", mimeType: "application/pdf" },
@@ -444,6 +447,107 @@ describe("Daily Reports & Weekly Evaluations Test Suite", () => {
         aiComment: "AI generated comment",
       });
       assert.equal(editedComment, true);
+    });
+
+    it("should dynamically allow evaluation window according to WORKING_DAYS_PER_WEEK setting", async () => {
+      const service = new WeeklyEvaluationService();
+      const intern = {
+        id: "mock-intern-1",
+        startDate: new Date("2026-09-01T00:00:00Z"),
+        createdAt: new Date("2026-09-01T00:00:00Z"),
+      };
+
+      const originalEnv = process.env.NODE_ENV;
+      const originalGetWorkingDays = (systemSettingService as any).getWorkingDaysPerWeek;
+
+      try {
+        process.env.NODE_ENV = "production";
+        // Mock permission check so it's a regular leader
+        (service as any).hasGlobalEvaluationAccess = async () => false;
+        (service as any).isAssignedMidWeekThisWeek = async () => false;
+
+        // --- Test 1: WORKING_DAYS_PER_WEEK = 5 (Mon-Fri) ---
+        (systemSettingService as any).getWorkingDaysPerWeek = async () => 5;
+
+        // Friday 11:30 VN (UTC day = 5, hour = 11) -> Allowed
+        const friday1130 = new Date(Date.UTC(2026, 8, 25, 11, 30));
+        await (service as any).validateEvaluationWindow(
+          "leader-1",
+          intern,
+          2,
+          2,
+          friday1130,
+          friday1130,
+        );
+
+        // Friday 09:30 VN (UTC day = 5, hour = 9) -> Blocked (before 11:00)
+        const friday0930 = new Date(Date.UTC(2026, 8, 25, 9, 30));
+        await assert.rejects(
+          async () => {
+            await (service as any).validateEvaluationWindow(
+              "leader-1",
+              intern,
+              2,
+              2,
+              friday0930,
+              friday0930,
+            );
+          },
+          (err: any) => {
+            assert.equal(err.code, ERROR_CODE.EVALUATION_WINDOW_CLOSED);
+            assert.ok(err.message.includes("Thứ Sáu"));
+            return true;
+          }
+        );
+
+        // Saturday (isoDay 6 > 5) -> Allowed
+        const saturday = new Date(Date.UTC(2026, 8, 26, 9, 0));
+        await (service as any).validateEvaluationWindow(
+          "leader-1",
+          intern,
+          2,
+          2,
+          saturday,
+          saturday,
+        );
+
+        // --- Test 2: WORKING_DAYS_PER_WEEK = 6 (Mon-Sat) ---
+        (systemSettingService as any).getWorkingDaysPerWeek = async () => 6;
+
+        // Friday 14:00 VN (isoDay 5 < 6) -> Blocked
+        const friday1400 = new Date(Date.UTC(2026, 8, 25, 14, 0));
+        await assert.rejects(
+          async () => {
+            await (service as any).validateEvaluationWindow(
+              "leader-1",
+              intern,
+              2,
+              2,
+              friday1400,
+              friday1400,
+            );
+          },
+          (err: any) => {
+            assert.equal(err.code, ERROR_CODE.EVALUATION_WINDOW_CLOSED);
+            assert.ok(err.message.includes("Thứ Bảy"));
+            return true;
+          }
+        );
+
+        // Saturday 11:30 VN (isoDay 6, hour = 11) -> Allowed
+        const saturday1130 = new Date(Date.UTC(2026, 8, 26, 11, 30));
+        await (service as any).validateEvaluationWindow(
+          "leader-1",
+          intern,
+          2,
+          2,
+          saturday1130,
+          saturday1130,
+        );
+      } finally {
+        process.env.NODE_ENV = originalEnv;
+        (systemSettingService as any).getWorkingDaysPerWeek = originalGetWorkingDays;
+      }
     });
   });
 

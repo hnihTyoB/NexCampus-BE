@@ -25,6 +25,7 @@ import {
 } from "../../common/constants/audit-log.constant";
 import { VIETNAM_OFFSET_MS } from "../../common/constants/date.constant";
 import { getVietnamWeekRange } from "../../common/helpers/date.helper";
+import { systemSettingService } from "../system-settings/system-setting.service";
 
 interface UserPayload {
   id: string;
@@ -136,34 +137,14 @@ export class WeeklyEvaluationService {
     }
 
     // 4. Current week window constraint & mid-week assignment check
-    if (
-      !(await this.hasGlobalEvaluationAccess(actor.id)) &&
-      process.env.NODE_ENV !== "test" &&
-      dto.week === maxAllowedWeek
-    ) {
-      // Thực tập sinh mới được giao giữa tuần không tính vào WeeklyEvaluation tuần này
-      const isMidWeek = await this.isAssignedMidWeekThisWeek(intern, now, actor.id);
-      if (isMidWeek) {
-        throw new AppError(
-          "Thực tập sinh mới được giao giữa tuần, không áp dụng đánh giá cho tuần này",
-          400,
-          ERROR_CODE.BAD_REQUEST,
-        );
-      }
-
-      const dayOfWeek = todayLocal.getUTCDay(); // 0 = Sunday, 6 = Saturday
-      const hours = todayLocal.getUTCHours();
-      const isSaturdayAllowed = dayOfWeek === 6 && hours >= 11;
-      const isSundayAllowed = dayOfWeek === 0;
-
-      if (!isSaturdayAllowed && !isSundayAllowed) {
-        throw new AppError(
-          "Chỉ có thể đánh giá tuần hiện tại từ Thứ Bảy (sau 11:00 sáng) đến hết Chủ Nhật",
-          400,
-          ERROR_CODE.EVALUATION_WINDOW_CLOSED,
-        );
-      }
-    }
+    await this.validateEvaluationWindow(
+      actor.id,
+      intern,
+      dto.week,
+      maxAllowedWeek,
+      now,
+      todayLocal,
+    );
 
     // 5. Unique check: no duplicate evaluations per intern per week
     const existing = await this.repository.findByInternAndWeek(
@@ -602,34 +583,14 @@ export class WeeklyEvaluationService {
       );
     }
 
-    if (
-      !(await this.hasGlobalEvaluationAccess(actor.id)) &&
-      process.env.NODE_ENV !== "test" &&
-      dto.week === maxAllowedWeek
-    ) {
-      // Thực tập sinh mới được giao giữa tuần không tính vào WeeklyEvaluation tuần này
-      const isMidWeek = await this.isAssignedMidWeekThisWeek(intern, now, actor.id);
-      if (isMidWeek) {
-        throw new AppError(
-          "Thực tập sinh mới được giao giữa tuần, không áp dụng đánh giá cho tuần này",
-          400,
-          ERROR_CODE.BAD_REQUEST,
-        );
-      }
-
-      const dayOfWeek = todayLocal.getUTCDay(); // 0 = Sunday, 6 = Saturday
-      const hours = todayLocal.getUTCHours();
-      const isSaturdayAllowed = dayOfWeek === 6 && hours >= 11;
-      const isSundayAllowed = dayOfWeek === 0;
-
-      if (!isSaturdayAllowed && !isSundayAllowed) {
-        throw new AppError(
-          "Chỉ có thể đánh giá tuần hiện tại từ Thứ Bảy (sau 11:00 sáng) đến hết Chủ Nhật",
-          400,
-          ERROR_CODE.EVALUATION_WINDOW_CLOSED,
-        );
-      }
-    }
+    await this.validateEvaluationWindow(
+      actor.id,
+      intern,
+      dto.week,
+      maxAllowedWeek,
+      now,
+      todayLocal,
+    );
 
     return this.aiService.generateSuggestion(dto, actor);
   }
@@ -676,5 +637,59 @@ export class WeeklyEvaluationService {
     }
 
     return false;
+  }
+
+  private async validateEvaluationWindow(
+    actorId: string,
+    intern: { id: string; startDate: Date; createdAt: Date },
+    week: number,
+    maxAllowedWeek: number,
+    now: Date,
+    todayLocal: Date,
+  ): Promise<void> {
+    if (
+      (await this.hasGlobalEvaluationAccess(actorId)) ||
+      process.env.NODE_ENV === "test" ||
+      week !== maxAllowedWeek
+    ) {
+      return;
+    }
+
+    // Thực tập sinh mới được giao giữa tuần không tính vào WeeklyEvaluation tuần này
+    const isMidWeek = await this.isAssignedMidWeekThisWeek(intern, now, actorId);
+    if (isMidWeek) {
+      throw new AppError(
+        "Thực tập sinh mới được giao giữa tuần, không áp dụng đánh giá cho tuần này",
+        400,
+        ERROR_CODE.BAD_REQUEST,
+      );
+    }
+
+    const workingDaysPerWeek = await systemSettingService.getWorkingDaysPerWeek();
+    const dayOfWeek = todayLocal.getUTCDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    const isoDay = dayOfWeek === 0 ? 7 : dayOfWeek; // 1 = Monday, ..., 7 = Sunday
+    const hours = todayLocal.getUTCHours();
+
+    const isLastWorkingDayAllowed = isoDay === workingDaysPerWeek && hours >= 11;
+    const isWeekendAllowed = isoDay > workingDaysPerWeek;
+
+    if (!isLastWorkingDayAllowed && !isWeekendAllowed) {
+      const VIETNAM_DAY_NAMES: Record<number, string> = {
+        1: "Thứ Hai",
+        2: "Thứ Ba",
+        3: "Thứ Tư",
+        4: "Thứ Năm",
+        5: "Thứ Sáu",
+        6: "Thứ Bảy",
+        7: "Chủ Nhật",
+      };
+      const startDayName = VIETNAM_DAY_NAMES[workingDaysPerWeek] || "Thứ Bảy";
+      const message =
+        workingDaysPerWeek === 7
+          ? "Chỉ có thể đánh giá tuần hiện tại vào Chủ Nhật (sau 11:00 sáng)"
+          : `Chỉ có thể đánh giá tuần hiện tại từ ${startDayName} (sau 11:00 sáng) đến hết Chủ Nhật`;
+
+      throw new AppError(message, 400, ERROR_CODE.EVALUATION_WINDOW_CLOSED);
+    }
   }
 }
