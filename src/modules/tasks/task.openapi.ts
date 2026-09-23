@@ -1,6 +1,7 @@
 import { openapiRegistry } from "../../config/openapi/openapi.registry";
 import {
   findAllTaskSchema,
+  taskAnalyticsQuerySchema,
   createTaskSchema,
   updateTaskSchema,
   taskIdParamSchema,
@@ -41,6 +42,29 @@ export function registerTaskOpenApi(): void {
                   totalPages: z.number(),
                 }),
               }),
+            }),
+          },
+        },
+      },
+    },
+  });
+
+  // GET /tasks/analytics
+  openapiRegistry.registerPath({
+    method: "get",
+    path: "/tasks/analytics",
+    tags: ["Tasks"],
+    summary: "Lấy thống kê công việc và khối lượng làm việc (Analytics)",
+    security: [{ BearerAuth: [] }],
+    request: { query: taskAnalyticsQuerySchema },
+    responses: {
+      200: {
+        description: "Thành công",
+        content: {
+          "application/json": {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              data: z.record(z.unknown()),
             }),
           },
         },

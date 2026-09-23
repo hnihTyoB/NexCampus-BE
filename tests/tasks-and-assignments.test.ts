@@ -9,6 +9,7 @@ import {
   createTaskSchema,
   updateTaskSchema,
   findAllTaskSchema,
+  taskAnalyticsQuerySchema,
   getAttachmentUploadUrlSchema,
   confirmAttachmentUploadSchema,
   createLinkAttachmentSchema,
@@ -489,6 +490,40 @@ describe("Task Management & Assignment Suite (task-groups, tasks, task-assignmen
 
       assert.equal(result.id, "created-task-1");
       assert.equal(result.title, "Valid Schedule");
+    });
+  });
+
+  // ─── 9. Task Analytics Query Validation ────────────────────────────────────
+
+  describe("9. Task Analytics Query Validation", () => {
+    it("should accept valid dateFrom and dateTo ISO strings", () => {
+      const parsed = taskAnalyticsQuerySchema.safeParse({
+        dateFrom: "2026-08-31T17:00:00.000Z",
+        dateTo: "2026-09-30T16:59:59.999Z",
+      });
+      assert.equal(parsed.success, true);
+    });
+
+    it("should accept valid taskGroupId UUID", () => {
+      const parsed = taskAnalyticsQuerySchema.safeParse({
+        taskGroupId: "11111111-1111-1111-1111-111111111111",
+        dateFrom: "2026-08-31T17:00:00.000Z",
+      });
+      assert.equal(parsed.success, true);
+    });
+
+    it("should reject invalid date strings in dateFrom", () => {
+      const parsed = taskAnalyticsQuerySchema.safeParse({
+        dateFrom: "not-a-date",
+      });
+      assert.equal(parsed.success, false);
+    });
+
+    it("should reject invalid taskGroupId that is not a UUID", () => {
+      const parsed = taskAnalyticsQuerySchema.safeParse({
+        taskGroupId: "invalid-uuid",
+      });
+      assert.equal(parsed.success, false);
     });
   });
 });

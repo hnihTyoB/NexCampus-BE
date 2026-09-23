@@ -22,6 +22,18 @@ export const taskAttachmentParamsSchema = z.object({
   attachmentId: z.string().uuid("Invalid attachment ID").optional(),
 });
 
+export const taskAnalyticsQuerySchema = z.object({
+  taskGroupId: z.string().uuid().optional(),
+  dateFrom: z
+    .string()
+    .refine((v) => !isNaN(Date.parse(v)), { message: "Invalid dateFrom" })
+    .optional(),
+  dateTo: z
+    .string()
+    .refine((v) => !isNaN(Date.parse(v)), { message: "Invalid dateTo" })
+    .optional(),
+});
+
 export const findAllTaskSchema = z.object({
   title: z.string().trim().optional(),
   code: z.string().trim().optional(),

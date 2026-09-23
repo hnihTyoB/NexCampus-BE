@@ -6,6 +6,7 @@ import { validate } from "../../middlewares/validate.middleware";
 import { PERMISSIONS } from "../../common/constants/permission.constant";
 import {
   findAllTaskSchema,
+  taskAnalyticsQuerySchema,
   createTaskSchema,
   updateTaskSchema,
   taskIdParamSchema,
@@ -27,6 +28,14 @@ router.get(
   requirePermission(PERMISSIONS.TASK_READ),
   validate(findAllTaskSchema, "query"),
   controller.findAll,
+);
+
+router.get(
+  "/analytics",
+  authMiddleware,
+  requirePermission(PERMISSIONS.TASK_READ),
+  validate(taskAnalyticsQuerySchema, "query"),
+  controller.getAnalytics,
 );
 
 router.post(

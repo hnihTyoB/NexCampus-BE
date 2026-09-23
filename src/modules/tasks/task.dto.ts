@@ -156,3 +156,47 @@ export interface TaskAllocationResultDto {
   }>;
 }
 
+// ─── Analytics DTOs ───────────────────────────────────────────────────────────
+
+export interface TaskStatusDistributionDto {
+  status: string;
+  count: number;
+}
+
+export interface TaskPriorityDistributionDto {
+  priority: string;
+  count: number;
+}
+
+export interface WorkloadByInternDto {
+  internId: string;
+  internFullName: string;
+  totalTasks: number;
+  totalEstDays: number;
+  byStatus: TaskStatusDistributionDto[];
+}
+
+export interface PhaseProgressDto {
+  phase: string;
+  totalTasks: number;
+  doneTasks: number;
+  completionRate: number; // 0.0 – 1.0
+}
+
+export interface TaskAnalyticsDto {
+  overview: {
+    totalTasks: number;
+    overdueTasks: number;
+    byStatus: TaskStatusDistributionDto[];
+    byPriority: TaskPriorityDistributionDto[];
+  };
+  workloadByIntern: WorkloadByInternDto[];
+  progressByPhase: PhaseProgressDto[];
+}
+
+export interface TaskAnalyticsQueryDto {
+  taskGroupId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+

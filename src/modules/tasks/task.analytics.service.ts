@@ -1,0 +1,254 @@
+import { prisma } from "../../database/prisma.client";
+import { TaskAnalyticsDto } from "./task.dto";
+import { ASSIGNMENT_STATUS } from "../../common/constants/task.constant";
+
+function buildDateFilter(dateFrom?: string, dateTo?: string) {
+  const filter: any = {};
+  if (dateFrom) {
+    const from = new Date(dateFrom);
+    if (!isNaN(from.getTime())) filter.gte = from;
+  }
+  if (dateTo) {
+    const to = new Date(dateTo);
+    if (!isNaN(to.getTime())) filter.lte = to;
+  }
+  return Object.keys(filter).length > 0 ? filter : undefined;
+}
+
+export class TaskAnalyticsService {
+  private async getOverview(
+    taskGroupId?: string,
+    dateFrom?: string,
+    dateTo?: string,
+    createdBy?: string,
+  ) {
+    const deadline = buildDateFilter(dateFrom, dateTo);
+
+    const taskWhere: any = { deletedAt: null };
+    if (taskGroupId) taskWhere.taskGroupId = taskGroupId;
+    if (deadline) taskWhere.deadline = deadline;
+    if (createdBy) taskWhere.createdBy = createdBy;
+
+    const assignmentWhere: any = {
+      task: { deletedAt: null },
+    };
+    if (taskGroupId) {
+      assignmentWhere.task = { deletedAt: null, taskGroupId: taskGroupId };
+    }
+    if (deadline) {
+      assignmentWhere.task = { ...assignmentWhere.task, deadline };
+    }
+    if (createdBy) {
+      assignmentWhere.task = { ...assignmentWhere.task, createdBy };
+    }
+
+    // Overdue: deadline < now AND not done (assignment status != DONE)
+    const overdueWhere: any = {
+      deletedAt: null,
+      deadline: { ...(deadline ?? {}), lt: new Date() },
+    };
+    if (taskGroupId) overdueWhere.taskGroupId = taskGroupId;
+    if (createdBy) overdueWhere.createdBy = createdBy;
+    overdueWhere.NOT = { assignment: { status: ASSIGNMENT_STATUS.DONE } };
+
+    const [totalTasks, overdueTasks, statusGroups, priorityGroups] =
+      await Promise.all([
+        prisma.task.count({ where: taskWhere }),
+        prisma.task.count({ where: overdueWhere }),
+        prisma.taskAssignment.groupBy({
+          by: ["status"],
+          where: assignmentWhere,
+          _count: { id: true },
+          orderBy: { status: "asc" },
+        }),
+        prisma.task.groupBy({
+          by: ["priority"],
+          where: taskWhere,
+          _count: { id: true },
+          orderBy: { priority: "asc" },
+        }),
+      ]);
+
+    return {
+      totalTasks,
+      overdueTasks,
+      byStatus: statusGroups.map((g) => ({
+        status: g.status,
+        count: g._count.id,
+      })),
+      byPriority: priorityGroups.map((g) => ({
+        priority: g.priority,
+        count: g._count.id,
+      })),
+    };
+  }
+
+  private async getWorkloadByIntern(
+    taskGroupId?: string,
+    dateFrom?: string,
+    dateTo?: string,
+    createdBy?: string,
+  ) {
+    let queryConditions = `t.deleted_at IS NULL AND i.deleted_at IS NULL`;
+    const queryParams: any[] = [];
+
+    if (taskGroupId) {
+      queryParams.push(taskGroupId);
+      queryConditions += ` AND t.task_group_id = $${queryParams.length}::uuid`;
+    }
+
+    if (dateFrom) {
+      const from = new Date(dateFrom);
+      if (!isNaN(from.getTime())) {
+        queryParams.push(from);
+        queryConditions += ` AND t.deadline >= $${queryParams.length}::timestamp`;
+      }
+    }
+
+    if (dateTo) {
+      const to = new Date(dateTo);
+      if (!isNaN(to.getTime())) {
+        queryParams.push(to);
+        queryConditions += ` AND t.deadline <= $${queryParams.length}::timestamp`;
+      }
+    }
+
+    if (createdBy) {
+      queryParams.push(createdBy);
+      queryConditions += ` AND t.created_by = $${queryParams.length}::uuid`;
+    }
+
+    const rows = await prisma.$queryRawUnsafe<any[]>(
+      `
+      SELECT 
+        i.id AS "internId",
+        i.full_name AS "internFullName",
+        ta.status AS "status",
+        COUNT(ta.id)::int AS "statusCount",
+        COALESCE(SUM(t.est_days), 0)::float AS "groupEstDays"
+      FROM task_assignments ta
+      INNER JOIN interns i ON ta.intern_id = i.id
+      INNER JOIN tasks t ON ta.task_id = t.id
+      WHERE ${queryConditions}
+      GROUP BY i.id, i.full_name, ta.status
+      ORDER BY i.full_name ASC
+      `,
+      ...queryParams,
+    );
+
+    const internMap = new Map<
+      string,
+      {
+        internId: string;
+        internFullName: string;
+        totalTasks: number;
+        totalEstDays: number;
+        byStatus: { status: string; count: number }[];
+      }
+    >();
+
+    for (const r of rows) {
+      const key = r.internId;
+      if (!internMap.has(key)) {
+        internMap.set(key, {
+          internId: r.internId,
+          internFullName: r.internFullName,
+          totalTasks: 0,
+          totalEstDays: 0,
+          byStatus: [],
+        });
+      }
+      const entry = internMap.get(key)!;
+      entry.totalTasks += r.statusCount;
+      entry.totalEstDays += r.groupEstDays;
+      entry.byStatus.push({
+        status: r.status,
+        count: r.statusCount,
+      });
+    }
+
+    return Array.from(internMap.values()).map((entry) => ({
+      internId: entry.internId,
+      internFullName: entry.internFullName,
+      totalTasks: entry.totalTasks,
+      totalEstDays: Math.round(entry.totalEstDays * 100) / 100,
+      byStatus: entry.byStatus,
+    }));
+  }
+
+  private async getProgressByPhase(
+    taskGroupId?: string,
+    dateFrom?: string,
+    dateTo?: string,
+    createdBy?: string,
+  ) {
+    let queryConditions = `t.deleted_at IS NULL AND t.phase IS NOT NULL`;
+    const queryParams: any[] = [];
+
+    if (taskGroupId) {
+      queryParams.push(taskGroupId);
+      queryConditions += ` AND t.task_group_id = $${queryParams.length}::uuid`;
+    }
+
+    if (dateFrom) {
+      const from = new Date(dateFrom);
+      if (!isNaN(from.getTime())) {
+        queryParams.push(from);
+        queryConditions += ` AND t.deadline >= $${queryParams.length}::timestamp`;
+      }
+    }
+
+    if (dateTo) {
+      const to = new Date(dateTo);
+      if (!isNaN(to.getTime())) {
+        queryParams.push(to);
+        queryConditions += ` AND t.deadline <= $${queryParams.length}::timestamp`;
+      }
+    }
+
+    if (createdBy) {
+      queryParams.push(createdBy);
+      queryConditions += ` AND t.created_by = $${queryParams.length}::uuid`;
+    }
+
+    const rows = await prisma.$queryRawUnsafe<any[]>(
+      `
+      SELECT 
+        t.phase AS "phase",
+        COUNT(t.id)::int AS "totalTasks",
+        COUNT(CASE WHEN ta.status = 'DONE' THEN 1 END)::int AS "doneTasks"
+      FROM tasks t
+      LEFT JOIN task_assignments ta ON t.id = ta.task_id
+      WHERE ${queryConditions}
+      GROUP BY t.phase
+      ORDER BY t.phase ASC
+      `,
+      ...queryParams,
+    );
+
+    return rows.map((r) => ({
+      phase: r.phase,
+      totalTasks: r.totalTasks,
+      doneTasks: r.doneTasks,
+      completionRate:
+        r.totalTasks > 0
+          ? Math.round((r.doneTasks / r.totalTasks) * 10000) / 10000
+          : 0,
+    }));
+  }
+
+  async getAll(
+    taskGroupId?: string,
+    dateFrom?: string,
+    dateTo?: string,
+    createdBy?: string,
+  ): Promise<TaskAnalyticsDto> {
+    const [overview, workloadByIntern, progressByPhase] = await Promise.all([
+      this.getOverview(taskGroupId, dateFrom, dateTo, createdBy),
+      this.getWorkloadByIntern(taskGroupId, dateFrom, dateTo, createdBy),
+      this.getProgressByPhase(taskGroupId, dateFrom, dateTo, createdBy),
+    ]);
+
+    return { overview, workloadByIntern, progressByPhase };
+  }
+}

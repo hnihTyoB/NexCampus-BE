@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import { TaskService } from "./task.service";
+import { TaskAnalyticsService } from "./task.analytics.service";
 import { taskAllocationAiService } from "./task-allocation.ai.service";
+import { ROLES } from "../../common/constants/role.constant";
 import {
   CreateTaskDto,
   UpdateTaskDto,
@@ -11,6 +13,7 @@ import {
 
 export class TaskController {
   private readonly service = new TaskService();
+  private readonly analyticsService = new TaskAnalyticsService();
 
   findAll = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -187,6 +190,28 @@ export class TaskController {
       const data = await this.service.getAiRecommendation(
         req.params.id,
         req.user!,
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getAnalytics = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const taskGroupId = (req.query.taskGroupId || req.body?.taskGroupId) as string | undefined;
+      const dateFrom = req.query.dateFrom as string | undefined;
+      const dateTo = req.query.dateTo as string | undefined;
+      const createdBy = req.user?.role === ROLES.LEADER ? req.user.id : undefined;
+      const data = await this.analyticsService.getAll(
+        taskGroupId,
+        dateFrom,
+        dateTo,
+        createdBy,
       );
       res.json({ success: true, data });
     } catch (error) {
