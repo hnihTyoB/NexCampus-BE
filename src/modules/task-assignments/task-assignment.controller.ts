@@ -174,4 +174,97 @@ export class TaskAssignmentController {
       next(error);
     }
   };
+
+  // ─── Task Extension Request Handlers ─────────────────────────────────────────
+
+  requestExtension = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await this.service.requestExtension(
+        req.params.id,
+        req.user!,
+        req.body,
+        { ipAddress: req.ip },
+      );
+      res.status(201).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getExtensionRequests = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const data = await this.service.getExtensionRequests(
+        req.query as any,
+        req.user!,
+      );
+      res.json({ success: true, ...data });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getExtensionRequestsByAssignment = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const data = await this.service.getExtensionRequestsByAssignment(
+        req.params.id,
+        req.user!,
+      );
+      res.json({ success: true, ...data });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  approveExtension = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const data = await this.service.approveExtension(
+        req.params.requestId,
+        req.user!,
+        { ipAddress: req.ip },
+      );
+      res.json({
+        success: true,
+        data,
+        message: "Gia hạn deadline công việc thành công",
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  rejectExtension = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const { rejectionReason } = req.body as { rejectionReason: string };
+      const data = await this.service.rejectExtension(
+        req.params.requestId,
+        req.user!,
+        rejectionReason,
+        { ipAddress: req.ip },
+      );
+      res.json({
+        success: true,
+        data,
+        message: "Đã từ chối yêu cầu gia hạn",
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
+

@@ -47,6 +47,7 @@ model User {
   uploadedAttachments           TaskAttachment[]       @relation("TaskAttachmentUploader")
   assignedTasks                 TaskAssignment[]       @relation("AssignedTasks")
   reviewedSubmissions           TaskSubmission[]       @relation("ReviewedSubmissions")
+  reviewedExtensionRequests    TaskExtensionRequest[] @relation("ReviewedExtensionRequests")
   uploadedSubmissionAttachments SubmissionAttachment[] @relation("SubmissionAttachmentUploader")
   createdMeetings               Meeting[]              @relation("CreatedMeetings")
   hostedMeetings                Meeting[]              @relation("HostedMeetings")
@@ -487,6 +488,7 @@ model Intern {
   dailyReports              DailyReport[]
   weeklyEvaluations         WeeklyEvaluation[]
   regulationAcknowledgments RegulationAcknowledgment[]
+  extensionRequests         TaskExtensionRequest[]
 
   @@index([leaderId])
   @@index([departmentId])
@@ -631,6 +633,13 @@ enum AssignmentStatus {
   REVIEW
   DONE
   BLOCKED
+  EXTENSION_PENDING
+}
+
+enum ExtensionRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum TaskGroupStatus {
@@ -751,8 +760,9 @@ model TaskAssignment {
   task        Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
   intern      Intern?          @relation("TaskAssignmentOwner", fields: [internId], references: [id], onDelete: Cascade)
   support     Intern?          @relation("TaskAssignmentSupport", fields: [supportId], references: [id], onDelete: SetNull)
-  assigner    User             @relation("AssignedTasks", fields: [assignedBy], references: [id], onDelete: Cascade)
-  submissions TaskSubmission[]
+  assigner          User                   @relation("AssignedTasks", fields: [assignedBy], references: [id], onDelete: Cascade)
+  submissions       TaskSubmission[]
+  extensionRequests TaskExtensionRequest[]
 
   @@index([internId])
   @@index([internId, status])
@@ -812,6 +822,33 @@ model SubmissionAttachment {
   @@index([submissionId])
   @@index([uploadedBy])
   @@map("submission_attachments")
+}
+
+model TaskExtensionRequest {
+  id               String                 @id @default(uuid()) @db.Uuid
+  assignmentId     String                 @map("assignment_id") @db.Uuid
+  internId         String                 @map("intern_id") @db.Uuid
+  currentDeadline  DateTime               @map("current_deadline")
+  proposedDeadline DateTime               @map("proposed_deadline")
+  extensionDays    Int                    @map("extension_days")
+  reason           String                 @db.Text
+  commitmentPlan   String                 @map("commitment_plan") @db.Text
+  status           ExtensionRequestStatus @default(PENDING)
+  rejectionReason  String?                @map("rejection_reason") @db.Text
+  reviewedBy       String?                @map("reviewed_by") @db.Uuid
+  reviewedAt       DateTime?              @map("reviewed_at")
+  createdAt        DateTime               @default(now()) @map("created_at")
+  updatedAt        DateTime               @updatedAt @map("updated_at")
+
+  assignment TaskAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  intern     Intern         @relation(fields: [internId], references: [id], onDelete: Cascade)
+  reviewer   User?          @relation("ReviewedExtensionRequests", fields: [reviewedBy], references: [id], onDelete: SetNull)
+
+  @@index([assignmentId])
+  @@index([internId])
+  @@index([status])
+  @@index([reviewedBy])
+  @@map("task_extension_requests")
 }
 
 // ─── Meeting & Absence Enums ────────────────────────────────────────────────

@@ -7,6 +7,9 @@ import {
   rejectAssignmentSchema,
   assignmentIdParamSchema,
   assignTaskIdParamSchema,
+  extensionRequestIdParamSchema,
+  rejectTaskExtensionSchema,
+  queryExtensionRequestsSchema,
 } from "./task-assignment.validation";
 import { z } from "zod";
 
@@ -349,6 +352,136 @@ export function registerTaskAssignmentOpenApi(): void {
       },
       400: { description: "Task không ở trạng thái BLOCKED" },
       403: { description: "Chỉ Leader trực tiếp hoặc Admin mới có quyền mở lại" },
+    },
+  });
+
+  // POST /task-assignments/:id/request-extension
+  openapiRegistry.registerPath({
+    method: "post",
+    path: "/task-assignments/{id}/request-extension",
+    tags: ["Task Assignments"],
+    summary: "Intern xin gia hạn deadline công việc (Request Deadline Extension)",
+    security: [{ BearerAuth: [] }],
+    request: {
+      params: assignmentIdParamSchema,
+      body: {
+        content: {
+          "application/json": {
+            schema: z.object({
+              proposedDeadline: z.string().openapi({ example: "2026-10-15T18:00:00.000Z" }),
+              extensionDays: z.number().openapi({ example: 3 }),
+              reason: z.string().openapi({ example: "Khối lượng module thanh toán phát sinh thêm cổng VNPay sandbox" }),
+              commitmentPlan: z.string().openapi({ example: "Tập trung hoàn thành trước 17:00 ngày 15/10 và viết unit test đầy đủ" }),
+            }),
+          },
+        },
+      },
+    },
+    responses: {
+      201: {
+        description: "Gửi đề xuất gia hạn thành công (chuyển sang EXTENSION_PENDING)",
+        content: {
+          "application/json": {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              data: z.record(z.unknown()),
+            }),
+          },
+        },
+      },
+      400: { description: "Dữ liệu không hợp lệ hoặc đã có đề xuất đang chờ duyệt" },
+    },
+  });
+
+  // GET /task-assignments/extension-requests
+  openapiRegistry.registerPath({
+    method: "get",
+    path: "/task-assignments/extension-requests",
+    tags: ["Task Assignments"],
+    summary: "Lấy danh sách các đề xuất xin gia hạn (Leader/Admin)",
+    security: [{ BearerAuth: [] }],
+    request: { query: queryExtensionRequestsSchema },
+    responses: {
+      200: {
+        description: "Thành công",
+        content: {
+          "application/json": {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              items: z.array(z.record(z.unknown())),
+              meta: z.object({
+                total: z.number(),
+                page: z.number(),
+                limit: z.number(),
+                totalPages: z.number(),
+              }),
+            }),
+          },
+        },
+      },
+    },
+  });
+
+  // POST /task-assignments/extension-requests/:requestId/approve
+  openapiRegistry.registerPath({
+    method: "post",
+    path: "/task-assignments/extension-requests/{requestId}/approve",
+    tags: ["Task Assignments"],
+    summary: "Leader duyệt đề xuất xin gia hạn (Cập nhật deadline mới cho Task và chuyển status về IN_PROGRESS)",
+    security: [{ BearerAuth: [] }],
+    request: { params: extensionRequestIdParamSchema },
+    responses: {
+      200: {
+        description: "Duyệt gia hạn thành công",
+        content: {
+          "application/json": {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              data: z.record(z.unknown()),
+              message: z.string(),
+            }),
+          },
+        },
+      },
+      400: { description: "Đề xuất đã được xử lý trước đó" },
+      403: { description: "Chỉ Leader trực tiếp hoặc Admin mới có quyền duyệt" },
+      404: { description: "Không tìm thấy yêu cầu gia hạn" },
+    },
+  });
+
+  // POST /task-assignments/extension-requests/:requestId/reject
+  openapiRegistry.registerPath({
+    method: "post",
+    path: "/task-assignments/extension-requests/{requestId}/reject",
+    tags: ["Task Assignments"],
+    summary: "Leader từ chối đề xuất xin gia hạn kèm lý do (Chuyển status về IN_PROGRESS)",
+    security: [{ BearerAuth: [] }],
+    request: {
+      params: extensionRequestIdParamSchema,
+      body: {
+        content: {
+          "application/json": {
+            schema: rejectTaskExtensionSchema,
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: "Từ chối đề xuất gia hạn thành công",
+        content: {
+          "application/json": {
+            schema: z.object({
+              success: z.boolean().openapi({ example: true }),
+              data: z.record(z.unknown()),
+              message: z.string(),
+            }),
+          },
+        },
+      },
+      400: { description: "Thiếu lý do từ chối hoặc đề xuất đã được xử lý" },
+      403: { description: "Chỉ Leader trực tiếp hoặc Admin mới có quyền từ chối" },
+      404: { description: "Không tìm thấy yêu cầu gia hạn" },
     },
   });
 }

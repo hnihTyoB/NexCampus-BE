@@ -155,8 +155,13 @@ export class WeeklyEvaluationAiService {
     // 1. Calculate week range in Vietnam time
     const weekRange = getWeekDateRange(new Date(intern.startDate), dto.week);
 
-    // 2. Fetch daily reports and task submissions in that week
-    const [dailyReports, taskSubmissions] = await Promise.all([
+    // 2. Fetch daily reports, task submissions, and extension requests in that week
+    const [
+      dailyReports,
+      taskSubmissions,
+      weekExtensionRequests,
+      allInternshipExtensionRequests,
+    ] = await Promise.all([
       prisma.dailyReport.findMany({
         where: {
           internId: dto.internId,
@@ -191,6 +196,32 @@ export class WeeklyEvaluationAiService {
         },
         orderBy: { submittedAt: "asc" },
       }),
+      prisma.taskExtensionRequest.findMany({
+        where: {
+          internId: dto.internId,
+          createdAt: {
+            gte: weekRange.from,
+            lte: weekRange.to,
+          },
+        },
+        include: {
+          assignment: {
+            include: { task: true },
+          },
+        },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.taskExtensionRequest.findMany({
+        where: {
+          internId: dto.internId,
+        },
+        include: {
+          assignment: {
+            include: { task: true },
+          },
+        },
+        orderBy: { createdAt: "asc" },
+      }),
     ]);
 
     // 3. Try calling Gemini if API key available, else use analytical heuristic
@@ -205,6 +236,8 @@ export class WeeklyEvaluationAiService {
           weekRange,
           dailyReports,
           taskSubmissions,
+          weekExtensionRequests,
+          allInternshipExtensionRequests,
         );
         if (geminiResult) {
           const score = computeAverageScore(geminiResult.ratings);
@@ -220,6 +253,8 @@ export class WeeklyEvaluationAiService {
             dataUsed: {
               dailyReportsCount: dailyReports.length,
               taskSubmissionsCount: taskSubmissions.length,
+              extensionRequestsCount: weekExtensionRequests.length,
+              totalInternshipExtensions: allInternshipExtensionRequests.length,
               weekRange: {
                 from: weekRange.from.toISOString(),
                 to: weekRange.to.toISOString(),
@@ -242,6 +277,8 @@ export class WeeklyEvaluationAiService {
       weekRange,
       dailyReports,
       taskSubmissions,
+      weekExtensionRequests,
+      allInternshipExtensionRequests,
     );
   }
 
@@ -290,6 +327,8 @@ export class WeeklyEvaluationAiService {
     weekRange: { from: Date; to: Date },
     dailyReports: any[],
     taskSubmissions: any[],
+    weekExtensionRequests?: any[],
+    allInternshipExtensionRequests?: any[],
   ): Promise<{
     ratings: EvaluationRatings;
     comment: string;
@@ -304,6 +343,8 @@ export class WeeklyEvaluationAiService {
       weekRange,
       dailyReports,
       taskSubmissions,
+      weekExtensionRequests,
+      allInternshipExtensionRequests,
     );
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
@@ -349,6 +390,8 @@ export class WeeklyEvaluationAiService {
     weekRange: { from: Date; to: Date },
     dailyReports: any[],
     taskSubmissions: any[],
+    weekExtensionRequests: any[] = [],
+    allInternshipExtensionRequests: any[] = [],
   ): string {
     const fromStr = formatVietnamDate(weekRange.from);
     const toStr = formatVietnamDate(weekRange.to);
@@ -373,6 +416,16 @@ export class WeeklyEvaluationAiService {
             )
             .join("\n");
 
+    const extensionLines =
+      weekExtensionRequests.length === 0
+        ? "(Không có đề xuất xin gia hạn nào trong tuần này)"
+        : weekExtensionRequests
+            .map(
+              (e, i) =>
+                `[${i + 1}] Task: <task_title>${this.escapeXml(e.assignment?.task?.title || "")}</task_title> | Xin thêm: +${e.extensionDays} ngày | Trạng thái: ${e.status} | Lý do: <reason>${this.escapeXml(e.reason)}</reason> | Cam kết: <commitment>${this.escapeXml(e.commitmentPlan)}</commitment>`,
+            )
+            .join("\n");
+
     return `Bạn hãy đánh giá tuần cho Thực tập sinh ${internName} (Tuần ${week}: ${fromStr} đến ${toStr}) theo mẫu chuẩn 12 tiêu chí của NexCampus dựa trên dữ liệu hoạt động dưới đây.
 
 Dữ liệu hoạt động:
@@ -381,6 +434,12 @@ ${reportLines}
 
 --- BÀI NỘP TASK (${taskSubmissions.length} bài nộp) ---
 ${submissionLines}
+
+--- ĐỀ XUẤT XIN GIA HẠN DEADLINE TASK (${weekExtensionRequests.length} trong tuần, tổng ${allInternshipExtensionRequests.length} trong cả kỳ thực tập) ---
+${extensionLines}
+
+LƯU Ý ĐẶC BIỆT VỀ TIÊU CHÍ TIẾN ĐỘ & TRÁCH NHIỆM (progressRequirement, workAttitude):
+Dữ liệu xin gia hạn task là căn cứ đánh giá cực kỳ quan trọng. Nếu thực tập sinh xin gia hạn deadline nhiều lần (có yêu cầu trong tuần hoặc từ 2 lần trở lên trong kỳ thực tập), AI BẮT BUỘC phải xem xét hạ mức đánh giá tiến độ (ví dụ hạ từ TOT xuống KHA hoặc TB) và làm rõ trong phần weaknesses (Điểm cần cải thiện) và recommendations (Lời khuyên) về kỹ năng ước lượng thời gian và cam kết deadline.
 
 Yêu cầu output JSON duy nhất, không markdown:
 {
@@ -455,6 +514,8 @@ Yêu cầu output JSON duy nhất, không markdown:
     weekRange: { from: Date; to: Date },
     dailyReports: any[],
     taskSubmissions: any[],
+    weekExtensionRequests: any[] = [],
+    allInternshipExtensionRequests: any[] = [],
   ): AiSuggestResponseDto {
     const reportCount = dailyReports.length;
     const subCount = taskSubmissions.length;
@@ -464,6 +525,9 @@ Yêu cầu output JSON duy nhất, không markdown:
     const rejectedCount = taskSubmissions.filter(
       (s) => s.reviewStatus === "REJECTED" || s.reviewStatus === "CHANGES_REQUESTED",
     ).length;
+
+    const weekExtCount = weekExtensionRequests.length;
+    const allExtCount = allInternshipExtensionRequests.length;
 
     // Edge Case: Zero Data Handling (rule in weekly-evaluation-12-criteria.json)
     if (reportCount === 0 && subCount === 0) {
@@ -496,6 +560,8 @@ Yêu cầu output JSON duy nhất, không markdown:
         dataUsed: {
           dailyReportsCount: 0,
           taskSubmissionsCount: 0,
+          extensionRequestsCount: weekExtCount,
+          totalInternshipExtensions: allExtCount,
           weekRange: {
             from: weekRange.from.toISOString(),
             to: weekRange.to.toISOString(),
@@ -539,6 +605,16 @@ Yêu cầu output JSON duy nhất, không markdown:
       practicalSkill = hasEvidence ? "KHA" : "TB";
       contentRequirement = "TB";
       progressRequirement = reportCount >= 4 ? "KHA" : "TB";
+    }
+
+    // AI deduction / adjustment for progress requirement based on extension requests
+    if (weekExtCount >= 2 || allExtCount >= 3) {
+      if (progressRequirement === "TOT") progressRequirement = "TB";
+      else if (progressRequirement === "KHA") progressRequirement = "TB";
+      else if (progressRequirement === "TB") progressRequirement = "TBY";
+      if (workAttitude === "TOT") workAttitude = "KHA";
+    } else if (weekExtCount >= 1 || allExtCount >= 2) {
+      if (progressRequirement === "TOT") progressRequirement = "KHA";
     }
 
     const learningCapacity: RatingLevel = rejectedCount > 0 && approvedCount > 0 ? "TOT" : "KHA";
@@ -595,14 +671,22 @@ Yêu cầu output JSON duy nhất, không markdown:
     if (!hasEvidence && reportCount > 0) {
       weaknesses.push("Nên bổ sung thêm PR link hoặc video demo minh chứng");
     }
+    if (weekExtCount > 0) {
+      weaknesses.push(`Có ${weekExtCount} lần xin gia hạn deadline công việc trong tuần (cần nâng cao năng lực ước lượng và cam kết tiến độ)`);
+    } else if (allExtCount >= 2) {
+      weaknesses.push(`Đã có ${allExtCount} lần xin gia hạn deadline trong cả kỳ thực tập (cần chủ động kiểm soát khối lượng công việc)`);
+    }
 
     const recommendations: string[] = [
       "Kiểm thử kỹ các kịch bản lỗi biên và acceptance criteria trước khi nộp bài",
       "Chủ động hỏi Leader hoặc Mentor khi gặp vướng mắc kỹ thuật",
       "Tiếp tục duy trì tính chủ động và trao đổi thường xuyên trong nhóm",
     ];
+    if (weekExtCount > 0 || allExtCount >= 2) {
+      recommendations.push("Chủ động chia nhỏ đầu việc, trao đổi sớm với Leader khi gặp khó khăn thay vì để sát deadline mới xin gia hạn");
+    }
 
-    const comment = `AI gợi ý đánh giá tuần ${week}: Thực tập sinh ${internName} đã hoàn thành ${reportCount} báo cáo hàng ngày và có ${subCount} lượt nộp bài${taskTitles ? ` (gồm: ${taskTitles})` : ""}. Nhìn chung, TTS thể hiện thái độ làm việc ${grade === "TOT" ? "rất tích cực, chăm chỉ và chuyên nghiệp, tuân thủ nghiêm túc các quy chế nội bộ" : "tốt, đáp ứng các yêu cầu tiến độ cơ bản"}. Chất lượng chuyên môn và khả năng phối hợp làm việc nhóm đạt mức ${grade}. Điểm trung bình 12 tiêu chí đề xuất là ${score.toFixed(1)}/10 (${grade}).`;
+    const comment = `AI gợi ý đánh giá tuần ${week}: Thực tập sinh ${internName} đã hoàn thành ${reportCount} báo cáo hàng ngày và có ${subCount} lượt nộp bài${taskTitles ? ` (gồm: ${taskTitles})` : ""}${weekExtCount > 0 ? `, có ${weekExtCount} đề xuất xin gia hạn deadline` : ""}. Nhìn chung, TTS thể hiện thái độ làm việc ${grade === "TOT" ? "rất tích cực, chăm chỉ và chuyên nghiệp, tuân thủ nghiêm túc các quy chế nội bộ" : "tốt, đáp ứng các yêu cầu cơ bản"}. Điểm tiến độ và trách nhiệm được đối soát theo đúng cam kết thời hạn. Điểm trung bình 12 tiêu chí đề xuất là ${score.toFixed(1)}/10 (${grade}).`;
 
     return {
       ratings,
@@ -615,6 +699,8 @@ Yêu cầu output JSON duy nhất, không markdown:
       dataUsed: {
         dailyReportsCount: reportCount,
         taskSubmissionsCount: subCount,
+        extensionRequestsCount: weekExtCount,
+        totalInternshipExtensions: allExtCount,
         weekRange: {
           from: weekRange.from.toISOString(),
           to: weekRange.to.toISOString(),

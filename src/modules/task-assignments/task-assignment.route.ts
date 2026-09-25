@@ -13,6 +13,10 @@ import {
   blockTaskSchema,
   assignmentIdParamSchema,
   assignTaskIdParamSchema,
+  extensionRequestIdParamSchema,
+  requestTaskExtensionSchema,
+  rejectTaskExtensionSchema,
+  queryExtensionRequestsSchema,
 } from "./task-assignment.validation";
 
 const router = Router();
@@ -24,6 +28,33 @@ router.get(
   requirePermission(PERMISSIONS.TASK_ASSIGNMENT_READ),
   validate(findAllAssignmentSchema, "query"),
   controller.findAll,
+);
+
+// ─── Task Extension Routes (Must be before /:id) ─────────────────────────────
+
+router.get(
+  "/extension-requests",
+  authMiddleware,
+  requirePermission(PERMISSIONS.TASK_ASSIGNMENT_READ),
+  validate(queryExtensionRequestsSchema, "query"),
+  controller.getExtensionRequests,
+);
+
+router.post(
+  "/extension-requests/:requestId/approve",
+  authMiddleware,
+  requirePermission(PERMISSIONS.TASK_ASSIGNMENT_APPROVE),
+  validate(extensionRequestIdParamSchema, "params"),
+  controller.approveExtension,
+);
+
+router.post(
+  "/extension-requests/:requestId/reject",
+  authMiddleware,
+  requirePermission(PERMISSIONS.TASK_ASSIGNMENT_APPROVE),
+  validate(extensionRequestIdParamSchema, "params"),
+  validate(rejectTaskExtensionSchema),
+  controller.rejectExtension,
 );
 
 router.get(
@@ -116,6 +147,23 @@ router.post(
   requirePermission(PERMISSIONS.TASK_ASSIGNMENT_UPDATE),
   validate(assignmentIdParamSchema, "params"),
   controller.unblock,
+);
+
+router.post(
+  "/:id/request-extension",
+  authMiddleware,
+  requirePermission(PERMISSIONS.TASK_ASSIGNMENT_UPDATE),
+  validate(assignmentIdParamSchema, "params"),
+  validate(requestTaskExtensionSchema),
+  controller.requestExtension,
+);
+
+router.get(
+  "/:id/extension-requests",
+  authMiddleware,
+  requirePermission(PERMISSIONS.TASK_ASSIGNMENT_READ),
+  validate(assignmentIdParamSchema, "params"),
+  controller.getExtensionRequestsByAssignment,
 );
 
 export default router;

@@ -6,12 +6,16 @@ import {
   CreateTaskAssignmentDto,
   AssignTaskDto,
   UpdateTaskAssignmentDto,
+  RequestTaskExtensionDto,
+  RejectTaskExtensionDto,
+  QueryExtensionRequestsDto,
 } from "./task-assignment.dto";
 import { PERMISSIONS } from "../../common/constants/permission.constant";
 import { permissionCacheService } from "../../common/services/permission-cache.service";
 import {
   ASSIGNMENT_STATUS,
   ACTIVE_CAPACITY_STATUSES,
+  EXTENSION_REQUEST_STATUS,
   SUPPORT_WORKLOAD_FACTOR,
   DEFAULT_MAX_WORKLOAD_DAYS,
   DEFAULT_TASK_DAYS,
@@ -20,7 +24,7 @@ import {
   AUDIT_ACTION,
   AUDIT_TARGET_TYPE,
 } from "../../common/constants/audit-log.constant";
-import { AssignmentStatus } from "@prisma/client";
+import { AssignmentStatus, ExtensionRequestStatus } from "@prisma/client";
 import { prisma } from "../../database/prisma.client";
 import { notificationDispatcher } from "../../common/services/notification-dispatcher.service";
 import {
@@ -877,5 +881,363 @@ export class TaskAssignmentService {
     });
 
     return result;
+  }
+
+  // ─── Task Extension Request Workflows ────────────────────────────────────────
+
+  async requestExtension(
+    id: string,
+    actor: UserPayload,
+    dto: RequestTaskExtensionDto,
+    context?: { ipAddress?: string },
+  ) {
+    const assignment = await this.findById(id);
+
+    this.ensureAssignmentEditable(assignment.status);
+
+    if (assignment.status === ASSIGNMENT_STATUS.DONE) {
+      throw new AppError(
+        "Không thể xin gia hạn cho công việc đã hoàn thành",
+        400,
+        ERROR_CODE.TASK_ALREADY_COMPLETED,
+      );
+    }
+
+    const intern = await prisma.intern.findUnique({
+      where: { userId: actor.id },
+    });
+    if (intern) {
+      const isOwner = assignment.internId === intern.id;
+      const isSupport = assignment.supportId === intern.id;
+      if (!isOwner && !isSupport) {
+        throw new AppError(
+          "Bạn chỉ có thể xin gia hạn cho công việc được phân công cho mình",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
+      }
+    }
+
+    const task = await prisma.task.findUnique({
+      where: { id: assignment.taskId },
+    });
+    if (!task) {
+      throw new AppError("Công việc không tồn tại", 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    const existingPending =
+      await this.repository.findPendingExtensionRequestByAssignmentId(id);
+    if (existingPending) {
+      throw new AppError(
+        "Công việc này đang có một đề xuất xin gia hạn chờ Leader xét duyệt",
+        400,
+        ERROR_CODE.EXTENSION_ALREADY_PENDING,
+      );
+    }
+
+    const proposedDate = new Date(dto.proposedDeadline);
+    if (isNaN(proposedDate.getTime())) {
+      throw new AppError(
+        "Ngày deadline mới không hợp lệ",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    const currentDeadline = new Date(task.deadline);
+    if (proposedDate.getTime() <= currentDeadline.getTime()) {
+      throw new AppError(
+        "Ngày deadline mới đề xuất phải sau ngày deadline hiện tại của task",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    const internId = assignment.internId || intern?.id;
+    if (!internId) {
+      throw new AppError(
+        "Công việc chưa được gán cho thực tập sinh nào",
+        400,
+        ERROR_CODE.BAD_REQUEST,
+      );
+    }
+
+    const extensionRequest = await this.repository.createExtensionRequest({
+      assignmentId: id,
+      internId,
+      currentDeadline,
+      proposedDeadline: proposedDate,
+      extensionDays: dto.extensionDays,
+      reason: dto.reason.trim(),
+      commitmentPlan: dto.commitmentPlan.trim(),
+    });
+
+    await this.repository.update(id, {
+      status: ASSIGNMENT_STATUS.EXTENSION_PENDING,
+    });
+
+    await this.repository.createAuditLog({
+      actorId: actor.id,
+      action: AUDIT_ACTION.REQUEST_TASK_EXTENSION,
+      targetType: AUDIT_TARGET_TYPE.TASK_EXTENSION_REQUEST,
+      targetId: extensionRequest.id,
+      details: {
+        taskId: assignment.taskId,
+        assignmentId: id,
+        currentDeadline: currentDeadline.toISOString(),
+        proposedDeadline: proposedDate.toISOString(),
+        extensionDays: dto.extensionDays,
+        reason: dto.reason.trim(),
+      },
+      ipAddress: context?.ipAddress,
+    });
+
+    const [totalExtensionsOnTask, totalExtensionsInInternship] =
+      await Promise.all([
+        this.repository.countExtensionRequestsByAssignment(id),
+        this.repository.countExtensionRequestsByIntern(internId),
+      ]);
+
+    return {
+      ...extensionRequest,
+      totalExtensionsOnTask,
+      totalExtensionsInInternship,
+    };
+  }
+
+  async getExtensionRequests(
+    query: QueryExtensionRequestsDto,
+    actor: UserPayload,
+  ) {
+    const callerPerms = new Set(
+      await permissionCacheService.getUserPermissions(actor.id),
+    );
+    const hasAdminPerm =
+      callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_APPROVE) ||
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+
+    let scope: { internId?: string; leaderUserId?: string } | undefined;
+    const intern = await prisma.intern.findUnique({
+      where: { userId: actor.id },
+    });
+
+    if (intern) {
+      scope = { internId: intern.id };
+    } else if (!hasAdminPerm) {
+      scope = { leaderUserId: actor.id };
+    }
+
+    const result = await this.repository.findExtensionRequests(query, scope);
+
+    const enrichedItems = await Promise.all(
+      result.items.map(async (item) => {
+        const [totalExtensionsOnTask, totalExtensionsInInternship] =
+          await Promise.all([
+            this.repository.countExtensionRequestsByAssignment(
+              item.assignmentId,
+            ),
+            this.repository.countExtensionRequestsByIntern(item.internId),
+          ]);
+        return {
+          ...item,
+          totalExtensionsOnTask,
+          totalExtensionsInInternship,
+        };
+      }),
+    );
+
+    return {
+      items: enrichedItems,
+      meta: result.meta,
+    };
+  }
+
+  async getExtensionRequestsByAssignment(
+    assignmentId: string,
+    actor: UserPayload,
+  ) {
+    const assignment = await this.findById(assignmentId);
+    const items =
+      await this.repository.findExtensionRequestsByAssignment(assignmentId);
+
+    const internId = assignment.internId;
+    const totalExtensionsInInternship = internId
+      ? await this.repository.countExtensionRequestsByIntern(internId)
+      : items.length;
+
+    return {
+      items: items.map((item) => ({
+        ...item,
+        totalExtensionsOnTask: items.length,
+        totalExtensionsInInternship,
+      })),
+      totalExtensionsOnTask: items.length,
+      totalExtensionsInInternship,
+    };
+  }
+
+  async approveExtension(
+    requestId: string,
+    actor: UserPayload,
+    context?: { ipAddress?: string },
+  ) {
+    const request = await this.repository.findExtensionRequestById(requestId);
+    if (!request) {
+      throw new AppError(
+        "Yêu cầu gia hạn không tồn tại",
+        404,
+        ERROR_CODE.EXTENSION_REQUEST_NOT_FOUND,
+      );
+    }
+
+    if (request.status !== EXTENSION_REQUEST_STATUS.PENDING) {
+      throw new AppError(
+        "Yêu cầu gia hạn này đã được xử lý trước đó",
+        400,
+        ERROR_CODE.INVALID_STATUS_TRANSITION,
+      );
+    }
+
+    const callerPerms = new Set(
+      await permissionCacheService.getUserPermissions(actor.id),
+    );
+    const hasAdminPerm =
+      callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_APPROVE) ||
+      callerPerms.has(PERMISSIONS.TASK_UPDATE) ||
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+
+    const internProfile = await prisma.intern.findUnique({
+      where: { id: request.internId },
+    });
+    const isDirectLeader = internProfile?.leaderId === actor.id;
+
+    if (!hasAdminPerm && !isDirectLeader) {
+      throw new AppError(
+        "Chỉ Leader trực tiếp hoặc Quản trị viên mới có quyền xét duyệt gia hạn",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
+    }
+
+    return await prisma.$transaction(async (tx) => {
+      const updatedRequest = await tx.taskExtensionRequest.update({
+        where: { id: requestId },
+        data: {
+          status: ExtensionRequestStatus.APPROVED,
+          reviewedBy: actor.id,
+          reviewedAt: new Date(),
+        },
+      });
+
+      await tx.task.update({
+        where: { id: request.assignment.taskId },
+        data: {
+          deadline: request.proposedDeadline,
+        },
+      });
+
+      await tx.taskAssignment.update({
+        where: { id: request.assignmentId },
+        data: {
+          status: ASSIGNMENT_STATUS.IN_PROGRESS,
+        },
+      });
+
+      await this.repository.createAuditLog({
+        actorId: actor.id,
+        action: AUDIT_ACTION.APPROVE_TASK_EXTENSION,
+        targetType: AUDIT_TARGET_TYPE.TASK_EXTENSION_REQUEST,
+        targetId: requestId,
+        details: {
+          assignmentId: request.assignmentId,
+          taskId: request.assignment.taskId,
+          oldDeadline: request.currentDeadline,
+          newDeadline: request.proposedDeadline,
+          extensionDays: request.extensionDays,
+        },
+        ipAddress: context?.ipAddress,
+      });
+
+      return updatedRequest;
+    });
+  }
+
+  async rejectExtension(
+    requestId: string,
+    actor: UserPayload,
+    rejectionReason: string,
+    context?: { ipAddress?: string },
+  ) {
+    const request = await this.repository.findExtensionRequestById(requestId);
+    if (!request) {
+      throw new AppError(
+        "Yêu cầu gia hạn không tồn tại",
+        404,
+        ERROR_CODE.EXTENSION_REQUEST_NOT_FOUND,
+      );
+    }
+
+    if (request.status !== EXTENSION_REQUEST_STATUS.PENDING) {
+      throw new AppError(
+        "Yêu cầu gia hạn này đã được xử lý trước đó",
+        400,
+        ERROR_CODE.INVALID_STATUS_TRANSITION,
+      );
+    }
+
+    const callerPerms = new Set(
+      await permissionCacheService.getUserPermissions(actor.id),
+    );
+    const hasAdminPerm =
+      callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_APPROVE) ||
+      callerPerms.has(PERMISSIONS.TASK_UPDATE) ||
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+
+    const internProfile = await prisma.intern.findUnique({
+      where: { id: request.internId },
+    });
+    const isDirectLeader = internProfile?.leaderId === actor.id;
+
+    if (!hasAdminPerm && !isDirectLeader) {
+      throw new AppError(
+        "Chỉ Leader trực tiếp hoặc Quản trị viên mới có quyền từ chối gia hạn",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
+    }
+
+    return await prisma.$transaction(async (tx) => {
+      const updatedRequest = await tx.taskExtensionRequest.update({
+        where: { id: requestId },
+        data: {
+          status: ExtensionRequestStatus.REJECTED,
+          rejectionReason: rejectionReason.trim(),
+          reviewedBy: actor.id,
+          reviewedAt: new Date(),
+        },
+      });
+
+      await tx.taskAssignment.update({
+        where: { id: request.assignmentId },
+        data: {
+          status: ASSIGNMENT_STATUS.IN_PROGRESS,
+        },
+      });
+
+      await this.repository.createAuditLog({
+        actorId: actor.id,
+        action: AUDIT_ACTION.REJECT_TASK_EXTENSION,
+        targetType: AUDIT_TARGET_TYPE.TASK_EXTENSION_REQUEST,
+        targetId: requestId,
+        details: {
+          assignmentId: request.assignmentId,
+          taskId: request.assignment.taskId,
+          rejectionReason: rejectionReason.trim(),
+        },
+        ipAddress: context?.ipAddress,
+      });
+
+      return updatedRequest;
+    });
   }
 }

@@ -129,6 +129,8 @@ export interface AiSuggestResponseDto {
   dataUsed: {
     dailyReportsCount: number;
     taskSubmissionsCount: number;
+    extensionRequestsCount?: number;
+    totalInternshipExtensions?: number;
     weekRange: {
       from: string;
       to: string;

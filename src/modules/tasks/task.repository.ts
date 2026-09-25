@@ -49,6 +49,21 @@ const defaultSelect = {
       updatedAt: true,
       intern: { select: { id: true, fullName: true, leaderId: true } },
       support: { select: { id: true, fullName: true, leaderId: true } },
+      extensionRequests: {
+        select: {
+          id: true,
+          proposedDeadline: true,
+          currentDeadline: true,
+          extensionDays: true,
+          reason: true,
+          commitmentPlan: true,
+          status: true,
+          rejectionReason: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "desc" as const },
+        take: 5,
+      },
     },
   },
   attachments: {

@@ -47,6 +47,7 @@ export class WeeklyEvaluationController {
 
       res.status(200).json({
         success: true,
+        data: result.items,
         ...result,
       });
     } catch (error) {
