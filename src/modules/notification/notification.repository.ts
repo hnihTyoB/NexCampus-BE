@@ -1,4 +1,5 @@
 import { prisma } from "../../database/prisma.client";
+import { MeetingStatus } from "@prisma/client";
 import {
   AUDIT_ACTION,
   AUDIT_TARGET_TYPE,
@@ -471,12 +472,16 @@ export class NotificationRepository {
             deletedAt: null,
           },
         }),
-        // Lời mời họp chưa xác nhận
+        // Lời mời họp chưa xác nhận (chỉ tính cuộc họp chưa kết thúc và chưa bị hủy)
         prisma.meetingParticipant.count({
           where: {
             userId,
             invitationStatus: "PENDING",
-            meeting: { deletedAt: null },
+            meeting: {
+              deletedAt: null,
+              endTime: { gt: now },
+              status: { notIn: [MeetingStatus.CANCELLED, MeetingStatus.COMPLETED] },
+            },
           },
         }),
       ]);

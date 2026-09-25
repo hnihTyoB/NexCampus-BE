@@ -76,6 +76,34 @@ const defaultMeetingSelect = {
 };
 
 export class MeetingRepository {
+  async autoCompletePastMeetings() {
+    const now = new Date();
+    // 1. Chuyển các cuộc họp đã qua endTime sang COMPLETED
+    await prisma.meeting.updateMany({
+      where: {
+        status: { in: [MeetingStatus.SCHEDULED, MeetingStatus.ONGOING] },
+        endTime: { lt: now },
+        deletedAt: null,
+      },
+      data: {
+        status: MeetingStatus.COMPLETED,
+      },
+    });
+
+    // 2. Chuyển các cuộc họp đang trong khung giờ sang ONGOING
+    await prisma.meeting.updateMany({
+      where: {
+        status: MeetingStatus.SCHEDULED,
+        startTime: { lte: now },
+        endTime: { gte: now },
+        deletedAt: null,
+      },
+      data: {
+        status: MeetingStatus.ONGOING,
+      },
+    });
+  }
+
   async findAll(
     query: MeetingQueryDto,
     scope?: {

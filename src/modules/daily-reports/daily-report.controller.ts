@@ -49,6 +49,7 @@ export class DailyReportController {
 
       res.status(200).json({
         success: true,
+        data: result.items,
         ...result,
       });
     } catch (error) {

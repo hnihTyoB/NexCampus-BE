@@ -39,6 +39,8 @@ export class MeetingService {
   }
 
   async findAll(query: MeetingQueryDto, actor: UserPayload) {
+    await this.repository.autoCompletePastMeetings();
+
     const hasGlobal = await this.hasGlobalAccess(actor.id);
     const isParticipantScope = !hasGlobal;
 
@@ -49,6 +51,8 @@ export class MeetingService {
   }
 
   async findById(id: string, actor: UserPayload) {
+    await this.repository.autoCompletePastMeetings();
+
     const meeting = await this.repository.findById(id);
     if (!meeting) {
       throw new AppError("Cuộc họp không tồn tại", 404, ERROR_CODE.MEETING_NOT_FOUND);
