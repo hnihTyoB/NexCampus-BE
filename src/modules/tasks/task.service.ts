@@ -184,7 +184,19 @@ export class TaskService {
         if (scope.internId) {
           const isOwner = task.assignment?.internId === scope.internId;
           const isSupport = task.assignment?.supportId === scope.internId;
-          if (!isOwner && !isSupport) {
+          let isSameGroupMember = false;
+          if (task.taskGroupId) {
+            const membership = await prisma.taskGroupMember.findUnique({
+              where: {
+                taskGroupId_internId: {
+                  taskGroupId: task.taskGroupId,
+                  internId: scope.internId,
+                },
+              },
+            });
+            isSameGroupMember = Boolean(membership);
+          }
+          if (!isOwner && !isSupport && !isSameGroupMember) {
             throw new AppError(
               "You are not authorized to view this task",
               403,

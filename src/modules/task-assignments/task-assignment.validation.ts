@@ -25,6 +25,7 @@ export const findAllAssignmentSchema = z.object({
       ASSIGNMENT_STATUS.EXTENSION_PENDING,
     ])
     .optional(),
+  role: z.enum(["ALL", "OWNER", "SUPPORT"]).optional(),
   sortBy: z.enum(["assignedAt", "status"]).optional(),
   order: z.enum(["asc", "desc"]).optional(),
   page: z.coerce.number().int().positive().optional().default(1),

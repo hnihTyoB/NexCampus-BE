@@ -79,6 +79,7 @@ export interface TaskAssignmentQueryDto {
   assignedBy?: string;
   status?: AssignmentStatus;
   leaderId?: string;
+  role?: "ALL" | "OWNER" | "SUPPORT";
   sortBy?: "assignedAt" | "status";
   order?: "asc" | "desc";
   page?: number;

@@ -645,16 +645,34 @@ export async function seedTasks(
     startOffset: 0,
   });
 
-  // ── Scenario 15: Recreated Task ───────────────────────────────────────────
-  // Gắn quan hệ recreated_task_id cho task FE-UI-003 nếu cần minh họa gia hạn task
-  const taskFE2 = taskCodeMap["FE-UI-002"];
-  const taskFE3 = taskCodeMap["FE-UI-003"];
-  if (taskFE2 && taskFE3) {
-    await prisma.task.update({
-      where: { id: taskFE3 },
-      data: { recreatedTaskId: taskFE2 },
-    });
+  // ── Scenario 16: Task Dependencies (Sơ đồ phụ thuộc Squad) ───────────────
+  async function connectDependency(taskCode: string, dependsOnCode: string) {
+    const taskId = taskCodeMap[taskCode];
+    const prereqId = taskCodeMap[dependsOnCode];
+    if (taskId && prereqId) {
+      await prisma.task.update({
+        where: { id: taskId },
+        data: {
+          dependsOn: { connect: { id: prereqId } },
+        },
+      });
+    }
   }
 
-  console.log("   ✓ Đã tạo đầy đủ các công việc, bài nộp và phân công (bao quát 100% các trạng thái).");
+  // Frontend squad dependencies:
+  // FE-UI-001 -> FE-UI-002, FE-UI-003, FE-I-001
+  await connectDependency("FE-UI-002", "FE-UI-001");
+  await connectDependency("FE-UI-003", "FE-UI-001");
+  await connectDependency("FE-UI-004", "FE-UI-002");
+  await connectDependency("FE-UI-005", "FE-UI-003");
+  await connectDependency("FE-I-001", "FE-UI-001");
+
+  // Backend squad dependencies:
+  await connectDependency("BE-CORE-002", "BE-CORE-001");
+  await connectDependency("BE-CORE-003", "BE-CORE-002");
+  await connectDependency("BE-CORE-004", "BE-CORE-003");
+  await connectDependency("BE-CORE-005", "BE-CORE-004");
+  await connectDependency("BE-G-001", "BE-CORE-002");
+
+  console.log("   ✓ Đã tạo đầy đủ các công việc, bài nộp, phân công và sơ đồ phụ thuộc (Task Dependencies).");
 }

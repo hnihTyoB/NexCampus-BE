@@ -28,7 +28,7 @@ const defaultSelect = {
           leaderId: true,
           fullName: true,
           status: true,
-          user: { select: { email: true } },
+          user: { select: { email: true, avatarUrl: true } },
           department: { select: { id: true, name: true } },
           position: { select: { id: true, name: true } },
         },
@@ -115,8 +115,7 @@ export class TaskGroupRepository {
     const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
-      (prisma.taskGroup.findMany as any)({
-        relationLoadStrategy: "join",
+      prisma.taskGroup.findMany({
         where,
         select: defaultSelect,
         orderBy: { name: "asc" },
@@ -315,8 +314,38 @@ export class TaskGroupRepository {
             status: true,
             internId: true,
             supportId: true,
-            intern: { select: { id: true, fullName: true } },
-            support: { select: { id: true, fullName: true } },
+            intern: {
+              select: {
+                id: true,
+                fullName: true,
+                user: { select: { email: true, avatarUrl: true } },
+              },
+            },
+            support: {
+              select: {
+                id: true,
+                fullName: true,
+                user: { select: { email: true, avatarUrl: true } },
+              },
+            },
+          },
+        },
+        dependsOn: {
+          where: { deletedAt: null },
+          select: {
+            id: true,
+            code: true,
+            title: true,
+            assignment: { select: { id: true, status: true } },
+          },
+        },
+        dependencies: {
+          where: { deletedAt: null },
+          select: {
+            id: true,
+            code: true,
+            title: true,
+            assignment: { select: { id: true, status: true } },
           },
         },
       },

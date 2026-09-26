@@ -165,6 +165,7 @@ export class TaskAssignmentRepository {
       assignedBy,
       leaderId,
       status,
+      role,
       sortBy = "assignedAt",
       order = "desc",
       page = 1,
@@ -183,12 +184,16 @@ export class TaskAssignmentRepository {
           }
         : {}),
       ...(scope?.internId !== undefined
-        ? {
-            OR: [
-              { internId: scope.internId },
-              { supportId: scope.internId },
-            ],
-          }
+        ? role === "OWNER"
+          ? { internId: scope.internId }
+          : role === "SUPPORT"
+            ? { supportId: scope.internId }
+            : {
+                OR: [
+                  { internId: scope.internId },
+                  { supportId: scope.internId },
+                ],
+              }
         : {}),
       ...(scope?.departmentIds !== undefined && scope?.leaderUserId !== undefined
         ? {

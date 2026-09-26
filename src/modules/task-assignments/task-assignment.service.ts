@@ -754,6 +754,37 @@ export class TaskAssignmentService {
       }
     }
 
+    const taskWithPrereqs = await prisma.task.findUnique({
+      where: { id: assignment.taskId },
+      select: {
+        dependsOn: {
+          where: { deletedAt: null },
+          select: {
+            id: true,
+            code: true,
+            title: true,
+            assignment: { select: { status: true } },
+          },
+        },
+      },
+    });
+
+    if (taskWithPrereqs && taskWithPrereqs.dependsOn.length > 0) {
+      const unfinishedPrereqs = taskWithPrereqs.dependsOn.filter(
+        (p) => p.assignment?.status !== ASSIGNMENT_STATUS.DONE,
+      );
+      if (unfinishedPrereqs.length > 0) {
+        const prereqCodes = unfinishedPrereqs
+          .map((p) => p.code || p.title)
+          .join(", ");
+        throw new AppError(
+          `Không thể bắt đầu làm việc vì các task điều kiện tiên quyết chưa hoàn thành: ${prereqCodes}`,
+          400,
+          ERROR_CODE.INVALID_STATUS_TRANSITION,
+        );
+      }
+    }
+
     const now = new Date();
     const result = await this.repository.update(id, {
       status: ASSIGNMENT_STATUS.IN_PROGRESS,

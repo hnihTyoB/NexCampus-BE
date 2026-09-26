@@ -217,8 +217,7 @@ export class TaskRepository {
     const orderBy = SORT_MAP[sortBy] ?? { createdAt: order };
 
     const [data, total] = await Promise.all([
-      (prisma.task.findMany as any)({
-        relationLoadStrategy: "join",
+      prisma.task.findMany({
         where,
         select: defaultSelect,
         orderBy,
@@ -235,16 +234,14 @@ export class TaskRepository {
   }
 
   findById(id: string) {
-    return (prisma.task.findFirst as any)({
-      relationLoadStrategy: "join",
+    return prisma.task.findFirst({
       where: { id, deletedAt: null },
       select: detailSelect,
     });
   }
 
   findByCode(code: string, taskGroupId: string | null = null) {
-    return (prisma.task.findFirst as any)({
-      relationLoadStrategy: "join",
+    return prisma.task.findFirst({
       where: { code, taskGroupId, deletedAt: null },
       select: detailSelect,
     });

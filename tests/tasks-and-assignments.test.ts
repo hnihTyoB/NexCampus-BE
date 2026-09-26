@@ -278,6 +278,18 @@ describe("Task Management & Assignment Suite (task-groups, tasks, task-assignmen
       });
       assert.equal(parsed.success, false);
     });
+
+    it("should accept valid role filter in findAllAssignmentSchema (ALL, OWNER, SUPPORT)", () => {
+      const allParsed = findAllAssignmentSchema.safeParse({ role: "ALL" });
+      const ownerParsed = findAllAssignmentSchema.safeParse({ role: "OWNER" });
+      const supportParsed = findAllAssignmentSchema.safeParse({ role: "SUPPORT" });
+      const invalidParsed = findAllAssignmentSchema.safeParse({ role: "INVALID" });
+
+      assert.equal(allParsed.success, true);
+      assert.equal(ownerParsed.success, true);
+      assert.equal(supportParsed.success, true);
+      assert.equal(invalidParsed.success, false);
+    });
   });
 
   // ─── 5. Task Locking Constraint (DONE -> TASK_ALREADY_COMPLETED) ──────────
@@ -368,7 +380,7 @@ describe("Task Management & Assignment Suite (task-groups, tasks, task-assignmen
 
       const task = await service.findEditableTask("active-task-id");
       assert.equal(task.id, "active-task-id");
-      assert.equal(task.assignment.status, "IN_PROGRESS");
+      assert.equal(task.assignment?.status, "IN_PROGRESS");
     });
   });
 

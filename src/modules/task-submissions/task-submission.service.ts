@@ -17,6 +17,12 @@ import {
 import { ReviewStatus } from "@prisma/client";
 import { prisma } from "../../database/prisma.client";
 import { R2Service } from "../../common/services/r2.service";
+import { NotificationService } from "../notification/notification.service";
+import {
+  NOTIFICATION_CHANNEL,
+  NOTIFICATION_PRIORITY,
+  NOTIFICATION_TYPE,
+} from "../../common/constants/notification.constant";
 import crypto from "crypto";
 
 interface UserPayload {
@@ -28,6 +34,7 @@ interface UserPayload {
 export class TaskSubmissionService {
   private readonly repository = new TaskSubmissionRepository();
   private readonly r2Service = new R2Service();
+  private readonly notificationService = new NotificationService();
 
   private async hasGlobalAccess(actorId: string): Promise<boolean> {
     const callerPerms = new Set(
@@ -260,7 +267,83 @@ export class TaskSubmissionService {
       ipAddress: context?.ipAddress,
     });
 
+    if (dto.reviewStatus === ReviewStatus.APPROVED) {
+      const taskCodeOrTitle =
+        submission.assignment?.task?.code || submission.assignment?.task?.title;
+      await this.autoUnblockDependentTasks(
+        submission.assignment.taskId,
+        taskCodeOrTitle || undefined,
+      );
+    }
+
     return result;
+  }
+
+  private async autoUnblockDependentTasks(
+    completedTaskId: string,
+    completedTaskName?: string,
+  ) {
+    try {
+      const dependentTasks = await prisma.task.findMany({
+        where: {
+          dependsOn: { some: { id: completedTaskId } },
+          deletedAt: null,
+        },
+        include: {
+          assignment: {
+            include: {
+              intern: {
+                select: { userId: true, fullName: true },
+              },
+            },
+          },
+          dependsOn: {
+            where: { deletedAt: null },
+            include: { assignment: true },
+          },
+        },
+      });
+
+      for (const depTask of dependentTasks) {
+        if (
+          depTask.assignment &&
+          (depTask.assignment.status === ASSIGNMENT_STATUS.BLOCKED ||
+            depTask.assignment.status === ASSIGNMENT_STATUS.PENDING_APPROVAL)
+        ) {
+          const allPrereqsDone = depTask.dependsOn.every(
+            (prereq) =>
+              prereq.id === completedTaskId ||
+              prereq.assignment?.status === ASSIGNMENT_STATUS.DONE,
+          );
+
+          if (allPrereqsDone) {
+            await prisma.taskAssignment.update({
+              where: { id: depTask.assignment.id },
+              data: {
+                status: ASSIGNMENT_STATUS.TODO,
+                blockedReason: null,
+              },
+            });
+
+            if (depTask.assignment.intern?.userId) {
+              const taskLabel = depTask.code || depTask.title;
+              const completedLabel = completedTaskName || "công việc tiên quyết";
+              await this.notificationService.send({
+                userIds: [depTask.assignment.intern.userId],
+                channels: [NOTIFICATION_CHANNEL.WEB],
+                title: `🎉 Task được mở khóa: ${taskLabel}`,
+                content: `Điều kiện tiên quyết [${completedLabel}] đã được nghiệm thu hoàn thành. Task của bạn đã sẵn sàng để bắt đầu làm!`,
+                type: NOTIFICATION_TYPE.SUCCESS,
+                priority: NOTIFICATION_PRIORITY.HIGH,
+                actionUrl: `/intern/task?assignmentId=${depTask.assignment.id}`,
+              });
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[autoUnblockDependentTasks] Error unblocking tasks:", err);
+    }
   }
 
   async getUploadUrl(
