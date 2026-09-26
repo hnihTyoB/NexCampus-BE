@@ -97,10 +97,34 @@ const detailSelect = {
     },
   },
   dependsOn: {
-    select: { id: true, code: true, title: true },
+    where: { deletedAt: null },
+    select: {
+      id: true,
+      code: true,
+      title: true,
+      assignment: {
+        select: {
+          id: true,
+          status: true,
+          intern: { select: { id: true, fullName: true } },
+        },
+      },
+    },
   },
   dependencies: {
-    select: { id: true, code: true, title: true },
+    where: { deletedAt: null },
+    select: {
+      id: true,
+      code: true,
+      title: true,
+      assignment: {
+        select: {
+          id: true,
+          status: true,
+          intern: { select: { id: true, fullName: true } },
+        },
+      },
+    },
   },
 };
 

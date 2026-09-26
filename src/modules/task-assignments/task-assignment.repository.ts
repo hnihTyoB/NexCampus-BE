@@ -80,9 +80,38 @@ const defaultSelect = {
       createdBy: true,
       taskGroupId: true,
       createdAt: true,
-      updatedAt: true,
       taskGroup: {
         select: { id: true, name: true, departmentId: true },
+      },
+      dependsOn: {
+        where: { deletedAt: null },
+        select: {
+          id: true,
+          code: true,
+          title: true,
+          assignment: {
+            select: {
+              id: true,
+              status: true,
+              intern: { select: { id: true, fullName: true } },
+            },
+          },
+        },
+      },
+      dependencies: {
+        where: { deletedAt: null },
+        select: {
+          id: true,
+          code: true,
+          title: true,
+          assignment: {
+            select: {
+              id: true,
+              status: true,
+              intern: { select: { id: true, fullName: true } },
+            },
+          },
+        },
       },
     },
   },
