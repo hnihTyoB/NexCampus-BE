@@ -9,6 +9,6 @@ export const mailConfig = {
     pass: envConfig.mail.pass,
   },
   from: envConfig.mail.from,
-  verificationUrl: `${envConfig.appUrl}/api/v1/auth/verify-email`,
-  resetPasswordUrl: `${envConfig.appUrl}/api/v1/auth/reset-password`,
+  verificationUrl: `${envConfig.appUrl}/api/v2/auth/verify-email`,
+  resetPasswordUrl: `${envConfig.clientUrl}/reset-password`,
 };

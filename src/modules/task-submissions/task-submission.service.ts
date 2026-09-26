@@ -23,6 +23,8 @@ import {
   NOTIFICATION_PRIORITY,
   NOTIFICATION_TYPE,
 } from "../../common/constants/notification.constant";
+import { TaskRepository } from "../tasks/task.repository";
+import { TaskAssignmentRepository } from "../task-assignments/task-assignment.repository";
 import crypto from "crypto";
 
 interface UserPayload {
@@ -35,13 +37,14 @@ export class TaskSubmissionService {
   private readonly repository = new TaskSubmissionRepository();
   private readonly r2Service = new R2Service();
   private readonly notificationService = new NotificationService();
+  private readonly taskRepository = new TaskRepository();
+  private readonly taskAssignmentRepository = new TaskAssignmentRepository();
 
   private async hasGlobalAccess(actorId: string): Promise<boolean> {
     const callerPerms = new Set(
       await permissionCacheService.getUserPermissions(actorId),
     );
     return (
-      callerPerms.has(PERMISSIONS.TASK_SUBMISSION_DELETE) ||
       callerPerms.has(PERMISSIONS.ROLE_READ) ||
       callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN)
     );
@@ -284,32 +287,17 @@ export class TaskSubmissionService {
     completedTaskName?: string,
   ) {
     try {
-      const dependentTasks = await prisma.task.findMany({
-        where: {
-          dependsOn: { some: { id: completedTaskId } },
-          deletedAt: null,
-        },
-        include: {
-          assignment: {
-            include: {
-              intern: {
-                select: { userId: true, fullName: true },
-              },
-            },
-          },
-          dependsOn: {
-            where: { deletedAt: null },
-            include: { assignment: true },
-          },
-        },
-      });
+      const dependentTasks =
+        await this.taskRepository.findDependentTasks(completedTaskId);
 
       for (const depTask of dependentTasks) {
-        if (
-          depTask.assignment &&
-          (depTask.assignment.status === ASSIGNMENT_STATUS.BLOCKED ||
-            depTask.assignment.status === ASSIGNMENT_STATUS.PENDING_APPROVAL)
-        ) {
+        if (!depTask.assignment) continue;
+
+        // DO NOT touch PENDING_APPROVAL - that is strictly for cross-team leader approval
+        const isBlocked = depTask.assignment.status === ASSIGNMENT_STATUS.BLOCKED;
+        const isTodo = depTask.assignment.status === ASSIGNMENT_STATUS.TODO;
+
+        if (isBlocked || isTodo) {
           const allPrereqsDone = depTask.dependsOn.every(
             (prereq) =>
               prereq.id === completedTaskId ||
@@ -317,14 +305,15 @@ export class TaskSubmissionService {
           );
 
           if (allPrereqsDone) {
-            await prisma.taskAssignment.update({
-              where: { id: depTask.assignment.id },
-              data: {
+            // Only update DB if it was currently BLOCKED
+            if (isBlocked) {
+              await this.taskAssignmentRepository.update(depTask.assignment.id, {
                 status: ASSIGNMENT_STATUS.TODO,
                 blockedReason: null,
-              },
-            });
+              });
+            }
 
+            // Notify intern that their task is ready
             if (depTask.assignment.intern?.userId) {
               const taskLabel = depTask.code || depTask.title;
               const completedLabel = completedTaskName || "công việc tiên quyết";

@@ -32,6 +32,8 @@ import {
   NOTIFICATION_TYPE,
 } from "../../common/constants/notification.constant";
 
+import { TaskRepository } from "../tasks/task.repository";
+
 interface UserPayload {
   id: string;
   email?: string | null;
@@ -40,6 +42,7 @@ interface UserPayload {
 
 export class TaskAssignmentService {
   private readonly repository = new TaskAssignmentRepository();
+  private readonly taskRepository = new TaskRepository();
 
   private ensureAssignmentEditable(status: AssignmentStatus) {
     if (status === ASSIGNMENT_STATUS.DONE) {
@@ -415,11 +418,13 @@ export class TaskAssignmentService {
     const callerPerms = new Set(
       await permissionCacheService.getUserPermissions(actorId),
     );
-    const hasApprovePerm =
-      callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_APPROVE) ||
-      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+    const isGlobalAdmin =
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN) ||
+      callerPerms.has(PERMISSIONS.ROLE_READ);
+    const hasApprovePerm = callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_APPROVE);
+    const isDirectLeader = assignment.intern.leaderId === actorId;
 
-    if (!hasApprovePerm && assignment.intern.leaderId !== actorId) {
+    if (!isGlobalAdmin && (!isDirectLeader || !hasApprovePerm)) {
       throw new AppError(
         "Bạn không có quyền duyệt yêu cầu giao việc này",
         403,
@@ -495,11 +500,13 @@ export class TaskAssignmentService {
     const callerPerms = new Set(
       await permissionCacheService.getUserPermissions(actorId),
     );
-    const hasApprovePerm =
-      callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_APPROVE) ||
-      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+    const isGlobalAdmin =
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN) ||
+      callerPerms.has(PERMISSIONS.ROLE_READ);
+    const hasApprovePerm = callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_APPROVE);
+    const isDirectLeader = assignment.intern.leaderId === actorId;
 
-    if (!hasApprovePerm && assignment.intern.leaderId !== actorId) {
+    if (!isGlobalAdmin && (!isDirectLeader || !hasApprovePerm)) {
       throw new AppError(
         "Bạn không có quyền từ chối yêu cầu giao việc này",
         403,
@@ -754,20 +761,9 @@ export class TaskAssignmentService {
       }
     }
 
-    const taskWithPrereqs = await prisma.task.findUnique({
-      where: { id: assignment.taskId },
-      select: {
-        dependsOn: {
-          where: { deletedAt: null },
-          select: {
-            id: true,
-            code: true,
-            title: true,
-            assignment: { select: { status: true } },
-          },
-        },
-      },
-    });
+    const taskWithPrereqs = await this.taskRepository.findWithPrerequisites(
+      assignment.taskId,
+    );
 
     if (taskWithPrereqs && taskWithPrereqs.dependsOn.length > 0) {
       const unfinishedPrereqs = taskWithPrereqs.dependsOn.filter(
@@ -1132,17 +1128,19 @@ export class TaskAssignmentService {
     const callerPerms = new Set(
       await permissionCacheService.getUserPermissions(actor.id),
     );
-    const hasAdminPerm =
+    const isGlobalAdmin =
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN) ||
+      callerPerms.has(PERMISSIONS.ROLE_READ);
+    const hasApprovePerm =
       callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_APPROVE) ||
-      callerPerms.has(PERMISSIONS.TASK_UPDATE) ||
-      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+      callerPerms.has(PERMISSIONS.TASK_UPDATE);
 
     const internProfile = await prisma.intern.findUnique({
       where: { id: request.internId },
     });
     const isDirectLeader = internProfile?.leaderId === actor.id;
 
-    if (!hasAdminPerm && !isDirectLeader) {
+    if (!isGlobalAdmin && (!isDirectLeader || !hasApprovePerm)) {
       throw new AppError(
         "Chỉ Leader trực tiếp hoặc Quản trị viên mới có quyền xét duyệt gia hạn",
         403,
@@ -1219,17 +1217,19 @@ export class TaskAssignmentService {
     const callerPerms = new Set(
       await permissionCacheService.getUserPermissions(actor.id),
     );
-    const hasAdminPerm =
+    const isGlobalAdmin =
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN) ||
+      callerPerms.has(PERMISSIONS.ROLE_READ);
+    const hasApprovePerm =
       callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_APPROVE) ||
-      callerPerms.has(PERMISSIONS.TASK_UPDATE) ||
-      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+      callerPerms.has(PERMISSIONS.TASK_UPDATE);
 
     const internProfile = await prisma.intern.findUnique({
       where: { id: request.internId },
     });
     const isDirectLeader = internProfile?.leaderId === actor.id;
 
-    if (!hasAdminPerm && !isDirectLeader) {
+    if (!isGlobalAdmin && (!isDirectLeader || !hasApprovePerm)) {
       throw new AppError(
         "Chỉ Leader trực tiếp hoặc Quản trị viên mới có quyền từ chối gia hạn",
         403,

@@ -1,5 +1,8 @@
 import nodemailer from "nodemailer";
 import { mailConfig } from "../../config/mail.config";
+import { envConfig } from "../../config/env.config";
+import { AppError } from "../errors/app-error";
+import { ERROR_CODE } from "../errors/error-code";
 import { formatVietnamDateTime } from "../helpers/date.helper";
 import { escapeHtml } from "../helpers/template.helper";
 
@@ -44,11 +47,18 @@ export class MailService {
     };
 
     if (!mailConfig.auth.user || !mailConfig.auth.pass) {
-      console.warn("-------- EMAIL VERIFICATION TOKEN (DEV MODE) --------");
-      console.warn(`To: ${email}`);
-      console.warn(`Link: ${verificationUrl}`);
-      console.warn("----------------------------------------------------");
-      return;
+      if (envConfig.nodeEnv === "development") {
+        console.warn("-------- EMAIL VERIFICATION TOKEN (DEV MODE) --------");
+        console.warn(`To: ${email}`);
+        console.warn(`Link: ${verificationUrl}`);
+        console.warn("----------------------------------------------------");
+        return;
+      }
+      throw new AppError(
+        "Dịch vụ gửi email chưa được cấu hình",
+        500,
+        ERROR_CODE.INTERNAL_SERVER_ERROR,
+      );
     }
 
     try {
@@ -89,11 +99,18 @@ export class MailService {
     };
 
     if (!mailConfig.auth.user || !mailConfig.auth.pass) {
-      console.warn("-------- EMAIL PASSWORD RESET TOKEN (DEV MODE) --------");
-      console.warn(`To: ${email}`);
-      console.warn(`Link: ${resetUrl}`);
-      console.warn("-------------------------------------------------------");
-      return;
+      if (envConfig.nodeEnv === "development") {
+        console.warn("-------- EMAIL PASSWORD RESET TOKEN (DEV MODE) --------");
+        console.warn(`To: ${email}`);
+        console.warn(`Link: ${resetUrl}`);
+        console.warn("-------------------------------------------------------");
+        return;
+      }
+      throw new AppError(
+        "Dịch vụ gửi email chưa được cấu hình",
+        500,
+        ERROR_CODE.INTERNAL_SERVER_ERROR,
+      );
     }
 
     try {
@@ -144,13 +161,20 @@ export class MailService {
     };
 
     if (!mailConfig.auth.user || !mailConfig.auth.pass) {
-      console.warn("-------- NEW DEVICE ALERT EMAIL (DEV MODE) --------");
-      console.warn(`To: ${email}`);
-      console.warn(`Device: ${details.deviceName}`);
-      console.warn(`IP: ${details.ipAddress}`);
-      console.warn(`Time: ${formattedDate}`);
-      console.warn("----------------------------------------------------");
-      return;
+      if (envConfig.nodeEnv === "development") {
+        console.warn("-------- NEW DEVICE ALERT EMAIL (DEV MODE) --------");
+        console.warn(`To: ${email}`);
+        console.warn(`Device: ${details.deviceName}`);
+        console.warn(`IP: ${details.ipAddress}`);
+        console.warn(`Time: ${formattedDate}`);
+        console.warn("----------------------------------------------------");
+        return;
+      }
+      throw new AppError(
+        "Dịch vụ gửi email chưa được cấu hình",
+        500,
+        ERROR_CODE.INTERNAL_SERVER_ERROR,
+      );
     }
 
     try {
@@ -203,16 +227,23 @@ export class MailService {
     };
 
     if (!mailConfig.auth.user || !mailConfig.auth.pass) {
-      console.warn(
-        "-------- EMAIL ACCOUNT DEACTIVATION TOKEN (DEV MODE) --------",
+      if (envConfig.nodeEnv === "development") {
+        console.warn(
+          "-------- EMAIL ACCOUNT DEACTIVATION TOKEN (DEV MODE) --------",
+        );
+        console.warn(`To: ${email}`);
+        console.warn(`Token: ${token}`);
+        console.warn(`Link: ${deactivationUrl}`);
+        console.warn(
+          "--------------------------------------------------------------",
+        );
+        return;
+      }
+      throw new AppError(
+        "Dịch vụ gửi email chưa được cấu hình",
+        500,
+        ERROR_CODE.INTERNAL_SERVER_ERROR,
       );
-      console.warn(`To: ${email}`);
-      console.warn(`Token: ${token}`);
-      console.warn(`Link: ${deactivationUrl}`);
-      console.warn(
-        "--------------------------------------------------------------",
-      );
-      return;
     }
 
     try {

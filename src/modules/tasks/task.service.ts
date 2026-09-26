@@ -18,6 +18,7 @@ import {
 import { R2Service } from "../../common/services/r2.service";
 import { prisma } from "../../database/prisma.client";
 import { taskAllocationAiService } from "./task-allocation.ai.service";
+import { TaskGroupRepository } from "../task-groups/task-group.repository";
 import crypto from "crypto";
 
 interface UserPayload {
@@ -40,6 +41,7 @@ const SCOPE_CACHE_TTL_MS = 60 * 1000; // 1 minute
 export class TaskService {
   private readonly repository = new TaskRepository();
   private readonly r2Service = new R2Service();
+  private readonly taskGroupRepository = new TaskGroupRepository();
 
   private async resolveUserScope(user: UserPayload): Promise<UserScope> {
     const cached = userScopeCache.get(user.id);
@@ -120,10 +122,45 @@ export class TaskService {
     }
   }
 
-  async findEditableTask(taskId: string) {
+  async findEditableTask(
+    taskId: string,
+    user?: UserPayload,
+  ) {
     const task = await this.repository.findById(taskId);
     if (!task) {
       throw new AppError("Task not found", 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    if (user) {
+      const callerPerms = new Set(
+        user.permissions ?? (await permissionCacheService.getUserPermissions(user.id)),
+      );
+      const hasGlobalAccess =
+        callerPerms.has(PERMISSIONS.ROLE_READ) ||
+        callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+
+      if (!hasGlobalAccess) {
+        const scope = await this.resolveUserScope(user);
+        const isCreator = task.createdBy === user.id;
+        const isDeptTask = Boolean(
+          task.taskGroup?.departmentId &&
+          scope.departmentIds?.includes(task.taskGroup.departmentId),
+        );
+        const isLeaderOfAssignee = Boolean(
+          (task.assignment?.intern as any)?.leaderId === user.id,
+        );
+        const isLeaderOfSupport = Boolean(
+          (task.assignment?.support as any)?.leaderId === user.id,
+        );
+
+        if (!isCreator && !isDeptTask && !isLeaderOfAssignee && !isLeaderOfSupport) {
+          throw new AppError(
+            "Bạn không có quyền chỉnh sửa hoặc thao tác trên công việc này",
+            403,
+            ERROR_CODE.FORBIDDEN,
+          );
+        }
+      }
     }
 
     if (task.assignment?.status === ASSIGNMENT_STATUS.DONE) {
@@ -186,15 +223,10 @@ export class TaskService {
           const isSupport = task.assignment?.supportId === scope.internId;
           let isSameGroupMember = false;
           if (task.taskGroupId) {
-            const membership = await prisma.taskGroupMember.findUnique({
-              where: {
-                taskGroupId_internId: {
-                  taskGroupId: task.taskGroupId,
-                  internId: scope.internId,
-                },
-              },
-            });
-            isSameGroupMember = Boolean(membership);
+            isSameGroupMember = await this.taskGroupRepository.isMember(
+              task.taskGroupId,
+              scope.internId,
+            );
           }
           if (!isOwner && !isSupport && !isSameGroupMember) {
             throw new AppError(
@@ -264,10 +296,13 @@ export class TaskService {
   async update(
     id: string,
     data: UpdateTaskDto,
-    actorId: string,
+    actor: string | UserPayload,
     context?: { ipAddress?: string },
   ) {
-    const current = await this.findEditableTask(id);
+    const actorUser: UserPayload =
+      typeof actor === "string" ? ({ id: actor } as UserPayload) : actor;
+    const actorId = actorUser.id;
+    const current = await this.findEditableTask(id, actorUser);
 
     const nextStartDate =
       data.startDate === undefined ? current.startDate : data.startDate;
@@ -304,10 +339,13 @@ export class TaskService {
 
   async delete(
     id: string,
-    actorId: string,
+    actor: string | UserPayload,
     context?: { ipAddress?: string },
   ) {
-    const task = await this.findEditableTask(id);
+    const actorUser: UserPayload =
+      typeof actor === "string" ? ({ id: actor } as UserPayload) : actor;
+    const actorId = actorUser.id;
+    const task = await this.findEditableTask(id, actorUser);
     const result = await this.repository.softDelete(id);
 
     await this.repository.createAuditLog({

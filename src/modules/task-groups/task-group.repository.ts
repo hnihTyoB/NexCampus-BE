@@ -209,6 +209,19 @@ export class TaskGroupRepository {
     return prisma.taskGroup.delete({ where: { id } });
   }
 
+  async isMember(taskGroupId: string, internId: string): Promise<boolean> {
+    const membership = await prisma.taskGroupMember.findUnique({
+      where: {
+        taskGroupId_internId: {
+          taskGroupId,
+          internId,
+        },
+      },
+      select: { internId: true },
+    });
+    return Boolean(membership);
+  }
+
   async getProgress(id: string): Promise<TaskGroupProgressDto> {
     const group = await prisma.taskGroup.findUnique({
       where: { id },

@@ -271,6 +271,48 @@ export class TaskRepository {
     });
   }
 
+  findWithPrerequisites(taskId: string) {
+    return prisma.task.findUnique({
+      where: { id: taskId, deletedAt: null },
+      select: {
+        id: true,
+        code: true,
+        title: true,
+        dependsOn: {
+          where: { deletedAt: null },
+          select: {
+            id: true,
+            code: true,
+            title: true,
+            assignment: { select: { status: true } },
+          },
+        },
+      },
+    });
+  }
+
+  findDependentTasks(completedTaskId: string) {
+    return prisma.task.findMany({
+      where: {
+        dependsOn: { some: { id: completedTaskId } },
+        deletedAt: null,
+      },
+      include: {
+        assignment: {
+          include: {
+            intern: {
+              select: { userId: true, fullName: true },
+            },
+          },
+        },
+        dependsOn: {
+          where: { deletedAt: null },
+          include: { assignment: true },
+        },
+      },
+    });
+  }
+
   create(data: CreateTaskDto, createdBy: string) {
     return prisma.task.create({
       data: {

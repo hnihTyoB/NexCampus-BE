@@ -68,11 +68,13 @@ app.use(express.json({ limit: "512kb" })); // Giới hạn kích thước payloa
 app.use(express.urlencoded({ extended: true, limit: "512kb" }));
 app.use(cookieParser());
 
-app.use(
-  "/api/docs",
-  swaggerUi.serve,
-  swaggerUi.setup(swaggerSpec, swaggerOptions),
-);
+if (envConfig.nodeEnv !== "production") {
+  app.use(
+    "/api/docs",
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec, swaggerOptions),
+  );
+}
 
 app.use("/api/v2", rateLimitMiddleware, routes);
 

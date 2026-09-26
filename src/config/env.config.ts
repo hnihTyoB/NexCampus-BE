@@ -80,6 +80,7 @@ const envSchema = z
 
     // ── Application Base URL ───────────────────────────────────────────────────
     APP_URL: z.string().default("http://localhost:7777"),
+    CLIENT_URL: z.string().default("http://localhost:3000"),
 
     // ── Mail / SMTP ───────────────────────────────────────────────────────────
     MAIL_HOST: z.string().default("smtp.gmail.com"),
@@ -264,6 +265,7 @@ export const envConfig = {
     clientSecret: _env.GOOGLE_CLIENT_SECRET,
   },
   appUrl: _env.APP_URL,
+  clientUrl: _env.CLIENT_URL,
   mail: {
     host: _env.MAIL_HOST,
     port: _env.MAIL_PORT,

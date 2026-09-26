@@ -1,4 +1,5 @@
 import { prisma } from "../../database/prisma.client";
+import { Prisma } from "@prisma/client";
 import { TaskAnalyticsDto } from "./task.dto";
 import { ASSIGNMENT_STATUS } from "../../common/constants/task.constant";
 
@@ -89,37 +90,36 @@ export class TaskAnalyticsService {
     dateTo?: string,
     createdBy?: string,
   ) {
-    let queryConditions = `t.deleted_at IS NULL AND i.deleted_at IS NULL`;
-    const queryParams: any[] = [];
+    const conditions: Prisma.Sql[] = [
+      Prisma.sql`t.deleted_at IS NULL`,
+      Prisma.sql`i.deleted_at IS NULL`,
+    ];
 
     if (taskGroupId) {
-      queryParams.push(taskGroupId);
-      queryConditions += ` AND t.task_group_id = $${queryParams.length}::uuid`;
+      conditions.push(Prisma.sql`t.task_group_id = ${taskGroupId}::uuid`);
     }
 
     if (dateFrom) {
       const from = new Date(dateFrom);
       if (!isNaN(from.getTime())) {
-        queryParams.push(from);
-        queryConditions += ` AND t.deadline >= $${queryParams.length}::timestamp`;
+        conditions.push(Prisma.sql`t.deadline >= ${from}::timestamp`);
       }
     }
 
     if (dateTo) {
       const to = new Date(dateTo);
       if (!isNaN(to.getTime())) {
-        queryParams.push(to);
-        queryConditions += ` AND t.deadline <= $${queryParams.length}::timestamp`;
+        conditions.push(Prisma.sql`t.deadline <= ${to}::timestamp`);
       }
     }
 
     if (createdBy) {
-      queryParams.push(createdBy);
-      queryConditions += ` AND t.created_by = $${queryParams.length}::uuid`;
+      conditions.push(Prisma.sql`t.created_by = ${createdBy}::uuid`);
     }
 
-    const rows = await prisma.$queryRawUnsafe<any[]>(
-      `
+    const whereClause = Prisma.join(conditions, " AND ");
+
+    const rows = await prisma.$queryRaw<any[]>`
       SELECT 
         i.id AS "internId",
         i.full_name AS "internFullName",
@@ -129,12 +129,10 @@ export class TaskAnalyticsService {
       FROM task_assignments ta
       INNER JOIN interns i ON ta.intern_id = i.id
       INNER JOIN tasks t ON ta.task_id = t.id
-      WHERE ${queryConditions}
+      WHERE ${whereClause}
       GROUP BY i.id, i.full_name, ta.status
       ORDER BY i.full_name ASC
-      `,
-      ...queryParams,
-    );
+    `;
 
     const internMap = new Map<
       string,
@@ -182,49 +180,46 @@ export class TaskAnalyticsService {
     dateTo?: string,
     createdBy?: string,
   ) {
-    let queryConditions = `t.deleted_at IS NULL AND t.phase IS NOT NULL`;
-    const queryParams: any[] = [];
+    const conditions: Prisma.Sql[] = [
+      Prisma.sql`t.deleted_at IS NULL`,
+      Prisma.sql`t.phase IS NOT NULL`,
+    ];
 
     if (taskGroupId) {
-      queryParams.push(taskGroupId);
-      queryConditions += ` AND t.task_group_id = $${queryParams.length}::uuid`;
+      conditions.push(Prisma.sql`t.task_group_id = ${taskGroupId}::uuid`);
     }
 
     if (dateFrom) {
       const from = new Date(dateFrom);
       if (!isNaN(from.getTime())) {
-        queryParams.push(from);
-        queryConditions += ` AND t.deadline >= $${queryParams.length}::timestamp`;
+        conditions.push(Prisma.sql`t.deadline >= ${from}::timestamp`);
       }
     }
 
     if (dateTo) {
       const to = new Date(dateTo);
       if (!isNaN(to.getTime())) {
-        queryParams.push(to);
-        queryConditions += ` AND t.deadline <= $${queryParams.length}::timestamp`;
+        conditions.push(Prisma.sql`t.deadline <= ${to}::timestamp`);
       }
     }
 
     if (createdBy) {
-      queryParams.push(createdBy);
-      queryConditions += ` AND t.created_by = $${queryParams.length}::uuid`;
+      conditions.push(Prisma.sql`t.created_by = ${createdBy}::uuid`);
     }
 
-    const rows = await prisma.$queryRawUnsafe<any[]>(
-      `
+    const whereClause = Prisma.join(conditions, " AND ");
+
+    const rows = await prisma.$queryRaw<any[]>`
       SELECT 
         t.phase AS "phase",
         COUNT(t.id)::int AS "totalTasks",
         COUNT(CASE WHEN ta.status = 'DONE' THEN 1 END)::int AS "doneTasks"
       FROM tasks t
       LEFT JOIN task_assignments ta ON t.id = ta.task_id
-      WHERE ${queryConditions}
+      WHERE ${whereClause}
       GROUP BY t.phase
       ORDER BY t.phase ASC
-      `,
-      ...queryParams,
-    );
+    `;
 
     return rows.map((r) => ({
       phase: r.phase,

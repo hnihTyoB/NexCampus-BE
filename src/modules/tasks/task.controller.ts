@@ -54,7 +54,7 @@ export class TaskController {
       const data = await this.service.update(
         req.params.id,
         req.body as UpdateTaskDto,
-        req.user!.id,
+        req.user!,
         { ipAddress: req.ip },
       );
       res.json({ success: true, data });
@@ -65,7 +65,7 @@ export class TaskController {
 
   delete = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await this.service.delete(req.params.id, req.user!.id, {
+      await this.service.delete(req.params.id, req.user!, {
         ipAddress: req.ip,
       });
       res.json({ success: true, message: "Task deleted successfully" });

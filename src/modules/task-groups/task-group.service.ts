@@ -49,6 +49,17 @@ export class TaskGroupService {
           if (intern) {
             return this.repository.findAll(query, { internId: intern.id });
           }
+          if (user.role === "INTERN") {
+            return {
+              data: [],
+              meta: {
+                total: 0,
+                page: query.page ?? 1,
+                limit: query.limit ?? 20,
+                totalPages: 1,
+              },
+            };
+          }
         }
 
         if (user.role !== "INTERN") {
@@ -69,7 +80,28 @@ export class TaskGroupService {
               },
             });
           }
+          if (user.role === "LEADER") {
+            return {
+              data: [],
+              meta: {
+                total: 0,
+                page: query.page ?? 1,
+                limit: query.limit ?? 20,
+                totalPages: 1,
+              },
+            };
+          }
         }
+
+        return {
+          data: [],
+          meta: {
+            total: 0,
+            page: query.page ?? 1,
+            limit: query.limit ?? 20,
+            totalPages: 1,
+          },
+        };
       }
     }
 
@@ -122,6 +154,12 @@ export class TaskGroupService {
                 ERROR_CODE.FORBIDDEN,
               );
             }
+          } else {
+            throw new AppError(
+              "You do not have access to this task group",
+              403,
+              ERROR_CODE.FORBIDDEN,
+            );
           }
         }
       }

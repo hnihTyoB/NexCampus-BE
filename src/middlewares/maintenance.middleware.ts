@@ -18,11 +18,11 @@ export interface MaintenanceGuardOptions {
 
 const DEFAULT_EXEMPT_PATHS: (string | RegExp)[] = [
   "/health",
-  /^\/api\/v1\/health/,
+  /^\/api\/v[12]\/health/,
   /^\/api\/docs/,
-  /^\/api\/v1\/maintenance/,
-  /^\/api\/v1\/auth\/(login|refresh|logout|me|sessions)/,
-  /^\/api\/v1\/system\/public/,
+  /^\/api\/v[12]\/maintenance/,
+  /^\/api\/v[12]\/auth\/(login|refresh|logout|me|sessions)/,
+  /^\/api\/v[12]\/system\/public/,
 ];
 
 export function maintenanceGuard(options?: MaintenanceGuardOptions) {
