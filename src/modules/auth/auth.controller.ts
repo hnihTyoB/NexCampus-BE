@@ -36,6 +36,27 @@ const REFRESH_COOKIE_MAX_AGE = parseDurationToMs(
   7 * 24 * 60 * 60 * 1000,
 );
 
+function getAuthCookieOptions(maxAge: number) {
+  return {
+    httpOnly: true,
+    secure: envConfig.nodeEnv === "production",
+    sameSite: "lax" as const,
+    path: "/",
+    domain: envConfig.cookieDomain || undefined,
+    maxAge,
+  };
+}
+
+function getClearAuthCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: envConfig.nodeEnv === "production",
+    sameSite: "lax" as const,
+    path: "/",
+    domain: envConfig.cookieDomain || undefined,
+  };
+}
+
 export class AuthController {
   private readonly service = new AuthService();
 
@@ -57,21 +78,8 @@ export class AuthController {
         });
       }
 
-      res.cookie("accessToken", result.accessToken!, {
-        httpOnly: true,
-        secure: envConfig.nodeEnv === "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge: ACCESS_COOKIE_MAX_AGE,
-      });
-
-      res.cookie("refreshToken", result.refreshToken!, {
-        httpOnly: true,
-        secure: envConfig.nodeEnv === "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge: REFRESH_COOKIE_MAX_AGE,
-      });
+      res.cookie("accessToken", result.accessToken!, getAuthCookieOptions(ACCESS_COOKIE_MAX_AGE));
+      res.cookie("refreshToken", result.refreshToken!, getAuthCookieOptions(REFRESH_COOKIE_MAX_AGE));
 
       res.json({
         success: true,
@@ -117,21 +125,8 @@ export class AuthController {
         ipAddress,
       });
 
-      res.cookie("accessToken", result.accessToken!, {
-        httpOnly: true,
-        secure: envConfig.nodeEnv === "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge: ACCESS_COOKIE_MAX_AGE,
-      });
-
-      res.cookie("refreshToken", result.refreshToken!, {
-        httpOnly: true,
-        secure: envConfig.nodeEnv === "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge: REFRESH_COOKIE_MAX_AGE,
-      });
+      res.cookie("accessToken", result.accessToken!, getAuthCookieOptions(ACCESS_COOKIE_MAX_AGE));
+      res.cookie("refreshToken", result.refreshToken!, getAuthCookieOptions(REFRESH_COOKIE_MAX_AGE));
 
       res.json({
         success: true,
@@ -152,14 +147,8 @@ export class AuthController {
         await this.service.logout(refreshToken);
       }
 
-      const cookieOptions = {
-        httpOnly: true,
-        secure: envConfig.nodeEnv === "production",
-        sameSite: "lax" as const,
-        path: "/",
-      };
-      res.clearCookie("accessToken", cookieOptions);
-      res.clearCookie("refreshToken", cookieOptions);
+      res.clearCookie("accessToken", getClearAuthCookieOptions());
+      res.clearCookie("refreshToken", getClearAuthCookieOptions());
 
       res.json({
         success: true,
@@ -475,21 +464,8 @@ export class AuthController {
         ipAddress,
       });
 
-      res.cookie("accessToken", result.accessToken!, {
-        httpOnly: true,
-        secure: envConfig.nodeEnv === "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge: ACCESS_COOKIE_MAX_AGE,
-      });
-
-      res.cookie("refreshToken", result.refreshToken!, {
-        httpOnly: true,
-        secure: envConfig.nodeEnv === "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge: REFRESH_COOKIE_MAX_AGE,
-      });
+      res.cookie("accessToken", result.accessToken!, getAuthCookieOptions(ACCESS_COOKIE_MAX_AGE));
+      res.cookie("refreshToken", result.refreshToken!, getAuthCookieOptions(REFRESH_COOKIE_MAX_AGE));
 
       res.json({
         success: true,
@@ -575,21 +551,8 @@ export class AuthController {
         });
       }
 
-      res.cookie("accessToken", result.accessToken!, {
-        httpOnly: true,
-        secure: envConfig.nodeEnv === "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge: ACCESS_COOKIE_MAX_AGE,
-      });
-
-      res.cookie("refreshToken", result.refreshToken!, {
-        httpOnly: true,
-        secure: envConfig.nodeEnv === "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge: REFRESH_COOKIE_MAX_AGE,
-      });
+      res.cookie("accessToken", result.accessToken!, getAuthCookieOptions(ACCESS_COOKIE_MAX_AGE));
+      res.cookie("refreshToken", result.refreshToken!, getAuthCookieOptions(REFRESH_COOKIE_MAX_AGE));
 
       res.json({
         success: true,

@@ -27,6 +27,7 @@ const envSchema = z
     // ── Encryption ───────────────────────────────────────────────────────────
     ENCRYPTION_KEY: z.string().default(""),
     APP_SECRET: z.string().default(""),
+    COOKIE_DOMAIN: z.string().optional().default(""),
 
     // ── Redis ─────────────────────────────────────────────────────────────────
     REDIS_URL: z.string().default(""),
@@ -230,6 +231,7 @@ export const envConfig = {
     refreshExpiresIn: _env.JWT_REFRESH_EXPIRES_IN,
   },
   trustProxy: parseTrustProxy(_env.TRUST_PROXY),
+  cookieDomain: _env.COOKIE_DOMAIN ? _env.COOKIE_DOMAIN.trim() : undefined,
   cors: {
     allowedOrigins: _env.ALLOWED_ORIGINS.split(",").map((s) => s.trim()),
   },
