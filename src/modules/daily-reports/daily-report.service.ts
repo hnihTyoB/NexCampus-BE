@@ -487,7 +487,7 @@ export class DailyReportService {
 
     const internProfile = await prisma.intern.findUnique({
       where: { id: internId },
-      select: { startDate: true },
+      select: { startDate: true, userId: true },
     });
 
     if (!internProfile) {
@@ -506,11 +506,29 @@ export class DailyReportService {
     const startOfMonth = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
     const endOfMonth = new Date(Date.UTC(year, month - 1, daysInMonth, 23, 59, 59, 999));
 
-    const reports = await this.repository.findReportsByInternAndMonth(
-      internId,
-      startOfMonth,
-      endOfMonth,
-    );
+    const [reports, approvedLeaves] = await Promise.all([
+      this.repository.findReportsByInternAndMonth(
+        internId,
+        startOfMonth,
+        endOfMonth,
+      ),
+      prisma.absence.findMany({
+        where: {
+          userId: internProfile.userId,
+          status: "APPROVED",
+          startDate: { lte: endOfMonth },
+          endDate: { gte: startOfMonth },
+        },
+        select: {
+          id: true,
+          startDate: true,
+          endDate: true,
+          durationUnit: true,
+          reasonType: true,
+          reason: true,
+        },
+      }),
+    ]);
 
     // Map reports by YYYY-MM-DD
     const reportMap = new Map<string, (typeof reports)[0]>();
@@ -526,6 +544,7 @@ export class DailyReportService {
     const days: CalendarDayDto[] = [];
     let reportedDays = 0;
     let totalWorkingDays = 0;
+    let approvedLeaveDays = 0;
 
     for (let d = 1; d <= daysInMonth; d++) {
       const dayDate = new Date(Date.UTC(year, month - 1, d, 0, 0, 0, 0));
@@ -535,18 +554,36 @@ export class DailyReportService {
       const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
       const report = reportMap.get(dateStr);
 
+      // Tìm xem ngày này có đơn nghỉ phép APPROVED không
+      const matchingLeave = approvedLeaves.find((leave) => {
+        const leaveStart = new Date(leave.startDate);
+        leaveStart.setUTCHours(0, 0, 0, 0);
+        const leaveEnd = new Date(leave.endDate);
+        leaveEnd.setUTCHours(23, 59, 59, 999);
+        return dayDate >= leaveStart && dayDate <= leaveEnd;
+      });
+
       let status: CalendarDayStatus;
 
       if (dayDate.getTime() < internStartVN.getTime()) {
         status = "OUT_OF_RANGE";
       } else if (isWeekend) {
         status = "WEEKEND";
-      } else if (dayDate.getTime() > todayVN.getTime()) {
-        status = "FUTURE";
       } else if (report) {
         status = "REPORTED";
         reportedDays++;
         totalWorkingDays++;
+      } else if (matchingLeave) {
+        // Có đơn nghỉ phép đã duyệt nhưng không có report
+        if (dayDate.getTime() > todayVN.getTime()) {
+          status = "FUTURE";
+        } else {
+          status = "LEAVE_APPROVED";
+          approvedLeaveDays++;
+          // Không cộng totalWorkingDays và không tăng missingDays để bảo vệ tỷ lệ chuyên cần
+        }
+      } else if (dayDate.getTime() > todayVN.getTime()) {
+        status = "FUTURE";
       } else {
         status = "MISSING";
         totalWorkingDays++;
@@ -559,6 +596,8 @@ export class DailyReportService {
         reportId: report?.id,
         hoursWorked: report?.hoursWorked ?? undefined,
         hasFeedback: !!report?.feedback,
+        leaveReason: matchingLeave?.reason,
+        leaveDurationUnit: matchingLeave?.durationUnit,
       });
     }
 
@@ -575,6 +614,7 @@ export class DailyReportService {
       totalWorkingDays,
       reportedDays,
       missingDays,
+      approvedLeaveDays,
       submissionRate,
       days,
     };

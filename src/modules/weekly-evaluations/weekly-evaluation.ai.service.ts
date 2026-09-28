@@ -161,6 +161,7 @@ export class WeeklyEvaluationAiService {
       taskSubmissions,
       weekExtensionRequests,
       allInternshipExtensionRequests,
+      approvedLeaves,
     ] = await Promise.all([
       prisma.dailyReport.findMany({
         where: {
@@ -222,7 +223,24 @@ export class WeeklyEvaluationAiService {
         },
         orderBy: { createdAt: "asc" },
       }),
+      prisma.absence.findMany({
+        where: {
+          userId: intern.userId,
+          status: "APPROVED",
+          startDate: { lte: weekRange.to },
+          endDate: { gte: weekRange.from },
+        },
+        select: {
+          id: true,
+          startDate: true,
+          endDate: true,
+          reason: true,
+          durationUnit: true,
+        },
+      }),
     ]);
+
+    const approvedLeaveCount = approvedLeaves.length;
 
     // 3. Try calling Gemini if API key available, else use analytical heuristic
     const apiKey = process.env.GEMINI_API_KEY || (process.env.GEMINI_API_KEYS?.split(",")[0]?.trim());
@@ -279,6 +297,7 @@ export class WeeklyEvaluationAiService {
       taskSubmissions,
       weekExtensionRequests,
       allInternshipExtensionRequests,
+      approvedLeaveCount,
     );
   }
 
@@ -516,8 +535,10 @@ Yêu cầu output JSON duy nhất, không markdown:
     taskSubmissions: any[],
     weekExtensionRequests: any[] = [],
     allInternshipExtensionRequests: any[] = [],
+    approvedLeaveCount: number = 0,
   ): AiSuggestResponseDto {
     const reportCount = dailyReports.length;
+    const effectiveReportCount = reportCount + approvedLeaveCount;
     const subCount = taskSubmissions.length;
     const approvedCount = taskSubmissions.filter(
       (s) => s.reviewStatus === "APPROVED",
@@ -531,6 +552,46 @@ Yêu cầu output JSON duy nhất, không markdown:
 
     // Edge Case: Zero Data Handling (rule in weekly-evaluation-12-criteria.json)
     if (reportCount === 0 && subCount === 0) {
+      if (approvedLeaveCount >= 4) {
+        // Thực tập sinh nghỉ phép cả tuần có duyệt (ví dụ thi học kỳ tập trung)
+        const ratings: EvaluationRatings = {
+          ruleCompliance: "TOT",
+          workAttitude: "TOT",
+          learningCapacity: "KHA",
+          pressureTolerance: "KHA",
+          communication: "TOT",
+          knowledge: "KHA",
+          practicalSkill: "KHA",
+          languageProficiency: "KHA",
+          teamwork: "KHA",
+          creativity: "KHA",
+          contentRequirement: "KHA",
+          progressRequirement: "KHA",
+        };
+        const score = 8.0;
+        return {
+          ratings,
+          score,
+          grade: EvaluationGrade.KHA,
+          comment: `AI gợi ý (Nghỉ phép có lý do tuần ${week}): Trong tuần vừa qua, Thực tập sinh ${internName} đã có đơn xin nghỉ phép hợp lệ được Leader phê duyệt (${approvedLeaveCount} ngày, lịch thi/việc trường). Thái độ tuân thủ và xin phép đầy đủ, không vi phạm quy chế.`,
+          strengths: ["Chủ động làm đơn xin nghỉ phép đúng quy trình"],
+          weaknesses: ["Tạm dừng tiến độ công việc do lịch thi cử"],
+          recommendations: [
+            "Sau khi hoàn thành đợt thi, nhanh chóng bắt nhịp lại với công việc và cập nhật tiến độ",
+          ],
+          dataUsed: {
+            dailyReportsCount: 0,
+            taskSubmissionsCount: 0,
+            extensionRequestsCount: weekExtCount,
+            totalInternshipExtensions: allExtCount,
+            weekRange: {
+              from: weekRange.from.toISOString(),
+              to: weekRange.to.toISOString(),
+            },
+          },
+        };
+      }
+
       const ratings: EvaluationRatings = {
         ruleCompliance: "TB",
         workAttitude: "TB",
@@ -570,17 +631,17 @@ Yêu cầu output JSON duy nhất, không markdown:
       };
     }
 
-    // Dynamic rating calculation based on actual empirical metrics
+    // Dynamic rating calculation based on actual empirical metrics (cộng cả ngày nghỉ phép hợp lệ)
     let ruleCompliance: RatingLevel = "TB";
-    if (reportCount >= 5) ruleCompliance = "TOT";
-    else if (reportCount >= 4) ruleCompliance = "KHA";
-    else if (reportCount >= 2) ruleCompliance = "TB";
+    if (effectiveReportCount >= 5) ruleCompliance = "TOT";
+    else if (effectiveReportCount >= 4) ruleCompliance = "KHA";
+    else if (effectiveReportCount >= 2) ruleCompliance = "TB";
     else ruleCompliance = "TBY";
 
     let workAttitude: RatingLevel = ruleCompliance;
     const hasBlockersReported = dailyReports.some((r) => r.blockers && r.blockers.trim().length > 0);
     const hasEvidence = dailyReports.some((r) => r.prLink || r.videoDemo || r.attachments?.length > 0);
-    if (hasEvidence && reportCount >= 4) workAttitude = "TOT";
+    if (hasEvidence && effectiveReportCount >= 4) workAttitude = "TOT";
 
     let practicalSkill: RatingLevel = "TB";
     let contentRequirement: RatingLevel = "TB";

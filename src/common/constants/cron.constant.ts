@@ -6,6 +6,7 @@ export const CRON_JOB_NAMES = {
   CLEANUP_EXPIRED_TOKENS: "cleanup-expired-tokens",
   DAILY_SUMMARY_DIGEST: "daily-summary-digest",
   WEEKLY_SUMMARY_DIGEST: "weekly-summary-digest",
+  REMIND_DAILY_REPORT: "remind-daily-report",
 } as const;
 
 export type CronJobName = (typeof CRON_JOB_NAMES)[keyof typeof CRON_JOB_NAMES];
@@ -37,6 +38,11 @@ export const DEFAULT_CRON_SCHEDULES: Record<
     cron: "0 8 * * 1", // Mondays at 08:00 AM Asia/Ho_Chi_Minh (UTC+7)
     description:
       "Tổng hợp số liệu hoạt động trong tuần và gửi email báo cáo tới Quản trị viên",
+  },
+  "remind-daily-report": {
+    cron: "0 17 * * 1-5", // Thứ 2 đến Thứ 6 lúc 17:00 Asia/Ho_Chi_Minh
+    description:
+      "Nhắc nhở nộp báo cáo ngày cho thực tập sinh (Tự động miễn trừ người có phép đã duyệt)",
   },
 };
 

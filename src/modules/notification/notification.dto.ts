@@ -175,6 +175,7 @@ export interface ActionCountsResponseDto {
   pendingSubmissions?: number;
   unreviewedReports?: number;
   pendingEvaluations?: number;
+  pendingAbsences?: number;
   // Admin / chung
   pendingApplications?: number;
 }

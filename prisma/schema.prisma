@@ -894,6 +894,22 @@ enum AbsenceStatus {
   PENDING
   APPROVED
   REJECTED
+  CANCELLED
+}
+
+enum AbsenceDuration {
+  MORNING
+  AFTERNOON
+  FULL_DAY
+  MULTI_DAY
+}
+
+enum AbsenceReasonType {
+  EXAM
+  SICKNESS
+  UNIVERSITY_EVENT
+  PERSONAL
+  OTHER
 }
 
 // ─── Meetings & Absences Models ─────────────────────────────────────────────
@@ -980,18 +996,20 @@ model AbsenceRequest {
 }
 
 model Absence {
-  id          String        @id @default(uuid()) @db.Uuid
-  userId      String        @map("user_id") @db.Uuid
-  startDate   DateTime      @map("start_date")
-  endDate     DateTime      @map("end_date")
-  reason      String        @db.Text
-  evidenceUrl String?       @map("evidence_url")
-  status      AbsenceStatus @default(PENDING)
-  reviewedBy  String?       @map("reviewed_by") @db.Uuid
-  reviewedAt  DateTime?     @map("reviewed_at")
-  reviewNote  String?       @map("review_note") @db.Text
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
+  id           String            @id @default(uuid()) @db.Uuid
+  userId       String            @map("user_id") @db.Uuid
+  startDate    DateTime          @map("start_date")
+  endDate      DateTime          @map("end_date")
+  durationUnit AbsenceDuration   @default(FULL_DAY) @map("duration_unit")
+  reasonType   AbsenceReasonType @default(PERSONAL) @map("reason_type")
+  reason       String            @db.Text
+  evidenceUrl  String?           @map("evidence_url")
+  status       AbsenceStatus     @default(PENDING)
+  reviewedBy   String?           @map("reviewed_by") @db.Uuid
+  reviewedAt   DateTime?         @map("reviewed_at")
+  reviewNote   String?           @map("review_note") @db.Text
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
 
   user     User  @relation("InternAbsences", fields: [userId], references: [id], onDelete: Cascade)
   reviewer User? @relation("ReviewedGeneralAbsences", fields: [reviewedBy], references: [id], onDelete: SetNull)
