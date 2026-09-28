@@ -98,6 +98,12 @@ router.delete(
   controller.revokeOtherSessions,
 );
 
+router.get(
+  "/avatar/upload-url",
+  authMiddleware,
+  validate(getAvatarUploadUrlSchema, "query"),
+  controller.getAvatarUploadUrl,
+);
 router.post(
   "/avatar/upload-url",
   authMiddleware,

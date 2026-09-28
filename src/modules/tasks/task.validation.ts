@@ -120,18 +120,41 @@ export const updateTaskSchema = z.object({
   recreatedTaskId: z.string().uuid().nullable().optional(),
 });
 
-export const getAttachmentUploadUrlSchema = z.object({
-  fileName: z.string().trim().min(1, "fileName is required"),
-  contentType: z.string().trim().min(1, "contentType is required"),
-  fileSize: z.coerce.number().int().positive().optional(),
-});
+export const getAttachmentUploadUrlSchema = z
+  .object({
+    fileName: z.string().trim().min(1, "fileName is required"),
+    contentType: z.string().trim().optional(),
+    mimeType: z.string().trim().optional(),
+    fileSize: z.coerce.number().int().positive().optional(),
+  })
+  .refine((data) => !!(data.contentType || data.mimeType), {
+    message: "contentType or mimeType is required",
+    path: ["contentType"],
+  })
+  .transform((data) => ({
+    fileName: data.fileName,
+    contentType: (data.contentType || data.mimeType)!,
+    fileSize: data.fileSize,
+  }));
 
-export const confirmAttachmentUploadSchema = z.object({
-  filePath: z.string().trim().min(1, "filePath is required"),
-  fileName: z.string().trim().min(1, "fileName is required"),
-  mimeType: z.string().trim().min(1, "mimeType is required"),
-  fileSize: z.coerce.number().int().positive(),
-});
+export const confirmAttachmentUploadSchema = z
+  .object({
+    filePath: z.string().trim().min(1, "filePath is required"),
+    fileName: z.string().trim().min(1, "fileName is required"),
+    mimeType: z.string().trim().optional(),
+    contentType: z.string().trim().optional(),
+    fileSize: z.coerce.number().int().positive(),
+  })
+  .refine((data) => !!(data.mimeType || data.contentType), {
+    message: "mimeType or contentType is required",
+    path: ["mimeType"],
+  })
+  .transform((data) => ({
+    filePath: data.filePath,
+    fileName: data.fileName,
+    mimeType: (data.mimeType || data.contentType)!,
+    fileSize: data.fileSize,
+  }));
 
 export const createLinkAttachmentSchema = z.object({
   fileName: z.string().trim().min(1, "fileName is required").max(255),

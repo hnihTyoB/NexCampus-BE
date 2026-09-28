@@ -69,17 +69,20 @@ export interface ResendVerificationDto {
 
 export interface GetAvatarUploadUrlDto {
   contentType: string;
+  mimeType?: string;
 }
 
 export interface GetAvatarUploadUrlResponseDto {
   uploadUrl: string;
   publicUrl: string;
   key: string;
+  filePath: string;
   expiresIn: number;
 }
 
 export interface ConfirmAvatarUploadDto {
   key: string;
+  filePath?: string;
 }
 
 export interface RequestDeactivateDto {

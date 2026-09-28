@@ -249,12 +249,29 @@ export const reviewApplicationSchema = z.object({
   leaderId: z.string().uuid("Invalid leader ID").optional(),
 });
 
-export const getAttachmentUploadUrlSchema = z.object({
-  token: z.string().trim().min(1, "token is required"),
-  fileName: z.string().trim().min(1, "fileName is required"),
-  contentType: z.enum(ALLOWED_APPLICATION_MIME_TYPES, {
-    errorMap: () => ({
+export const getAttachmentUploadUrlSchema = z
+  .object({
+    token: z.string().trim().min(1, "token is required"),
+    fileName: z.string().trim().min(1, "fileName is required"),
+    contentType: z.string().trim().optional(),
+    mimeType: z.string().trim().optional(),
+  })
+  .refine((data) => !!(data.contentType || data.mimeType), {
+    message: "contentType or mimeType is required",
+    path: ["contentType"],
+  })
+  .transform((data) => ({
+    token: data.token,
+    fileName: data.fileName,
+    contentType: (data.contentType || data.mimeType) as (typeof ALLOWED_APPLICATION_MIME_TYPES)[number],
+  }))
+  .refine(
+    (data) =>
+      (ALLOWED_APPLICATION_MIME_TYPES as readonly string[]).includes(
+        data.contentType,
+      ),
+    {
       message: `contentType must be one of: ${ALLOWED_APPLICATION_MIME_TYPES.join(", ")}`,
-    }),
-  }),
-});
+      path: ["contentType"],
+    },
+  );

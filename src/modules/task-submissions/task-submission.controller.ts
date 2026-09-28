@@ -102,4 +102,69 @@ export class TaskSubmissionController {
       next(error);
     }
   };
+
+  getVideoUploadUrl = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const mimeType = (req.query.mimeType || req.query.contentType || "video/mp4") as string;
+      const data = await this.service.getVideoUploadUrl(
+        req.params.id,
+        mimeType,
+        req.user!,
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  confirmVideoUpload = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { filePath } = req.body as { filePath: string };
+      const data = await this.service.confirmVideoUpload(
+        req.params.id,
+        filePath,
+        req.user!,
+        { ipAddress: req.ip },
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getAttachmentUploadUrl = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const fileName = (req.query.fileName || "attachment") as string;
+      const mimeType = (req.query.mimeType || req.query.contentType || "application/octet-stream") as string;
+      const data = await this.service.getAttachmentUploadUrl(
+        req.params.id || req.params.submissionId,
+        fileName,
+        mimeType,
+        req.user!,
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  confirmAttachmentUpload = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = req.body as {
+        filePath: string;
+        fileName: string;
+        mimeType: string;
+        fileSize: number;
+      };
+      const data = await this.service.confirmAttachmentUpload(
+        req.params.id || req.params.submissionId,
+        body,
+        req.user!,
+        { ipAddress: req.ip },
+      );
+      res.status(201).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

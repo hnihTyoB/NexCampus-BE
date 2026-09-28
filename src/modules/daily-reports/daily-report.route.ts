@@ -12,6 +12,10 @@ import {
   queryDailyReportSchema,
   updateDailyReportSchema,
   uploadReportUrlSchema,
+  getVideoReportUrlSchema,
+  confirmVideoReportSchema,
+  getReportAttachmentUploadUrlSchema,
+  confirmReportAttachmentSchema,
 } from "./daily-report.validation";
 
 const router = Router();
@@ -26,12 +30,58 @@ const attachmentParamSchema = z.object({
 });
 
 // 1. Upload Presigned URL for Cloudflare R2
+router.get(
+  "/upload-url",
+  authMiddleware,
+  requirePermission(PERMISSIONS.DAILY_REPORT_CREATE),
+  validate(uploadReportUrlSchema, "query"),
+  controller.getUploadUrl,
+);
+
 router.post(
   "/upload-url",
   authMiddleware,
   requirePermission(PERMISSIONS.DAILY_REPORT_CREATE),
   validate(uploadReportUrlSchema),
   controller.getUploadUrl,
+);
+
+// Video Upload sub-routes
+router.get(
+  "/:id/video/upload-url",
+  authMiddleware,
+  requirePermission(PERMISSIONS.DAILY_REPORT_CREATE),
+  validate(idParamSchema, "params"),
+  validate(getVideoReportUrlSchema, "query"),
+  controller.getVideoUploadUrl,
+);
+
+router.post(
+  "/:id/video/confirm",
+  authMiddleware,
+  requirePermission(PERMISSIONS.DAILY_REPORT_CREATE),
+  validate(idParamSchema, "params"),
+  validate(confirmVideoReportSchema),
+  controller.confirmVideoUpload,
+);
+
+// Attachment Upload sub-routes
+router.get(
+  "/:id/attachments/upload-url",
+  authMiddleware,
+  requirePermission(PERMISSIONS.DAILY_REPORT_CREATE),
+  validate(idParamSchema, "params"),
+  validate(getReportAttachmentUploadUrlSchema, "query"),
+  controller.getAttachmentUploadUrl,
+);
+
+router.post(
+  "/:id/attachments/confirm",
+  authMiddleware,
+  requirePermission(PERMISSIONS.DAILY_REPORT_CREATE),
+  validate(idParamSchema, "params"),
+  validate(confirmReportAttachmentSchema),
+  controller.confirmAttachmentUpload,
 );
 
 // 2. Calendar View & Stats

@@ -11,10 +11,34 @@ import {
   userSessionParamsSchema,
   userDeviceParamsSchema,
 } from "./user.validation";
+import {
+  getAvatarUploadUrlSchema,
+  confirmAvatarUploadSchema,
+} from "../auth/auth.validation";
 import { PERMISSIONS } from "../../common/constants/permission.constant";
 
 const router = Router();
 const controller = new UserController();
+
+// Avatar upload & confirm routes (accessible by authenticated users for own profile)
+router.get(
+  "/avatar/upload-url",
+  authMiddleware,
+  validate(getAvatarUploadUrlSchema, "query"),
+  controller.getAvatarUploadUrl,
+);
+router.post(
+  "/avatar/upload-url",
+  authMiddleware,
+  validate(getAvatarUploadUrlSchema),
+  controller.getAvatarUploadUrl,
+);
+router.post(
+  "/avatar/confirm",
+  authMiddleware,
+  validate(confirmAvatarUploadSchema),
+  controller.confirmAvatarUpload,
+);
 
 router.get(
   "/",

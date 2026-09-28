@@ -1071,6 +1071,7 @@ export class AuthService {
       uploadUrl,
       publicUrl,
       key,
+      filePath: key,
       expiresIn: r2Config.presignedUrlExpiresIn,
     };
   }

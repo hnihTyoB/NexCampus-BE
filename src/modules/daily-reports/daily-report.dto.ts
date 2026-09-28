@@ -141,4 +141,7 @@ export interface UploadReportAttachmentUrlResponseDto {
   uploadUrl: string;
   fileUrl: string;
   filePath: string;
+  key?: string;
+  publicUrl?: string;
 }
+
