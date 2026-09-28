@@ -15,13 +15,17 @@ import {
 import {
   EMAIL_TEMPLATE_KEY,
   NOTIFICATION_CHANNEL,
+  NOTIFICATION_TYPE,
 } from "../../common/constants/notification.constant";
 import {
   formatVietnamDate,
   getVietnamDayRange,
+  getVietnamToday,
 } from "../../common/helpers/date.helper";
 import { CronJobExecutionResultDto, CronJobItemDto, ToggleCronJobResponseDto } from "./cron.dto";
 import { cronQueue } from "../../common/queues/cron.queue";
+import { prisma } from "../../database/prisma.client";
+import { AbsenceStatus } from "@prisma/client";
 
 export class CronService {
   /**
@@ -318,6 +322,114 @@ export class CronService {
   }
 
   /**
+   * 5. Nhắc nhở nộp báo cáo tiến độ ngày cho thực tập sinh (Tự động miễn trừ chuông cho người có phép đã duyệt)
+   */
+  async executeRemindDailyReports(): Promise<{
+    remindedCount: number;
+    bypassedCount: number;
+    bypassedInterns: string[];
+  }> {
+    const today = getVietnamToday();
+    const todayStr = formatVietnamDate(today);
+
+    // Lấy danh sách thực tập sinh đang hoạt động
+    const activeInterns = await prisma.intern.findMany({
+      where: {
+        user: { isActive: true, deletedAt: null },
+      },
+      include: {
+        user: { select: { id: true, email: true, fullName: true } },
+      },
+    });
+
+    if (activeInterns.length === 0) {
+      return { remindedCount: 0, bypassedCount: 0, bypassedInterns: [] };
+    }
+
+    // Lấy danh sách intern đã nộp report hôm nay
+    const submittedReports = await prisma.dailyReport.findMany({
+      where: {
+        date: today,
+      },
+      select: { internId: true },
+    });
+    const submittedInternIds = new Set(submittedReports.map((r) => r.internId));
+
+    // Lấy danh sách intern có đơn nghỉ phép APPROVED bao trùm ngày hôm nay (cả ngày hoặc nhiều ngày)
+    const approvedLeaves = await prisma.absence.findMany({
+      where: {
+        status: AbsenceStatus.APPROVED,
+        startDate: { lte: today },
+        endDate: { gte: today },
+      },
+      select: { userId: true, durationUnit: true },
+    });
+
+    // Các intern nghỉ cả ngày hoặc nhiều ngày được miễn trừ hoàn toàn
+    const excusedUserIds = new Set(
+      approvedLeaves
+        .filter((l) => l.durationUnit === "FULL_DAY" || l.durationUnit === "MULTI_DAY")
+        .map((l) => l.userId),
+    );
+
+    let remindedCount = 0;
+    let bypassedCount = 0;
+    const bypassedInterns: string[] = [];
+
+    for (const intern of activeInterns) {
+      // Đã nộp report -> không cần nhắc
+      if (submittedInternIds.has(intern.id)) {
+        continue;
+      }
+
+      // Có đơn nghỉ phép đã duyệt cả ngày -> Miễn trừ chuông cảnh báo và email!
+      if (excusedUserIds.has(intern.userId)) {
+        bypassedCount++;
+        bypassedInterns.push(intern.user.fullName || intern.id);
+        continue;
+      }
+
+      // Gửi thông báo nhắc nhở nộp báo cáo ngày
+      remindedCount++;
+      await notificationDispatcher
+        .send({
+          userId: intern.userId,
+          channels: [NOTIFICATION_CHANNEL.WEB],
+          web: {
+            type: NOTIFICATION_TYPE.WARNING,
+            title: "Nhắc nhở nộp báo cáo ngày",
+            content: `Đã 17:00 rồi! Đừng quên nộp báo cáo tiến độ ngày hôm nay (${todayStr}) trước giờ kết thúc ca nhé!`,
+            actionUrl: "/intern/daily-report",
+          },
+          email: intern.user.email
+            ? {
+                toEmail: intern.user.email,
+                templateKey: EMAIL_TEMPLATE_KEY.CUSTOM,
+                templateData: {
+                  subject: `[NexCampus] Nhắc nhở nộp báo cáo ngày hôm nay (${todayStr})`,
+                  title: "Nhắc nhở nộp báo cáo ngày",
+                  content: `Xin chào ${intern.user.fullName || "bạn"}, đừng quên nộp báo cáo tiến độ ngày hôm nay trước giờ kết thúc ca làm việc nhé!`,
+                  actionUrl: "/intern/daily-report",
+                },
+              }
+            : undefined,
+        })
+        .catch((err: any) => {
+          console.warn(
+            `[CronService] Failed to send daily reminder to intern ${intern.id}:`,
+            err.message,
+          );
+        });
+    }
+
+    return {
+      remindedCount,
+      bypassedCount,
+      bypassedInterns,
+    };
+  }
+
+  /**
    * Kích hoạt chạy ngay một Cron Job bất kỳ (Manual trigger từ Admin)
    */
   async triggerJob(
@@ -356,6 +468,10 @@ export class CronService {
       }
       case CRON_JOB_NAMES.WEEKLY_SUMMARY_DIGEST: {
         executionData = await this.executeSummaryDigest({ period: "WEEKLY" });
+        break;
+      }
+      case CRON_JOB_NAMES.REMIND_DAILY_REPORT: {
+        executionData = await this.executeRemindDailyReports();
         break;
       }
       default:

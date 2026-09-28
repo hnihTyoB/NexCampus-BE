@@ -30,6 +30,22 @@ export class AbsenceController {
     }
   };
 
+  getTaskConflicts = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const data = await this.service.getTaskConflicts(
+        req.params.id,
+        req.user!,
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   create = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = await this.service.create(
@@ -50,6 +66,39 @@ export class AbsenceController {
         req.body as ReviewAbsenceDto,
         req.user!,
         { ipAddress: req.ip },
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  cancel = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await this.service.cancel(req.params.id, req.user!, {
+        ipAddress: req.ip,
+      });
+      res.json({
+        success: true,
+        data,
+        message: "Đơn xin nghỉ phép đã được hủy thành công",
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getUploadPresignedUrl = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const { fileName, mimeType } = req.body;
+      const data = await this.service.getUploadPresignedUrl(
+        fileName,
+        mimeType,
+        req.user!,
       );
       res.json({ success: true, data });
     } catch (error) {

@@ -560,6 +560,7 @@ export class NotificationRepository {
         unreviewedReports,
         evaluationsThisWeek,
         pendingMeetingRsvp,
+        pendingAbsences,
       ] = await prisma.$transaction([
         // Bài nộp chờ duyệt từ các intern dưới quyền
         prisma.taskSubmission.count({
@@ -603,6 +604,15 @@ export class NotificationRepository {
             meeting: { deletedAt: null },
           },
         }),
+        // Đơn xin nghỉ phép chờ duyệt từ các intern dưới quyền
+        prisma.absence.count({
+          where: {
+            status: "PENDING",
+            user: {
+              intern: { leaderId: userId, deletedAt: null },
+            },
+          },
+        }),
       ]);
 
       const evaluatedSet = new Set(evaluationsThisWeek.map((e) => e.internId));
@@ -615,6 +625,7 @@ export class NotificationRepository {
         unreviewedReports,
         pendingEvaluations,
         pendingMeetingRsvp,
+        pendingAbsences,
       };
     }
 
