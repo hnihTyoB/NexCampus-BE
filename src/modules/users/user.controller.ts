@@ -1,6 +1,10 @@
 import { Request, Response, NextFunction } from "express";
 import { UserService } from "./user.service";
 import { UserQueryDto, CreateUserDto, UpdateUserDto } from "./user.dto";
+import {
+  GetAvatarUploadUrlDto,
+  ConfirmAvatarUploadDto,
+} from "../auth/auth.dto";
 
 export class UserController {
   private readonly service = new UserService();
@@ -148,6 +152,42 @@ export class UserController {
       res.json({
         success: true,
         message: "Thiết bị đã được xóa khỏi tài khoản",
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getAvatarUploadUrl = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const body = (req.body && Object.keys(req.body).length > 0
+        ? req.body
+        : req.query) as unknown as GetAvatarUploadUrlDto;
+      const result = await this.service.getAvatarUploadUrl(req.user!.id, body);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  confirmAvatarUpload = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const body = req.body as ConfirmAvatarUploadDto;
+      const avatarUrl = await this.service.confirmAvatarUpload(
+        req.user!.id,
+        body,
+      );
+      res.json({
+        success: true,
+        data: { avatarUrl, filePath: body.key, key: body.key },
       });
     } catch (error) {
       next(error);

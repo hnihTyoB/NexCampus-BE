@@ -667,7 +667,7 @@ export class ApplicationService {
     token: string,
     fileName: string,
     contentType: string,
-  ): Promise<{ uploadUrl: string; key: string; publicUrl: string }> {
+  ): Promise<{ uploadUrl: string; key: string; filePath: string; publicUrl: string }> {
     // SEC-05: Xác thực invitation token hợp lệ trước khi cấp presigned URL
     await this.verifyInvite(token);
 
@@ -680,6 +680,6 @@ export class ApplicationService {
     );
     const publicUrl = this.r2Service.getPublicUrl(key);
 
-    return { uploadUrl, key, publicUrl };
+    return { uploadUrl, key, filePath: key, publicUrl };
   }
 }

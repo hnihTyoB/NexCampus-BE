@@ -56,9 +56,59 @@ export const reviewSubmissionSchema = z
     },
   );
 
-export const getSubmissionUploadUrlSchema = z.object({
-  fileName: z.string().trim().min(1, "fileName is required"),
-  mimeType: z.string().trim().min(1, "mimeType is required"),
+export const getSubmissionUploadUrlSchema = z
+  .object({
+    fileName: z.string().trim().min(1, "fileName is required"),
+    mimeType: z.string().trim().optional(),
+    contentType: z.string().trim().optional(),
+    fileSize: z.coerce.number().int().positive().optional(),
+  })
+  .refine((data) => !!(data.mimeType || data.contentType), {
+    message: "mimeType or contentType is required",
+    path: ["mimeType"],
+  })
+  .transform((data) => ({
+    fileName: data.fileName,
+    mimeType: (data.mimeType || data.contentType)!,
+    fileSize: data.fileSize,
+  }));
+
+export const getVideoUploadUrlSchema = z
+  .object({
+    mimeType: z.string().trim().optional(),
+    contentType: z.string().trim().optional(),
+  })
+  .refine((data) => !!(data.mimeType || data.contentType), {
+    message: "mimeType or contentType is required",
+    path: ["mimeType"],
+  })
+  .transform((data) => ({
+    mimeType: (data.mimeType || data.contentType)!,
+  }));
+
+export const confirmVideoUploadSchema = z.object({
+  filePath: z.string().trim().min(1, "filePath is required"),
 });
+
+export const getSubmissionAttachmentUploadUrlSchema = getSubmissionUploadUrlSchema;
+
+export const confirmSubmissionAttachmentSchema = z
+  .object({
+    filePath: z.string().trim().min(1, "filePath is required"),
+    fileName: z.string().trim().min(1, "fileName is required"),
+    mimeType: z.string().trim().optional(),
+    contentType: z.string().trim().optional(),
+    fileSize: z.coerce.number().int().nonnegative().optional(),
+  })
+  .refine((data) => !!(data.mimeType || data.contentType), {
+    message: "mimeType or contentType is required",
+    path: ["mimeType"],
+  })
+  .transform((data) => ({
+    filePath: data.filePath,
+    fileName: data.fileName,
+    mimeType: (data.mimeType || data.contentType)!,
+    fileSize: data.fileSize ?? 0,
+  }));
 
 export const addAttachmentSchema = submissionAttachmentItemSchema;

@@ -11,6 +11,10 @@ import {
   createSubmissionSchema,
   reviewSubmissionSchema,
   getSubmissionUploadUrlSchema,
+  getVideoUploadUrlSchema,
+  confirmVideoUploadSchema,
+  getSubmissionAttachmentUploadUrlSchema,
+  confirmSubmissionAttachmentSchema,
   addAttachmentSchema,
 } from "./task-submission.validation";
 
@@ -62,7 +66,44 @@ router.post(
   controller.review,
 );
 
-// 5. Attachments sub-routes
+// 5. Video Upload sub-routes
+router.get(
+  "/:id/video/upload-url",
+  authMiddleware,
+  requirePermission(PERMISSIONS.TASK_SUBMISSION_CREATE),
+  validate(submissionIdParamSchema, "params"),
+  validate(getVideoUploadUrlSchema, "query"),
+  controller.getVideoUploadUrl,
+);
+
+router.post(
+  "/:id/video/confirm",
+  authMiddleware,
+  requirePermission(PERMISSIONS.TASK_SUBMISSION_CREATE),
+  validate(submissionIdParamSchema, "params"),
+  validate(confirmVideoUploadSchema),
+  controller.confirmVideoUpload,
+);
+
+// 6. Attachments sub-routes
+router.get(
+  "/:id/attachments/upload-url",
+  authMiddleware,
+  requirePermission(PERMISSIONS.TASK_SUBMISSION_CREATE),
+  validate(submissionIdParamSchema, "params"),
+  validate(getSubmissionAttachmentUploadUrlSchema, "query"),
+  controller.getAttachmentUploadUrl,
+);
+
+router.post(
+  "/:id/attachments/confirm",
+  authMiddleware,
+  requirePermission(PERMISSIONS.TASK_SUBMISSION_CREATE),
+  validate(submissionIdParamSchema, "params"),
+  validate(confirmSubmissionAttachmentSchema),
+  controller.confirmAttachmentUpload,
+);
+
 router.post(
   "/:id/attachments",
   authMiddleware,

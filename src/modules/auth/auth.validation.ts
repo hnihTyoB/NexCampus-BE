@@ -99,21 +99,53 @@ export const resendVerificationSchema = z.object({
   email: z.string().min(1, "Email is required").email("Invalid email format"),
 });
 
-export const getAvatarUploadUrlSchema = z.object({
-  contentType: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif"], {
-    errorMap: () => ({
+export const getAvatarUploadUrlSchema = z
+  .object({
+    contentType: z.string().optional(),
+    mimeType: z.string().optional(),
+  })
+  .refine((data) => !!(data.contentType || data.mimeType), {
+    message: "contentType or mimeType is required",
+    path: ["contentType"],
+  })
+  .transform((data) => ({
+    contentType: (data.contentType || data.mimeType) as
+      | "image/jpeg"
+      | "image/png"
+      | "image/webp"
+      | "image/gif",
+  }))
+  .refine(
+    (data) =>
+      ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(
+        data.contentType,
+      ),
+    {
       message:
         "contentType must be one of: image/jpeg, image/png, image/webp, image/gif",
-    }),
-  }),
-});
+      path: ["contentType"],
+    },
+  );
 
-export const confirmAvatarUploadSchema = z.object({
-  key: z
-    .string()
-    .min(1, "Key is required")
-    .regex(/^avatars\/[a-f0-9-]+\/\d+\.[a-z]+$/, "Invalid avatar key format"),
-});
+export const confirmAvatarUploadSchema = z
+  .object({
+    key: z.string().optional(),
+    filePath: z.string().optional(),
+  })
+  .refine((data) => !!(data.key || data.filePath), {
+    message: "key or filePath is required",
+    path: ["key"],
+  })
+  .transform((data) => ({
+    key: (data.key || data.filePath)!,
+  }))
+  .refine(
+    (data) => /^avatars\/[a-f0-9-]+\/\d+\.[a-z]+$/.test(data.key),
+    {
+      message: "Invalid avatar key format",
+      path: ["key"],
+    },
+  );
 
 export const requestDeactivateSchema = z.object({
   password: z

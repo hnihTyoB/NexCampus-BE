@@ -12,6 +12,11 @@ import { PERMISSIONS } from "../../common/constants/permission.constant";
 import { parseUserAgent } from "../../common/helpers/user-agent.helper";
 import { permissionCacheService } from "../../common/services/permission-cache.service";
 import { UserQueryDto, CreateUserDto, UpdateUserDto } from "./user.dto";
+import { AuthService } from "../auth/auth.service";
+import {
+  GetAvatarUploadUrlDto,
+  ConfirmAvatarUploadDto,
+} from "../auth/auth.dto";
 
 export class UserService {
   private readonly repository = new UserRepository();
@@ -281,5 +286,15 @@ export class UserService {
       ipAddress: metadata?.ipAddress,
       userAgent: metadata?.userAgent,
     });
+  }
+
+  private readonly authService = new AuthService();
+
+  async getAvatarUploadUrl(userId: string, data: GetAvatarUploadUrlDto) {
+    return this.authService.getAvatarUploadUrl(userId, data);
+  }
+
+  async confirmAvatarUpload(userId: string, data: ConfirmAvatarUploadDto) {
+    return this.authService.confirmAvatarUpload(userId, data);
   }
 }

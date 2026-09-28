@@ -353,7 +353,136 @@ export class TaskSubmissionService {
       uploadUrl,
       fileUrl,
       filePath: key,
+      publicUrl: fileUrl,
     };
+  }
+
+  private async verifySubmissionAccess(
+    submissionId: string,
+    actor: UserPayload,
+    actionDesc = "thao tác trên bài nộp này",
+  ) {
+    const submission = await this.repository.findById(submissionId);
+    if (!submission) {
+      throw new AppError(
+        "Bài nộp không tồn tại",
+        404,
+        ERROR_CODE.SUBMISSION_NOT_FOUND,
+      );
+    }
+
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal) {
+      const intern = await prisma.intern.findUnique({
+        where: { userId: actor.id },
+        select: { id: true },
+      });
+      const isOwner = intern && submission.assignment.internId === intern.id;
+      const isSupport = intern && submission.assignment.supportId === intern.id;
+      if (!isOwner && !isSupport) {
+        throw new AppError(
+          `Không có quyền ${actionDesc}`,
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
+      }
+    }
+
+    if (submission.reviewStatus === ReviewStatus.APPROVED) {
+      throw new AppError(
+        "Không thể chỉnh sửa bài nộp đã được duyệt",
+        400,
+        ERROR_CODE.SUBMISSION_CANNOT_EDIT,
+      );
+    }
+
+    return submission;
+  }
+
+  async getVideoUploadUrl(
+    submissionId: string,
+    mimeType: string,
+    actor: UserPayload,
+  ) {
+    await this.verifySubmissionAccess(submissionId, actor, "tải video lên bài nộp này");
+    const ext = mimeType.split("/")[1] ?? "mp4";
+    const key = `submissions/${submissionId}/video_${Date.now()}.${ext}`;
+    const uploadUrl = await this.r2Service.getPresignedUploadUrl(key, mimeType);
+    const fileUrl = this.r2Service.getPublicUrl(key);
+    return {
+      uploadUrl,
+      fileUrl,
+      filePath: key,
+      key,
+      publicUrl: fileUrl,
+    };
+  }
+
+  async confirmVideoUpload(
+    submissionId: string,
+    filePath: string,
+    actor: UserPayload,
+    context?: { ipAddress?: string },
+  ) {
+    await this.verifySubmissionAccess(submissionId, actor, "cập nhật video cho bài nộp này");
+    const videoDemo = this.r2Service.getPublicUrl(filePath);
+
+    const updated = await prisma.taskSubmission.update({
+      where: { id: submissionId },
+      data: { videoDemo },
+      include: {
+        attachments: true,
+        assignment: {
+          include: {
+            task: true,
+            intern: { include: { user: true } },
+          },
+        },
+      },
+    });
+
+    return updated;
+  }
+
+  async getAttachmentUploadUrl(
+    submissionId: string,
+    fileName: string,
+    mimeType: string,
+    actor: UserPayload,
+  ) {
+    await this.verifySubmissionAccess(submissionId, actor, "tải tệp đính kèm lên bài nộp này");
+    const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const key = `submissions/${submissionId}/${crypto.randomUUID()}_${safeFileName}`;
+    const uploadUrl = await this.r2Service.getPresignedUploadUrl(key, mimeType);
+    const fileUrl = this.r2Service.getPublicUrl(key);
+    return {
+      uploadUrl,
+      fileUrl,
+      filePath: key,
+      key,
+      publicUrl: fileUrl,
+    };
+  }
+
+  async confirmAttachmentUpload(
+    submissionId: string,
+    data: { filePath: string; fileName: string; mimeType: string; fileSize: number },
+    actor: UserPayload,
+    context?: { ipAddress?: string },
+  ) {
+    const fileUrl = this.r2Service.getPublicUrl(data.filePath);
+    return this.addAttachment(
+      submissionId,
+      {
+        fileName: data.fileName,
+        fileUrl,
+        filePath: data.filePath,
+        fileSize: data.fileSize,
+        mimeType: data.mimeType,
+      },
+      actor,
+      context,
+    );
   }
 
   async addAttachment(

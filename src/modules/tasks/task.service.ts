@@ -366,7 +366,7 @@ export class TaskService {
     taskId: string,
     fileName: string,
     contentType: string,
-  ): Promise<{ uploadUrl: string; key: string; publicUrl: string }> {
+  ): Promise<{ uploadUrl: string; key: string; filePath: string; publicUrl: string }> {
     await this.findEditableTask(taskId);
 
     const existing = await this.repository.findAttachmentsByTaskId(taskId);
@@ -387,7 +387,7 @@ export class TaskService {
     );
     const publicUrl = this.r2Service.getPublicUrl(key);
 
-    return { uploadUrl, key, publicUrl };
+    return { uploadUrl, key, filePath: key, publicUrl };
   }
 
   async confirmAttachment(

@@ -325,7 +325,9 @@ export class AuthController {
     next: NextFunction,
   ) => {
     try {
-      const body = req.body as GetAvatarUploadUrlDto;
+      const body = (req.body && Object.keys(req.body).length > 0
+        ? req.body
+        : req.query) as unknown as GetAvatarUploadUrlDto;
       const result = await this.service.getAvatarUploadUrl(req.user.id, body);
 
       res.json({
@@ -354,7 +356,7 @@ export class AuthController {
 
       res.json({
         success: true,
-        data: { avatarUrl },
+        data: { avatarUrl, filePath: body.key, key: body.key },
       });
     } catch (error) {
       next(error);

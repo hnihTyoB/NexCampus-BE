@@ -68,10 +68,60 @@ export const calendarDailyReportSchema = z.object({
   internId: z.string().uuid("Intern ID không hợp lệ").optional(),
 });
 
-export const uploadReportUrlSchema = z.object({
-  fileName: z.string().trim().min(1, "Tên file không được để trống"),
-  mimeType: z.string().trim().min(1, "Mime type không được để trống"),
+export const uploadReportUrlSchema = z
+  .object({
+    fileName: z.string().trim().min(1, "Tên file không được để trống"),
+    mimeType: z.string().trim().optional(),
+    contentType: z.string().trim().optional(),
+    fileSize: z.coerce.number().int().positive().optional(),
+  })
+  .refine((data) => !!(data.mimeType || data.contentType), {
+    message: "mimeType hoặc contentType không được để trống",
+    path: ["mimeType"],
+  })
+  .transform((data) => ({
+    fileName: data.fileName,
+    mimeType: (data.mimeType || data.contentType)!,
+    fileSize: data.fileSize,
+  }));
+
+export const getVideoReportUrlSchema = z
+  .object({
+    mimeType: z.string().trim().optional(),
+    contentType: z.string().trim().optional(),
+  })
+  .refine((data) => !!(data.mimeType || data.contentType), {
+    message: "mimeType hoặc contentType không được để trống",
+    path: ["mimeType"],
+  })
+  .transform((data) => ({
+    mimeType: (data.mimeType || data.contentType)!,
+  }));
+
+export const confirmVideoReportSchema = z.object({
+  filePath: z.string().trim().min(1, "filePath không được để trống"),
 });
+
+export const getReportAttachmentUploadUrlSchema = uploadReportUrlSchema;
+
+export const confirmReportAttachmentSchema = z
+  .object({
+    filePath: z.string().trim().min(1, "filePath không được để trống"),
+    fileName: z.string().trim().min(1, "fileName không được để trống"),
+    mimeType: z.string().trim().optional(),
+    contentType: z.string().trim().optional(),
+    fileSize: z.coerce.number().int().nonnegative().optional(),
+  })
+  .refine((data) => !!(data.mimeType || data.contentType), {
+    message: "mimeType hoặc contentType không được để trống",
+    path: ["mimeType"],
+  })
+  .transform((data) => ({
+    filePath: data.filePath,
+    fileName: data.fileName,
+    mimeType: (data.mimeType || data.contentType)!,
+    fileSize: data.fileSize ?? 0,
+  }));
 
 export type CreateDailyReportInput = z.infer<typeof createDailyReportSchema>;
 export type UpdateDailyReportInput = z.infer<typeof updateDailyReportSchema>;

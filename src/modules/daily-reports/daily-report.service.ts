@@ -132,7 +132,113 @@ export class DailyReportService {
       uploadUrl,
       fileUrl,
       filePath: key,
+      key,
+      publicUrl: fileUrl,
     };
+  }
+
+  private async verifyReportAccess(
+    reportId: string,
+    actor: UserPayload,
+    actionDesc = "thao tác trên báo cáo này",
+  ) {
+    const report = await this.repository.findById(reportId);
+    if (!report) {
+      throw new AppError(
+        "Báo cáo không tồn tại",
+        404,
+        ERROR_CODE.REPORT_NOT_FOUND,
+      );
+    }
+
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal && report.intern?.user?.id !== actor.id) {
+      throw new AppError(
+        `Không có quyền ${actionDesc}`,
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
+    }
+
+    return report;
+  }
+
+  async getVideoUploadUrl(
+    reportId: string,
+    mimeType: string,
+    actor: UserPayload,
+  ) {
+    await this.verifyReportAccess(reportId, actor, "tải video lên báo cáo này");
+    const ext = mimeType.split("/")[1] ?? "mp4";
+    const key = `daily-reports/${reportId}/video_${Date.now()}.${ext}`;
+    const uploadUrl = await this.r2Service.getPresignedUploadUrl(key, mimeType);
+    const fileUrl = this.r2Service.getPublicUrl(key);
+    return {
+      uploadUrl,
+      fileUrl,
+      filePath: key,
+      key,
+      publicUrl: fileUrl,
+    };
+  }
+
+  async confirmVideoUpload(
+    reportId: string,
+    filePath: string,
+    actor: UserPayload,
+  ) {
+    await this.verifyReportAccess(reportId, actor, "cập nhật video cho báo cáo này");
+    const videoUrl = this.r2Service.getPublicUrl(filePath);
+    const updated = await prisma.dailyReport.update({
+      where: { id: reportId },
+      data: { videoDemo: videoUrl },
+      include: {
+        attachments: true,
+        intern: { include: { user: true } },
+      },
+    });
+    return updated;
+  }
+
+  async getAttachmentUploadUrl(
+    reportId: string,
+    fileName: string,
+    mimeType: string,
+    actor: UserPayload,
+  ) {
+    await this.verifyReportAccess(reportId, actor, "tải tệp đính kèm lên báo cáo này");
+    const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const key = `daily-reports/${reportId}/${crypto.randomUUID()}_${safeFileName}`;
+    const uploadUrl = await this.r2Service.getPresignedUploadUrl(key, mimeType);
+    const fileUrl = this.r2Service.getPublicUrl(key);
+    return {
+      uploadUrl,
+      fileUrl,
+      filePath: key,
+      key,
+      publicUrl: fileUrl,
+    };
+  }
+
+  async confirmAttachmentUpload(
+    reportId: string,
+    data: { filePath: string; fileName: string; mimeType: string; fileSize: number },
+    actor: UserPayload,
+  ) {
+    await this.verifyReportAccess(reportId, actor, "thêm tệp đính kèm vào báo cáo này");
+    const fileUrl = this.r2Service.getPublicUrl(data.filePath);
+    const attachment = await prisma.reportAttachment.create({
+      data: {
+        reportId,
+        fileName: data.fileName,
+        fileUrl,
+        filePath: data.filePath,
+        fileSize: data.fileSize,
+        mimeType: data.mimeType,
+        uploadedBy: actor.id,
+      },
+    });
+    return attachment;
   }
 
   async findAll(query: DailyReportQueryDto, actor: UserPayload) {
