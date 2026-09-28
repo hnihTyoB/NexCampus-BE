@@ -42,6 +42,7 @@
     "sharp": "^0.35.4",
     "swagger-ui-express": "^5.0.1",
     "uuidv7": "^1.2.1",
+    "xlsx": "^0.18.5",
     "zod": "^3.25.76"
   },
   "devDependencies": {

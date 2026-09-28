@@ -200,3 +200,54 @@ export interface TaskAnalyticsQueryDto {
   dateTo?: string;
 }
 
+// ─── Task Import DTOs ────────────────────────────────────────────────────────
+
+export interface ImportTaskRowDto {
+  excelCode: string;
+  title: string;
+  description: string;
+  deadline: string;
+  startDate?: string;
+  priority: TaskPriority;
+  ownerEmail?: string;
+  supportEmail?: string;
+  phase?: string;
+  module?: string;
+  estDays?: number;
+  acceptanceCriteria?: string;
+  taskNotes?: string;
+  dependencyCodes: string[];
+  attachmentUrls?: string[];
+  _status?: string;
+}
+
+export interface ImportPreviewDto {
+  totalRows: number;
+  validRows: ImportTaskRowDto[];
+  errorRows: { rowIndex: number; excelCode?: string; errors: string[] }[];
+  internMappings: {
+    ownerAlias: string;
+    email: string;
+    internId: string | null;
+    internFullName: string | null;
+  }[];
+  taskGroupId?: string;
+  taskGroupName?: string;
+}
+
+export interface ImportResultDto {
+  importedTasks: number;
+  importedAssignments: number;
+  importedDependencies: number;
+  importedAttachments: number;
+  skippedCodes: string[];
+  errorRows: { excelCode?: string; error: string }[];
+  taskGroupId?: string;
+  taskGroupName?: string;
+}
+
+export interface ImportTaskBodyDto {
+  taskGroupId?: string;
+  taskGroupName?: string;
+}
+

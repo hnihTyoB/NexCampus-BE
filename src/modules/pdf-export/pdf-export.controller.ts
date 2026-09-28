@@ -46,7 +46,29 @@ export class PdfExportController {
           fileUrl: result.downloadUrl,
           fileName: result.fileName,
           expiresAt: result.expiresAt,
+          summary: result.viewModel,
         },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getInternshipSummaryData = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    try {
+      const { internId } = req.params;
+      const data = await this.service.getInternshipSummaryData(
+        internId,
+        req.user
+      );
+
+      res.status(200).json({
+        success: true,
+        data,
       });
     } catch (error) {
       next(error);

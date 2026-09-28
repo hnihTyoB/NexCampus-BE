@@ -3,6 +3,7 @@ import { TaskController } from "./task.controller";
 import { authMiddleware } from "../../middlewares/auth.middleware";
 import { requirePermission } from "../../middlewares/permission.middleware";
 import { validate } from "../../middlewares/validate.middleware";
+import { uploadExcelSingle } from "../../middlewares/upload.middleware";
 import { PERMISSIONS } from "../../common/constants/permission.constant";
 import {
   findAllTaskSchema,
@@ -15,10 +16,38 @@ import {
   confirmAttachmentUploadSchema,
   createLinkAttachmentSchema,
   aiSuggestTaskAllocationSchema,
+  importTaskBodySchema,
 } from "./task.validation";
 
 const router = Router();
 const controller = new TaskController();
+
+// ─── Task Import ────────────────────────────────────────────────────────────
+
+router.get(
+  "/import/template",
+  authMiddleware,
+  requirePermission(PERMISSIONS.TASK_READ),
+  controller.downloadTemplate,
+);
+
+router.post(
+  "/import/preview",
+  authMiddleware,
+  requirePermission(PERMISSIONS.TASK_CREATE),
+  uploadExcelSingle("file"),
+  validate(importTaskBodySchema),
+  controller.previewImport,
+);
+
+router.post(
+  "/import",
+  authMiddleware,
+  requirePermission(PERMISSIONS.TASK_CREATE),
+  uploadExcelSingle("file"),
+  validate(importTaskBodySchema),
+  controller.executeImport,
+);
 
 // ─── Task CRUD ──────────────────────────────────────────────────────────────
 

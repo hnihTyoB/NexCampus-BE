@@ -217,7 +217,12 @@ startxref
   async exportInternshipSummary(
     internId: string,
     actor: ActorPayload
-  ): Promise<{ downloadUrl: string; fileName: string; expiresAt: Date }> {
+  ): Promise<{
+    downloadUrl: string;
+    fileName: string;
+    expiresAt: Date;
+    viewModel: InternshipSummaryPdfDTO;
+  }> {
     const data = await this.repository.findInternshipSummaryData(internId);
     if (!data || !data.intern) {
       throw new AppError("Intern profile not found", 404, ERROR_CODE.NOT_FOUND);
@@ -279,7 +284,54 @@ startxref
       expiresAt,
     });
 
-    return { downloadUrl, fileName, expiresAt };
+    return { downloadUrl, fileName, expiresAt, viewModel };
+  }
+
+  /**
+   * Lấy cấu trúc dữ liệu tổng kết thực tập để Client-Side render đồ họa PDF chất lượng cao
+   */
+  async getInternshipSummaryData(
+    internId: string,
+    actor: ActorPayload
+  ): Promise<InternshipSummaryPdfDTO> {
+    const data = await this.repository.findInternshipSummaryData(internId);
+    if (!data || !data.intern) {
+      throw new AppError("Intern profile not found", 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    const { intern, evaluations, taskStats, reportCount } = data;
+
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal) {
+      const internRecord = await prisma.intern.findUnique({
+        where: { userId: actor.id },
+        select: { id: true },
+      });
+      if (internRecord) {
+        if (intern.userId !== actor.id) {
+          throw new AppError(
+            "Forbidden: You can only view your own internship summary",
+            403,
+            ERROR_CODE.FORBIDDEN
+          );
+        }
+      } else {
+        if (intern.leaderId !== actor.id) {
+          throw new AppError(
+            "Forbidden: You can only view summary for your assigned interns",
+            403,
+            ERROR_CODE.FORBIDDEN
+          );
+        }
+      }
+    }
+
+    return new InternshipSummaryPdfDTO(
+      intern,
+      evaluations,
+      taskStats,
+      reportCount
+    );
   }
 }
 

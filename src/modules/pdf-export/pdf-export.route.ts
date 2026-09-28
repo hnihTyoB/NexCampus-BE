@@ -22,6 +22,14 @@ router.post(
 );
 
 // ── Export Internship Summary / Certificate PDF ──
+router.get(
+  "/internship-summary/:internId/data",
+  authMiddleware,
+  requirePermission(PERMISSIONS.PDF_EXPORT_SUMMARY),
+  validate(exportInternshipSummaryParamSchema, "params"),
+  controller.getInternshipSummaryData
+);
+
 router.post(
   "/internship-summary/:internId",
   authMiddleware,
