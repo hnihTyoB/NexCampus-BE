@@ -1,8 +1,13 @@
+import fs from "fs";
+import path from "path";
 import { Request, Response, NextFunction } from "express";
 import { TaskService } from "./task.service";
 import { TaskAnalyticsService } from "./task.analytics.service";
 import { taskAllocationAiService } from "./task-allocation.ai.service";
+import { TaskImportService, taskImportService } from "./task.import.service";
 import { ROLES } from "../../common/constants/role.constant";
+import { AppError } from "../../common/errors/app-error";
+import { ERROR_CODE } from "../../common/errors/error-code";
 import {
   CreateTaskDto,
   UpdateTaskDto,
@@ -14,6 +19,7 @@ import {
 export class TaskController {
   private readonly service = new TaskService();
   private readonly analyticsService = new TaskAnalyticsService();
+  private readonly importService = taskImportService;
 
   findAll = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -218,4 +224,91 @@ export class TaskController {
       next(error);
     }
   };
+
+  downloadTemplate = async (
+    _req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const templatePath = path.join(
+        process.cwd(),
+        "templates",
+        "task-import-template.xlsx",
+      );
+      if (!fs.existsSync(templatePath)) {
+        throw new AppError(
+          "File mẫu không tồn tại trên hệ thống",
+          404,
+          ERROR_CODE.NOT_FOUND,
+        );
+      }
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+      res.setHeader(
+        "Content-Disposition",
+        'attachment; filename="task-import-template.xlsx"',
+      );
+      const fileStream = fs.createReadStream(templatePath);
+      fileStream.pipe(res);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  previewImport = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      if (!req.file) {
+        throw new AppError(
+          "Vui lòng tải lên file Excel (.xlsx)",
+          400,
+          ERROR_CODE.VALIDATION_ERROR,
+        );
+      }
+      const data = await this.importService.preview(
+        req.file.buffer,
+        req.body.taskGroupId,
+        req.body.taskGroupName,
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  executeImport = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      if (!req.file) {
+        throw new AppError(
+          "Vui lòng tải lên file Excel (.xlsx)",
+          400,
+          ERROR_CODE.VALIDATION_ERROR,
+        );
+      }
+      const data = await this.importService.execute(
+        req.file.buffer,
+        req.user!.id,
+        req.body.taskGroupId,
+        req.body.taskGroupName,
+      );
+      res.json({
+        success: true,
+        message: `Đã nhập thành công ${data.importedTasks} công việc và ${data.importedAssignments} phân công.`,
+        data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
+

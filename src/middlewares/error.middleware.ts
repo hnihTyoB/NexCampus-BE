@@ -64,6 +64,21 @@ export function errorMiddleware(
     return;
   }
 
+  if ((error as any).name === "MulterError") {
+    const multerError = error as any;
+    const message =
+      multerError.code === "LIMIT_FILE_SIZE"
+        ? "Dung lượng file vượt quá giới hạn cho phép (10MB)"
+        : multerError.message || "Lỗi tải file";
+    res.status(400).json({
+      success: false,
+      message,
+      code: ERROR_CODE.VALIDATION_ERROR,
+      errorCode: ERROR_CODE.VALIDATION_ERROR,
+    });
+    return;
+  }
+
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002") {
       const conflictingFields =

@@ -192,3 +192,8 @@ export const aiSuggestTaskAllocationSchema = z.object({
     .min(1, "At least one candidate is required"),
 });
 
+export const importTaskBodySchema = z.object({
+  taskGroupId: z.string().uuid("Invalid taskGroupId").optional(),
+  taskGroupName: z.string().trim().max(100).optional(),
+});
+
