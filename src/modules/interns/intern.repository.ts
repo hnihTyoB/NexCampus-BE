@@ -32,6 +32,7 @@ const defaultSelect = {
   position: { select: { id: true, name: true } },
   startDate: true,
   duration: true,
+  discordUserId: true,
   discordUsername: true,
   discordRoleGranted: true,
   status: true,
@@ -298,6 +299,7 @@ export class InternRepository {
         positionId: data.positionId,
         startDate: new Date(data.startDate),
         duration: data.duration ?? defaultDuration,
+        discordUserId: data.discordUserId,
         discordUsername: data.discordUsername,
         internCode: data.internCode,
         university: data.university,
@@ -345,6 +347,7 @@ export class InternRepository {
           positionId: data.positionId,
           startDate: new Date(data.startDate),
           duration: data.duration ?? defaultDuration,
+          discordUserId: data.discordUserId,
           discordUsername: data.discordUsername,
           internCode: data.internCode,
           university: data.university,
@@ -383,6 +386,9 @@ export class InternRepository {
           ? { startDate: new Date(data.startDate) }
           : {}),
         ...(data.duration !== undefined ? { duration: data.duration } : {}),
+        ...(data.discordUserId !== undefined
+          ? { discordUserId: data.discordUserId }
+          : {}),
         ...(data.discordUsername !== undefined
           ? { discordUsername: data.discordUsername }
           : {}),

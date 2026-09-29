@@ -15,6 +15,8 @@ model User {
   fullName    String?   @map("full_name")
   avatarUrl   String?   @map("avatar_url")
   phoneNumber String?   @unique @map("phone_number")
+  discordUserId String? @map("discord_user_id")
+  discordUsername String? @map("discord_username")
   isActive    Boolean   @default(false) @map("is_active")
   twoFactorEnabled     Boolean   @default(false) @map("two_factor_enabled")
   twoFactorSecret      String?   @map("two_factor_secret")
@@ -374,6 +376,55 @@ model WebhookDelivery {
   @@map("webhook_deliveries")
 }
 
+// ─── Discord Webhook Integration ───────────────────────────────────────────
+
+enum DiscordWebhookScope {
+  GLOBAL
+  DEPARTMENT
+  TASK_GROUP
+}
+
+enum DiscordWebhookPurpose {
+  DAILY_STANDUP
+  TASK_BOARD
+  MEETING_ROOM
+  LEADERBOARD
+  LEADER_ALERTS
+}
+
+enum DiscordPingStatus {
+  SUCCESS
+  FAILED
+}
+
+model DiscordWebhookConfig {
+  id            String                @id @default(uuid()) @db.Uuid
+  scope         DiscordWebhookScope   @default(GLOBAL)
+  departmentId  String?               @map("department_id") @db.Uuid
+  taskGroupId   String?               @map("task_group_id") @db.Uuid
+  purpose       DiscordWebhookPurpose
+  webhookUrl    String                @map("webhook_url") @db.Text
+  discordRoleId String?               @map("discord_role_id")
+  threadId      String?               @map("thread_id")
+  isEnabled     Boolean               @default(true) @map("is_enabled")
+  lastPingAt    DateTime?             @map("last_ping_at")
+  lastStatus    DiscordPingStatus?    @map("last_status")
+  lastError     String?               @map("last_error") @db.Text
+  createdAt     DateTime              @default(now()) @map("created_at")
+  updatedAt     DateTime              @updatedAt @map("updated_at")
+
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  taskGroup  TaskGroup?  @relation(fields: [taskGroupId], references: [id], onDelete: Cascade)
+
+  @@index([scope])
+  @@index([departmentId])
+  @@index([taskGroupId])
+  @@index([purpose])
+  @@index([isEnabled])
+  @@map("discord_webhook_configs")
+}
+
+
 model SystemConfig {
   id          String   @id @default(uuid()) @db.Uuid
   key         String   @unique
@@ -409,6 +460,7 @@ model Department {
   applications      Application[]
   taskGroups        TaskGroup[]
   meetings          Meeting[]
+  discordWebhooks   DiscordWebhookConfig[]
 
   @@index([deletedAt])
   @@map("departments")
@@ -468,6 +520,7 @@ model Intern {
   positionId         String?      @map("position_id") @db.Uuid
   startDate          DateTime     @map("start_date")
   duration           Int
+  discordUserId      String?      @map("discord_user_id")
   discordUsername    String?      @map("discord_username")
   discordRoleGranted Boolean      @default(false) @map("discord_role_granted")
   status             InternStatus @default(ACTIVE)
@@ -663,6 +716,7 @@ model TaskGroup {
   department Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   tasks      Task[]
   members    TaskGroupMember[]
+  discordWebhooks DiscordWebhookConfig[]
 
   @@unique([name, departmentId])
   @@index([departmentId])

@@ -20,6 +20,8 @@ export interface MeDto {
   fullName: string | null;
   avatarUrl: string | null;
   phoneNumber: string | null;
+  discordUserId?: string | null;
+  discordUsername?: string | null;
   role: string;
   roleId: string;
   permissions: string[];
@@ -47,6 +49,8 @@ export interface UpdateProfileDto {
   fullName?: string;
   avatarUrl?: string;
   phoneNumber?: string;
+  discordUserId?: string | null;
+  discordUsername?: string | null;
 }
 
 export interface UpdatePasswordDto {

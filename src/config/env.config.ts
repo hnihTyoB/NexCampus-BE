@@ -90,6 +90,11 @@ const envSchema = z
     MAIL_USER: z.string().default(""),
     MAIL_PASS: z.string().default(""),
     MAIL_FROM: z.string().default("App Template <noreply@gmail.com>"),
+
+    // ── Discord Bot & Automation ─────────────────────────────────────────────
+    DISCORD_BOT_ENABLED: z.string().default("true"),
+    DISCORD_BOT_TOKEN: z.string().default(""),
+    DISCORD_GUILD_ID: z.string().default(""),
   })
   // ── Production-only Constraints ───────────────────────────────────────────
   .refine(
@@ -275,5 +280,10 @@ export const envConfig = {
     user: _env.MAIL_USER,
     pass: _env.MAIL_PASS,
     from: _env.MAIL_FROM,
+  },
+  discord: {
+    botEnabled: _env.DISCORD_BOT_ENABLED !== "false",
+    botToken: _env.DISCORD_BOT_TOKEN,
+    guildId: _env.DISCORD_GUILD_ID,
   },
 } as const;

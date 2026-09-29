@@ -6,6 +6,8 @@ import { SystemSettingsResponseDto } from "./system-setting.dto";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import { VIETNAM_TIMEZONE } from "../../common/constants/date.constant";
+import { envConfig } from "../../config/env.config";
+import { discordBotService } from "../../common/services/discord-bot.service";
 
 interface CacheEntry {
   value: any;
@@ -25,6 +27,9 @@ const DEFAULT_SETTINGS: SystemSettingsResponseDto = {
   APPLICATION_MAX_FILE_SIZE_MB: 10,
   ALLOW_CROSS_DEPARTMENT_ASSIGNMENT: true,
   AUTO_EVALUATION_ENABLED: false,
+  DISCORD_BOT_ENABLED: envConfig.discord.botEnabled,
+  DISCORD_BOT_TOKEN: envConfig.discord.botToken || "",
+  DISCORD_GUILD_ID: envConfig.discord.guildId || "",
 };
 
 export class SystemSettingService {
@@ -101,7 +106,14 @@ export class SystemSettingService {
     if (rawValue === "true") return true;
     if (rawValue === "false") return false;
 
+    if (key === "DISCORD_BOT_ENABLED") {
+      return rawValue !== "false";
+    }
+
     const defaultVal = (DEFAULT_SETTINGS as any)[key];
+    if (typeof defaultVal === "boolean") {
+      return rawValue === "true";
+    }
     if (typeof defaultVal === "number" || /_MB$|^MAX_/.test(key)) {
       const num = Number(rawValue);
       if (!isNaN(num)) return num;
@@ -298,13 +310,34 @@ export class SystemSettingService {
       }
     }
 
+    // Validation tham số Discord
+    if (key === "DISCORD_GUILD_ID") {
+      const guildStr = String(value || "").trim();
+      if (guildStr.length > 0 && !/^\d{16,21}$/.test(guildStr)) {
+        throw new AppError(
+          "Discord Server ID (Guild ID) không hợp lệ (phải gồm 16 đến 21 chữ số)",
+          400,
+          ERROR_CODE.VALIDATION_ERROR
+        );
+      }
+    }
+
     const stringValue = String(value);
     const updated = await this.repository.upsert(
       key,
       stringValue,
-      category || "GENERAL",
+      category || (key.startsWith("DISCORD_") ? "INTEGRATION" : "GENERAL"),
       description
     );
+
+    // Tự động đồng bộ cấu hình runtime cho Discord Bot Service
+    if (key === "DISCORD_BOT_TOKEN") {
+      discordBotService.setRuntimeConfig({ token: String(value) });
+    } else if (key === "DISCORD_GUILD_ID") {
+      discordBotService.setRuntimeConfig({ guildId: String(value) });
+    } else if (key === "DISCORD_BOT_ENABLED") {
+      discordBotService.setRuntimeConfig({ enabled: value === true || value === "true" });
+    }
 
     // Xóa bộ đệm cache ngay lập tức
     this.clearCache();

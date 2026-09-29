@@ -33,6 +33,7 @@ import {
 } from "../../common/constants/notification.constant";
 
 import { TaskRepository } from "../tasks/task.repository";
+import { discordWebhookService } from "../../common/services/discord-webhook.service";
 
 interface UserPayload {
   id: string;
@@ -359,6 +360,25 @@ export class TaskAssignmentService {
       },
       ipAddress: context?.ipAddress,
     });
+
+    // Bắn thông báo Discord Webhook thời gian thực vào kênh #task-board
+    try {
+      await discordWebhookService.notifyTaskCreated({
+        taskGroupId: task.taskGroupId,
+        departmentId: task.taskGroup?.departmentId || intern.departmentId,
+        task: {
+          id: task.id,
+          code: task.code,
+          title: task.title,
+          deadline: task.deadline,
+          priority: task.priority,
+          assigneeName: intern.fullName,
+          assigneeDiscordId: intern.discordUsername,
+        },
+      });
+    } catch (err: any) {
+      console.warn("[TaskAssignmentService] Failed to dispatch Discord task created:", err.message);
+    }
 
     return result;
   }
@@ -854,6 +874,25 @@ export class TaskAssignmentService {
       details: { taskId: assignment.taskId, blockedReason: blockedReason.trim() },
       ipAddress: context?.ipAddress,
     });
+
+    // Bắn thông báo Discord Webhook thời gian thực vào kênh #task-board (cảnh báo đỏ Neon)
+    try {
+      const taskDetail = await this.taskRepository.findById(assignment.taskId);
+      const internName = assignment.intern?.fullName || "Thực tập sinh";
+
+      await discordWebhookService.notifyTaskBlocked({
+        taskGroupId: taskDetail?.taskGroupId,
+        departmentId: taskDetail?.taskGroup?.departmentId,
+        task: {
+          code: taskDetail?.code,
+          title: taskDetail?.title || "Nhiệm vụ",
+          internName,
+          blockedReason: blockedReason.trim(),
+        },
+      });
+    } catch (err: any) {
+      console.warn("[TaskAssignmentService] Failed to dispatch Discord task blocked:", err.message);
+    }
 
     return result;
   }

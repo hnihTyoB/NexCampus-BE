@@ -1,5 +1,13 @@
 import { z } from "zod";
 import { isPublicHttpUrl } from "../../common/helpers/url.helper";
+import {
+  DISCORD_WEBHOOK_URL_REGEX,
+  DISCORD_WEBHOOK_SCOPE,
+  DISCORD_WEBHOOK_PURPOSE,
+} from "../../common/constants/discord.constant";
+
+const discordScopeValues = Object.values(DISCORD_WEBHOOK_SCOPE) as [string, ...string[]];
+const discordPurposeValues = Object.values(DISCORD_WEBHOOK_PURPOSE) as [string, ...string[]];
 
 export const createApiKeySchema = z.object({
   name: z
@@ -87,3 +95,80 @@ export const triggerJobSchema = z.object({
   data: z.record(z.unknown()).default({}),
   simulateError: z.boolean().optional().default(false),
 });
+
+// ── Discord Webhook Schemas ─────────────────────────────────────────────────
+
+export const createDiscordWebhookSchema = z.object({
+  scope: z
+    .enum(discordScopeValues)
+    .optional()
+    .default(DISCORD_WEBHOOK_SCOPE.GLOBAL),
+  departmentId: z.string().uuid("Invalid Department ID format").nullable().optional(),
+  taskGroupId: z.string().uuid("Invalid Task Group ID format").nullable().optional(),
+  purpose: z.enum(discordPurposeValues),
+  webhookUrl: z
+    .string()
+    .min(1, "Discord Webhook URL là bắt buộc")
+    .regex(
+      DISCORD_WEBHOOK_URL_REGEX,
+      "URL Discord Webhook không đúng định dạng chuẩn (https://discord.com/api/webhooks/...)",
+    ),
+  discordRoleId: z.string().trim().nullable().optional(),
+  threadId: z.string().trim().nullable().optional(),
+  isEnabled: z.boolean().optional().default(true),
+});
+
+export const updateDiscordWebhookSchema = z.object({
+  scope: z.enum(discordScopeValues).optional(),
+  departmentId: z.string().uuid("Invalid Department ID format").nullable().optional(),
+  taskGroupId: z.string().uuid("Invalid Task Group ID format").nullable().optional(),
+  purpose: z.enum(discordPurposeValues).optional(),
+  webhookUrl: z
+    .string()
+    .regex(
+      DISCORD_WEBHOOK_URL_REGEX,
+      "URL Discord Webhook không đúng định dạng chuẩn (https://discord.com/api/webhooks/...)",
+    )
+    .optional(),
+  discordRoleId: z.string().trim().nullable().optional(),
+  threadId: z.string().trim().nullable().optional(),
+  isEnabled: z.boolean().optional(),
+});
+
+export const discordDepartmentParamSchema = z.object({
+  id: z.string().uuid("Invalid Department ID format"),
+});
+
+export const discordWebhookIdParamSchema = z.object({
+  id: z.string().uuid("Invalid Discord Webhook ID format"),
+});
+
+export const testDiscordWebhookSchema = z
+  .object({
+    id: z.string().uuid("Invalid Discord Webhook ID format").optional(),
+    webhookUrl: z
+      .string()
+      .regex(
+        DISCORD_WEBHOOK_URL_REGEX,
+        "URL Discord Webhook không đúng định dạng chuẩn",
+      )
+      .optional(),
+    discordRoleId: z.string().trim().nullable().optional(),
+    channelName: z.string().trim().optional(),
+  })
+  .refine((data) => Boolean(data.id || data.webhookUrl), {
+    message: "Cần cung cấp ít nhất ID hoặc Webhook URL để thử nghiệm",
+    path: ["webhookUrl"],
+  });
+
+export const findAllDiscordWebhooksQuerySchema = z.object({
+  scope: z.enum(discordScopeValues).optional(),
+  departmentId: z.string().uuid().optional(),
+  taskGroupId: z.string().uuid().optional(),
+  purpose: z.enum(discordPurposeValues).optional(),
+  isEnabled: z
+    .enum(["true", "false"])
+    .transform((val) => val === "true")
+    .optional(),
+});
+

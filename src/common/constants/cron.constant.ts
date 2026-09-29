@@ -7,6 +7,10 @@ export const CRON_JOB_NAMES = {
   DAILY_SUMMARY_DIGEST: "daily-summary-digest",
   WEEKLY_SUMMARY_DIGEST: "weekly-summary-digest",
   REMIND_DAILY_REPORT: "remind-daily-report",
+  REMIND_DAILY_REPORT_FIRST: "remind-daily-report-first",
+  REMIND_DAILY_REPORT_CLOSING: "remind-daily-report-closing",
+  REMIND_UPCOMING_MEETINGS: "remind-upcoming-meetings",
+  WEEKLY_LEADERBOARD_DISCORD: "weekly-leaderboard-discord",
 } as const;
 
 export type CronJobName = (typeof CRON_JOB_NAMES)[keyof typeof CRON_JOB_NAMES];
@@ -43,6 +47,26 @@ export const DEFAULT_CRON_SCHEDULES: Record<
     cron: "0 17 * * 1-5", // Thứ 2 đến Thứ 6 lúc 17:00 Asia/Ho_Chi_Minh
     description:
       "Nhắc nhở nộp báo cáo ngày cho thực tập sinh (Tự động miễn trừ người có phép đã duyệt)",
+  },
+  "remind-daily-report-first": {
+    cron: "30 17 * * 1-5", // Thứ 2 đến Thứ 6 lúc 17:30 Asia/Ho_Chi_Minh
+    description:
+      "Nhắc nhở nộp báo cáo ngày đợt 1 (17:30) qua Discord Webhook theo Phòng ban và In-app",
+  },
+  "remind-daily-report-closing": {
+    cron: "30 18 * * 1-5", // Thứ 2 đến Thứ 6 lúc 18:30 Asia/Ho_Chi_Minh
+    description:
+      "Điểm danh chốt ca nộp báo cáo ngày (18:30) qua Discord Webhook (tag đích danh)",
+  },
+  "remind-upcoming-meetings": {
+    cron: "*/5 * * * *", // Quét mỗi 5 phút
+    description:
+      "Quét và nhắc nhở cuộc họp trước 15 phút qua Discord Webhook phòng họp",
+  },
+  "weekly-leaderboard-discord": {
+    cron: "0 9 * * 1", // Thứ 2 lúc 09:00 sáng Asia/Ho_Chi_Minh
+    description:
+      "Bảng vàng vinh danh Top 3 thực tập sinh xuất sắc nhất tuần trên kênh Discord #vinh-danh",
   },
 };
 

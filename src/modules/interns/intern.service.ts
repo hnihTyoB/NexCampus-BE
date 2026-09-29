@@ -23,6 +23,7 @@ import {
 } from "../../common/constants/audit-log.constant";
 import { systemConfigService } from "../system-config/system-config.service";
 import { HRM_CONFIG_KEYS } from "../../common/constants/system-config.constant";
+import { discordBotService } from "../../common/services/discord-bot.service";
 
 export class InternService {
   private readonly repository = new InternRepository();
@@ -242,6 +243,27 @@ export class InternService {
       },
     });
 
+    // Zero-Touch Discord Member Sync
+    const discordId =
+      intern.discordUserId ||
+      (intern.discordUsername && /^\d{17,20}$/.test(intern.discordUsername)
+        ? intern.discordUsername
+        : null);
+    if (discordId && intern.departmentId) {
+      discordBotService
+        .syncInternMember({
+          internId: intern.id,
+          discordUserId: discordId,
+          departmentId: intern.departmentId,
+        })
+        .catch((err) => {
+          console.warn(
+            `[InternService] Discord sync for ${intern.fullName} failed:`,
+            err?.message,
+          );
+        });
+    }
+
     return intern;
   }
 
@@ -356,6 +378,27 @@ export class InternService {
       },
     });
 
+    // Zero-Touch Discord Member Sync
+    const discordId =
+      intern.discordUserId ||
+      (intern.discordUsername && /^\d{17,20}$/.test(intern.discordUsername)
+        ? intern.discordUsername
+        : null);
+    if (discordId && intern.departmentId) {
+      discordBotService
+        .syncInternMember({
+          internId: intern.id,
+          discordUserId: discordId,
+          departmentId: intern.departmentId,
+        })
+        .catch((err) => {
+          console.warn(
+            `[InternService] Discord sync for ${intern.fullName} failed:`,
+            err?.message,
+          );
+        });
+    }
+
     return {
       ...intern,
       generatedPassword: rawPassword,
@@ -435,6 +478,54 @@ export class InternService {
       },
     });
 
+    // Zero-Touch Discord Member Sync
+    const oldDeptId = intern.departmentId;
+    const newDeptId = updated.departmentId;
+    const isCompletedOrDropped =
+      data.status === INTERN_STATUS.COMPLETED ||
+      data.status === INTERN_STATUS.DROPPED;
+    const currentDiscordId =
+      updated.discordUserId ||
+      (updated.discordUsername && /^\d{17,20}$/.test(updated.discordUsername)
+        ? updated.discordUsername
+        : null);
+
+    if (currentDiscordId) {
+      if (isCompletedOrDropped) {
+        discordBotService
+          .syncInternMember({
+            internId: id,
+            discordUserId: currentDiscordId,
+            departmentId: null,
+            oldDepartmentId: oldDeptId,
+          })
+          .catch((err) => {
+            console.warn(
+              `[InternService] Discord de-sync on status change failed:`,
+              err?.message,
+            );
+          });
+      } else if (
+        (newDeptId && newDeptId !== oldDeptId) ||
+        data.discordUserId ||
+        (data.discordUsername && !updated.discordRoleGranted)
+      ) {
+        discordBotService
+          .syncInternMember({
+            internId: id,
+            discordUserId: currentDiscordId,
+            departmentId: newDeptId,
+            oldDepartmentId: oldDeptId !== newDeptId ? oldDeptId : null,
+          })
+          .catch((err) => {
+            console.warn(
+              `[InternService] Discord sync on update failed:`,
+              err?.message,
+            );
+          });
+      }
+    }
+
     return updated;
   }
 
@@ -492,7 +583,7 @@ export class InternService {
   }
 
   async delete(id: string, actorId?: string): Promise<InternDto> {
-    await this.findById(id);
+    const intern = await this.findById(id);
 
     const result = await this.repository.softDelete(id);
 
@@ -502,6 +593,28 @@ export class InternService {
       targetType: AUDIT_TARGET_TYPE.INTERN,
       targetId: id,
     });
+
+    // Zero-Touch Discord De-sync
+    const discordId =
+      intern.discordUserId ||
+      (intern.discordUsername && /^\d{17,20}$/.test(intern.discordUsername)
+        ? intern.discordUsername
+        : null);
+    if (discordId && intern.departmentId) {
+      discordBotService
+        .syncInternMember({
+          internId: id,
+          discordUserId: discordId,
+          departmentId: null,
+          oldDepartmentId: intern.departmentId,
+        })
+        .catch((err) => {
+          console.warn(
+            `[InternService] Discord de-sync on delete failed:`,
+            err?.message,
+          );
+        });
+    }
 
     return result;
   }

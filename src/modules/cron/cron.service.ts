@@ -25,7 +25,8 @@ import {
 import { CronJobExecutionResultDto, CronJobItemDto, ToggleCronJobResponseDto } from "./cron.dto";
 import { cronQueue } from "../../common/queues/cron.queue";
 import { prisma } from "../../database/prisma.client";
-import { AbsenceStatus } from "@prisma/client";
+import { AbsenceStatus, MeetingStatus } from "@prisma/client";
+import { discordWebhookService } from "../../common/services/discord-webhook.service";
 
 export class CronService {
   /**
@@ -323,27 +324,32 @@ export class CronService {
 
   /**
    * 5. Nhắc nhở nộp báo cáo tiến độ ngày cho thực tập sinh (Tự động miễn trừ chuông cho người có phép đã duyệt)
+   * Tích hợp tự động bắn Discord Webhook theo Phòng ban:
+   * - 17:30 (Nhắc nhở đợt 1 / phase = 'REMINDER'): Bắn Embed màu Vàng/Cam (#FEE75C) tag Role phòng ban
+   * - 18:30 (Điểm danh chốt ca / phase = 'CLOSING'): Bắn Embed màu Đỏ Cam danh sách những ai chưa nộp, tag đích danh
    */
-  async executeRemindDailyReports(): Promise<{
+  async executeRemindDailyReports(params: { phase?: "REMINDER" | "CLOSING" } = {}): Promise<{
     remindedCount: number;
     bypassedCount: number;
     bypassedInterns: string[];
+    discordNotifiedDepartments?: number;
   }> {
     const today = getVietnamToday();
     const todayStr = formatVietnamDate(today);
 
-    // Lấy danh sách thực tập sinh đang hoạt động
+    // Lấy danh sách thực tập sinh đang hoạt động kèm phòng ban
     const activeInterns = await prisma.intern.findMany({
       where: {
         user: { isActive: true, deletedAt: null },
       },
       include: {
         user: { select: { id: true, email: true, fullName: true } },
+        department: { select: { id: true, name: true } },
       },
     });
 
     if (activeInterns.length === 0) {
-      return { remindedCount: 0, bypassedCount: 0, bypassedInterns: [] };
+      return { remindedCount: 0, bypassedCount: 0, bypassedInterns: [], discordNotifiedDepartments: 0 };
     }
 
     // Lấy danh sách intern đã nộp report hôm nay
@@ -376,7 +382,15 @@ export class CronService {
     let bypassedCount = 0;
     const bypassedInterns: string[] = [];
 
+    // Nhóm thực tập sinh chưa nộp theo từng Phòng ban để gửi Discord Webhook
+    const missingByDepartment = new Map<string, { departmentName: string; interns: any[] }>();
+    const allDepartmentsWithActiveInterns = new Map<string, string>();
+
     for (const intern of activeInterns) {
+      if (intern.departmentId && intern.department?.name) {
+        allDepartmentsWithActiveInterns.set(intern.departmentId, intern.department.name);
+      }
+
       // Đã nộp report -> không cần nhắc
       if (submittedInternIds.has(intern.id)) {
         continue;
@@ -389,43 +403,228 @@ export class CronService {
         continue;
       }
 
-      // Gửi thông báo nhắc nhở nộp báo cáo ngày
+      // Intern chưa nộp và không có phép
       remindedCount++;
-      await notificationDispatcher
-        .send({
-          userId: intern.userId,
-          channels: [NOTIFICATION_CHANNEL.WEB],
-          web: {
-            type: NOTIFICATION_TYPE.WARNING,
-            title: "Nhắc nhở nộp báo cáo ngày",
-            content: `Đã 17:00 rồi! Đừng quên nộp báo cáo tiến độ ngày hôm nay (${todayStr}) trước giờ kết thúc ca nhé!`,
-            actionUrl: "/intern/daily-report",
-          },
-          email: intern.user.email
-            ? {
-                toEmail: intern.user.email,
-                templateKey: EMAIL_TEMPLATE_KEY.CUSTOM,
-                templateData: {
-                  subject: `[NexCampus] Nhắc nhở nộp báo cáo ngày hôm nay (${todayStr})`,
-                  title: "Nhắc nhở nộp báo cáo ngày",
-                  content: `Xin chào ${intern.user.fullName || "bạn"}, đừng quên nộp báo cáo tiến độ ngày hôm nay trước giờ kết thúc ca làm việc nhé!`,
-                  actionUrl: "/intern/daily-report",
-                },
-              }
-            : undefined,
-        })
-        .catch((err: any) => {
-          console.warn(
-            `[CronService] Failed to send daily reminder to intern ${intern.id}:`,
-            err.message,
-          );
+
+      if (intern.departmentId && intern.department?.name) {
+        const currentGroup = missingByDepartment.get(intern.departmentId) || {
+          departmentName: intern.department.name,
+          interns: [],
+        };
+        currentGroup.interns.push({
+          fullName: intern.user.fullName || intern.fullName || intern.id,
+          discordUsername: intern.discordUsername,
+          internCode: intern.internCode,
         });
+        missingByDepartment.set(intern.departmentId, currentGroup);
+      }
+
+      // Gửi thông báo Web in-app & Email cá nhân nếu ở phase REMINDER
+      if (params.phase !== "CLOSING") {
+        await notificationDispatcher
+          .send({
+            userId: intern.userId,
+            channels: [NOTIFICATION_CHANNEL.WEB],
+            web: {
+              type: NOTIFICATION_TYPE.WARNING,
+              title: "Nhắc nhở nộp báo cáo ngày",
+              content: `Đã 17:30 rồi! Đừng quên nộp báo cáo tiến độ ngày hôm nay (${todayStr}) trước giờ kết thúc ca nhé!`,
+              actionUrl: "/intern/daily-report",
+            },
+            email: intern.user.email
+              ? {
+                  toEmail: intern.user.email,
+                  templateKey: EMAIL_TEMPLATE_KEY.CUSTOM,
+                  templateData: {
+                    subject: `[NexCampus] Nhắc nhở nộp báo cáo ngày hôm nay (${todayStr})`,
+                    title: "Nhắc nhở nộp báo cáo ngày",
+                    content: `Xin chào ${intern.user.fullName || "bạn"}, đừng quên nộp báo cáo tiến độ ngày hôm nay trước giờ kết thúc ca làm việc nhé!`,
+                    actionUrl: "/intern/daily-report",
+                  },
+                }
+              : undefined,
+          })
+          .catch((err: any) => {
+            console.warn(
+              `[CronService] Failed to send daily reminder to intern ${intern.id}:`,
+              err.message,
+            );
+          });
+      }
+    }
+
+    // ── Bắn thông báo Discord Webhook theo phân luồng Phòng ban ──────────────
+    let discordNotifiedDepartments = 0;
+
+    if (params.phase === "CLOSING") {
+      // 18:30 — Chốt ca điểm danh: Bắn danh sách chưa nộp vào kênh của từng phòng ban
+      for (const [deptId, deptName] of allDepartmentsWithActiveInterns.entries()) {
+        const missingData = missingByDepartment.get(deptId);
+        const missingList = missingData ? missingData.interns : [];
+        const sent = await discordWebhookService.notifyDailyStandupClosing({
+          departmentId: deptId,
+          departmentName: deptName,
+          missingInterns: missingList,
+        });
+        if (sent) discordNotifiedDepartments++;
+      }
+    } else {
+      // 17:30 — Nhắc nhở đợt 1: Bắn Embed vàng nhắc nhở vào kênh của từng phòng ban
+      for (const [deptId, deptName] of allDepartmentsWithActiveInterns.entries()) {
+        const sent = await discordWebhookService.notifyDailyStandupReminder({
+          departmentId: deptId,
+          departmentName: deptName,
+        });
+        if (sent) discordNotifiedDepartments++;
+      }
     }
 
     return {
       remindedCount,
       bypassedCount,
       bypassedInterns,
+      discordNotifiedDepartments,
+    };
+  }
+
+  /**
+   * 6. Quét lịch họp và gửi Embed nhắc nhở trước 15 phút qua Discord Webhook (#meeting-room)
+   */
+  async executeMeetingReminderJob(): Promise<{
+    remindedMeetingsCount: number;
+    meetings: string[];
+  }> {
+    const now = new Date();
+    // Khung giờ quét từ 10 phút đến 20 phút tới (bình quân ~15 phút trước giờ bắt đầu)
+    const windowStart = new Date(now.getTime() + 10 * 60 * 1000);
+    const windowEnd = new Date(now.getTime() + 20 * 60 * 1000);
+
+    const upcomingMeetings = await prisma.meeting.findMany({
+      where: {
+        status: MeetingStatus.SCHEDULED,
+        deletedAt: null,
+        startTime: {
+          gte: windowStart,
+          lte: windowEnd,
+        },
+      },
+      include: {
+        department: { select: { id: true, name: true } },
+        host: { select: { fullName: true } },
+      },
+    });
+
+    let remindedMeetingsCount = 0;
+    const meetings: string[] = [];
+
+    for (const meeting of upcomingMeetings) {
+      // Kiểm tra tránh gửi trùng lặp nếu cron chạy lặp lại mỗi 5 phút
+      const alreadyNotified = await prisma.auditLog.findFirst({
+        where: {
+          targetType: AUDIT_TARGET_TYPE.MEETING,
+          targetId: meeting.id,
+          action: AUDIT_ACTION.NOTIFY_DISCORD_REMINDER,
+        },
+      });
+
+      if (alreadyNotified) {
+        continue;
+      }
+
+      const sent = await discordWebhookService.notifyMeetingReminder({
+        departmentId: meeting.departmentId,
+        meeting: {
+          id: meeting.id,
+          title: meeting.title,
+          departmentName: meeting.department?.name,
+          startTime: meeting.startTime,
+          endTime: meeting.endTime,
+          meetingLink: meeting.meetingLink,
+          location: meeting.location,
+          hostName: meeting.host?.fullName,
+        },
+      });
+
+      if (sent) {
+        remindedMeetingsCount++;
+        meetings.push(meeting.title);
+
+        await prisma.auditLog.create({
+          data: {
+            action: AUDIT_ACTION.NOTIFY_DISCORD_REMINDER,
+            targetType: AUDIT_TARGET_TYPE.MEETING,
+            targetId: meeting.id,
+            details: { meetingTitle: meeting.title, startTime: meeting.startTime },
+          },
+        });
+      }
+    }
+
+    return { remindedMeetingsCount, meetings };
+  }
+
+  /**
+   * 7. Bảng vàng vinh danh Top 3 Thực tập sinh điểm đánh giá tuần cao nhất (#vinh-danh)
+   */
+  async executeWeeklyLeaderboardJob(params: { week?: number; year?: number } = {}): Promise<{
+    week: number;
+    year: number;
+    topCount: number;
+    sent: boolean;
+  }> {
+    const now = new Date();
+    // Tìm tuần đánh giá gần nhất nếu không truyền
+    const latestEval = await prisma.weeklyEvaluation.findFirst({
+      where: { deletedAt: null },
+      orderBy: [{ year: "desc" }, { week: "desc" }],
+      select: { week: true, year: true },
+    });
+
+    const targetWeek = params.week || latestEval?.week || 1;
+    const targetYear = params.year || latestEval?.year || now.getFullYear();
+
+    const evaluations = await prisma.weeklyEvaluation.findMany({
+      where: {
+        week: targetWeek,
+        year: targetYear,
+        deletedAt: null,
+      },
+      include: {
+        intern: {
+          select: {
+            id: true,
+            fullName: true,
+            internCode: true,
+            discordUsername: true,
+            department: { select: { id: true, name: true } },
+          },
+        },
+      },
+      orderBy: { score: "desc" },
+      take: 3,
+    });
+
+    const topInterns = evaluations.map((ev, idx) => ({
+      rank: idx + 1,
+      fullName: ev.intern.fullName,
+      internCode: ev.intern.internCode,
+      departmentName: ev.intern.department?.name,
+      score: ev.score,
+      strengths: ev.strengths,
+      discordUsername: ev.intern.discordUsername,
+    }));
+
+    const sent = await discordWebhookService.notifyWeeklyLeaderboard({
+      week: targetWeek,
+      year: targetYear,
+      topInterns,
+    });
+
+    return {
+      week: targetWeek,
+      year: targetYear,
+      topCount: topInterns.length,
+      sent,
     };
   }
 
@@ -471,7 +670,26 @@ export class CronService {
         break;
       }
       case CRON_JOB_NAMES.REMIND_DAILY_REPORT: {
-        executionData = await this.executeRemindDailyReports();
+        const phase = params["phase"] as "REMINDER" | "CLOSING" | undefined;
+        executionData = await this.executeRemindDailyReports({ phase });
+        break;
+      }
+      case CRON_JOB_NAMES.REMIND_DAILY_REPORT_FIRST: {
+        executionData = await this.executeRemindDailyReports({ phase: "REMINDER" });
+        break;
+      }
+      case CRON_JOB_NAMES.REMIND_DAILY_REPORT_CLOSING: {
+        executionData = await this.executeRemindDailyReports({ phase: "CLOSING" });
+        break;
+      }
+      case CRON_JOB_NAMES.REMIND_UPCOMING_MEETINGS: {
+        executionData = await this.executeMeetingReminderJob();
+        break;
+      }
+      case CRON_JOB_NAMES.WEEKLY_LEADERBOARD_DISCORD: {
+        const week = typeof params["week"] === "number" ? params["week"] : undefined;
+        const year = typeof params["year"] === "number" ? params["year"] : undefined;
+        executionData = await this.executeWeeklyLeaderboardJob({ week, year });
         break;
       }
       default:
