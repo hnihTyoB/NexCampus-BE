@@ -16,6 +16,7 @@ import {
 } from "../../common/constants/audit-log.constant";
 import { PERMISSIONS } from "../../common/constants/permission.constant";
 import { permissionCacheService } from "../../common/services/permission-cache.service";
+import { discordBotService } from "../../common/services/discord-bot.service";
 
 export class DepartmentService {
   private readonly repository = new DepartmentRepository();
@@ -78,6 +79,19 @@ export class DepartmentService {
       details: { name: result.name },
     });
 
+    // Zero-Touch Discord Bot Provisioning (Tạo Role & Private Thread trên Discord)
+    try {
+      await discordBotService.provisionDepartment({
+        departmentId: result.id,
+        departmentName: result.name,
+      });
+    } catch (err: any) {
+      console.warn(
+        `[DepartmentService] Auto-provision Discord for ${result.name} warning:`,
+        err?.message,
+      );
+    }
+
     return result;
   }
 
@@ -133,6 +147,16 @@ export class DepartmentService {
       targetId: id,
       details: { name: dept.name },
     });
+
+    // Zero-Touch Discord Bot Cleanup (Xóa Role & Private Thread trên Discord)
+    try {
+      await discordBotService.deprovisionDepartment(id);
+    } catch (err: any) {
+      console.warn(
+        `[DepartmentService] Auto-deprovision Discord for ${dept.name} warning:`,
+        err?.message,
+      );
+    }
 
     return result;
   }

@@ -30,6 +30,8 @@ export class AuthRepository {
         fullName: true,
         avatarUrl: true,
         phoneNumber: true,
+        discordUserId: true,
+        discordUsername: true,
         isActive: true,
         twoFactorEnabled: true,
         createdAt: true,
@@ -255,7 +257,13 @@ export class AuthRepository {
 
   async updateProfile(
     userId: string,
-    data: { fullName?: string; avatarUrl?: string; phoneNumber?: string },
+    data: {
+      fullName?: string;
+      avatarUrl?: string;
+      phoneNumber?: string;
+      discordUserId?: string | null;
+      discordUsername?: string | null;
+    },
   ) {
     return prisma.user.update({
       where: { id: userId },

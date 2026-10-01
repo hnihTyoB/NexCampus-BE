@@ -25,6 +25,8 @@ import {
 } from "../../common/constants/notification.constant";
 import { TaskRepository } from "../tasks/task.repository";
 import { TaskAssignmentRepository } from "../task-assignments/task-assignment.repository";
+import { UserRepository } from "../users/user.repository";
+import { discordWebhookService } from "../../common/services/discord-webhook.service";
 import crypto from "crypto";
 
 interface UserPayload {
@@ -39,6 +41,7 @@ export class TaskSubmissionService {
   private readonly notificationService = new NotificationService();
   private readonly taskRepository = new TaskRepository();
   private readonly taskAssignmentRepository = new TaskAssignmentRepository();
+  private readonly userRepository = new UserRepository();
 
   private async hasGlobalAccess(actorId: string): Promise<boolean> {
     const callerPerms = new Set(
@@ -197,6 +200,31 @@ export class TaskSubmissionService {
       },
       ipAddress: context?.ipAddress,
     });
+
+    // Bắn thông báo Discord Webhook thời gian thực vào kênh #task-board (Bài nộp mới cần xét duyệt)
+    try {
+      const taskDetail = await this.taskRepository.findById(assignment.taskId);
+
+      const leaderUser = assignment.intern?.leaderId
+        ? await this.userRepository.findById(assignment.intern.leaderId)
+        : null;
+
+      await discordWebhookService.notifyTaskNeedsReview({
+        taskGroupId: taskDetail?.taskGroupId,
+        departmentId: taskDetail?.taskGroup?.departmentId || assignment.intern?.departmentId,
+        task: {
+          code: taskDetail?.code,
+          title: taskDetail?.title || "Nhiệm vụ",
+          internName: assignment.intern?.fullName || "Thực tập sinh",
+          attempt: submission.attempt,
+          prLink: dto.prLink,
+          videoDemo: dto.videoDemo,
+          leaderName: leaderUser?.fullName,
+        },
+      });
+    } catch (err: any) {
+      console.warn("[TaskSubmissionService] Failed to dispatch Discord submission review:", err.message);
+    }
 
     return submission;
   }

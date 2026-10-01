@@ -63,6 +63,8 @@ import {
 
 import { Auth2FAService } from "./services/auth-2fa.service";
 import { dispatchEmailJob } from "../../queues";
+import { discordBotService } from "../../common/services/discord-bot.service";
+import { prisma } from "../../database/prisma.client";
 import { mailConfig } from "../../config/mail.config";
 
 export class AuthService {
@@ -740,6 +742,8 @@ export class AuthService {
       fullName: user.fullName,
       avatarUrl: user.avatarUrl,
       phoneNumber: user.phoneNumber,
+      discordUserId: (user as any).discordUserId || null,
+      discordUsername: (user as any).discordUsername || null,
       role: user.role.name,
       roleId: user.roleId,
       permissions,
@@ -853,6 +857,50 @@ export class AuthService {
     }
 
     await this.repository.updateProfile(userId, data);
+
+    // Đồng bộ quyền truy cập Discord tương ứng theo vai trò
+    if (data.discordUserId !== undefined) {
+      const discordId = data.discordUserId?.trim() || null;
+
+      // 1. Nếu là INTERN: đồng bộ bảng Intern và gọi syncInternMember
+      if (user.role.name === ROLES.INTERN) {
+        try {
+          const intern = await prisma.intern.findUnique({ where: { userId } });
+          if (intern) {
+            await prisma.intern.update({
+              where: { id: intern.id },
+              data: {
+                discordUserId: discordId,
+                discordUsername: data.discordUsername?.trim() || intern.discordUsername,
+              },
+            });
+            if (discordId) {
+              await discordBotService.syncInternMember({
+                internId: intern.id,
+                discordUserId: discordId,
+                departmentId: intern.departmentId,
+              });
+            }
+          }
+        } catch (err: any) {
+          console.warn(`[AuthService] Sync intern discord failed:`, err?.message);
+        }
+      }
+
+      // 2. Nếu là ADMIN: Admin mặc định luôn được truy cập mọi thread của tất cả phòng ban
+      if (user.role.name === ROLES.ADMIN && discordId) {
+        discordBotService.syncAdminThreads(discordId).catch((err) => {
+          console.warn(`[AuthService] Sync admin discord threads failed:`, err?.message);
+        });
+      }
+
+      // 3. Nếu là LEADER: Leader tự động được thêm vào Private Threads của các phòng ban họ phụ trách
+      if (user.role.name === ROLES.LEADER && discordId) {
+        discordBotService.syncLeaderThreads(userId, discordId).catch((err) => {
+          console.warn(`[AuthService] Sync leader discord threads failed:`, err?.message);
+        });
+      }
+    }
 
     notificationDispatcher
       .notify(

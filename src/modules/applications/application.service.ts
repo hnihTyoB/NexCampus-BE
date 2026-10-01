@@ -36,6 +36,7 @@ import {
 import { dispatchEmailJob } from "../../queues";
 import { R2Service } from "../../common/services/r2.service";
 import { envConfig } from "../../config/env.config";
+import { discordBotService } from "../../common/services/discord-bot.service";
 
 export class ApplicationService {
   private readonly repository = new ApplicationRepository();
@@ -484,7 +485,7 @@ export class ApplicationService {
       "INT",
     );
 
-    const { application: approvedApp, user } =
+    const { application: approvedApp, user, intern } =
       await this.repository.approveWithAccount(
         id,
         actorId,
@@ -506,6 +507,36 @@ export class ApplicationService {
           internCodePrefix,
         },
       );
+
+    // Zero-Touch Discord Member Sync
+    if (intern?.id && application.departmentId) {
+      prisma.intern
+        .findUnique({
+          where: { id: intern.id },
+          select: { discordUserId: true, discordUsername: true },
+        })
+        .then((freshIntern) => {
+          const discordId =
+            freshIntern?.discordUserId ||
+            (freshIntern?.discordUsername &&
+            /^\d{17,20}$/.test(freshIntern.discordUsername)
+              ? freshIntern.discordUsername
+              : null);
+          if (discordId && application.departmentId) {
+            return discordBotService.syncInternMember({
+              internId: intern.id,
+              discordUserId: discordId,
+              departmentId: application.departmentId,
+            });
+          }
+        })
+        .catch((err) => {
+          console.warn(
+            `[ApplicationService] Discord auto-sync on approve warning:`,
+            err?.message,
+          );
+        });
+    }
 
     // Enqueue approval and welcome email to BullMQ emailQueue
     const loginUrl =

@@ -122,6 +122,11 @@ export const updateMeInternSchema = z.object({
   // departmentId và positionId bị loại bỏ có chủ đích:
   // Intern không được tự chuyển phòng ban hoặc vị trí (SEC-03).
   // Chỉ Admin/Manager mới được thay đổi qua endpoint quản lý.
+  discordUserId: z
+    .string()
+    .regex(/^\d{17,20}$/, "Discord User ID phải là chuỗi số từ 17 đến 20 ký tự")
+    .nullable()
+    .optional(),
   discordUsername: z.string().nullable().optional(),
   university: z.string().trim().nullable().optional(),
   major: z.string().trim().nullable().optional(),

@@ -61,6 +61,13 @@ export const updateProfileSchema = z.object({
       "Invalid phone number format (must be 10-11 digits)",
     )
     .optional(),
+  discordUserId: z
+    .string()
+    .regex(/^\d{17,20}$/, "Discord User ID phải là dãy từ 17 đến 20 chữ số")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  discordUsername: z.string().max(100).optional().nullable(),
 });
 
 export const updatePasswordSchema = z.object({

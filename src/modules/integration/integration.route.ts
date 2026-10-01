@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { IntegrationController } from "./integration.controller";
+import { discordWebhookController } from "./discord-webhook.controller";
 import { authMiddleware } from "../../middlewares/auth.middleware";
 import { apiKeyAuthMiddleware } from "../../middlewares/api-key.middleware";
 import { requirePermission } from "../../middlewares/permission.middleware";
@@ -15,6 +16,12 @@ import {
   deliveryIdParamSchema,
   listDeliveriesQuerySchema,
   triggerJobSchema,
+  createDiscordWebhookSchema,
+  updateDiscordWebhookSchema,
+  discordWebhookIdParamSchema,
+  discordDepartmentParamSchema,
+  testDiscordWebhookSchema,
+  findAllDiscordWebhooksQuerySchema,
 } from "./integration.validation";
 
 const router = Router();
@@ -127,4 +134,147 @@ router.post(
   controller.triggerDemoJob,
 );
 
+// ── Discord Webhook Endpoints ───────────────────────────────────────────────
+
+// List Discord Webhooks
+router.get(
+  "/discord/webhooks",
+  authMiddleware,
+  requirePermission(PERMISSIONS.WEBHOOK_READ),
+  validate(findAllDiscordWebhooksQuerySchema, "query"),
+  discordWebhookController.listWebhooks,
+);
+router.get(
+  "/webhooks/discord",
+  authMiddleware,
+  requirePermission(PERMISSIONS.WEBHOOK_READ),
+  validate(findAllDiscordWebhooksQuerySchema, "query"),
+  discordWebhookController.listWebhooks,
+);
+
+// Get Discord Webhook by ID
+router.get(
+  "/discord/webhooks/:id",
+  authMiddleware,
+  requirePermission(PERMISSIONS.WEBHOOK_READ),
+  validate(discordWebhookIdParamSchema, "params"),
+  discordWebhookController.getWebhookById,
+);
+router.get(
+  "/webhooks/discord/:id",
+  authMiddleware,
+  requirePermission(PERMISSIONS.WEBHOOK_READ),
+  validate(discordWebhookIdParamSchema, "params"),
+  discordWebhookController.getWebhookById,
+);
+
+// Create or Update Discord Webhook
+router.post(
+  "/discord/webhooks",
+  authMiddleware,
+  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  validate(createDiscordWebhookSchema),
+  discordWebhookController.createOrUpdateWebhook,
+);
+router.post(
+  "/webhooks/discord",
+  authMiddleware,
+  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  validate(createDiscordWebhookSchema),
+  discordWebhookController.createOrUpdateWebhook,
+);
+
+// Update Discord Webhook
+router.put(
+  "/discord/webhooks/:id",
+  authMiddleware,
+  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  validate(discordWebhookIdParamSchema, "params"),
+  validate(updateDiscordWebhookSchema),
+  discordWebhookController.updateWebhook,
+);
+router.put(
+  "/webhooks/discord/:id",
+  authMiddleware,
+  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  validate(discordWebhookIdParamSchema, "params"),
+  validate(updateDiscordWebhookSchema),
+  discordWebhookController.updateWebhook,
+);
+
+// Delete Discord Webhook
+router.delete(
+  "/discord/webhooks/:id",
+  authMiddleware,
+  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  validate(discordWebhookIdParamSchema, "params"),
+  discordWebhookController.deleteWebhook,
+);
+router.delete(
+  "/webhooks/discord/:id",
+  authMiddleware,
+  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  validate(discordWebhookIdParamSchema, "params"),
+  discordWebhookController.deleteWebhook,
+);
+
+// Test Ping Discord Webhook
+router.post(
+  "/discord/webhooks/test",
+  authMiddleware,
+  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  validate(testDiscordWebhookSchema),
+  discordWebhookController.testPingWebhook,
+);
+router.post(
+  "/webhooks/discord/test",
+  authMiddleware,
+  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  validate(testDiscordWebhookSchema),
+  discordWebhookController.testPingWebhook,
+);
+router.post(
+  "/discord/webhooks/:id/test",
+  authMiddleware,
+  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  validate(discordWebhookIdParamSchema, "params"),
+  discordWebhookController.testPingWebhook,
+);
+router.post(
+  "/webhooks/discord/:id/test",
+  authMiddleware,
+  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  validate(discordWebhookIdParamSchema, "params"),
+  discordWebhookController.testPingWebhook,
+);
+
+// ── Discord Bot Automation & Provisioning ───────────────────────────────────
+
+// Check Discord Bot status
+router.get(
+  "/discord/status",
+  authMiddleware,
+  requirePermission(PERMISSIONS.WEBHOOK_READ),
+  discordWebhookController.getBotStatus,
+);
+
+// Provision ALL Departments at once (bulk provisioning for existing departments)
+// NOTE: Must be placed BEFORE /:id/provision to prevent "provision-all" being matched as :id
+router.post(
+  "/discord/departments/provision-all",
+  authMiddleware,
+  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  discordWebhookController.provisionAllDepartments,
+);
+
+// Quick Provision Role & Private Thread for a specific Department
+router.post(
+  "/discord/departments/:id/provision",
+  authMiddleware,
+  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  validate(discordDepartmentParamSchema, "params"),
+  discordWebhookController.provisionDepartment,
+);
+
 export default router;
+

@@ -32,5 +32,8 @@ export interface SystemSettingsResponseDto {
   APPLICATION_MAX_FILE_SIZE_MB: number;
   ALLOW_CROSS_DEPARTMENT_ASSIGNMENT: boolean;
   AUTO_EVALUATION_ENABLED: boolean;
+  DISCORD_BOT_ENABLED?: boolean;
+  DISCORD_BOT_TOKEN?: string;
+  DISCORD_GUILD_ID?: string;
   [key: string]: string | number | boolean | undefined;
 }

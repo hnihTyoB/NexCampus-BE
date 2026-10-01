@@ -23,6 +23,7 @@ export interface InternDto {
   position: { id: string; name: string } | null;
   startDate: Date;
   duration: number;
+  discordUserId?: string | null;
   discordUsername: string | null;
   discordRoleGranted: boolean;
   status: InternStatus;
@@ -65,6 +66,7 @@ export interface CreateInternDto {
   positionId: string;
   startDate: string;
   duration?: number;
+  discordUserId?: string;
   discordUsername?: string;
   internCode?: string;
   university?: string;
@@ -80,6 +82,7 @@ export interface DirectCreateInternDto {
   positionId: string;
   startDate: string;
   duration?: number;
+  discordUserId?: string;
   discordUsername?: string;
   internCode?: string;
   university?: string;
@@ -94,6 +97,7 @@ export interface UpdateInternDto {
   positionId?: string | null;
   startDate?: string;
   duration?: number;
+  discordUserId?: string | null;
   discordUsername?: string | null;
   discordRoleGranted?: boolean;
   status?: InternStatus;
@@ -106,6 +110,7 @@ export interface UpdateMeInternDto {
   phone?: string;
   departmentId?: string;
   positionId?: string;
+  discordUserId?: string | null;
   discordUsername?: string | null;
   university?: string | null;
   major?: string | null;

@@ -20,6 +20,7 @@ import { PERMISSIONS } from "../../common/constants/permission.constant";
 import { permissionCacheService } from "../../common/services/permission-cache.service";
 import { systemConfigService } from "../system-config/system-config.service";
 import { HRM_CONFIG_KEYS } from "../../common/constants/system-config.constant";
+import { discordBotService } from "../../common/services/discord-bot.service";
 
 export class LeaderService {
   private readonly repository = new LeaderRepository();
@@ -156,6 +157,12 @@ export class LeaderService {
       },
     });
 
+    if (departmentIds.length > 0) {
+      discordBotService.syncLeaderThreads(data.userId).catch((err) => {
+        console.warn(`[LeaderService] syncLeaderThreads on create warning:`, err?.message);
+      });
+    }
+
     return result;
   }
 
@@ -207,6 +214,12 @@ export class LeaderService {
         position: resetPosition ? null : data.position,
       },
     });
+
+    if (departmentIds !== undefined) {
+      discordBotService.syncLeaderThreads(existing.userId).catch((err) => {
+        console.warn(`[LeaderService] syncLeaderThreads on update warning:`, err?.message);
+      });
+    }
 
     return result;
   }
