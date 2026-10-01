@@ -140,6 +140,12 @@ describe("Scheduled Tasks & BullMQ Cron Jobs Engine", () => {
     );
     assert.ok(weeklyDigestJob);
     assert.equal(weeklyDigestJob.cron, "0 8 * * 1");
+
+    const standupSummaryJob = jobs.find(
+      (j) => j.name === CRON_JOB_NAMES.DAILY_STANDUP_EXECUTIVE_SUMMARY,
+    );
+    assert.ok(standupSummaryJob);
+    assert.equal(standupSummaryJob.cron, "45 18 * * 1-5");
   });
 
   it("2. Audit Log Cleanup: should delete audit logs older than retention days and record audit log", async () => {
