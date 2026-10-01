@@ -208,6 +208,216 @@ describe("Discord Webhook Notifications & Isolation Test Suite", () => {
       assert.equal(DISCORD_EMBED_COLORS.MEETING_REMINDER, 0x9b59b6);
       assert.equal(DISCORD_EMBED_COLORS.LEADERBOARD, 0xf1c40f);
       assert.equal(DISCORD_EMBED_COLORS.TEST_PING, 0x00f0ff);
+      assert.equal(DISCORD_EMBED_COLORS.EXECUTIVE_SUMMARY, 0x5865f2);
+    });
+  });
+
+  describe("6. Interactive Action Row Components (Link Buttons)", () => {
+    it("should accept Discord Link Button components in SendDiscordPayload", async () => {
+      // Mock fetch
+      const originalFetch = globalThis.fetch;
+      let sentBody: any = null;
+
+      globalThis.fetch = async (_input: any, init?: any) => {
+        if (init?.body) {
+          sentBody = JSON.parse(init.body as string);
+        }
+        return new Response(JSON.stringify({ id: "mock-msg-123" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      };
+
+      try {
+        const result = await discordWebhookService.sendEmbed({
+          webhookUrl: validWebhookUrl,
+          embeds: [{ title: "Test Embed with Button" }],
+          components: [
+            {
+              type: 1,
+              components: [
+                {
+                  type: 2,
+                  style: 5,
+                  label: "🛠️ Gỡ Rối Task Block",
+                  url: "https://nexcampus.app/leader/tasks?status=BLOCKED",
+                },
+                {
+                  type: 2,
+                  style: 5,
+                  label: "⏳ Duyệt Đơn Gia Hạn",
+                  url: "https://nexcampus.app/leader/tasks?tab=extensions",
+                },
+              ],
+            },
+          ],
+        });
+
+        assert.equal(result.success, true);
+        assert.ok(sentBody);
+        assert.ok(Array.isArray(sentBody.components));
+        assert.equal(sentBody.components.length, 1);
+        assert.equal(sentBody.components[0].type, 1);
+        assert.equal(sentBody.components[0].components.length, 2);
+        assert.equal(sentBody.components[0].components[0].type, 2);
+        assert.equal(sentBody.components[0].components[0].style, 5);
+        assert.equal(
+          sentBody.components[0].components[0].url,
+          "https://nexcampus.app/leader/tasks?status=BLOCKED",
+        );
+        assert.equal(
+          sentBody.components[0].components[1].url,
+          "https://nexcampus.app/leader/tasks?tab=extensions",
+        );
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    it("should dispatch notifyDailyStandupExecutiveSummary with 2 link buttons", async () => {
+      const originalFetch = globalThis.fetch;
+      let sentPayload: any = null;
+
+      globalThis.fetch = async (_input: any, init?: any) => {
+        if (init?.body) {
+          sentPayload = JSON.parse(init.body as string);
+        }
+        return new Response(JSON.stringify({ id: "mock-summary-msg" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      };
+
+      try {
+        const sent = await discordWebhookService.notifyDailyStandupExecutiveSummary({
+          targetWebhookUrl: validWebhookUrl,
+          summaryDateStr: "01/10/2026",
+          totalActiveInterns: 10,
+          submittedCount: 8,
+          approvedAbsences: [
+            {
+              internName: "Nguyễn Văn A",
+              internCode: "INT-01",
+              departmentName: "Kỹ Thuật",
+              reason: "Thi học kỳ tại trường",
+            },
+          ],
+          blockedTasks: [
+            {
+              taskId: "task-uuid-1",
+              taskCode: "FE-101",
+              taskTitle: "Làm trang Dashboard",
+              internName: "Trần Văn B",
+              blockedReason: "Thiếu Mock API từ Backend",
+            },
+          ],
+          pendingExtensions: [
+            {
+              requestId: "req-uuid-1",
+              taskId: "task-uuid-2",
+              taskCode: "BE-202",
+              taskTitle: "Refactor Database Schema",
+              internName: "Lê Văn C",
+              extensionDays: 2,
+            },
+          ],
+        });
+
+        assert.equal(sent, true);
+        assert.ok(sentPayload);
+        assert.ok(sentPayload.embeds && sentPayload.embeds.length > 0);
+        assert.ok(sentPayload.embeds[0].title.includes("SMART STANDUP EXECUTIVE SUMMARY"));
+        assert.equal(sentPayload.embeds[0].color, DISCORD_EMBED_COLORS.EXECUTIVE_SUMMARY);
+
+        // Check Action row and Link buttons
+        assert.ok(Array.isArray(sentPayload.components));
+        assert.equal(sentPayload.components.length, 1);
+        const buttons = sentPayload.components[0].components;
+        assert.equal(buttons.length, 2);
+        assert.ok(buttons[0].url.includes("/leader/tasks?status=BLOCKED"));
+        assert.ok(buttons[1].url.includes("/leader/tasks?tab=extensions"));
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    it("should dispatch notifyTaskBlocked with action button link to task", async () => {
+      const originalFetch = globalThis.fetch;
+      let sentPayload: any = null;
+
+      globalThis.fetch = async (_input: any, init?: any) => {
+        if (init?.body) {
+          sentPayload = JSON.parse(init.body as string);
+        }
+        return new Response(JSON.stringify({ id: "mock-blocked-msg" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      };
+
+      try {
+        const sent = await discordWebhookService.notifyTaskBlocked({
+          departmentId: testDeptId,
+          task: {
+            id: "task-uuid-999",
+            code: "SEC-01",
+            title: "Security Hardening",
+            internName: "Phạm Văn D",
+            blockedReason: "Chờ cấp quyền Cloudflare API Key",
+          },
+        });
+
+        assert.equal(sent, true);
+        assert.ok(sentPayload);
+        assert.ok(Array.isArray(sentPayload.components));
+        const button = sentPayload.components[0].components[0];
+        assert.equal(button.type, 2);
+        assert.equal(button.style, 5);
+        assert.ok(button.url.includes("/leader/tasks?taskId=task-uuid-999"));
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    it("should dispatch notifyTaskExtensionRequested with action button link to extension request", async () => {
+      const originalFetch = globalThis.fetch;
+      let sentPayload: any = null;
+
+      globalThis.fetch = async (_input: any, init?: any) => {
+        if (init?.body) {
+          sentPayload = JSON.parse(init.body as string);
+        }
+        return new Response(JSON.stringify({ id: "mock-ext-msg" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      };
+
+      try {
+        const sent = await discordWebhookService.notifyTaskExtensionRequested({
+          departmentId: testDeptId,
+          requestId: "req-uuid-555",
+          task: {
+            id: "task-uuid-777",
+            code: "DEV-12",
+            title: "Xây dựng Worker Queue",
+            internName: "Hoàng Văn E",
+            extensionDays: 3,
+            proposedDeadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+            reason: "Chờ review PR của bên thứ 3",
+          },
+        });
+
+        assert.equal(sent, true);
+        assert.ok(sentPayload);
+        assert.ok(Array.isArray(sentPayload.components));
+        const button = sentPayload.components[0].components[0];
+        assert.equal(button.type, 2);
+        assert.equal(button.style, 5);
+        assert.ok(button.url.includes("/leader/tasks?tab=extensions&requestId=req-uuid-555"));
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
     });
   });
 });

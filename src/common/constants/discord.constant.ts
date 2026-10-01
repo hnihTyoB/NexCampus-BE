@@ -39,6 +39,7 @@ export const DISCORD_EMBED_COLORS = {
   MEETING_REMINDER: 0x9b59b6, // Tím neon nhắc nhở phòng họp 15 phút (#9B59B6)
   LEADERBOARD: 0xf1c40f, // Vàng kim vinh danh Top tuần (#F1C40F)
   TEST_PING: 0x00f0ff, // Cyberpunk Cyan thử nghiệm kết nối (#00F0FF)
+  EXECUTIVE_SUMMARY: 0x5865f2, // Blurple Báo cáo điều hành Standup 18:45 (#5865F2)
 } as const;
 
 /**

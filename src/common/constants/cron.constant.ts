@@ -9,6 +9,7 @@ export const CRON_JOB_NAMES = {
   REMIND_DAILY_REPORT: "remind-daily-report",
   REMIND_DAILY_REPORT_FIRST: "remind-daily-report-first",
   REMIND_DAILY_REPORT_CLOSING: "remind-daily-report-closing",
+  DAILY_STANDUP_EXECUTIVE_SUMMARY: "daily-standup-executive-summary",
   REMIND_UPCOMING_MEETINGS: "remind-upcoming-meetings",
   WEEKLY_LEADERBOARD_DISCORD: "weekly-leaderboard-discord",
 } as const;
@@ -57,6 +58,11 @@ export const DEFAULT_CRON_SCHEDULES: Record<
     cron: "30 18 * * 1-5", // Thứ 2 đến Thứ 6 lúc 18:30 Asia/Ho_Chi_Minh
     description:
       "Điểm danh chốt ca nộp báo cáo ngày (18:30) qua Discord Webhook (tag đích danh)",
+  },
+  "daily-standup-executive-summary": {
+    cron: "45 18 * * 1-5", // 18:45 từ Thứ 2 đến Thứ 6 Asia/Ho_Chi_Minh
+    description:
+      "Báo cáo tóm tắt thông minh điều hành Standup ngày (Smart Standup Executive Summary) cho Leader",
   },
   "remind-upcoming-meetings": {
     cron: "*/5 * * * *", // Quét mỗi 5 phút

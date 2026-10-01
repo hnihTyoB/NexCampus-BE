@@ -41,6 +41,19 @@ export interface DiscordEmbed {
   fields?: DiscordEmbedField[];
 }
 
+export interface DiscordButtonComponent {
+  type: 2;
+  style: 5; // LINK BUTTON
+  label: string;
+  url: string;
+  emoji?: { name: string };
+}
+
+export interface DiscordActionRowComponent {
+  type: 1;
+  components: DiscordButtonComponent[];
+}
+
 export interface SendDiscordPayload {
   webhookUrl: string;
   threadId?: string | null;
@@ -48,6 +61,7 @@ export interface SendDiscordPayload {
   username?: string;
   avatar_url?: string;
   embeds?: DiscordEmbed[];
+  components?: DiscordActionRowComponent[];
 }
 
 export interface SendDiscordResult {
@@ -90,17 +104,18 @@ export class DiscordWebhookService {
    * và fallback sang Discord Bot API gửi vào Thread nếu Webhook lỗi hoặc dùng placeholder
    */
   async sendEmbed(payload: SendDiscordPayload): Promise<SendDiscordResult> {
-    const { webhookUrl, threadId, content, embeds, username, avatar_url } = payload;
+    const { webhookUrl, threadId, content, embeds, components, username, avatar_url } = payload;
 
     if (!webhookUrl && !threadId) {
       return { success: false, message: "Webhook URL hoặc Thread ID là bắt buộc" };
     }
 
-    const body = {
+    const body: Record<string, any> = {
       username: username || DEFAULT_DISCORD_BOT_USERNAME,
       avatar_url: avatar_url || DEFAULT_DISCORD_BOT_AVATAR,
       content: content || undefined,
       embeds: embeds && embeds.length > 0 ? embeds : undefined,
+      components: components && components.length > 0 ? components : undefined,
     };
 
     // 1. Gửi qua Discord Webhook URL (kèm ?thread_id nếu có threadId)
@@ -163,6 +178,7 @@ export class DiscordWebhookService {
             body: JSON.stringify({
               content: content || undefined,
               embeds: embeds && embeds.length > 0 ? embeds : undefined,
+              components: components && components.length > 0 ? components : undefined,
             }),
             signal: AbortSignal.timeout(6000),
           },
@@ -608,6 +624,7 @@ export class DiscordWebhookService {
     departmentId?: string | null;
     taskGroupId?: string | null;
     task: {
+      id?: string;
       code?: string | null;
       title: string;
       internName: string;
@@ -616,11 +633,18 @@ export class DiscordWebhookService {
       leaderName?: string | null;
     };
   }): Promise<boolean> {
-    const webhook = await this.findWebhookForRouting({
+    let webhook = await this.findWebhookForRouting({
       purpose: DISCORD_WEBHOOK_PURPOSE.TASK_BOARD,
       departmentId: params.departmentId,
       taskGroupId: params.taskGroupId,
     });
+
+    if (!webhook) {
+      webhook = await this.findWebhookForRouting({
+        purpose: DISCORD_WEBHOOK_PURPOSE.LEADER_ALERTS,
+        departmentId: params.departmentId,
+      });
+    }
 
     if (!webhook) return false;
 
@@ -629,6 +653,11 @@ export class DiscordWebhookService {
       : params.task.leaderName
         ? `@${params.task.leaderName}`
         : "";
+
+    const appUrl = envConfig.clientUrl || envConfig.appUrl;
+    const taskLinkUrl = params.task.id
+      ? `${appUrl}/leader/tasks?taskId=${params.task.id}`
+      : `${appUrl}/leader/tasks?status=BLOCKED`;
 
     const embed: DiscordEmbed = {
       title: `🛑 CẢNH BÁO BỊ CHẶN (BLOCKED): [${params.task.code || "TASK"}] ${params.task.title}`,
@@ -648,7 +677,7 @@ export class DiscordWebhookService {
         },
         {
           name: "🔗 Mở khóa nhiệm vụ",
-          value: `[👉 Vào bảng Task để gỡ vướng mắc](${envConfig.clientUrl}/leader/tasks)`,
+          value: `[👉 Vào bảng Task để gỡ vướng mắc](${taskLinkUrl})`,
           inline: false,
         },
       ],
@@ -656,11 +685,322 @@ export class DiscordWebhookService {
       timestamp: new Date().toISOString(),
     };
 
+    const components: DiscordActionRowComponent[] = [
+      {
+        type: 1,
+        components: [
+          {
+            type: 2,
+            style: 5,
+            label: "🚀 Vào Hỗ Trợ Task Ngay",
+            url: taskLinkUrl,
+          },
+        ],
+      },
+    ];
+
     const res = await this.sendEmbed({
       webhookUrl: webhook.webhookUrl,
       threadId: (webhook as any).threadId || undefined,
       content: leaderTag ? `${leaderTag} 🚨 **Có nhiệm vụ bị nghẽn cần tháo gỡ ngay!**` : undefined,
       embeds: [embed],
+      components,
+    });
+
+    return res.success;
+  }
+
+  /**
+   * 2.4 Kênh #task-board / Leader: Yêu cầu xin gia hạn task mới (Task Extension Request)
+   * Embed Vàng/Cam cảnh báo kèm Link Button dẫn thẳng vào duyệt đơn gia hạn
+   */
+  async notifyTaskExtensionRequested(params: {
+    departmentId?: string | null;
+    taskGroupId?: string | null;
+    requestId: string;
+    task: {
+      id: string;
+      code?: string | null;
+      title: string;
+      internName: string;
+      extensionDays: number;
+      proposedDeadline: Date | string;
+      reason: string;
+      commitmentPlan?: string | null;
+      leaderDiscordId?: string | null;
+      leaderName?: string | null;
+    };
+  }): Promise<boolean> {
+    let webhook = await this.findWebhookForRouting({
+      purpose: DISCORD_WEBHOOK_PURPOSE.TASK_BOARD,
+      departmentId: params.departmentId,
+      taskGroupId: params.taskGroupId,
+    });
+
+    if (!webhook) {
+      webhook = await this.findWebhookForRouting({
+        purpose: DISCORD_WEBHOOK_PURPOSE.LEADER_ALERTS,
+        departmentId: params.departmentId,
+      });
+    }
+
+    if (!webhook) return false;
+
+    const leaderTag = params.task.leaderDiscordId
+      ? `<@${params.task.leaderDiscordId}>`
+      : params.task.leaderName
+        ? `@${params.task.leaderName}`
+        : "";
+
+    const appUrl = envConfig.clientUrl || envConfig.appUrl;
+    const extensionUrl = `${appUrl}/leader/tasks?tab=extensions&requestId=${params.requestId}`;
+
+    const deadlineStr = new Date(params.task.proposedDeadline).toLocaleDateString("vi-VN", {
+      timeZone: "Asia/Ho_Chi_Minh",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    const embed: DiscordEmbed = {
+      title: `⏳ ĐỀ XUẤT XIN GIA HẠN: [${params.task.code || "TASK"}] ${params.task.title}`,
+      description: `Thực tập sinh **${params.task.internName}** vừa gửi đề xuất xin gia hạn hạn chót cho nhiệm vụ này.`,
+      color: DISCORD_EMBED_COLORS.STANDUP_REMINDER, // Màu Vàng/Cam (#FEE75C)
+      fields: [
+        { name: "👤 Người xin gia hạn", value: params.task.internName, inline: true },
+        { name: "⏱️ Thời gian xin thêm", value: `\`+${params.task.extensionDays} ngày\``, inline: true },
+        { name: "📅 Hạn chót mới đề xuất", value: `\`${deadlineStr}\``, inline: true },
+        {
+          name: "📝 Lý do xin gia hạn",
+          value: `>>> **${params.task.reason}**`,
+          inline: false,
+        },
+        ...(params.task.commitmentPlan
+          ? [
+              {
+                name: "🎯 Kế hoạch cam kết hoàn thành",
+                value: params.task.commitmentPlan,
+                inline: false,
+              },
+            ]
+          : []),
+        {
+          name: "🔗 Xem xét phê duyệt",
+          value: `[👉 Nhấn vào đây để xem và duyệt gia hạn](${extensionUrl})`,
+          inline: false,
+        },
+      ],
+      footer: { text: "NexCampus Task Board • Yêu cầu xin gia hạn" },
+      timestamp: new Date().toISOString(),
+    };
+
+    const components: DiscordActionRowComponent[] = [
+      {
+        type: 1,
+        components: [
+          {
+            type: 2,
+            style: 5,
+            label: "⏳ Xem & Duyệt Gia Hạn",
+            url: extensionUrl,
+          },
+        ],
+      },
+    ];
+
+    const res = await this.sendEmbed({
+      webhookUrl: webhook.webhookUrl,
+      threadId: (webhook as any).threadId || undefined,
+      content: leaderTag ? `${leaderTag} 🔔 Có đề xuất xin gia hạn nhiệm vụ cần xét duyệt!` : undefined,
+      embeds: [embed],
+      components,
+    });
+
+    return res.success;
+  }
+
+  /**
+   * 1.3 Kênh #leader-hq-alerts / Leader: Báo cáo tóm tắt thông minh điều hành Standup ngày (18:45)
+   * Embed Cyberpunk Blurple (#5865F2)
+   * Gắn kèm 2 nút Action Row:
+   * [ 🛠️ Gỡ Rối Task Block ] ➔ ${appUrl}/leader/tasks?status=BLOCKED
+   * [ ⏳ Duyệt Đơn Gia Hạn ] ➔ ${appUrl}/leader/tasks?tab=extensions
+   */
+  async notifyDailyStandupExecutiveSummary(params: {
+    targetWebhookUrl?: string;
+    targetThreadId?: string | null;
+    departmentId?: string | null;
+    departmentName?: string | null;
+    summaryDateStr: string;
+    totalActiveInterns: number;
+    submittedCount: number;
+    approvedAbsences: Array<{
+      internName: string;
+      internCode?: string | null;
+      departmentName?: string | null;
+      reason: string;
+    }>;
+    blockedTasks: Array<{
+      taskId: string;
+      taskCode?: string | null;
+      taskTitle: string;
+      internName: string;
+      blockedReason: string;
+    }>;
+    pendingExtensions: Array<{
+      requestId: string;
+      taskId: string;
+      taskCode?: string | null;
+      taskTitle: string;
+      internName: string;
+      extensionDays: number;
+    }>;
+  }): Promise<boolean> {
+    let targetUrl = params.targetWebhookUrl;
+    let targetThreadId = params.targetThreadId;
+
+    if (!targetUrl) {
+      // Tìm Webhook cho LEADER_ALERTS (Global hoặc theo Phòng ban)
+      const webhook = await this.findWebhookForRouting({
+        purpose: DISCORD_WEBHOOK_PURPOSE.LEADER_ALERTS,
+        departmentId: params.departmentId,
+      });
+      if (webhook) {
+        targetUrl = webhook.webhookUrl;
+        targetThreadId = (webhook as any).threadId || null;
+      }
+    }
+
+    if (!targetUrl) {
+      console.warn(
+        `[DiscordWebhookService] No Webhook found for Daily Standup Executive Summary (LEADER_ALERTS)`,
+      );
+      return false;
+    }
+
+    const appUrl = envConfig.clientUrl || envConfig.appUrl;
+    const completionRate =
+      params.totalActiveInterns > 0
+        ? Math.round((params.submittedCount / params.totalActiveInterns) * 100)
+        : 100;
+
+    const scopeTitle = params.departmentName
+      ? `BAN ${params.departmentName.toUpperCase()}`
+      : "TOÀN TRƯỜNG (HQ)";
+
+    // Format danh sách vắng phép
+    let absenceText = "*Không có bạn nào nghỉ phép hôm nay*";
+    if (params.approvedAbsences.length > 0) {
+      absenceText = params.approvedAbsences
+        .map((a, i) => {
+          const dept = a.departmentName ? ` [${a.departmentName}]` : "";
+          const code = a.internCode ? ` (\`${a.internCode}\`)` : "";
+          return `${i + 1}. **${a.internName}**${code}${dept} — *Lý do*: ${a.reason}`;
+        })
+        .join("\n");
+      if (absenceText.length > 1024) {
+        absenceText = absenceText.slice(0, 1020) + "...";
+      }
+    }
+
+    // Format danh sách task blocked
+    let blockedText = "*Không có task nào bị nghẽn (Zero Blockers)* 🟢";
+    if (params.blockedTasks.length > 0) {
+      blockedText = params.blockedTasks
+        .map((b, i) => {
+          const code = b.taskCode ? `[${b.taskCode}] ` : "";
+          return `${i + 1}. **${code}${b.taskTitle}** — Phụ trách: **${b.internName}**\n  ↳ 🛑 *Nghẽn do*: ${b.blockedReason}`;
+        })
+        .join("\n");
+      if (blockedText.length > 1024) {
+        blockedText = blockedText.slice(0, 1020) + "...";
+      }
+    }
+
+    // Format danh sách gia hạn pending
+    let extensionText = "*Không có đơn gia hạn chờ duyệt*";
+    if (params.pendingExtensions.length > 0) {
+      extensionText = params.pendingExtensions
+        .map((e, i) => {
+          const code = e.taskCode ? `[${e.taskCode}] ` : "";
+          return `${i + 1}. **${code}${e.taskTitle}** — **${e.internName}** xin gia hạn \`+${e.extensionDays} ngày\``;
+        })
+        .join("\n");
+      if (extensionText.length > 1024) {
+        extensionText = extensionText.slice(0, 1020) + "...";
+      }
+    }
+
+    const embed: DiscordEmbed = {
+      title: `📊 SMART STANDUP EXECUTIVE SUMMARY — ${scopeTitle}`,
+      description: `Báo cáo điều hành tổng kết tiến độ và các điểm nghẽn ngày **${params.summaryDateStr}** lúc 18:45 dành cho Ban Quản Trị & Leader.`,
+      color: DISCORD_EMBED_COLORS.EXECUTIVE_SUMMARY,
+      fields: [
+        {
+          name: "📈 Tiến độ nộp Daily Report",
+          value: `• Hoàn thành: **${params.submittedCount}/${params.totalActiveInterns}** bạn (**${completionRate}%**)\n• Chưa nộp: **${params.totalActiveInterns - params.submittedCount}** bạn`,
+          inline: true,
+        },
+        {
+          name: "🏖️ Nghỉ phép có duyệt",
+          value: `**${params.approvedAbsences.length}** bạn đã duyệt nghỉ hôm nay`,
+          inline: true,
+        },
+        {
+          name: "🚨 Điểm nghẽn & Tắc vụ",
+          value: `• Task Blocked: **${params.blockedTasks.length}**\n• Chờ duyệt gia hạn: **${params.pendingExtensions.length}**`,
+          inline: true,
+        },
+        {
+          name: `🏖️ Danh sách nghỉ phép (${params.approvedAbsences.length} bạn)`,
+          value: absenceText,
+          inline: false,
+        },
+        {
+          name: `🛑 Danh sách Task đang bị cản trở (${params.blockedTasks.length} task)`,
+          value: blockedText,
+          inline: false,
+        },
+        {
+          name: `⏳ Danh sách xin gia hạn chờ duyệt (${params.pendingExtensions.length} đơn)`,
+          value: extensionText,
+          inline: false,
+        },
+      ],
+      footer: {
+        text: "NexCampus Automation Dispatcher • Executive Standup Summary 18:45",
+      },
+      timestamp: new Date().toISOString(),
+    };
+
+    const components: DiscordActionRowComponent[] = [
+      {
+        type: 1,
+        components: [
+          {
+            type: 2,
+            style: 5,
+            label: "🛠️ Gỡ Rối Task Block",
+            url: `${appUrl}/leader/tasks?status=BLOCKED`,
+          },
+          {
+            type: 2,
+            style: 5,
+            label: "⏳ Duyệt Đơn Gia Hạn",
+            url: `${appUrl}/leader/tasks?tab=extensions`,
+          },
+        ],
+      },
+    ];
+
+    const res = await this.sendEmbed({
+      webhookUrl: targetUrl,
+      threadId: targetThreadId || undefined,
+      content: "📢 **Bản tin điều hành Standup cuối ngày đã sẵn sàng!**",
+      embeds: [embed],
+      components,
     });
 
     return res.success;

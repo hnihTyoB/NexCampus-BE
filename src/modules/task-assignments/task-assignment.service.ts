@@ -700,6 +700,27 @@ export class TaskAssignmentService {
       ipAddress: context?.ipAddress,
     });
 
+    if (data.status === ASSIGNMENT_STATUS.BLOCKED) {
+      try {
+        const taskDetail = await this.taskRepository.findById(assignment.taskId);
+        const internName = assignment.intern?.fullName || "Thực tập sinh";
+
+        await discordWebhookService.notifyTaskBlocked({
+          taskGroupId: taskDetail?.taskGroupId,
+          departmentId: taskDetail?.taskGroup?.departmentId,
+          task: {
+            id: assignment.taskId,
+            code: taskDetail?.code,
+            title: taskDetail?.title || "Nhiệm vụ",
+            internName,
+            blockedReason: data.blockedReason || "Nhiệm vụ bị cản trở",
+          },
+        });
+      } catch (err: any) {
+        console.warn("[TaskAssignmentService] Failed to dispatch Discord task blocked:", err.message);
+      }
+    }
+
     return result;
   }
 
@@ -884,6 +905,7 @@ export class TaskAssignmentService {
         taskGroupId: taskDetail?.taskGroupId,
         departmentId: taskDetail?.taskGroup?.departmentId,
         task: {
+          id: assignment.taskId,
           code: taskDetail?.code,
           title: taskDetail?.title || "Nhiệm vụ",
           internName,
@@ -1057,6 +1079,44 @@ export class TaskAssignmentService {
       },
       ipAddress: context?.ipAddress,
     });
+
+    // Bắn thông báo Discord Webhook tới Leader kèm Link Button duyệt nhanh
+    try {
+      const taskDetail = await prisma.task.findUnique({
+        where: { id: assignment.taskId },
+        include: {
+          taskGroup: { select: { id: true, departmentId: true } },
+        },
+      });
+
+      const internDetail = await prisma.intern.findUnique({
+        where: { id: internId },
+        include: {
+          user: { select: { fullName: true } },
+          leader: { select: { fullName: true, discordUsername: true, discordUserId: true } },
+        },
+      });
+
+      await discordWebhookService.notifyTaskExtensionRequested({
+        departmentId: taskDetail?.taskGroup?.departmentId,
+        taskGroupId: taskDetail?.taskGroupId,
+        requestId: extensionRequest.id,
+        task: {
+          id: assignment.taskId,
+          code: taskDetail?.code,
+          title: taskDetail?.title || "Nhiệm vụ",
+          internName: internDetail?.fullName || internDetail?.user?.fullName || "Thực tập sinh",
+          extensionDays: dto.extensionDays,
+          proposedDeadline: proposedDate,
+          reason: dto.reason.trim(),
+          commitmentPlan: dto.commitmentPlan?.trim(),
+          leaderDiscordId: internDetail?.leader?.discordUserId || internDetail?.leader?.discordUsername,
+          leaderName: internDetail?.leader?.fullName,
+        },
+      });
+    } catch (err: any) {
+      console.warn("[TaskAssignmentService] Failed to dispatch Discord task extension request:", err.message);
+    }
 
     const [totalExtensionsOnTask, totalExtensionsInInternship] =
       await Promise.all([
