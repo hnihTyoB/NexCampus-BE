@@ -74,6 +74,12 @@ export class TaskSubmissionService {
         });
         if (leader) {
           scope = { leaderUserId: actor.id };
+        } else {
+          throw new AppError(
+            "Bạn không có quyền xem danh sách bài nộp",
+            403,
+            ERROR_CODE.FORBIDDEN,
+          );
         }
       }
     }

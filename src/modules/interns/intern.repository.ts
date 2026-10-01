@@ -15,6 +15,8 @@ const userSelect = {
   fullName: true,
   avatarUrl: true,
   isActive: true,
+  discordUserId: true,
+  discordUsername: true,
 };
 
 const defaultSelect = {
@@ -438,5 +440,17 @@ export class InternRepository {
         userAgent: data.userAgent ?? null,
       },
     });
+  }
+
+  async syncUserDiscord(
+    userId: string,
+    data: { discordUserId?: string | null; discordUsername?: string | null },
+  ): Promise<void> {
+    await prisma.user
+      .update({
+        where: { id: userId },
+        data,
+      })
+      .catch(() => {});
   }
 }

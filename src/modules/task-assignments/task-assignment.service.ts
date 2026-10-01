@@ -33,6 +33,7 @@ import {
 } from "../../common/constants/notification.constant";
 
 import { TaskRepository } from "../tasks/task.repository";
+import { InternRepository } from "../interns/intern.repository";
 import { discordWebhookService } from "../../common/services/discord-webhook.service";
 
 interface UserPayload {
@@ -44,6 +45,7 @@ interface UserPayload {
 export class TaskAssignmentService {
   private readonly repository = new TaskAssignmentRepository();
   private readonly taskRepository = new TaskRepository();
+  private readonly internRepository = new InternRepository();
 
   private ensureAssignmentEditable(status: AssignmentStatus) {
     if (status === ASSIGNMENT_STATUS.DONE) {
@@ -170,6 +172,12 @@ export class TaskAssignmentService {
             leaderUserId: user.id,
           });
         }
+
+        throw new AppError(
+          "Bạn không có quyền xem danh sách phân công công việc",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
       }
     }
 
@@ -1082,20 +1090,10 @@ export class TaskAssignmentService {
 
     // Bắn thông báo Discord Webhook tới Leader kèm Link Button duyệt nhanh
     try {
-      const taskDetail = await prisma.task.findUnique({
-        where: { id: assignment.taskId },
-        include: {
-          taskGroup: { select: { id: true, departmentId: true } },
-        },
-      });
-
-      const internDetail = await prisma.intern.findUnique({
-        where: { id: internId },
-        include: {
-          user: { select: { fullName: true } },
-          leader: { select: { fullName: true, discordUsername: true, discordUserId: true } },
-        },
-      });
+      const [taskDetail, internDetail] = await Promise.all([
+        this.taskRepository.findById(assignment.taskId),
+        this.internRepository.findById(internId),
+      ]);
 
       await discordWebhookService.notifyTaskExtensionRequested({
         departmentId: taskDetail?.taskGroup?.departmentId,

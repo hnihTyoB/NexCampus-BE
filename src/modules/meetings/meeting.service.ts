@@ -392,6 +392,21 @@ export class MeetingService {
       throw new AppError("Cuộc họp không tồn tại", 404, ERROR_CODE.MEETING_NOT_FOUND);
     }
 
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal) {
+      const isParticipant =
+        meeting.createdBy === actor.id ||
+        meeting.hostId === actor.id ||
+        meeting.participants.some((p) => p.userId === actor.id);
+      if (!isParticipant) {
+        throw new AppError(
+          "Không có quyền xem danh sách vắng mặt của cuộc họp này",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
+      }
+    }
+
     return this.repository.findAbsencesByMeeting(meetingId);
   }
 
@@ -409,6 +424,12 @@ export class MeetingService {
       });
       if (leader) {
         scope = { leaderUserId: actor.id };
+      } else {
+        throw new AppError(
+          "Chỉ Leader hoặc Admin mới có quyền xem đơn vắng mặt cuộc họp chờ duyệt",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
       }
     }
     return this.repository.findPendingAbsences(scope);

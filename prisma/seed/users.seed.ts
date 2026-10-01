@@ -58,6 +58,10 @@ const SYSTEM_PERMISSIONS: PermissionDef[] = [
   { name: "WEBHOOK_READ", resource: "WEBHOOK", action: "READ", description: "Xem danh sách Webhooks" },
   { name: "WEBHOOK_MANAGE", resource: "WEBHOOK", action: "MANAGE", description: "Cấu hình và quản lý Webhooks" },
 
+  // Discord Integration
+  { name: "DISCORD_READ", resource: "DISCORD", action: "READ", description: "Xem cấu hình và trạng thái Discord" },
+  { name: "DISCORD_MANAGE", resource: "DISCORD", action: "MANAGE", description: "Cấu hình Webhook, Kênh và Đồng bộ Role Discord" },
+
   // System Configuration & Feature Flags
   { name: "SYSTEM_CONFIG_READ", resource: "SYSTEM_CONFIG", action: "READ", description: "Xem cấu hình hệ thống và cờ tính năng" },
   { name: "SYSTEM_CONFIG_MANAGE", resource: "SYSTEM_CONFIG", action: "MANAGE", description: "Cập nhật cấu hình hệ thống" },
@@ -136,6 +140,13 @@ const SYSTEM_PERMISSIONS: PermissionDef[] = [
   { name: "MEETING_ABSENCE_SUBMIT", resource: "MEETING", action: "ABSENCE_SUBMIT", description: "Gửi yêu cầu vắng mặt cuộc họp" },
   { name: "MEETING_ABSENCE_REVIEW", resource: "MEETING", action: "ABSENCE_REVIEW", description: "Duyệt yêu cầu vắng mặt cuộc họp" },
 
+  // Absences (Leave & Absence Management)
+  { name: "ABSENCE_READ", resource: "ABSENCE", action: "READ", description: "Xem đơn xin nghỉ phép" },
+  { name: "ABSENCE_CREATE", resource: "ABSENCE", action: "CREATE", description: "Nộp đơn xin nghỉ phép" },
+  { name: "ABSENCE_REVIEW", resource: "ABSENCE", action: "REVIEW", description: "Duyệt đơn xin nghỉ phép" },
+  { name: "ABSENCE_CANCEL", resource: "ABSENCE", action: "CANCEL", description: "Hủy đơn xin nghỉ phép" },
+  { name: "ABSENCE_DELETE", resource: "ABSENCE", action: "DELETE", description: "Xóa đơn xin nghỉ phép" },
+
   // Daily Reports
   { name: "DAILY_REPORT_READ", resource: "DAILY_REPORT", action: "READ", description: "Xem báo cáo tiến độ hằng ngày" },
   { name: "DAILY_REPORT_CREATE", resource: "DAILY_REPORT", action: "CREATE", description: "Nộp báo cáo tiến độ hằng ngày" },
@@ -174,7 +185,7 @@ const LEADER_PERMISSIONS: string[] = [
   "TASK_ATTACHMENT_UPLOAD", "TASK_ATTACHMENT_DELETE", "TASK_ASSIGNMENT_READ", "TASK_ASSIGNMENT_CREATE",
   "TASK_ASSIGNMENT_UPDATE", "TASK_ASSIGNMENT_DELETE", "TASK_ASSIGNMENT_APPROVE", "TASK_SUBMISSION_READ",
   "TASK_SUBMISSION_REVIEW", "MEETING_READ", "MEETING_CREATE", "MEETING_UPDATE", "MEETING_DELETE",
-  "MEETING_ATTEND", "MEETING_ABSENCE_REVIEW", "DAILY_REPORT_READ",
+  "MEETING_ATTEND", "MEETING_ABSENCE_REVIEW", "ABSENCE_READ", "ABSENCE_REVIEW", "DAILY_REPORT_READ",
   "DAILY_REPORT_FEEDBACK", "WEEKLY_EVALUATION_READ", "WEEKLY_EVALUATION_CREATE", "WEEKLY_EVALUATION_UPDATE",
   "NOTIFICATION_READ", "NOTIFICATION_CREATE", "NOTIFICATION_SETTING_READ", "NOTIFICATION_SETTING_UPDATE",
   "NOTIFICATION_TEMPLATE_READ", "MAINTENANCE_READ", "AUDIT_LOG_READ", "REGULATION_READ", "REGULATION_ACKNOWLEDGE",
@@ -184,7 +195,7 @@ const LEADER_PERMISSIONS: string[] = [
 const INTERN_PERMISSIONS: string[] = [
   "DEPARTMENT_READ", "POSITION_READ", "TASK_GROUP_READ", "TASK_READ", "TASK_ASSIGNMENT_READ",
   "TASK_SUBMISSION_READ", "TASK_SUBMISSION_CREATE", "TASK_SUBMISSION_UPDATE", "TASK_SUBMISSION_DELETE",
-  "MEETING_READ", "MEETING_ATTEND", "MEETING_ABSENCE_SUBMIT",
+  "MEETING_READ", "MEETING_ATTEND", "MEETING_ABSENCE_SUBMIT", "ABSENCE_READ", "ABSENCE_CREATE", "ABSENCE_CANCEL",
   "DAILY_REPORT_READ", "DAILY_REPORT_CREATE", "DAILY_REPORT_UPDATE", "WEEKLY_EVALUATION_READ",
   "WEEKLY_EVALUATION_CONFIRM", "NOTIFICATION_READ", "NOTIFICATION_SETTING_READ", "NOTIFICATION_SETTING_UPDATE",
   "REGULATION_READ", "REGULATION_ACKNOWLEDGE", "STATS_INTERN_READ", "PDF_EXPORT_WEEKLY_EVALUATION",

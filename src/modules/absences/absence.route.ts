@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { AbsenceController } from "./absence.controller";
 import { authMiddleware } from "../../middlewares/auth.middleware";
+import { requirePermission } from "../../middlewares/permission.middleware";
+import { PERMISSIONS } from "../../common/constants/permission.constant";
 import { validate } from "../../middlewares/validate.middleware";
 import {
   absenceIdParamSchema,
@@ -17,6 +19,7 @@ const controller = new AbsenceController();
 router.post(
   "/upload-url",
   authMiddleware,
+  requirePermission(PERMISSIONS.ABSENCE_CREATE),
   validate(getAbsenceUploadUrlSchema),
   controller.getUploadPresignedUrl,
 );
@@ -25,6 +28,7 @@ router.post(
 router.get(
   "/",
   authMiddleware,
+  requirePermission(PERMISSIONS.ABSENCE_READ),
   validate(findAllAbsenceSchema, "query"),
   controller.findAll,
 );
@@ -33,6 +37,7 @@ router.get(
 router.get(
   "/:id",
   authMiddleware,
+  requirePermission(PERMISSIONS.ABSENCE_READ),
   validate(absenceIdParamSchema, "params"),
   controller.findById,
 );
@@ -41,6 +46,7 @@ router.get(
 router.get(
   "/:id/conflicts",
   authMiddleware,
+  requirePermission(PERMISSIONS.ABSENCE_READ),
   validate(absenceIdParamSchema, "params"),
   controller.getTaskConflicts,
 );
@@ -49,6 +55,7 @@ router.get(
 router.post(
   "/",
   authMiddleware,
+  requirePermission(PERMISSIONS.ABSENCE_CREATE),
   validate(createAbsenceSchema),
   controller.create,
 );
@@ -57,6 +64,7 @@ router.post(
 router.post(
   "/:id/review",
   authMiddleware,
+  requirePermission(PERMISSIONS.ABSENCE_REVIEW),
   validate(absenceIdParamSchema, "params"),
   validate(reviewGeneralAbsenceSchema),
   controller.review,
@@ -66,6 +74,7 @@ router.post(
 router.post(
   "/:id/cancel",
   authMiddleware,
+  requirePermission(PERMISSIONS.ABSENCE_CANCEL),
   validate(absenceIdParamSchema, "params"),
   controller.cancel,
 );

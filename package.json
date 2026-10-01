@@ -19,6 +19,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "node --test --import tsx tests/*.test.ts",
+    "test:integration": "node --test --import tsx tests/integration/01-health-maintenance.test.ts tests/integration/02-auth-users-rbac.test.ts tests/integration/03-organization-recruitment.test.ts tests/integration/04-task-and-work-management.test.ts tests/integration/05-reports-evaluations-absences-meetings.test.ts tests/integration/06-notifications-logs-system-integrations.test.ts",
+    "test:all": "node --test --import tsx tests/*.test.ts tests/integration/01-health-maintenance.test.ts tests/integration/02-auth-users-rbac.test.ts tests/integration/03-organization-recruitment.test.ts tests/integration/04-task-and-work-management.test.ts tests/integration/05-reports-evaluations-absences-meetings.test.ts tests/integration/06-notifications-logs-system-integrations.test.ts",
     "test:evals": "node --test --import tsx tests/ai-evals.test.ts"
   },
   "dependencies": {

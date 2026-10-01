@@ -439,7 +439,7 @@ export class DiscordWebhookManageService {
     });
 
     const discordInviteUrl = await systemSettingService.getDiscordInviteUrl();
-    const profileUrl = `${envConfig.appUrl || envConfig.cors.allowedOrigins[0] || "http://localhost:3000"}/intern/profile`;
+    const profileUrl = `${(envConfig.clientUrl || envConfig.cors.allowedOrigins[0] || "http://localhost:3000").replace(/\/$/, "")}/intern/profile`;
 
     let sentCount = 0;
     for (const intern of eligible) {
@@ -462,16 +462,13 @@ export class DiscordWebhookManageService {
     }
 
     try {
-      await prisma.auditLog.create({
-        data: {
-          actorId: actorContext?.actorId || null,
-          action: AUDIT_ACTION.SEND_DISCORD_REMINDER,
-          targetType: "SYSTEM",
-          targetId: "ALL_UNLINKED_INTERNS",
-          details: { totalEligible: eligible.length, sentCount },
-          ipAddress: actorContext?.ipAddress || null,
-          userAgent: actorContext?.userAgent || null,
-        },
+      await this.repository.createAuditLog({
+        actorId: actorContext?.actorId || undefined,
+        action: AUDIT_ACTION.SEND_DISCORD_REMINDER,
+        targetId: "ALL_UNLINKED_INTERNS",
+        details: { totalEligible: eligible.length, sentCount },
+        ipAddress: actorContext?.ipAddress,
+        userAgent: actorContext?.userAgent,
       });
     } catch {
       // ignore
@@ -521,7 +518,7 @@ export class DiscordWebhookManageService {
     }
 
     const discordInviteUrl = await systemSettingService.getDiscordInviteUrl();
-    const profileUrl = `${envConfig.appUrl || envConfig.cors.allowedOrigins[0] || "http://localhost:3000"}/intern/profile`;
+    const profileUrl = `${(envConfig.clientUrl || envConfig.cors.allowedOrigins[0] || "http://localhost:3000").replace(/\/$/, "")}/intern/profile`;
 
     await dispatchEmailJob({
       type: "DISCORD_LINK_REMINDER",
@@ -535,16 +532,13 @@ export class DiscordWebhookManageService {
     });
 
     try {
-      await prisma.auditLog.create({
-        data: {
-          actorId: actorContext?.actorId || null,
-          action: AUDIT_ACTION.SEND_DISCORD_REMINDER,
-          targetType: "INTERN",
-          targetId: intern.id,
-          details: { email: intern.user.email },
-          ipAddress: actorContext?.ipAddress || null,
-          userAgent: actorContext?.userAgent || null,
-        },
+      await this.repository.createAuditLog({
+        actorId: actorContext?.actorId || undefined,
+        action: AUDIT_ACTION.SEND_DISCORD_REMINDER,
+        targetId: intern.id,
+        details: { email: intern.user.email },
+        ipAddress: actorContext?.ipAddress,
+        userAgent: actorContext?.userAgent,
       });
     } catch {
       // ignore

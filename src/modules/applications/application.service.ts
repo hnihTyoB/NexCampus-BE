@@ -62,14 +62,7 @@ export class ApplicationService {
 
     if (activeInvite) {
       token = activeInvite.token;
-      await prisma.applicationInvite.update({
-        where: { id: activeInvite.id },
-        data: { expiresAt },
-      });
-      invite = {
-        ...activeInvite,
-        expiresAt,
-      };
+      invite = await this.repository.updateInviteExpiresAt(activeInvite.id, expiresAt);
     } else {
       token = crypto.randomBytes(32).toString("hex");
       invite = await this.repository.createInvite({
@@ -81,7 +74,7 @@ export class ApplicationService {
     }
 
     const baseUrl =
-      envConfig.appUrl ||
+      envConfig.clientUrl ||
       envConfig.cors.allowedOrigins[0] ||
       "http://localhost:3000";
     const applyUrl = `${baseUrl.replace(/\/$/, "")}/onboarding/${token}`;
@@ -547,10 +540,7 @@ export class ApplicationService {
     }
 
     // Enqueue approval and welcome email to BullMQ emailQueue
-    const loginUrl =
-      envConfig.appUrl ||
-      envConfig.cors.allowedOrigins[0] ||
-      "http://localhost:3000";
+    const loginUrl = `${(envConfig.clientUrl || envConfig.cors.allowedOrigins[0] || "http://localhost:3000").replace(/\/$/, "")}/login`;
     const discordInviteUrl = await systemSettingService.getDiscordInviteUrl();
     await dispatchEmailJob(
       {

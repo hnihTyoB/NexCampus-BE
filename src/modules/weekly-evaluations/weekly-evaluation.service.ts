@@ -336,7 +336,11 @@ export class WeeklyEvaluationService {
       });
     }
 
-    return this.repository.findAll(query, { isAdmin: true });
+    throw new AppError(
+      "Bạn không có quyền xem danh sách đánh giá tuần",
+      403,
+      ERROR_CODE.FORBIDDEN,
+    );
   }
 
   async findById(id: string, actor: UserPayload) {

@@ -71,6 +71,16 @@ export class DailyReportService {
           ERROR_CODE.NOT_FOUND,
         );
       }
+      const hasGlobal = await this.hasGlobalAccess(actor.id);
+      const isDirectLeader = targetIntern.leaderId === actor.id;
+      const isSelf = intern?.id === targetIntern.id;
+      if (!hasGlobal && !isDirectLeader && !isSelf) {
+        throw new AppError(
+          "Bạn không có quyền nộp báo cáo thay thực tập sinh này",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
+      }
       internId = targetIntern.id;
     } else if (intern) {
       internId = intern.id;
@@ -270,6 +280,12 @@ export class DailyReportService {
           directInternIds,
         });
       }
+
+      throw new AppError(
+        "Bạn không có quyền xem danh sách báo cáo ngày",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
     }
 
     return this.repository.findAll(query, { isAdmin: true });

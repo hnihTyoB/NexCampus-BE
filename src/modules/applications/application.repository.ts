@@ -144,6 +144,14 @@ export class ApplicationRepository {
     });
   }
 
+  updateInviteExpiresAt(id: string, expiresAt: Date): Promise<ApplicationInviteDto> {
+    return prisma.applicationInvite.update({
+      where: { id },
+      data: { expiresAt },
+      select: inviteSelect,
+    });
+  }
+
   findActiveInviteByEmail(email: string): Promise<ApplicationInviteDto | null> {
     const normalized = email.toLowerCase().trim();
     return prisma.applicationInvite.findFirst({

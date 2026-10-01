@@ -6,6 +6,8 @@ export interface InternUserDto {
   fullName: string | null;
   avatarUrl?: string | null;
   isActive: boolean;
+  discordUserId?: string | null;
+  discordUsername?: string | null;
 }
 
 export interface InternDto {

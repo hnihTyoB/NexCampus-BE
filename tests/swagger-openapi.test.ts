@@ -122,6 +122,11 @@ describe("Auto Swagger OpenAPI Generation via zod-to-openapi", () => {
     assert.ok(paths["/health"]);
     assert.ok(paths["/health/readiness"]);
     assert.ok(paths["/health/liveness"]);
+
+    // Absence paths (New verification)
+    assert.ok(paths["/absences"]);
+    assert.ok(paths["/absences/{id}"]);
+    assert.ok(paths["/absences/{id}/review"]);
   });
 
   it("should export valid swaggerOptions configuration for Swagger UI", () => {

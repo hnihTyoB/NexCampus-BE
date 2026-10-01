@@ -65,6 +65,12 @@ export class AbsenceService {
         });
         if (leader) {
           scope = { leaderUserId: actor.id };
+        } else {
+          throw new AppError(
+            "Bạn không có quyền xem danh sách đơn nghỉ phép",
+            403,
+            ERROR_CODE.FORBIDDEN,
+          );
         }
       }
     }
@@ -88,16 +94,22 @@ export class AbsenceService {
         where: { userId: actor.id },
         select: { id: true },
       });
-      if (intern && absence.userId !== actor.id) {
-        throw new AppError("Bạn không có quyền xem đơn này", 403, ERROR_CODE.FORBIDDEN);
-      }
-
-      const leader = await prisma.leader.findFirst({
-        where: { userId: actor.id },
-        select: { id: true },
-      });
-      if (leader && absence.user?.intern?.leaderId !== actor.id) {
-        throw new AppError("Bạn không có quyền xem đơn này", 403, ERROR_CODE.FORBIDDEN);
+      if (intern) {
+        if (absence.userId !== actor.id) {
+          throw new AppError("Bạn không có quyền xem đơn này", 403, ERROR_CODE.FORBIDDEN);
+        }
+      } else {
+        const leader = await prisma.leader.findFirst({
+          where: { userId: actor.id },
+          select: { id: true },
+        });
+        if (leader) {
+          if (absence.user?.intern?.leaderId !== actor.id) {
+            throw new AppError("Bạn không có quyền xem đơn này", 403, ERROR_CODE.FORBIDDEN);
+          }
+        } else {
+          throw new AppError("Bạn không có quyền xem đơn này", 403, ERROR_CODE.FORBIDDEN);
+        }
       }
     }
 
@@ -128,6 +140,19 @@ export class AbsenceService {
         404,
         ERROR_CODE.ABSENCE_NOT_FOUND,
       );
+    }
+
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal) {
+      const isOwner = absence.userId === actor.id;
+      const isLeader = absence.user?.intern?.leaderId === actor.id;
+      if (!isOwner && !isLeader) {
+        throw new AppError(
+          "Bạn không có quyền xem xung đột công việc của đơn này",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
+      }
     }
 
     return this.repository.findConflictTasks(
