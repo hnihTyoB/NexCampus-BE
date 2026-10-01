@@ -95,6 +95,7 @@ const envSchema = z
     DISCORD_BOT_ENABLED: z.string().default("true"),
     DISCORD_BOT_TOKEN: z.string().default(""),
     DISCORD_GUILD_ID: z.string().default(""),
+    DISCORD_INVITE_URL: z.string().default("https://discord.gg/nexcampus"),
   })
   // ── Production-only Constraints ───────────────────────────────────────────
   .refine(
@@ -285,5 +286,6 @@ export const envConfig = {
     botEnabled: _env.DISCORD_BOT_ENABLED !== "false",
     botToken: _env.DISCORD_BOT_TOKEN,
     guildId: _env.DISCORD_GUILD_ID,
+    inviteUrl: _env.DISCORD_INVITE_URL || "https://discord.gg/nexcampus",
   },
 } as const;

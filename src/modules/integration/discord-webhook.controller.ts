@@ -188,6 +188,72 @@ export class DiscordWebhookController {
       next(err);
     }
   };
+
+  batchSyncRoles = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const actorId = (req as any).user?.id;
+      const ipAddress = req.ip;
+      const userAgent = req.headers["user-agent"];
+      const force = req.body?.force === true || req.query["force"] === "true";
+
+      const result = await this.service.batchSyncRoles(
+        { actorId, ipAddress, userAgent },
+        { force },
+      );
+
+      res.json({
+        success: true,
+        message: `Đã hoàn tất đồng bộ Discord Roles: Cấp mới ${result.grantedCount}, Thu hồi ${result.revokedCount}, Đã đồng bộ ${result.alreadySyncedCount}, Thiếu ID ${result.missingIdCount}, Lỗi ${result.failedCount}`,
+        data: result,
+      });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  remindUnlinkedDiscord = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const actorId = (req as any).user?.id;
+      const ipAddress = req.ip;
+      const userAgent = req.headers["user-agent"];
+
+      const result = await this.service.remindUnlinkedDiscord({
+        actorId,
+        ipAddress,
+        userAgent,
+      });
+
+      res.json({
+        success: true,
+        message: `Đã gửi email nhắc nhở liên kết Discord tới ${result.sentCount}/${result.totalEligible} thực tập sinh`,
+        data: result,
+      });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  remindInternDiscord = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const internId = req.params["id"] as string;
+      const actorId = (req as any).user?.id;
+      const ipAddress = req.ip;
+      const userAgent = req.headers["user-agent"];
+
+      const result = await this.service.remindInternDiscord(internId, {
+        actorId,
+        ipAddress,
+        userAgent,
+      });
+
+      res.json({
+        success: true,
+        message: result.message,
+      });
+    } catch (err) {
+      next(err);
+    }
+  };
 }
 
 export const discordWebhookController = new DiscordWebhookController();

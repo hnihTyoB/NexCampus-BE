@@ -3,6 +3,7 @@ import Handlebars from "handlebars";
 export type EmailTemplateType =
   | "INVITE_APPLICATION"
   | "INTERN_ACCOUNT_CREATED"
+  | "DISCORD_LINK_REMINDER"
   | "RESET_PASSWORD"
   | "DAILY_REPORT_REMINDER"
   | "CUSTOM";
@@ -81,10 +82,64 @@ const internAccountCreatedTemplate = Handlebars.compile(`
     <div class="info-item"><span class="info-label">Ngày bắt đầu:</span> <span class="info-value">{{startDate}}</span></div>
     {{/if}}
   </div>
-  <div style="text-align: center;">
-    <a href="{{{loginUrl}}}" class="btn">Đăng nhập hệ thống ngay</a>
+  <div style="text-align: center; margin: 20px 0;">
+    <a href="{{{loginUrl}}}" class="btn" style="background-color: #4f46e5;">Đăng nhập hệ thống ngay</a>
   </div>
-  <p style="font-size: 13px; color: #ef4444;"><strong>Quan trọng:</strong> Vì lý do bảo mật, vui lòng tiến hành đổi mật khẩu ngay sau lần đăng nhập đầu tiên.</p>
+  <p style="font-size: 13px; color: #ef4444; margin-bottom: 24px;"><strong>Quan trọng:</strong> Vì lý do bảo mật, vui lòng tiến hành đổi mật khẩu ngay sau lần đăng nhập đầu tiên.</p>
+
+  <div style="border-top: 2px dashed #cbd5e1; margin: 24px 0;"></div>
+
+  <div style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); border-radius: 12px; padding: 22px; color: #ffffff; box-shadow: 0 4px 12px rgba(49, 46, 129, 0.25);">
+    <div style="margin-bottom: 12px;">
+      <h3 style="color: #ffffff; margin: 0 0 6px 0; font-size: 17px; font-weight: 700;">🚀 Tham gia Discord & Nhận phân quyền phòng ban tự động</h3>
+      <p style="color: #c7d2fe; font-size: 13px; margin: 0; line-height: 1.5;">
+        NexCampus sử dụng Discord làm trung tâm làm việc nhóm, trao đổi Daily Standup và nhận thông báo công việc. Vui lòng hoàn thành 3 bước sau để Bot tự cấp Role phòng ban cho bạn:
+      </p>
+    </div>
+    
+    <div style="background: rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 14px; margin: 16px 0;">
+      <ol style="color: #e0e7ff; font-size: 13px; padding-left: 18px; margin: 0; line-height: 1.7;">
+        <li><strong>Bước 1:</strong> Bấm nút bên dưới để tham gia Server Discord chính thức của NexCampus.</li>
+        <li><strong>Bước 2:</strong> Mở <em>Cài đặt Discord ➔ Nâng cao (Advanced) ➔ Bật "Chế độ nhà phát triển" (Developer Mode)</em>. Sau đó chuột phải vào avatar của bạn và chọn <strong>"Sao chép ID người dùng"</strong> (Snowflake ID - dãy 17-20 chữ số).</li>
+        <li><strong>Bước 3:</strong> Đăng nhập NexCampus ➔ Vào <strong>Hồ sơ cá nhân (/intern/profile)</strong> và dán ID để Bot tự cấp Role phòng ban và mở Private Threads trong 3 giây.</li>
+      </ol>
+    </div>
+
+    <div style="text-align: center; margin-top: 18px;">
+      <a href="{{{discordInviteUrl}}}" class="btn" style="background-color: #5865F2; color: #ffffff !important; font-weight: 700; padding: 12px 28px; border-radius: 8px; text-decoration: none; display: inline-block; box-shadow: 0 4px 14px rgba(88, 101, 242, 0.4);">
+        👾 Tham Gia Server Discord NexCampus
+      </a>
+    </div>
+  </div>
+`);
+
+const discordLinkReminderTemplate = Handlebars.compile(`
+  <h2 style="color: #111827; margin-top: 0; font-size: 18px;">Nhắc nhở: Liên kết Discord để nhận phân quyền phòng ban</h2>
+  <p>Xin chào <strong>{{fullName}}</strong>,</p>
+  <p>Hệ thống NexCampus ghi nhận bạn hiện đang tham gia thực tập{{#if departmentName}} tại <strong>Ban {{departmentName}}</strong>{{/if}} nhưng <strong>chưa liên kết Discord User ID</strong> vào hồ sơ cá nhân.</p>
+  <p style="color: #4b5563; font-size: 14px; line-height: 1.5;">
+    Việc liên kết Discord là bắt buộc để bạn được tự động cấp quyền vào các kênh trao đổi phòng ban, kênh báo cáo ngày (Daily Standup) và kênh phân công công việc (Task Board).
+  </p>
+
+  <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 20px 0;">
+    <h3 style="color: #1e293b; margin-top: 0; margin-bottom: 8px; font-size: 15px;">Hướng dẫn 3 bước kết nối nhanh:</h3>
+    <ol style="color: #334155; font-size: 13px; padding-left: 20px; line-height: 1.7; margin: 0;">
+      <li><strong>Bước 1:</strong> Tham gia Server Discord NexCampus qua liên kết mời bên dưới.</li>
+      <li><strong>Bước 2:</strong> Mở Cài đặt Discord ➔ Nâng cao ➔ Bật "Chế độ nhà phát triển" (Developer Mode) ➔ Chuột phải vào avatar của mình bấm "Sao chép ID người dùng" (Snowflake ID).</li>
+      <li><strong>Bước 3:</strong> Đăng nhập NexCampus ➔ Vào Hồ sơ cá nhân (/intern/profile) dán ID để Bot tự cấp Role phòng ban trong 3 giây.</li>
+    </ol>
+  </div>
+
+  <div style="text-align: center; margin: 24px 0;">
+    <a href="{{{discordInviteUrl}}}" class="btn" style="background-color: #5865F2; margin-right: 10px; color: #ffffff !important;">
+      👾 1. Tham Gia Server Discord
+    </a>
+    <a href="{{{profileUrl}}}" class="btn" style="background-color: #0ea5e9; color: #ffffff !important;">
+      🔗 2. Cập Nhật Discord ID Ngay
+    </a>
+  </div>
+
+  <p style="font-size: 13px; color: #64748b;">Nếu cần hỗ trợ, bạn vui lòng liên hệ Leader phòng ban hoặc Ban Quản Trị NexCampus.</p>
 `);
 
 const resetPasswordTemplate = Handlebars.compile(`
@@ -134,6 +189,13 @@ export function renderEmailTemplate(
         (data.subject as string) ||
         "[NexCampus] Chúc mừng bạn đã được phê duyệt thực tập — Thông tin tài khoản";
       bodyHtml = internAccountCreatedTemplate(data);
+      break;
+    }
+    case "DISCORD_LINK_REMINDER": {
+      subject =
+        (data.subject as string) ||
+        "[NexCampus] Nhắc nhở: Liên kết Discord để nhận phân quyền phòng ban";
+      bodyHtml = discordLinkReminderTemplate(data);
       break;
     }
     case "RESET_PASSWORD": {

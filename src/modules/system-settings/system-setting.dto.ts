@@ -35,5 +35,6 @@ export interface SystemSettingsResponseDto {
   DISCORD_BOT_ENABLED?: boolean;
   DISCORD_BOT_TOKEN?: string;
   DISCORD_GUILD_ID?: string;
+  DISCORD_INVITE_URL?: string;
   [key: string]: string | number | boolean | undefined;
 }

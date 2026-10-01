@@ -37,6 +37,7 @@ import { dispatchEmailJob } from "../../queues";
 import { R2Service } from "../../common/services/r2.service";
 import { envConfig } from "../../config/env.config";
 import { discordBotService } from "../../common/services/discord-bot.service";
+import { systemSettingService } from "../system-settings/system-setting.service";
 
 export class ApplicationService {
   private readonly repository = new ApplicationRepository();
@@ -53,24 +54,31 @@ export class ApplicationService {
 
     const activeInvite =
       await this.repository.findActiveInviteByEmail(normalizedEmail);
-    if (activeInvite) {
-      throw new AppError(
-        "An active invitation already exists for this email",
-        400,
-        ERROR_CODE.VALIDATION_ERROR,
-      );
-    }
 
-    const token = crypto.randomBytes(32).toString("hex");
+    let token: string;
+    let invite: ApplicationInviteDto;
     // Default invitation validity: 7 days
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    const invite = await this.repository.createInvite({
-      email: normalizedEmail,
-      token,
-      expiresAt,
-      createdBy: actorId,
-    });
+    if (activeInvite) {
+      token = activeInvite.token;
+      await prisma.applicationInvite.update({
+        where: { id: activeInvite.id },
+        data: { expiresAt },
+      });
+      invite = {
+        ...activeInvite,
+        expiresAt,
+      };
+    } else {
+      token = crypto.randomBytes(32).toString("hex");
+      invite = await this.repository.createInvite({
+        email: normalizedEmail,
+        token,
+        expiresAt,
+        createdBy: actorId,
+      });
+    }
 
     const baseUrl =
       envConfig.appUrl ||
@@ -543,6 +551,7 @@ export class ApplicationService {
       envConfig.appUrl ||
       envConfig.cors.allowedOrigins[0] ||
       "http://localhost:3000";
+    const discordInviteUrl = await systemSettingService.getDiscordInviteUrl();
     await dispatchEmailJob(
       {
         type: "INTERN_ACCOUNT_CREATED",
@@ -552,6 +561,7 @@ export class ApplicationService {
           email: normalizedEmail,
           temporaryPassword: rawPassword,
           loginUrl,
+          discordInviteUrl,
           departmentName: (application as any).department?.name,
           positionTitle: (application as any).position?.title,
           startDate: application.startDate

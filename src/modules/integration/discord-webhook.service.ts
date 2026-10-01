@@ -13,8 +13,14 @@ import { discordWebhookService } from "../../common/services/discord-webhook.ser
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import { AUDIT_ACTION } from "../../common/constants/audit-log.constant";
-import { discordBotService } from "../../common/services/discord-bot.service";
+import {
+  discordBotService,
+  BatchSyncRolesResult,
+} from "../../common/services/discord-bot.service";
 import { prisma } from "../../database/prisma.client";
+import { dispatchEmailJob } from "../../queues";
+import { envConfig } from "../../config/env.config";
+import { systemSettingService } from "../system-settings/system-setting.service";
 
 export class DiscordWebhookManageService {
   constructor(
@@ -398,6 +404,156 @@ export class DiscordWebhookManageService {
     });
 
     return { total: departments.length, succeeded, failed, results };
+  }
+
+  /**
+   * Quét và đồng bộ Role Discord hàng loạt (Batch Role Sync)
+   */
+  async batchSyncRoles(
+    actorContext?: { actorId?: string; ipAddress?: string; userAgent?: string },
+    options: { force?: boolean } = {},
+  ): Promise<BatchSyncRolesResult> {
+    return discordBotService.batchSyncRoles(actorContext, options);
+  }
+
+  /**
+   * Gửi email nhắc nhở liên kết Discord cho tất cả thực tập sinh ACTIVE chưa có Discord ID
+   */
+  async remindUnlinkedDiscord(
+    actorContext?: { actorId?: string; ipAddress?: string; userAgent?: string },
+  ): Promise<{ totalEligible: number; sentCount: number }> {
+    const interns = await prisma.intern.findMany({
+      where: {
+        status: "ACTIVE",
+        deletedAt: null,
+      },
+      include: {
+        user: { select: { id: true, email: true, fullName: true, discordUserId: true } },
+        department: { select: { id: true, name: true } },
+      },
+    });
+
+    const eligible = interns.filter((i) => {
+      const id = i.discordUserId || i.user?.discordUserId;
+      return !id || !/^\d{17,20}$/.test(id.trim());
+    });
+
+    const discordInviteUrl = await systemSettingService.getDiscordInviteUrl();
+    const profileUrl = `${envConfig.appUrl || envConfig.cors.allowedOrigins[0] || "http://localhost:3000"}/intern/profile`;
+
+    let sentCount = 0;
+    for (const intern of eligible) {
+      if (!intern.user?.email) continue;
+      try {
+        await dispatchEmailJob({
+          type: "DISCORD_LINK_REMINDER",
+          to: intern.user.email,
+          data: {
+            fullName: intern.fullName || intern.user.fullName || "Thực tập sinh",
+            departmentName: intern.department?.name,
+            discordInviteUrl,
+            profileUrl,
+          },
+        });
+        sentCount++;
+      } catch (err: any) {
+        console.warn(`[DiscordService] Failed to send reminder to ${intern.user.email}:`, err?.message);
+      }
+    }
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          actorId: actorContext?.actorId || null,
+          action: AUDIT_ACTION.SEND_DISCORD_REMINDER,
+          targetType: "SYSTEM",
+          targetId: "ALL_UNLINKED_INTERNS",
+          details: { totalEligible: eligible.length, sentCount },
+          ipAddress: actorContext?.ipAddress || null,
+          userAgent: actorContext?.userAgent || null,
+        },
+      });
+    } catch {
+      // ignore
+    }
+
+    return { totalEligible: eligible.length, sentCount };
+  }
+
+  /**
+   * Gửi email nhắc nhở liên kết Discord cho một thực tập sinh cụ thể
+   */
+  async remindInternDiscord(
+    internId: string,
+    actorContext?: { actorId?: string; ipAddress?: string; userAgent?: string },
+  ): Promise<{ success: boolean; message: string }> {
+    const intern = await prisma.intern.findUnique({
+      where: { id: internId },
+      include: {
+        user: { select: { id: true, email: true, fullName: true, discordUserId: true } },
+        department: { select: { id: true, name: true } },
+      },
+    });
+
+    if (!intern || intern.deletedAt) {
+      throw new AppError("Không tìm thấy hồ sơ thực tập sinh", 404, ERROR_CODE.NOT_FOUND);
+    }
+
+    if (intern.status !== "ACTIVE") {
+      throw new AppError(
+        "Chỉ có thể gửi nhắc nhở cho thực tập sinh đang hoạt động (ACTIVE)",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    const discordId = intern.discordUserId || intern.user?.discordUserId;
+    if (discordId && /^\d{17,20}$/.test(discordId.trim())) {
+      throw new AppError(
+        "Thực tập sinh này đã liên kết tài khoản Discord",
+        400,
+        ERROR_CODE.DUPLICATE_ENTRY,
+      );
+    }
+
+    if (!intern.user?.email) {
+      throw new AppError("Thực tập sinh không có địa chỉ email hợp lệ", 400, ERROR_CODE.VALIDATION_ERROR);
+    }
+
+    const discordInviteUrl = await systemSettingService.getDiscordInviteUrl();
+    const profileUrl = `${envConfig.appUrl || envConfig.cors.allowedOrigins[0] || "http://localhost:3000"}/intern/profile`;
+
+    await dispatchEmailJob({
+      type: "DISCORD_LINK_REMINDER",
+      to: intern.user.email,
+      data: {
+        fullName: intern.fullName || intern.user.fullName || "Thực tập sinh",
+        departmentName: intern.department?.name,
+        discordInviteUrl,
+        profileUrl,
+      },
+    });
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          actorId: actorContext?.actorId || null,
+          action: AUDIT_ACTION.SEND_DISCORD_REMINDER,
+          targetType: "INTERN",
+          targetId: intern.id,
+          details: { email: intern.user.email },
+          ipAddress: actorContext?.ipAddress || null,
+          userAgent: actorContext?.userAgent || null,
+        },
+      });
+    } catch {
+      // ignore
+    }
+
+    return {
+      success: true,
+      message: `Đã gửi email nhắc liên kết Discord đến ${intern.user.email}`,
+    };
   }
 }
 

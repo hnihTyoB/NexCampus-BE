@@ -199,4 +199,48 @@ export class InternController {
       next(error);
     }
   };
+
+  remindDiscord = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const result = await this.service.sendDiscordReminder(
+        req.params.id as string,
+        req.user?.id,
+        req.ip,
+        req.headers["user-agent"],
+      );
+
+      res.json({
+        success: true,
+        message: result.message,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  remindAllDiscord = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const result = await this.service.sendBatchDiscordReminders(
+        req.user?.id,
+        req.ip,
+        req.headers["user-agent"],
+      );
+
+      res.json({
+        success: true,
+        message: `Đã gửi email nhắc nhở liên kết Discord tới ${result.sentCount}/${result.totalEligible} thực tập sinh`,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

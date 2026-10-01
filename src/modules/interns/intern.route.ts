@@ -47,6 +47,13 @@ router.post(
   controller.directCreate,
 );
 
+router.post(
+  "/remind-discord",
+  authMiddleware,
+  requirePermission(PERMISSIONS.INTERN_UPDATE),
+  controller.remindAllDiscord,
+);
+
 // ── Intern Management Resource Routes ──
 router.get(
   "/",
@@ -91,6 +98,13 @@ router.patch(
   validate(internIdParamSchema, "params"),
   validate(assignLeaderSchema),
   controller.assignLeader,
+);
+router.post(
+  "/:id/remind-discord",
+  authMiddleware,
+  requirePermission(PERMISSIONS.INTERN_UPDATE),
+  validate(internIdParamSchema, "params"),
+  controller.remindDiscord,
 );
 
 router.delete(
