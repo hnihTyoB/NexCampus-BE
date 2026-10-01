@@ -131,7 +131,12 @@ router.post(
   controller.confirmDeactivate,
 );
 
-router.post("/2fa/setup", authMiddleware, controller.setup2FA);
+router.post(
+  "/2fa/setup",
+  authMiddleware,
+  authRateLimitMiddleware,
+  controller.setup2FA,
+);
 router.post(
   "/2fa/enable",
   authMiddleware,

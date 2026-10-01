@@ -102,3 +102,13 @@ async function handleShutdown(signal: string) {
 
 process.on("SIGTERM", () => handleShutdown("SIGTERM"));
 process.on("SIGINT", () => handleShutdown("SIGINT"));
+
+process.on("unhandledRejection", (reason: any) => {
+  console.error("[Process] Unhandled Promise Rejection:", reason);
+  handleShutdown("UNHANDLED_REJECTION");
+});
+
+process.on("uncaughtException", (error: Error) => {
+  console.error("[Process] Uncaught Exception:", error);
+  handleShutdown("UNCAUGHT_EXCEPTION");
+});

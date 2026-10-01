@@ -19,6 +19,7 @@ import { registerTaskSubmissionOpenApi } from "../modules/task-submissions/task-
 import { registerMeetingOpenApi } from "../modules/meetings/meeting.openapi";
 import { registerDailyReportOpenApi } from "../modules/daily-reports/daily-report.openapi";
 import { registerWeeklyEvaluationOpenApi } from "../modules/weekly-evaluations/weekly-evaluation.openapi";
+import { registerAbsenceOpenApi } from "../modules/absences/absence.openapi";
 import { registerNotificationSettingOpenApi } from "../modules/notification-settings/notification-setting.openapi";
 import { registerActivityLogOpenApi } from "../modules/activity-logs/activity-log.openapi";
 import { registerStatsOpenApi } from "../modules/stats/stats.openapi";
@@ -48,6 +49,7 @@ registerTaskSubmissionOpenApi();
 registerMeetingOpenApi();
 registerDailyReportOpenApi();
 registerWeeklyEvaluationOpenApi();
+registerAbsenceOpenApi();
 registerActivityLogOpenApi();
 registerStatsOpenApi();
 registerPdfExportOpenApi();

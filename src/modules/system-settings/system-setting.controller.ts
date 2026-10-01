@@ -12,11 +12,11 @@ export class SystemSettingController {
   constructor(private readonly service: SystemSettingService = systemSettingService) {}
 
   private async canManageSystemConfig(req: Request): Promise<boolean> {
-    const roleId = (req as any).user?.roleId;
-    if (!roleId) return false;
+    const userId = (req as any).user?.id;
+    if (!userId) return false;
     try {
-      const perms = await permissionCacheService.getRolePermissions(roleId);
-      return perms.has(PERMISSIONS.SYSTEM_CONFIG_MANAGE);
+      const perms = await permissionCacheService.getUserPermissions(userId);
+      return perms.includes(PERMISSIONS.SYSTEM_CONFIG_MANAGE);
     } catch {
       return false;
     }

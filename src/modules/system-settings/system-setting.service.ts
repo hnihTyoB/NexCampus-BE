@@ -28,7 +28,7 @@ const DEFAULT_SETTINGS: SystemSettingsResponseDto = {
   ALLOW_CROSS_DEPARTMENT_ASSIGNMENT: true,
   AUTO_EVALUATION_ENABLED: false,
   DISCORD_BOT_ENABLED: envConfig.discord.botEnabled,
-  DISCORD_BOT_TOKEN: envConfig.discord.botToken || "",
+  DISCORD_BOT_TOKEN: "",
   DISCORD_GUILD_ID: envConfig.discord.guildId || "",
   DISCORD_INVITE_URL: envConfig.discord.inviteUrl || "https://discord.gg/nexcampus",
 };

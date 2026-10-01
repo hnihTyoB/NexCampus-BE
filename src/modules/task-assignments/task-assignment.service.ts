@@ -172,6 +172,12 @@ export class TaskAssignmentService {
             leaderUserId: user.id,
           });
         }
+
+        throw new AppError(
+          "Bạn không có quyền xem danh sách phân công công việc",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
       }
     }
 
