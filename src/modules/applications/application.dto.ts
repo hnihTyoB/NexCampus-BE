@@ -66,10 +66,31 @@ export interface ApplicationInviteDto {
   createdBy?: string | null;
   createdAt: Date;
   updatedAt: Date;
+  creator?: {
+    id: string;
+    fullName: string | null;
+    email?: string | null;
+  } | null;
   application?: {
     id: string;
     fullName: string;
+    email: string;
+    phone: string;
+    university?: string | null;
+    major?: string | null;
+    cvUrl?: string | null;
+    preferredDepartment?: string | null;
+    preferredPosition?: string | null;
+    departmentId?: string | null;
+    positionId?: string | null;
+    department?: { id: string; name: string } | null;
+    position?: { id: string; name: string } | null;
+    startDate: Date;
+    duration: number;
     status: ApplicationStatus;
+    createdAt: Date;
+    updatedAt: Date;
+    attachments?: ApplicationAttachmentDto[];
   } | null;
 }
 

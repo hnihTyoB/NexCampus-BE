@@ -2,7 +2,8 @@ import { Queue, QueueOptions, JobsOptions } from "bullmq";
 import IORedis from "ioredis";
 import { getRedisConnectionOptions } from "../config/redis.config";
 import { envConfig } from "../config/env.config";
-import { EmailTemplateType } from "./templates/email-templates";
+import { EmailTemplateType, renderEmailTemplate } from "./templates/email-templates";
+import { MailService } from "../common/services/mail.service";
 
 export const QUEUE_NAMES = {
   EMAIL: "email-queue",
@@ -115,7 +116,7 @@ export const notificationQueue = createQueue<NotificationJobData>(
 export const cleanupQueue = createQueue<CleanupJobData>(QUEUE_NAMES.CLEANUP);
 
 /**
- * Đẩy job gửi email vào emailQueue
+ * Đẩy job gửi email vào emailQueue (kèm cơ chế Direct Send Fallback tự động khi Redis offline hoặc bị vô hiệu hóa)
  */
 export async function dispatchEmailJob(
   data: EmailJobData,
@@ -129,12 +130,42 @@ export async function dispatchEmailJob(
       });
       return { id: job.id, dispatched: true };
     }
-    // Fallback log khi Redis offline hoặc đang trong test
-    console.log(`[EmailQueue:Fallback] Enqueued job ${data.type} to ${data.to}`);
-    return { id: `mock-${Date.now()}`, dispatched: false };
+
+    // Direct Send Fallback qua MailService khi Redis offline hoặc REDIS_ENABLED=false
+    console.log(
+      `[EmailQueue:Fallback] Sending ${data.type} directly to recipient: ${data.to}`,
+    );
+    const rendered = renderEmailTemplate(data.type, data.data);
+    const subject = data.subject || rendered.subject;
+    const mailService = new MailService();
+    await mailService.sendRaw(data.to, subject, rendered.html);
+    console.log(
+      `[EmailQueue:Fallback] ✅ Direct email sent successfully to ${data.to}`,
+    );
+    return { id: `direct-${Date.now()}`, dispatched: true };
   } catch (err: any) {
-    console.error("[EmailQueue] Failed to dispatch email job:", err.message);
-    return { dispatched: false };
+    console.error("[EmailQueue] Failed to dispatch email job via queue:", err.message);
+
+    // Cứu hộ khẩn cấp: nếu queue ném lỗi, thử gửi trực tiếp qua SMTP
+    try {
+      console.log(
+        `[EmailQueue:Fallback] Attempting emergency direct send to ${data.to}...`,
+      );
+      const rendered = renderEmailTemplate(data.type, data.data);
+      const subject = data.subject || rendered.subject;
+      const mailService = new MailService();
+      await mailService.sendRaw(data.to, subject, rendered.html);
+      console.log(
+        `[EmailQueue:Fallback] ✅ Emergency direct email sent to ${data.to}`,
+      );
+      return { id: `emergency-${Date.now()}`, dispatched: true };
+    } catch (emergencyErr: any) {
+      console.error(
+        "[EmailQueue] Emergency direct send also failed:",
+        emergencyErr.message,
+      );
+      return { dispatched: false };
+    }
   }
 }
 

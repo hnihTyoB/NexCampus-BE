@@ -6,6 +6,28 @@ import {
   DISCORD_WEBHOOK_SCOPE,
 } from "../constants/discord.constant";
 import { ROLES } from "../constants/role.constant";
+import { AUDIT_ACTION } from "../constants/audit-log.constant";
+
+export interface BatchSyncRoleDetail {
+  internId: string;
+  internCode: string;
+  fullName: string;
+  email: string;
+  departmentName: string;
+  discordUserId: string | null;
+  status: "GRANTED" | "REVOKED" | "ALREADY_SYNCED" | "MISSING_ID" | "FAILED";
+  message: string;
+}
+
+export interface BatchSyncRolesResult {
+  totalScanned: number;
+  grantedCount: number;
+  revokedCount: number;
+  alreadySyncedCount: number;
+  missingIdCount: number;
+  failedCount: number;
+  details: BatchSyncRoleDetail[];
+}
 
 export interface CreateRoleOptions {
   name: string;
@@ -808,10 +830,19 @@ export class DiscordBotService {
       };
     }
 
-    // 1. Nếu đổi ban: Thu hồi Role và rời khỏi TẤT CẢ Private Threads của ban cũ
-    if (oldDepartmentId && oldDepartmentId !== departmentId) {
+    // 1. Nếu đổi ban hoặc thu hồi ban: Thu hồi Role và rời khỏi TẤT CẢ Private Threads của ban cũ
+    let targetOldDept = oldDepartmentId;
+    if (!targetOldDept && (departmentId === null || departmentId === undefined)) {
+      const internData = await prisma.intern.findUnique({
+        where: { id: internId },
+        select: { departmentId: true },
+      });
+      targetOldDept = internData?.departmentId || null;
+    }
+
+    if (targetOldDept && targetOldDept !== departmentId) {
       const oldConfigs = await prisma.discordWebhookConfig.findMany({
-        where: { departmentId: oldDepartmentId },
+        where: { departmentId: targetOldDept },
         select: { discordRoleId: true, threadId: true },
       });
 
@@ -897,9 +928,17 @@ export class DiscordBotService {
       };
     }
 
+    // 3. Nếu không có departmentId mới (thu hồi quyền): Cập nhật discordRoleGranted = false
+    await prisma.intern.update({
+      where: { id: internId },
+      data: {
+        discordRoleGranted: false,
+      },
+    });
+
     return {
       success: true,
-      message: "Đã thu hồi quyền Discord ban cũ thành công.",
+      message: "Đã thu hồi quyền Discord phòng ban thành công.",
     };
   }
 
@@ -998,6 +1037,216 @@ export class DiscordBotService {
       console.warn(`[DiscordBot] syncLeaderThreads failed:`, err?.message);
       return 0;
     }
+  }
+
+  /**
+   * Quét và đồng bộ Role Discord hàng loạt (Batch Role Sync Engine)
+   */
+  async batchSyncRoles(
+    actorContext?: { actorId?: string; ipAddress?: string; userAgent?: string },
+    options: { force?: boolean } = {},
+  ): Promise<BatchSyncRolesResult> {
+    const interns = await prisma.intern.findMany({
+      where: { deletedAt: null },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            fullName: true,
+            discordUserId: true,
+            discordUsername: true,
+          },
+        },
+        department: {
+          select: { id: true, name: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const details: BatchSyncRoleDetail[] = [];
+    let grantedCount = 0;
+    let revokedCount = 0;
+    let alreadySyncedCount = 0;
+    let missingIdCount = 0;
+    let failedCount = 0;
+
+    for (const intern of interns) {
+      const email = intern.user?.email || "";
+      const fullName = intern.fullName || intern.user?.fullName || "Thực tập sinh";
+      const departmentName = intern.department?.name || "Chưa phân ban";
+      const internCode = intern.internCode || intern.id.slice(0, 8).toUpperCase();
+
+      const rawDiscordId =
+        intern.discordUserId ||
+        intern.user?.discordUserId ||
+        (intern.discordUsername && /^\d{17,20}$/.test(intern.discordUsername)
+          ? intern.discordUsername
+          : null);
+      const validDiscordId =
+        rawDiscordId && /^\d{17,20}$/.test(rawDiscordId.trim())
+          ? rawDiscordId.trim()
+          : null;
+
+      try {
+        if (intern.status === "ACTIVE") {
+          if (!validDiscordId) {
+            missingIdCount++;
+            details.push({
+              internId: intern.id,
+              internCode,
+              fullName,
+              email,
+              departmentName,
+              discordUserId: null,
+              status: "MISSING_ID",
+              message: "Chưa liên kết Discord User ID",
+            });
+            continue;
+          }
+
+          if (!intern.discordRoleGranted || options?.force) {
+            if (!intern.departmentId) {
+              missingIdCount++;
+              details.push({
+                internId: intern.id,
+                internCode,
+                fullName,
+                email,
+                departmentName,
+                discordUserId: validDiscordId,
+                status: "MISSING_ID",
+                message: "Chưa được phân bổ phòng ban",
+              });
+              continue;
+            }
+
+            const syncRes = await this.syncInternMember({
+              internId: intern.id,
+              discordUserId: validDiscordId,
+              departmentId: intern.departmentId,
+            });
+
+            grantedCount++;
+            details.push({
+              internId: intern.id,
+              internCode,
+              fullName,
+              email,
+              departmentName,
+              discordUserId: validDiscordId,
+              status: "GRANTED",
+              message:
+                syncRes.message ||
+                "Đã cấp Role phòng ban và Private Threads thành công",
+            });
+
+            await new Promise((r) => setTimeout(r, 120));
+          } else {
+            alreadySyncedCount++;
+            details.push({
+              internId: intern.id,
+              internCode,
+              fullName,
+              email,
+              departmentName,
+              discordUserId: validDiscordId,
+              status: "ALREADY_SYNCED",
+              message: "Đã có đủ quyền Discord phòng ban",
+            });
+          }
+        } else if (
+          intern.status === "COMPLETED" ||
+          intern.status === "DROPPED"
+        ) {
+          if (intern.discordRoleGranted) {
+            await this.syncInternMember({
+              internId: intern.id,
+              discordUserId: validDiscordId || undefined,
+              departmentId: null,
+              oldDepartmentId: intern.departmentId,
+            });
+
+            revokedCount++;
+            details.push({
+              internId: intern.id,
+              internCode,
+              fullName,
+              email,
+              departmentName,
+              discordUserId: validDiscordId,
+              status: "REVOKED",
+              message: "Đã thu hồi Role phòng ban và xóa khỏi Private Threads",
+            });
+
+            await new Promise((r) => setTimeout(r, 120));
+          } else {
+            alreadySyncedCount++;
+            details.push({
+              internId: intern.id,
+              internCode,
+              fullName,
+              email,
+              departmentName,
+              discordUserId: validDiscordId,
+              status: "ALREADY_SYNCED",
+              message: `Đã kết thúc thực tập (${intern.status}), không có Role cần thu hồi`,
+            });
+          }
+        } else {
+          alreadySyncedCount++;
+        }
+      } catch (err: any) {
+        failedCount++;
+        details.push({
+          internId: intern.id,
+          internCode,
+          fullName,
+          email,
+          departmentName,
+          discordUserId: validDiscordId,
+          status: "FAILED",
+          message: err?.message || "Lỗi khi xử lý đồng bộ Discord",
+        });
+      }
+    }
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          actorId: actorContext?.actorId || null,
+          action: AUDIT_ACTION.BATCH_SYNC_DISCORD_ROLES,
+          targetType: "SYSTEM",
+          targetId: "DISCORD_ROLES",
+          details: {
+            totalScanned: interns.length,
+            grantedCount,
+            revokedCount,
+            alreadySyncedCount,
+            missingIdCount,
+            failedCount,
+          },
+          ipAddress: actorContext?.ipAddress || null,
+          userAgent: actorContext?.userAgent || null,
+        },
+      });
+    } catch (auditErr: any) {
+      console.warn(
+        `[DiscordBot] Failed to create audit log for batchSyncRoles:`,
+        auditErr?.message,
+      );
+    }
+
+    return {
+      totalScanned: interns.length,
+      grantedCount,
+      revokedCount,
+      alreadySyncedCount,
+      missingIdCount,
+      failedCount,
+      details,
+    };
   }
 }
 

@@ -73,11 +73,45 @@ const inviteSelect = {
   createdBy: true,
   createdAt: true,
   updatedAt: true,
+  creator: {
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+    },
+  },
   application: {
     select: {
       id: true,
       fullName: true,
+      email: true,
+      phone: true,
+      university: true,
+      major: true,
+      cvUrl: true,
+      preferredDepartment: true,
+      preferredPosition: true,
+      departmentId: true,
+      positionId: true,
+      department: { select: { id: true, name: true } },
+      position: { select: { id: true, name: true } },
+      startDate: true,
+      duration: true,
       status: true,
+      createdAt: true,
+      updatedAt: true,
+      attachments: {
+        select: {
+          id: true,
+          applicationId: true,
+          fileName: true,
+          fileUrl: true,
+          filePath: true,
+          fileSize: true,
+          mimeType: true,
+          createdAt: true,
+        },
+      },
     },
   },
 } satisfies Prisma.ApplicationInviteSelect;
@@ -122,11 +156,79 @@ export class ApplicationRepository {
     });
   }
 
-  findInviteById(id: string): Promise<ApplicationInviteDto | null> {
-    return prisma.applicationInvite.findUnique({
-      where: { id },
+  async findInviteById(id: string): Promise<ApplicationInviteDto | null> {
+    let invite = await prisma.applicationInvite.findFirst({
+      where: {
+        OR: [
+          { id },
+          { applicationId: id },
+        ],
+      },
       select: inviteSelect,
     });
+
+    if (invite && !invite.application) {
+      const app = await prisma.application.findFirst({
+        where: {
+          email: invite.email.toLowerCase().trim(),
+          deletedAt: null,
+        },
+        select: inviteSelect.application.select,
+      });
+      if (app) {
+        await prisma.applicationInvite.update({
+          where: { id: invite.id },
+          data: {
+            applicationId: app.id,
+            status: APPLICATION_INVITE_STATUS.USED,
+            usedAt: invite.usedAt ?? app.createdAt,
+          },
+        });
+        invite = {
+          ...invite,
+          status: APPLICATION_INVITE_STATUS.USED,
+          usedAt: invite.usedAt ?? app.createdAt,
+          applicationId: app.id,
+          application: app,
+        };
+      }
+    }
+
+    if (!invite) {
+      const app = await prisma.application.findUnique({
+        where: { id },
+        select: inviteSelect.application.select,
+      });
+      if (app) {
+        const existingInvite = await prisma.applicationInvite.findFirst({
+          where: { email: app.email.toLowerCase().trim() },
+          select: inviteSelect,
+        });
+        if (existingInvite) {
+          return {
+            ...existingInvite,
+            applicationId: app.id,
+            application: app,
+          };
+        }
+
+        return {
+          id: app.id,
+          email: app.email,
+          token: "",
+          status: APPLICATION_INVITE_STATUS.USED,
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          usedAt: app.createdAt,
+          applicationId: app.id,
+          createdAt: app.createdAt,
+          updatedAt: app.updatedAt,
+          creator: null,
+          application: app,
+        };
+      }
+    }
+
+    return invite;
   }
 
   async findInvites(query: GetApplicationInvitesQuery): Promise<{

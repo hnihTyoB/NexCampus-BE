@@ -30,6 +30,7 @@ const DEFAULT_SETTINGS: SystemSettingsResponseDto = {
   DISCORD_BOT_ENABLED: envConfig.discord.botEnabled,
   DISCORD_BOT_TOKEN: envConfig.discord.botToken || "",
   DISCORD_GUILD_ID: envConfig.discord.guildId || "",
+  DISCORD_INVITE_URL: envConfig.discord.inviteUrl || "https://discord.gg/nexcampus",
 };
 
 export class SystemSettingService {
@@ -322,6 +323,20 @@ export class SystemSettingService {
       }
     }
 
+    if (key === "DISCORD_INVITE_URL") {
+      const inviteUrlStr = String(value || "").trim();
+      if (
+        inviteUrlStr.length > 0 &&
+        !/^https:\/\/(discord\.(gg|com\/invite)\/[a-zA-Z0-9-]+)/.test(inviteUrlStr)
+      ) {
+        throw new AppError(
+          "Đường dẫn mời Discord không hợp lệ (phải bắt đầu bằng https://discord.gg/ hoặc https://discord.com/invite/)",
+          400,
+          ERROR_CODE.VALIDATION_ERROR
+        );
+      }
+    }
+
     const stringValue = String(value);
     const updated = await this.repository.upsert(
       key,
@@ -363,6 +378,25 @@ export class SystemSettingService {
 
     this.clearCache();
     return results;
+  }
+
+  /**
+   * Lấy đường link mời Server Discord (ưu tiên DB -> fallback env)
+   */
+  async getDiscordInviteUrl(): Promise<string> {
+    try {
+      const item = await this.getSetting<string>("DISCORD_INVITE_URL");
+      if (item && typeof item === "string" && item.trim().length > 0) {
+        return item.trim();
+      }
+    } catch {
+      // fallback
+    }
+    return (
+      envConfig.discord?.inviteUrl ||
+      process.env.DISCORD_INVITE_URL ||
+      "https://discord.gg/nexcampus"
+    );
   }
 
   /**

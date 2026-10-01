@@ -24,6 +24,7 @@ import {
 import { systemConfigService } from "../system-config/system-config.service";
 import { HRM_CONFIG_KEYS } from "../../common/constants/system-config.constant";
 import { discordBotService } from "../../common/services/discord-bot.service";
+import { discordWebhookManageService } from "../integration/discord-webhook.service";
 
 export class InternService {
   private readonly repository = new InternRepository();
@@ -526,6 +527,25 @@ export class InternService {
       }
     }
 
+    if (
+      updated.userId &&
+      (data.discordUserId !== undefined || data.discordUsername !== undefined)
+    ) {
+      await prisma.user
+        .update({
+          where: { id: updated.userId },
+          data: {
+            ...(data.discordUserId !== undefined
+              ? { discordUserId: data.discordUserId?.trim() || null }
+              : {}),
+            ...(data.discordUsername !== undefined
+              ? { discordUsername: data.discordUsername?.trim() || null }
+              : {}),
+          },
+        })
+        .catch(() => {});
+    }
+
     return updated;
   }
 
@@ -638,5 +658,30 @@ export class InternService {
   ): Promise<InternDto> {
     const profile = await this.getMe(userId);
     return this.update(profile.id, data, actorId);
+  }
+
+  async sendDiscordReminder(
+    internId: string,
+    actorId?: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<{ success: boolean; message: string }> {
+    return discordWebhookManageService.remindInternDiscord(internId, {
+      actorId,
+      ipAddress,
+      userAgent,
+    });
+  }
+
+  async sendBatchDiscordReminders(
+    actorId?: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<{ totalEligible: number; sentCount: number }> {
+    return discordWebhookManageService.remindUnlinkedDiscord({
+      actorId,
+      ipAddress,
+      userAgent,
+    });
   }
 }

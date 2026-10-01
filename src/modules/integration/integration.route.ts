@@ -276,5 +276,35 @@ router.post(
   discordWebhookController.provisionDepartment,
 );
 
+// Batch Discord Role Synchronization (Quét & Đồng Bộ Role Hàng Loạt)
+router.post(
+  "/discord/sync-roles",
+  authMiddleware,
+  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  discordWebhookController.batchSyncRoles,
+);
+router.post(
+  "/webhooks/discord/sync-roles",
+  authMiddleware,
+  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  discordWebhookController.batchSyncRoles,
+);
+
+// Send reminder email to all unlinked interns
+router.post(
+  "/discord/remind-unlinked",
+  authMiddleware,
+  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  discordWebhookController.remindUnlinkedDiscord,
+);
+
+// Send reminder email to a specific intern
+router.post(
+  "/discord/remind/:id",
+  authMiddleware,
+  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  discordWebhookController.remindInternDiscord,
+);
+
 export default router;
 
