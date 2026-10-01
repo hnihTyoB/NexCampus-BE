@@ -142,14 +142,14 @@ router.post(
 router.get(
   "/discord/webhooks",
   authMiddleware,
-  requirePermission(PERMISSIONS.WEBHOOK_READ),
+  requirePermission(PERMISSIONS.DISCORD_READ),
   validate(findAllDiscordWebhooksQuerySchema, "query"),
   discordWebhookController.listWebhooks,
 );
 router.get(
   "/webhooks/discord",
   authMiddleware,
-  requirePermission(PERMISSIONS.WEBHOOK_READ),
+  requirePermission(PERMISSIONS.DISCORD_READ),
   validate(findAllDiscordWebhooksQuerySchema, "query"),
   discordWebhookController.listWebhooks,
 );
@@ -158,14 +158,14 @@ router.get(
 router.get(
   "/discord/webhooks/:id",
   authMiddleware,
-  requirePermission(PERMISSIONS.WEBHOOK_READ),
+  requirePermission(PERMISSIONS.DISCORD_READ),
   validate(discordWebhookIdParamSchema, "params"),
   discordWebhookController.getWebhookById,
 );
 router.get(
   "/webhooks/discord/:id",
   authMiddleware,
-  requirePermission(PERMISSIONS.WEBHOOK_READ),
+  requirePermission(PERMISSIONS.DISCORD_READ),
   validate(discordWebhookIdParamSchema, "params"),
   discordWebhookController.getWebhookById,
 );
@@ -174,14 +174,14 @@ router.get(
 router.post(
   "/discord/webhooks",
   authMiddleware,
-  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  requirePermission(PERMISSIONS.DISCORD_MANAGE),
   validate(createDiscordWebhookSchema),
   discordWebhookController.createOrUpdateWebhook,
 );
 router.post(
   "/webhooks/discord",
   authMiddleware,
-  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  requirePermission(PERMISSIONS.DISCORD_MANAGE),
   validate(createDiscordWebhookSchema),
   discordWebhookController.createOrUpdateWebhook,
 );
@@ -190,7 +190,7 @@ router.post(
 router.put(
   "/discord/webhooks/:id",
   authMiddleware,
-  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  requirePermission(PERMISSIONS.DISCORD_MANAGE),
   validate(discordWebhookIdParamSchema, "params"),
   validate(updateDiscordWebhookSchema),
   discordWebhookController.updateWebhook,
@@ -198,7 +198,7 @@ router.put(
 router.put(
   "/webhooks/discord/:id",
   authMiddleware,
-  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  requirePermission(PERMISSIONS.DISCORD_MANAGE),
   validate(discordWebhookIdParamSchema, "params"),
   validate(updateDiscordWebhookSchema),
   discordWebhookController.updateWebhook,
@@ -208,14 +208,14 @@ router.put(
 router.delete(
   "/discord/webhooks/:id",
   authMiddleware,
-  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  requirePermission(PERMISSIONS.DISCORD_MANAGE),
   validate(discordWebhookIdParamSchema, "params"),
   discordWebhookController.deleteWebhook,
 );
 router.delete(
   "/webhooks/discord/:id",
   authMiddleware,
-  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  requirePermission(PERMISSIONS.DISCORD_MANAGE),
   validate(discordWebhookIdParamSchema, "params"),
   discordWebhookController.deleteWebhook,
 );
@@ -224,28 +224,28 @@ router.delete(
 router.post(
   "/discord/webhooks/test",
   authMiddleware,
-  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  requirePermission(PERMISSIONS.DISCORD_MANAGE),
   validate(testDiscordWebhookSchema),
   discordWebhookController.testPingWebhook,
 );
 router.post(
   "/webhooks/discord/test",
   authMiddleware,
-  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  requirePermission(PERMISSIONS.DISCORD_MANAGE),
   validate(testDiscordWebhookSchema),
   discordWebhookController.testPingWebhook,
 );
 router.post(
   "/discord/webhooks/:id/test",
   authMiddleware,
-  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  requirePermission(PERMISSIONS.DISCORD_MANAGE),
   validate(discordWebhookIdParamSchema, "params"),
   discordWebhookController.testPingWebhook,
 );
 router.post(
   "/webhooks/discord/:id/test",
   authMiddleware,
-  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  requirePermission(PERMISSIONS.DISCORD_MANAGE),
   validate(discordWebhookIdParamSchema, "params"),
   discordWebhookController.testPingWebhook,
 );
@@ -256,7 +256,7 @@ router.post(
 router.get(
   "/discord/status",
   authMiddleware,
-  requirePermission(PERMISSIONS.WEBHOOK_READ),
+  requirePermission(PERMISSIONS.DISCORD_READ),
   discordWebhookController.getBotStatus,
 );
 
@@ -265,7 +265,7 @@ router.get(
 router.post(
   "/discord/departments/provision-all",
   authMiddleware,
-  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  requirePermission(PERMISSIONS.DISCORD_MANAGE),
   discordWebhookController.provisionAllDepartments,
 );
 
@@ -273,7 +273,7 @@ router.post(
 router.post(
   "/discord/departments/:id/provision",
   authMiddleware,
-  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  requirePermission(PERMISSIONS.DISCORD_MANAGE),
   validate(discordDepartmentParamSchema, "params"),
   discordWebhookController.provisionDepartment,
 );
@@ -282,14 +282,14 @@ router.post(
 router.post(
   "/discord/sync-roles",
   authMiddleware,
-  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  requirePermission(PERMISSIONS.DISCORD_MANAGE),
   validate(batchSyncRolesSchema, "body"),
   discordWebhookController.batchSyncRoles,
 );
 router.post(
   "/webhooks/discord/sync-roles",
   authMiddleware,
-  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  requirePermission(PERMISSIONS.DISCORD_MANAGE),
   validate(batchSyncRolesSchema, "body"),
   discordWebhookController.batchSyncRoles,
 );
@@ -298,7 +298,7 @@ router.post(
 router.post(
   "/discord/remind-unlinked",
   authMiddleware,
-  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  requirePermission(PERMISSIONS.DISCORD_MANAGE),
   discordWebhookController.remindUnlinkedDiscord,
 );
 
@@ -306,7 +306,7 @@ router.post(
 router.post(
   "/discord/remind/:id",
   authMiddleware,
-  requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  requirePermission(PERMISSIONS.DISCORD_MANAGE),
   validate(discordRemindInternParamSchema, "params"),
   discordWebhookController.remindInternDiscord,
 );

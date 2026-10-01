@@ -58,6 +58,10 @@ const SYSTEM_PERMISSIONS: PermissionDef[] = [
   { name: "WEBHOOK_READ", resource: "WEBHOOK", action: "READ", description: "Xem danh sách Webhooks" },
   { name: "WEBHOOK_MANAGE", resource: "WEBHOOK", action: "MANAGE", description: "Cấu hình và quản lý Webhooks" },
 
+  // Discord Integration
+  { name: "DISCORD_READ", resource: "DISCORD", action: "READ", description: "Xem cấu hình và trạng thái Discord" },
+  { name: "DISCORD_MANAGE", resource: "DISCORD", action: "MANAGE", description: "Cấu hình Webhook, Kênh và Đồng bộ Role Discord" },
+
   // System Configuration & Feature Flags
   { name: "SYSTEM_CONFIG_READ", resource: "SYSTEM_CONFIG", action: "READ", description: "Xem cấu hình hệ thống và cờ tính năng" },
   { name: "SYSTEM_CONFIG_MANAGE", resource: "SYSTEM_CONFIG", action: "MANAGE", description: "Cập nhật cấu hình hệ thống" },
