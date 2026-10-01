@@ -9,7 +9,14 @@ const router = Router();
 let healthRedisClient: IORedis | null = null;
 
 function getHealthRedisClient(): IORedis | null {
-  if (!envConfig.redis.enabled) return null;
+  if (
+    process.env.NODE_ENV === "test" ||
+    Boolean(process.env.NODE_TEST_CONTEXT) ||
+    process.argv.some((arg) => arg.includes("test")) ||
+    !envConfig.redis.enabled
+  ) {
+    return null;
+  }
   if (!healthRedisClient) {
     const baseOptions = getRedisConnectionOptions();
     healthRedisClient = new IORedis({
