@@ -515,70 +515,27 @@ export class CronService {
     const { startOfDay, endOfDay } = getVietnamDayRange(today);
     const todayStr = formatVietnamDate(today);
 
-    // 1. Thống kê tổng số Intern đang ACTIVE
-    const activeInternsWhere: any = {
-      status: "ACTIVE",
-      deletedAt: null,
-      user: { isActive: true, deletedAt: null },
-    };
-    if (params.departmentId) {
-      activeInternsWhere.departmentId = params.departmentId;
-    }
-
-    const activeInterns = await prisma.intern.findMany({
-      where: activeInternsWhere,
-      include: {
-        user: { select: { id: true, email: true, fullName: true } },
-        department: { select: { id: true, name: true } },
-      },
+    // 1. Lấy dữ liệu tổng hợp Standup thông qua repository
+    const execData = await this.repository.getDailyStandupExecutiveData({
+      startOfDay,
+      endOfDay,
+      today,
+      departmentId: params.departmentId,
     });
 
-    const activeInternIds = new Set(activeInterns.map((i) => i.id));
-    const activeUserIds = new Set(activeInterns.map((i) => i.userId));
+    const activeInterns = execData.activeInterns;
+    const submittedReports = execData.submittedReports;
+    const approvedAbsencesData = execData.approvedAbsencesData;
+    const blockedAssignments = execData.blockedAssignments;
+    const pendingExtensionsData = execData.pendingExtensionsData;
+    const deptConfigs = execData.deptWebhookConfigs;
 
-    // 2. Số lượng đã nộp DailyReport trong ngày hôm nay
-    const submittedReports = await prisma.dailyReport.findMany({
-      where: {
-        date: today,
-        deletedAt: null,
-        internId: { in: Array.from(activeInternIds) },
-      },
-      select: { internId: true },
-    });
-    const submittedInternIds = new Set(submittedReports.map((r) => r.internId));
-    const submittedCount = submittedInternIds.size;
+    const submittedCount = new Set(submittedReports.map((r) => r.internId)).size;
     const totalActiveInterns = activeInterns.length;
     const completionRate =
       totalActiveInterns > 0
         ? Math.round((submittedCount / totalActiveInterns) * 100)
         : 100;
-
-    // 3. Danh sách Intern có đơn Absence ở trạng thái APPROVED
-    const approvedAbsencesData = await prisma.absence.findMany({
-      where: {
-        status: AbsenceStatus.APPROVED,
-        startDate: { lte: endOfDay },
-        endDate: { gte: startOfDay },
-        userId: { in: Array.from(activeUserIds) },
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            fullName: true,
-            intern: {
-              select: {
-                id: true,
-                fullName: true,
-                internCode: true,
-                department: { select: { name: true } },
-              },
-            },
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
 
     const approvedAbsences = approvedAbsencesData.map((a) => ({
       internName:
@@ -590,45 +547,6 @@ export class CronService {
       reason: a.reason || "Lý do cá nhân",
     }));
 
-    // 4. Danh sách các TaskAssignment đang có status = 'BLOCKED' hoặc có blockedReason != null phát sinh/cập nhật trong ngày
-    const blockedAssignments = await prisma.taskAssignment.findMany({
-      where: {
-        OR: [
-          { status: "BLOCKED" },
-          {
-            blockedReason: { not: null },
-            updatedAt: { gte: startOfDay, lte: endOfDay },
-          },
-        ],
-        task: {
-          deletedAt: null,
-          ...(params.departmentId
-            ? { taskGroup: { departmentId: params.departmentId } }
-            : {}),
-        },
-      },
-      include: {
-        task: {
-          select: {
-            id: true,
-            code: true,
-            title: true,
-            taskGroupId: true,
-            taskGroup: { select: { id: true, name: true, departmentId: true } },
-          },
-        },
-        intern: {
-          select: {
-            id: true,
-            fullName: true,
-            internCode: true,
-            department: { select: { id: true, name: true } },
-          },
-        },
-      },
-      orderBy: { updatedAt: "desc" },
-    });
-
     const blockedTasks = blockedAssignments.map((b) => ({
       taskId: b.taskId,
       taskCode: b.task?.code,
@@ -636,45 +554,6 @@ export class CronService {
       internName: b.intern?.fullName || "Chưa phân công",
       blockedReason: b.blockedReason || "Không rõ lý do",
     }));
-
-    // 5. Danh sách các TaskExtensionRequest đang có status = 'PENDING'
-    const pendingExtensionsData = await prisma.taskExtensionRequest.findMany({
-      where: {
-        status: "PENDING",
-        assignment: {
-          task: {
-            deletedAt: null,
-            ...(params.departmentId
-              ? { taskGroup: { departmentId: params.departmentId } }
-              : {}),
-          },
-        },
-      },
-      include: {
-        assignment: {
-          include: {
-            task: {
-              select: {
-                id: true,
-                code: true,
-                title: true,
-                taskGroupId: true,
-                taskGroup: { select: { id: true, name: true, departmentId: true } },
-              },
-            },
-          },
-        },
-        intern: {
-          select: {
-            id: true,
-            fullName: true,
-            internCode: true,
-            department: { select: { id: true, name: true } },
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
 
     const pendingExtensions = pendingExtensionsData.map((e) => ({
       requestId: e.id,
@@ -685,7 +564,7 @@ export class CronService {
       extensionDays: e.extensionDays,
     }));
 
-    // 6. Gửi báo cáo tới Webhook:
+    // 2. Gửi báo cáo tới Webhook:
     // Ưu tiên Webhook Global kênh #leader-hq-alerts (purpose = LEADER_ALERTS),
     // hoặc Webhook của từng phòng ban nếu không có kênh Global.
     let dispatchedWebhooksCount = 0;
@@ -719,20 +598,6 @@ export class CronService {
 
       // 2. Nếu không có Global, fallback sang Webhook các phòng ban
       if (targetWebhooks.length === 0) {
-        const deptConfigs = await prisma.discordWebhookConfig.findMany({
-          where: {
-            isEnabled: true,
-            purpose: {
-              in: [
-                DISCORD_WEBHOOK_PURPOSE.LEADER_ALERTS,
-                DISCORD_WEBHOOK_PURPOSE.DAILY_STANDUP,
-              ],
-            },
-            departmentId: { not: null },
-          },
-          include: { department: true },
-        });
-
         const seenUrls = new Set<string>();
         for (const cfg of deptConfigs) {
           if (cfg.webhookUrl && !seenUrls.has(cfg.webhookUrl)) {

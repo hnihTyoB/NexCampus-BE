@@ -22,6 +22,8 @@ import {
   discordDepartmentParamSchema,
   testDiscordWebhookSchema,
   findAllDiscordWebhooksQuerySchema,
+  discordRemindInternParamSchema,
+  batchSyncRolesSchema,
 } from "./integration.validation";
 
 const router = Router();
@@ -281,12 +283,14 @@ router.post(
   "/discord/sync-roles",
   authMiddleware,
   requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  validate(batchSyncRolesSchema, "body"),
   discordWebhookController.batchSyncRoles,
 );
 router.post(
   "/webhooks/discord/sync-roles",
   authMiddleware,
   requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  validate(batchSyncRolesSchema, "body"),
   discordWebhookController.batchSyncRoles,
 );
 
@@ -303,6 +307,7 @@ router.post(
   "/discord/remind/:id",
   authMiddleware,
   requirePermission(PERMISSIONS.WEBHOOK_MANAGE),
+  validate(discordRemindInternParamSchema, "params"),
   discordWebhookController.remindInternDiscord,
 );
 

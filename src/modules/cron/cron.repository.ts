@@ -192,6 +192,168 @@ export class CronRepository {
       },
     });
   }
+
+  /**
+   * Truy vấn tổng hợp dữ liệu báo cáo điều hành Standup ngày (Executive Summary)
+   */
+  async getDailyStandupExecutiveData(params: {
+    startOfDay: Date;
+    endOfDay: Date;
+    today: Date;
+    departmentId?: string;
+  }) {
+    // 1. Lấy danh sách thực tập sinh đang hoạt động (ACTIVE)
+    const activeInterns = await prisma.intern.findMany({
+      where: {
+        status: "ACTIVE",
+        deletedAt: null,
+        ...(params.departmentId ? { departmentId: params.departmentId } : {}),
+      },
+      include: {
+        user: { select: { id: true, email: true, fullName: true } },
+        department: { select: { id: true, name: true } },
+      },
+    });
+
+    const activeInternIds = new Set(activeInterns.map((i) => i.id));
+    const activeUserIds = new Set(activeInterns.map((i) => i.userId));
+
+    // 2. Số lượng đã nộp DailyReport trong ngày hôm nay
+    const submittedReports = await prisma.dailyReport.findMany({
+      where: {
+        date: params.today,
+        deletedAt: null,
+        internId: { in: Array.from(activeInternIds) },
+      },
+      select: { internId: true },
+    });
+
+    // 3. Danh sách Intern có đơn Absence ở trạng thái APPROVED
+    const approvedAbsencesData = await prisma.absence.findMany({
+      where: {
+        status: "APPROVED",
+        startDate: { lte: params.endOfDay },
+        endDate: { gte: params.startOfDay },
+        userId: { in: Array.from(activeUserIds) },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            intern: {
+              select: {
+                id: true,
+                fullName: true,
+                internCode: true,
+                department: { select: { name: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    // 4. Danh sách các TaskAssignment đang có status = 'BLOCKED'
+    const blockedAssignments = await prisma.taskAssignment.findMany({
+      where: {
+        OR: [
+          { status: "BLOCKED" },
+          {
+            blockedReason: { not: null },
+            updatedAt: { gte: params.startOfDay, lte: params.endOfDay },
+          },
+        ],
+        task: {
+          deletedAt: null,
+          ...(params.departmentId
+            ? { taskGroup: { departmentId: params.departmentId } }
+            : {}),
+        },
+      },
+      include: {
+        task: {
+          select: {
+            id: true,
+            code: true,
+            title: true,
+            taskGroupId: true,
+            taskGroup: { select: { id: true, name: true, departmentId: true } },
+          },
+        },
+        intern: {
+          select: {
+            id: true,
+            fullName: true,
+            internCode: true,
+            department: { select: { id: true, name: true } },
+          },
+        },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    // 5. Danh sách các TaskExtensionRequest đang có status = 'PENDING'
+    const pendingExtensionsData = await prisma.taskExtensionRequest.findMany({
+      where: {
+        status: "PENDING",
+        assignment: {
+          task: {
+            deletedAt: null,
+            ...(params.departmentId
+              ? { taskGroup: { departmentId: params.departmentId } }
+              : {}),
+          },
+        },
+      },
+      include: {
+        assignment: {
+          include: {
+            task: {
+              select: {
+                id: true,
+                code: true,
+                title: true,
+                taskGroupId: true,
+                taskGroup: { select: { id: true, name: true, departmentId: true } },
+              },
+            },
+          },
+        },
+        intern: {
+          select: {
+            id: true,
+            fullName: true,
+            internCode: true,
+            department: { select: { id: true, name: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    // 6. Webhook configs theo phòng ban
+    const deptWebhookConfigs = await prisma.discordWebhookConfig.findMany({
+      where: {
+        isEnabled: true,
+        purpose: {
+          in: ["LEADER_ALERTS", "DAILY_STANDUP"],
+        },
+        departmentId: { not: null },
+      },
+      include: { department: true },
+    });
+
+    return {
+      activeInterns,
+      submittedReports,
+      approvedAbsencesData,
+      blockedAssignments,
+      pendingExtensionsData,
+      deptWebhookConfigs,
+    };
+  }
 }
 
 export const cronRepository = new CronRepository();

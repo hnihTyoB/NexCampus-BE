@@ -172,3 +172,11 @@ export const findAllDiscordWebhooksQuerySchema = z.object({
     .optional(),
 });
 
+export const discordRemindInternParamSchema = z.object({
+  id: z.string().uuid("Invalid Intern ID format"),
+});
+
+export const batchSyncRolesSchema = z.object({
+  force: z.boolean().optional(),
+});
+

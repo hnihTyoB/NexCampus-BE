@@ -531,19 +531,18 @@ export class InternService {
       updated.userId &&
       (data.discordUserId !== undefined || data.discordUsername !== undefined)
     ) {
-      await prisma.user
-        .update({
-          where: { id: updated.userId },
-          data: {
-            ...(data.discordUserId !== undefined
-              ? { discordUserId: data.discordUserId?.trim() || null }
-              : {}),
-            ...(data.discordUsername !== undefined
-              ? { discordUsername: data.discordUsername?.trim() || null }
-              : {}),
-          },
-        })
-        .catch(() => {});
+      const cleanDiscordId = data.discordUserId?.trim();
+      const validDiscordId =
+        cleanDiscordId && /^\d{17,20}$/.test(cleanDiscordId) ? cleanDiscordId : null;
+
+      await this.repository.syncUserDiscord(updated.userId, {
+        ...(data.discordUserId !== undefined
+          ? { discordUserId: validDiscordId }
+          : {}),
+        ...(data.discordUsername !== undefined
+          ? { discordUsername: data.discordUsername?.trim() || null }
+          : {}),
+      });
     }
 
     return updated;
