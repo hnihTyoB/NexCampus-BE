@@ -323,13 +323,13 @@ export async function seedEvaluations(
 
     await prisma.weeklyEvaluation.upsert({
       where: {
-        internId_week: {
-          internId,
+        targetUserId_week: {
+          targetUserId: internId,
           week: item.week,
         },
       },
       update: {
-        leaderId: item.leaderId,
+        evaluatorId: item.leaderId,
         year,
         startDate,
         endDate,
@@ -352,8 +352,8 @@ export async function seedEvaluations(
         updatedAt: viewedAt || createdAt,
       },
       create: {
-        internId,
-        leaderId: item.leaderId,
+        targetUserId: internId,
+        evaluatorId: item.leaderId,
         week: item.week,
         year,
         startDate,

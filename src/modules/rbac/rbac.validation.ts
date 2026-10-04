@@ -14,6 +14,7 @@ export const createRoleSchema = z.object({
       "Tên vai trò chỉ được gồm chữ hoa, số và dấu gạch dưới (VD: ACCOUNTANT, AUDITOR)",
     ),
   description: z.string().max(255, "Mô tả tối đa 255 ký tự").optional(),
+  portalType: z.enum(["ADMIN", "LEADER", "INTERN"]).default("ADMIN"),
   permissionIds: z
     .array(z.string().uuid("Permission ID không hợp lệ"))
     .optional(),
@@ -30,6 +31,7 @@ export const updateRoleSchema = z.object({
     )
     .optional(),
   description: z.string().max(255, "Mô tả tối đa 255 ký tự").optional(),
+  portalType: z.enum(["ADMIN", "LEADER", "INTERN"]).optional(),
 });
 
 export const assignPermissionsSchema = z.object({

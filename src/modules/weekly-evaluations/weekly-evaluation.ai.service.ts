@@ -109,18 +109,45 @@ export class WeeklyEvaluationAiService {
     dto: AiSuggestRequestDto,
     actor: { id: string; role: string },
   ): Promise<AiSuggestResponseDto> {
-    const intern = await prisma.intern.findUnique({
-      where: { id: dto.internId },
+    const rawTargetId = dto.targetUserId || dto.internId;
+    if (!rawTargetId) {
+      throw new AppError("targetUserId hoặc internId là bắt buộc", 400, ERROR_CODE.VALIDATION_ERROR);
+    }
+
+    let targetUser = await prisma.user.findUnique({
+      where: { id: rawTargetId },
       include: {
-        department: true,
-        position: true,
-        user: true,
+        internshipProfile: {
+          include: {
+            department: true,
+            position: true,
+            mentor: true,
+          },
+        },
       },
     });
 
-    if (!intern) {
+    if (!targetUser) {
+      const profile = await prisma.internshipProfile.findUnique({
+        where: { id: rawTargetId },
+        include: {
+          user: true,
+          department: true,
+          position: true,
+          mentor: true,
+        },
+      });
+      if (profile) {
+        targetUser = {
+          ...profile.user,
+          internshipProfile: profile,
+        };
+      }
+    }
+
+    if (!targetUser) {
       throw new AppError(
-        "Hồ sơ thực tập sinh không tồn tại",
+        "Hồ sơ người dùng không tồn tại",
         404,
         ERROR_CODE.NOT_FOUND,
       );
@@ -134,18 +161,23 @@ export class WeeklyEvaluationAiService {
       callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
 
     if (!hasGlobalAccess) {
-      const isDirect = intern.leaderId === actor.id;
-      const leaderProfile = await prisma.leader.findUnique({
-        where: { userId: actor.id },
-        include: { departments: true },
-      });
-      const inDept = leaderProfile?.departments.some(
-        (d: { departmentId: string }) => d.departmentId === intern.departmentId,
-      );
+      const isDirect = targetUser.internshipProfile?.mentorId === actor.id;
+      let inDept = false;
+      if (targetUser.internshipProfile?.departmentId) {
+        const mgr = await prisma.departmentManager.findUnique({
+          where: {
+            departmentId_userId: {
+              departmentId: targetUser.internshipProfile.departmentId,
+              userId: actor.id,
+            },
+          },
+        });
+        inDept = !!mgr;
+      }
 
       if (!isDirect && !inDept) {
         throw new AppError(
-          "Bạn không có quyền đánh giá thực tập sinh này",
+          "Bạn không có quyền đánh giá người dùng này",
           403,
           ERROR_CODE.FORBIDDEN,
         );
@@ -153,7 +185,10 @@ export class WeeklyEvaluationAiService {
     }
 
     // 1. Calculate week range in Vietnam time
-    const weekRange = getWeekDateRange(new Date(intern.startDate), dto.week);
+    const startDate = targetUser.internshipProfile?.startDate
+      ? new Date(targetUser.internshipProfile.startDate)
+      : new Date(targetUser.createdAt);
+    const weekRange = getWeekDateRange(startDate, dto.week);
 
     // 2. Fetch daily reports, task submissions, and extension requests in that week
     const [
@@ -165,7 +200,7 @@ export class WeeklyEvaluationAiService {
     ] = await Promise.all([
       prisma.dailyReport.findMany({
         where: {
-          internId: dto.internId,
+          userId: targetUser.id,
           deletedAt: null,
           date: {
             gte: new Date(weekRange.from.getTime() + VIETNAM_OFFSET_MS),
@@ -184,7 +219,7 @@ export class WeeklyEvaluationAiService {
             lte: weekRange.to,
           },
           assignment: {
-            internId: dto.internId,
+            assigneeId: targetUser.id,
           },
         },
         include: {
@@ -199,7 +234,7 @@ export class WeeklyEvaluationAiService {
       }),
       prisma.taskExtensionRequest.findMany({
         where: {
-          internId: dto.internId,
+          userId: targetUser.id,
           createdAt: {
             gte: weekRange.from,
             lte: weekRange.to,
@@ -214,7 +249,7 @@ export class WeeklyEvaluationAiService {
       }),
       prisma.taskExtensionRequest.findMany({
         where: {
-          internId: dto.internId,
+          userId: targetUser.id,
         },
         include: {
           assignment: {
@@ -225,7 +260,7 @@ export class WeeklyEvaluationAiService {
       }),
       prisma.absence.findMany({
         where: {
-          userId: intern.userId,
+          userId: targetUser.id,
           status: "APPROVED",
           startDate: { lte: weekRange.to },
           endDate: { gte: weekRange.from },
@@ -249,7 +284,7 @@ export class WeeklyEvaluationAiService {
       try {
         const geminiResult = await this.callGeminiApi(
           apiKey,
-          intern.fullName,
+          targetUser.fullName || targetUser.email || "Thực tập sinh",
           dto.week,
           weekRange,
           dailyReports,
@@ -290,7 +325,7 @@ export class WeeklyEvaluationAiService {
 
     // 4. Smart Heuristic Evaluator based on 12 criteria & edge cases
     return this.evaluateHeuristic(
-      intern.fullName,
+      targetUser.fullName || targetUser.email || "Thực tập sinh",
       dto.week,
       weekRange,
       dailyReports,
@@ -770,3 +805,6 @@ Yêu cầu output JSON duy nhất, không markdown:
     };
   }
 }
+
+export const weeklyEvaluationAiService = new WeeklyEvaluationAiService();
+

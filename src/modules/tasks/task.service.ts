@@ -58,38 +58,23 @@ export class TaskService {
       try {
         const scope: UserScope = {};
 
-        // If role is known, optimize query by querying only the relevant table
-        if (user.role === "INTERN") {
-          const intern = await prisma.intern.findUnique({
+        // Dynamically resolve scope using InternshipProfile & DepartmentManager
+        const [profile, managedDepts] = await Promise.all([
+          prisma.internshipProfile.findUnique({
             where: { userId: user.id },
-            select: { id: true },
-          });
-          if (intern) scope.internId = intern.id;
-        } else if (user.role === "LEADER") {
-          const leader = await prisma.leader.findFirst({
+            select: { id: true, departmentId: true },
+          }),
+          prisma.departmentManager.findMany({
             where: { userId: user.id },
-            select: { departments: { select: { departmentId: true } } },
-          });
-          if (leader) {
-            scope.departmentIds = leader.departments.map((d) => d.departmentId) ?? [];
-          }
-        } else {
-          // Unknown / generic role fallback
-          const intern = await prisma.intern.findUnique({
-            where: { userId: user.id },
-            select: { id: true },
-          });
-          if (intern) {
-            scope.internId = intern.id;
-          } else {
-            const leader = await prisma.leader.findFirst({
-              where: { userId: user.id },
-              select: { departments: { select: { departmentId: true } } },
-            });
-            if (leader) {
-              scope.departmentIds = leader.departments.map((d) => d.departmentId) ?? [];
-            }
-          }
+            select: { departmentId: true },
+          }),
+        ]);
+
+        if (profile) {
+          scope.internId = user.id;
+        }
+        if (managedDepts.length > 0) {
+          scope.departmentIds = managedDepts.map((d: { departmentId: string }) => d.departmentId);
         }
 
         userScopeCache.set(user.id, {
@@ -507,10 +492,10 @@ export class TaskService {
       throw new AppError("Task not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
-    const whereIntern: Record<string, unknown> = {
+    const whereProfile: any = {
       status: "ACTIVE",
       deletedAt: null,
-      user: { isActive: true },
+      user: { isActive: true, deletedAt: null },
     };
 
     const callerPerms = new Set(
@@ -521,42 +506,50 @@ export class TaskService {
       callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
 
     if (!hasGlobalAccess) {
-      const leader = await prisma.leader.findFirst({
+      const managedDepts = await prisma.departmentManager.findMany({
         where: { userId: actor.id },
-        select: { id: true },
+        select: { departmentId: true },
       });
-      if (leader) {
-        whereIntern.leaderId = actor.id;
+      if (managedDepts.length > 0) {
+        whereProfile.departmentId = { in: managedDepts.map((d: { departmentId: string }) => d.departmentId) };
+      } else {
+        whereProfile.mentorId = actor.id;
       }
     }
 
     if (task.taskGroup?.departmentId) {
-      whereIntern.departmentId = task.taskGroup.departmentId;
+      whereProfile.departmentId = task.taskGroup.departmentId;
     }
 
-    const interns = await prisma.intern.findMany({
-      where: whereIntern,
+    const profiles = await prisma.internshipProfile.findMany({
+      where: whereProfile,
       include: {
-        user: { select: { email: true } },
-        position: { select: { name: true } },
-        assignedTasks: {
-          where: {
-            status: {
-              in: [
-                ASSIGNMENT_STATUS.TODO,
-                ASSIGNMENT_STATUS.IN_PROGRESS,
-                ASSIGNMENT_STATUS.REVIEW,
-              ],
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            assignedTasks: {
+              where: {
+                status: {
+                  in: [
+                    ASSIGNMENT_STATUS.TODO,
+                    ASSIGNMENT_STATUS.IN_PROGRESS,
+                    ASSIGNMENT_STATUS.REVIEW,
+                  ],
+                },
+              },
+              include: {
+                task: { select: { estDays: true } },
+              },
             },
           },
-          include: {
-            task: { select: { estDays: true } },
-          },
         },
+        position: { select: { name: true } },
       },
     });
 
-    if (interns.length === 0) {
+    if (profiles.length === 0) {
       throw new AppError(
         "Không có thực tập sinh phù hợp để đánh giá",
         400,
@@ -564,19 +557,25 @@ export class TaskService {
       );
     }
 
-    const candidates = interns.map((i) => {
-      const activeTaskDays = i.assignedTasks.reduce(
+    const candidates: Array<{
+      id: string;
+      fullName: string;
+      position?: { name: string };
+      activeTaskDays: number;
+    }> = profiles.map((p) => {
+      const activeTaskDays = (p.user.assignedTasks || []).reduce(
         (acc: number, curr: { task: { estDays: number | null } | null }) =>
           acc + (curr.task?.estDays || 1),
         0,
       );
       return {
-        id: i.id,
-        fullName: i.fullName || "Thực tập sinh",
-        position: i.position ? { name: i.position.name } : undefined,
+        id: p.userId,
+        fullName: p.user.fullName || "Thực tập sinh",
+        position: p.position ? { name: p.position.name } : undefined,
         activeTaskDays,
       };
     });
+
 
     const evaluated = taskAllocationAiService.evaluateAllocation({
       task: {

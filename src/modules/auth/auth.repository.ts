@@ -40,6 +40,7 @@ export class AuthRepository {
           select: {
             id: true,
             name: true,
+            portalType: true,
           },
         },
       },

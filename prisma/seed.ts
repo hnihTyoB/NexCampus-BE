@@ -15,7 +15,7 @@ import { seedRecruitment } from "./seed/recruitment.seed";
 // Models that use a composite primary key and do NOT have an `id` field.
 // For these models we must skip id injection to avoid Prisma validation errors.
 const COMPOSITE_PK_MODELS = new Set([
-  "LeaderDepartment",
+  "DepartmentManager",
   "TaskGroupMember",
 ]);
 

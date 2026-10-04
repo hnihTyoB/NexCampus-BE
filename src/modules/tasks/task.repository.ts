@@ -40,15 +40,31 @@ const defaultSelect = {
     select: {
       id: true,
       taskId: true,
-      internId: true,
+      assigneeId: true,
       supportId: true,
       assignedBy: true,
       status: true,
       blockedReason: true,
       assignedAt: true,
       updatedAt: true,
-      intern: { select: { id: true, fullName: true, leaderId: true } },
-      support: { select: { id: true, fullName: true, leaderId: true } },
+      assignee: {
+        select: {
+          id: true,
+          fullName: true,
+          internshipProfile: {
+            select: { mentorId: true, departmentId: true },
+          },
+        },
+      },
+      support: {
+        select: {
+          id: true,
+          fullName: true,
+          internshipProfile: {
+            select: { mentorId: true, departmentId: true },
+          },
+        },
+      },
       extensionRequests: {
         select: {
           id: true,
@@ -77,10 +93,11 @@ const defaultSelect = {
       fileSize: true,
       uploadedBy: true,
       createdAt: true,
+      uploader: { select: creatorSelect },
     },
     orderBy: { createdAt: "desc" as const },
   },
-};
+} satisfies Prisma.TaskSelect;
 
 const detailSelect = {
   ...defaultSelect,
@@ -91,7 +108,7 @@ const detailSelect = {
       title: true,
       assignment: {
         select: {
-          intern: { select: { fullName: true } },
+          assignee: { select: { fullName: true } },
         },
       },
     },
@@ -106,7 +123,7 @@ const detailSelect = {
         select: {
           id: true,
           status: true,
-          intern: { select: { id: true, fullName: true } },
+          assignee: { select: { id: true, fullName: true } },
         },
       },
     },
@@ -121,12 +138,42 @@ const detailSelect = {
         select: {
           id: true,
           status: true,
-          intern: { select: { id: true, fullName: true } },
+          assignee: { select: { id: true, fullName: true } },
         },
       },
     },
   },
-};
+} satisfies Prisma.TaskSelect;
+
+function serializeTask(task: any) {
+  if (!task) return null;
+  const assignment = task.assignment
+    ? {
+        ...task.assignment,
+        internId: task.assignment.assigneeId,
+        intern: task.assignment.assignee
+          ? {
+              id: task.assignment.assignee.id,
+              fullName: task.assignment.assignee.fullName,
+              leaderId: task.assignment.assignee.internshipProfile?.mentorId ?? null,
+            }
+          : null,
+        support: task.assignment.support
+          ? {
+              id: task.assignment.support.id,
+              fullName: task.assignment.support.fullName,
+              leaderId: task.assignment.support.internshipProfile?.mentorId ?? null,
+            }
+          : null,
+      }
+    : null;
+
+  return {
+    ...task,
+    assignment,
+  };
+}
+
 
 export class TaskRepository {
   async findAll(
@@ -181,10 +228,10 @@ export class TaskRepository {
       ...(owner
         ? {
             assignment: {
-              intern: {
+              assignee: {
                 OR: [
                   { fullName: { contains: owner, mode: "insensitive" } },
-                  { user: { email: { contains: owner, mode: "insensitive" } } },
+                  { email: { contains: owner, mode: "insensitive" } },
                 ],
               },
             },
@@ -202,7 +249,7 @@ export class TaskRepository {
         ? {
             assignment: {
               OR: [
-                { internId: scope.internId },
+                { assigneeId: scope.internId },
                 { supportId: scope.internId },
               ],
             },
@@ -215,9 +262,9 @@ export class TaskRepository {
                 ? [{ taskGroup: { departmentId: { in: scope.leaderScope.departmentIds } } }]
                 : []),
               { createdBy: scope.leaderScope.leaderUserId },
-              { assignment: { intern: { leaderId: scope.leaderScope.leaderUserId } } },
-              { assignment: { support: { leaderId: scope.leaderScope.leaderUserId } } },
-              { taskGroup: { members: { some: { intern: { leaderId: scope.leaderScope.leaderUserId } } } } },
+              { assignment: { assignee: { internshipProfile: { mentorId: scope.leaderScope.leaderUserId } } } },
+              { assignment: { support: { internshipProfile: { mentorId: scope.leaderScope.leaderUserId } } } },
+              { taskGroup: { members: { some: { user: { internshipProfile: { mentorId: scope.leaderScope.leaderUserId } } } } } },
             ],
           }
         : scope?.departmentIds !== undefined
@@ -240,7 +287,7 @@ export class TaskRepository {
     };
     const orderBy = SORT_MAP[sortBy] ?? { createdAt: order };
 
-    const [data, total] = await Promise.all([
+    const [rawTasks, total] = await Promise.all([
       prisma.task.findMany({
         where,
         select: defaultSelect,
@@ -251,24 +298,28 @@ export class TaskRepository {
       prisma.task.count({ where }),
     ]);
 
+    const data = rawTasks.map(serializeTask);
+
     return {
       data,
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 
-  findById(id: string) {
-    return prisma.task.findFirst({
+  async findById(id: string) {
+    const task = await prisma.task.findFirst({
       where: { id, deletedAt: null },
       select: detailSelect,
     });
+    return serializeTask(task);
   }
 
-  findByCode(code: string, taskGroupId: string | null = null) {
-    return prisma.task.findFirst({
+  async findByCode(code: string, taskGroupId: string | null = null) {
+    const task = await prisma.task.findFirst({
       where: { code, taskGroupId, deletedAt: null },
       select: detailSelect,
     });
+    return serializeTask(task);
   }
 
   findWithPrerequisites(taskId: string) {
@@ -291,8 +342,8 @@ export class TaskRepository {
     });
   }
 
-  findDependentTasks(completedTaskId: string) {
-    return prisma.task.findMany({
+  async findDependentTasks(completedTaskId: string) {
+    const tasks = await prisma.task.findMany({
       where: {
         dependsOn: { some: { id: completedTaskId } },
         deletedAt: null,
@@ -300,8 +351,8 @@ export class TaskRepository {
       include: {
         assignment: {
           include: {
-            intern: {
-              select: { userId: true, fullName: true },
+            assignee: {
+              select: { id: true, fullName: true },
             },
           },
         },
@@ -311,9 +362,25 @@ export class TaskRepository {
         },
       },
     });
+
+    return tasks.map((t: any) => ({
+      ...t,
+      assignment: t.assignment
+        ? {
+            ...t.assignment,
+            intern: t.assignment.assignee
+              ? {
+                  userId: t.assignment.assignee.id,
+                  fullName: t.assignment.assignee.fullName,
+                }
+              : null,
+          }
+        : null,
+    }));
   }
 
   create(data: CreateTaskDto, createdBy: string) {
+
     return prisma.task.create({
       data: {
         title: data.title,

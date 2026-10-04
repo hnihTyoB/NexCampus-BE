@@ -156,12 +156,14 @@ startxref
         select: { id: true },
       });
       if (intern) {
-        if (evaluation.intern.userId !== actor.id) {
+        if ((evaluation.intern?.userId || evaluation.targetUserId) !== actor.id) {
           throw new AppError("Forbidden: You can only export your own weekly evaluations", 403, ERROR_CODE.FORBIDDEN);
         }
       } else {
         const isLeaderOfIntern =
-          evaluation.leaderId === actor.id || evaluation.intern.leaderId === actor.id;
+          evaluation.leaderId === actor.id ||
+          evaluation.evaluatorId === actor.id ||
+          evaluation.intern?.leaderId === actor.id;
         if (!isLeaderOfIntern) {
           throw new AppError("Forbidden: You can only export evaluations for your assigned interns", 403, ERROR_CODE.FORBIDDEN);
         }

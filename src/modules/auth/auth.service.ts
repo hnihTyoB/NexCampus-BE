@@ -138,7 +138,7 @@ export class AuthService {
       id: string;
       email: string | null;
       fullName: string | null;
-      role: { name: string };
+      role: { name: string; portalType?: string | null };
       roleId: string;
     },
     metadata?: { userAgent?: string; ipAddress?: string },
@@ -148,6 +148,7 @@ export class AuthService {
       email: user.email,
       role: user.role.name,
       roleId: user.roleId,
+      portalType: user.role.portalType || "ADMIN",
       purpose: "ACCESS",
     };
 
@@ -239,6 +240,7 @@ export class AuthService {
         fullName: user.fullName,
         role: user.role.name,
         roleId: user.roleId,
+        portalType: user.role.portalType || "ADMIN",
         permissions,
       },
     };
@@ -679,6 +681,7 @@ export class AuthService {
       email: user.email,
       role: user.role.name,
       roleId: user.roleId,
+      portalType: user.role.portalType || "ADMIN",
       purpose: "ACCESS",
     };
 
@@ -746,6 +749,7 @@ export class AuthService {
       discordUsername: (user as any).discordUsername || null,
       role: user.role.name,
       roleId: user.roleId,
+      portalType: (user.role as any).portalType || "ADMIN",
       permissions,
       isActive: user.isActive,
       twoFactorEnabled: user.twoFactorEnabled,
@@ -862,25 +866,17 @@ export class AuthService {
     if (data.discordUserId !== undefined) {
       const discordId = data.discordUserId?.trim() || null;
 
-      // 1. Nếu là INTERN: đồng bộ bảng Intern và gọi syncInternMember
-      if (user.role.name === ROLES.INTERN) {
+      // 1. Nếu là INTERN: đồng bộ bảng InternshipProfile và gọi syncInternMember
+      if (user.role.name === ROLES.INTERN || (user.role as any).portalType === "INTERN") {
         try {
-          const intern = await prisma.intern.findUnique({ where: { userId } });
-          if (intern) {
-            await prisma.intern.update({
-              where: { id: intern.id },
-              data: {
-                discordUserId: discordId,
-                discordUsername: data.discordUsername?.trim() || intern.discordUsername,
-              },
-            });
-            if (discordId) {
-              await discordBotService.syncInternMember({
-                internId: intern.id,
-                discordUserId: discordId,
-                departmentId: intern.departmentId,
-              });
-            }
+          const profile = await prisma.internshipProfile.findUnique({ where: { userId } });
+          if (profile && discordId && profile.departmentId) {
+            await discordBotService.syncInternMember({
+              internId: profile.id,
+              userId: profile.userId,
+              discordUserId: discordId,
+              departmentId: profile.departmentId,
+            } as any);
           }
         } catch (err: any) {
           console.warn(`[AuthService] Sync intern discord failed:`, err?.message);
@@ -888,14 +884,14 @@ export class AuthService {
       }
 
       // 2. Nếu là ADMIN: Admin mặc định luôn được truy cập mọi thread của tất cả phòng ban
-      if (user.role.name === ROLES.ADMIN && discordId) {
+      if ((user.role.name === ROLES.ADMIN || (user.role as any).portalType === "ADMIN") && discordId) {
         discordBotService.syncAdminThreads(discordId).catch((err) => {
           console.warn(`[AuthService] Sync admin discord threads failed:`, err?.message);
         });
       }
 
       // 3. Nếu là LEADER: Leader tự động được thêm vào Private Threads của các phòng ban họ phụ trách
-      if (user.role.name === ROLES.LEADER && discordId) {
+      if ((user.role.name === ROLES.LEADER || (user.role as any).portalType === "LEADER") && discordId) {
         discordBotService.syncLeaderThreads(userId, discordId).catch((err) => {
           console.warn(`[AuthService] Sync leader discord threads failed:`, err?.message);
         });

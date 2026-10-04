@@ -104,6 +104,7 @@ export class RbacRepository {
   async createRole(data: {
     name: string;
     description?: string;
+    portalType?: "ADMIN" | "LEADER" | "INTERN";
     permissionIds?: string[];
   }) {
     return prisma.$transaction(async (tx) => {
@@ -111,6 +112,7 @@ export class RbacRepository {
         data: {
           name: data.name,
           description: data.description,
+          portalType: data.portalType || "ADMIN",
           isSystem: false,
         },
       });
@@ -129,7 +131,10 @@ export class RbacRepository {
     });
   }
 
-  async updateRole(id: string, data: { name?: string; description?: string }) {
+  async updateRole(
+    id: string,
+    data: { name?: string; description?: string; portalType?: "ADMIN" | "LEADER" | "INTERN" },
+  ) {
     return prisma.role.update({
       where: { id },
       data,

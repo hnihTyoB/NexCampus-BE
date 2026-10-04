@@ -125,6 +125,7 @@ export class RegulationService {
 
     const ack = await this.repository.acknowledge(
       regulationId,
+      userId,
       internId,
       ipAddress,
       userAgent

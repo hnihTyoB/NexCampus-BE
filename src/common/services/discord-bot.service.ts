@@ -682,20 +682,16 @@ export class DiscordBotService {
     }
 
     try {
-      const leaderAssignments = await prisma.leaderDepartment.findMany({
+      const leaderAssignments = await prisma.departmentManager.findMany({
         where: { departmentId },
         include: {
-          leader: {
-            include: {
-              user: {
-                select: { discordUserId: true },
-              },
-            },
+          user: {
+            select: { discordUserId: true },
           },
         },
       });
       for (const la of leaderAssignments) {
-        const leaderDiscordId = la.leader?.user?.discordUserId;
+        const leaderDiscordId = la.user?.discordUserId;
         if (leaderDiscordId) {
           membersToAdd.add(leaderDiscordId);
           if (discordRoleId) {
@@ -703,6 +699,7 @@ export class DiscordBotService {
           }
         }
       }
+
     } catch (err: any) {
       console.warn(`[DiscordBot] Fetch leaders for thread failed:`, err?.message);
     }
@@ -995,17 +992,14 @@ export class DiscordBotService {
       }
       if (!discordUserId) return 0;
 
-      const leader = await prisma.leader.findUnique({
+      const managers = await prisma.departmentManager.findMany({
         where: { userId: leaderUserId },
-        include: {
-          departments: {
-            select: { departmentId: true },
-          },
-        },
+        select: { departmentId: true },
       });
 
-      if (!leader || leader.departments.length === 0) return 0;
-      const departmentIds = leader.departments.map((d) => d.departmentId);
+      if (managers.length === 0) return 0;
+      const departmentIds = managers.map((d) => d.departmentId);
+
 
       const configs = await prisma.discordWebhookConfig.findMany({
         where: {

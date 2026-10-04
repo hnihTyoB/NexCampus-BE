@@ -180,19 +180,21 @@ export class RegulationRepository {
 
   async acknowledge(
     regulationId: string,
+    userId: string,
     internId: string,
     ipAddress?: string,
     userAgent?: string
   ) {
     return prisma.regulationAcknowledgment.upsert({
       where: {
-        regulationId_internId: {
+        regulationId_userId: {
           regulationId,
-          internId,
+          userId,
         },
       },
       create: {
         regulationId,
+        userId,
         internId,
         ipAddress,
         userAgent,

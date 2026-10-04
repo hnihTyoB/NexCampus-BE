@@ -102,19 +102,19 @@ export async function seedTasks(
 
     // Gán thành viên vào nhóm (Bắt buộc để thỏa mãn ràng buộc TaskGroupMember)
     for (const email of g.memberEmails) {
-      const internId = interns[email];
-      if (internId) {
+      const userId = interns[email];
+      if (userId) {
         await prisma.taskGroupMember.upsert({
           where: {
-            taskGroupId_internId: {
+            taskGroupId_userId: {
               taskGroupId: group.id,
-              internId,
+              userId,
             },
           },
           update: {},
           create: {
             taskGroupId: group.id,
-            internId,
+            userId,
           },
         });
       }
@@ -200,7 +200,7 @@ export async function seedTasks(
     const assignment = await prisma.taskAssignment.create({
       data: {
         taskId: task.id,
-        internId,
+        assigneeId: internId,
         supportId,
         assignedBy: input.leaderId,
         status: input.status,

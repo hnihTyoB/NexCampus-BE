@@ -429,6 +429,15 @@ export class SystemSettingService {
   async getSubmissionMaxFileSizeMb(): Promise<number> {
     return this.getSetting<number>("SUBMISSION_MAX_FILE_SIZE_MB", 50);
   }
+
+  async getEvaluationMaxFutureDays(): Promise<number> {
+    return this.getSetting<number>("EVALUATION_MAX_FUTURE_DAYS", 7);
+  }
+
+  async getEvaluationMaxPastWeeks(): Promise<number> {
+    return this.getSetting<number>("EVALUATION_MAX_PAST_WEEKS", 4);
+  }
 }
+
 
 export const systemSettingService = new SystemSettingService();

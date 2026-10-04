@@ -6,7 +6,10 @@ import {
   CreatePositionDto,
   UpdatePositionDto,
   DepartmentQueryDto,
+  AssignDepartmentManagerDto,
+  UpdateDepartmentManagerDto,
 } from "./department.dto";
+
 
 export class DepartmentController {
   private readonly service = new DepartmentService();
@@ -182,4 +185,86 @@ export class DepartmentController {
       next(error);
     }
   };
+
+  // ─── Department Managers ──────────────────────────────────────────
+
+  findManagers = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const result = await this.service.findManagers(req.params.id);
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  assignManager = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const body = req.body as AssignDepartmentManagerDto;
+      const result = await this.service.assignManager(
+        req.params.id,
+        body,
+        req.user?.id,
+      );
+      res.status(201).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  updateManager = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const body = req.body as UpdateDepartmentManagerDto;
+      const result = await this.service.updateManager(
+        req.params.id,
+        req.params.userId,
+        body,
+        req.user?.id,
+      );
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  removeManager = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      await this.service.removeManager(
+        req.params.id,
+        req.params.userId,
+        req.user?.id,
+      );
+      res.json({
+        success: true,
+        message: "Đã hủy quyền phụ trách phòng ban thành công",
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
+

@@ -20,6 +20,7 @@ export interface CachedUserState {
   deletedAt: Date | null;
   roleId: string | null;
   roleName: string | null;
+  portalType?: string | null;
 }
 
 interface UserCacheEntry {
@@ -200,6 +201,7 @@ export class PermissionCacheService {
               deletedAt: user.deletedAt,
               roleId: user.roleId,
               roleName: user.role?.name || null,
+              portalType: user.role?.portalType || null,
             }
           : null;
 

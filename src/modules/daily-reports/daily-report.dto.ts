@@ -12,7 +12,8 @@ export interface ReportAttachmentDto {
 
 export interface DailyReportDto {
   id: string;
-  internId: string;
+  userId: string;
+  internId?: string; // backwards compatibility alias for userId
   date: Date | string;
   content: string;
   blockers: string | null;
@@ -25,6 +26,26 @@ export interface DailyReportDto {
   feedbackAt: Date | string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
+  user?: {
+    id: string;
+    email: string | null;
+    fullName: string | null;
+    avatarUrl?: string | null;
+    phoneNumber?: string | null;
+    internshipProfile?: {
+      id: string;
+      internCode?: string | null;
+      departmentId?: string | null;
+      department?: {
+        id: string;
+        name: string;
+      } | null;
+      position?: {
+        id: string;
+        name: string;
+      } | null;
+    } | null;
+  };
   intern?: {
     id: string;
     fullName: string;
@@ -47,7 +68,7 @@ export interface DailyReportDto {
   };
   feedbackUser?: {
     id: string;
-    email: string;
+    email: string | null;
     fullName: string | null;
   } | null;
   attachments?: ReportAttachmentDto[];
@@ -62,7 +83,8 @@ export interface CreateReportAttachmentInput {
 }
 
 export interface CreateDailyReportDto {
-  internId?: string;
+  userId?: string;
+  internId?: string; // backwards compatibility alias
   date?: string; // YYYY-MM-DD (defaults to today in Vietnam time)
   content: string;
   blockers?: string | null;
@@ -93,7 +115,8 @@ export interface DailyReportQueryDto {
   date?: string;
   from?: string;
   to?: string;
-  internId?: string;
+  userId?: string;
+  internId?: string; // backwards compatibility alias
   departmentId?: string;
   sortBy?: "date" | "createdAt" | "hoursWorked";
   order?: "asc" | "desc";
@@ -102,7 +125,8 @@ export interface DailyReportQueryDto {
 export interface DailyReportCalendarQueryDto {
   month: number; // 1-12
   year: number;
-  internId?: string;
+  userId?: string;
+  internId?: string; // backwards compatibility alias
 }
 
 export type CalendarDayStatus =
@@ -125,7 +149,8 @@ export interface CalendarDayDto {
 }
 
 export interface DailyReportCalendarResponseDto {
-  internId: string;
+  userId: string;
+  internId?: string;
   month: number;
   year: number;
   totalWorkingDays: number;

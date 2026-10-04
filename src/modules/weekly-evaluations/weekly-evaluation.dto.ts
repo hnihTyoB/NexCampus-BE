@@ -24,8 +24,10 @@ export interface EvaluationRatings {
 
 export interface WeeklyEvaluationDto {
   id: string;
-  internId: string;
-  leaderId: string;
+  targetUserId: string;
+  evaluatorId: string;
+  internId?: string; // backwards compatibility alias for targetUserId
+  leaderId?: string; // backwards compatibility alias for evaluatorId
   week: number;
   year: number;
   startDate: Date | string | null;
@@ -47,6 +49,30 @@ export interface WeeklyEvaluationDto {
   viewedAt: Date | string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
+  targetUser?: {
+    id: string;
+    email: string | null;
+    fullName: string | null;
+    avatarUrl?: string | null;
+    internshipProfile?: {
+      id: string;
+      internCode?: string | null;
+      department?: {
+        id: string;
+        name: string;
+      } | null;
+      position?: {
+        id: string;
+        name: string;
+      } | null;
+    } | null;
+  };
+  evaluator?: {
+    id: string;
+    email: string | null;
+    fullName: string | null;
+    avatarUrl?: string | null;
+  };
   intern?: {
     id: string;
     fullName: string;
@@ -75,7 +101,8 @@ export interface WeeklyEvaluationDto {
 }
 
 export interface CreateWeeklyEvaluationDto {
-  internId: string;
+  targetUserId?: string;
+  internId?: string; // backwards compatibility alias
   week: number;
   year?: number;
   ratings: EvaluationRatings;
@@ -106,15 +133,18 @@ export interface WeeklyEvaluationQueryDto {
   limit?: number;
   week?: number;
   year?: number;
-  internId?: string;
-  leaderId?: string;
+  targetUserId?: string;
+  evaluatorId?: string;
+  internId?: string; // backwards compatibility alias
+  leaderId?: string; // backwards compatibility alias
   departmentId?: string;
   sortBy?: "week" | "score" | "createdAt";
   order?: "asc" | "desc";
 }
 
 export interface AiSuggestRequestDto {
-  internId: string;
+  targetUserId?: string;
+  internId?: string; // backwards compatibility alias
   week: number;
 }
 
@@ -139,6 +169,7 @@ export interface AiSuggestResponseDto {
 }
 
 export interface InternEvaluationSummaryDto {
+  targetUserId?: string;
   internId: string;
   internName: string;
   totalEvaluations: number;

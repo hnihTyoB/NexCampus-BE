@@ -208,6 +208,7 @@ export class Auth2FAService {
       email: user.email,
       role: user.role.name,
       roleId: user.roleId,
+      portalType: user.role.portalType || "ADMIN",
       purpose: "ACCESS",
     };
 

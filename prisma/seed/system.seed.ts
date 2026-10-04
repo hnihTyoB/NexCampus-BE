@@ -81,15 +81,15 @@ export async function seedSystem(
     if (internId && regulation) {
       await prisma.regulationAcknowledgment.upsert({
         where: {
-          regulationId_internId: {
+          regulationId_userId: {
             regulationId: regulation.id,
-            internId,
+            userId: internId,
           },
         },
         update: {},
         create: {
           regulationId: regulation.id,
-          internId,
+          userId: internId,
           acknowledgedAt: getVnDate(-25, 9, 15),
           ipAddress: "14.162.145.89",
           userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/128.0.0.0",

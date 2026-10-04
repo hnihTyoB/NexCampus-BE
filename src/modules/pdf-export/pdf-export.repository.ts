@@ -35,7 +35,7 @@ export class PdfExportRepository {
           })
         : null;
 
-    const internStart = new Date(evaluation.intern.startDate);
+    const internStart = new Date(evaluation.intern?.startDate || evaluation.startDate || new Date());
     const weekOffsetMs = (evaluation.week - 1) * 7 * 24 * 60 * 60 * 1000;
     const weekStart = new Date(internStart.getTime() + weekOffsetMs);
     const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);

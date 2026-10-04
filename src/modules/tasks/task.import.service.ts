@@ -413,21 +413,20 @@ export class TaskImportService {
 
     const matchingInterns =
       uniqueEmails.length > 0
-        ? await prisma.intern.findMany({
+        ? await prisma.internshipProfile.findMany({
             where: {
               deletedAt: null,
               user: { email: { in: uniqueEmails, mode: "insensitive" } },
             },
             select: {
-              id: true,
-              fullName: true,
-              user: { select: { email: true } },
+              userId: true,
+              user: { select: { id: true, email: true, fullName: true } },
             },
           })
         : [];
 
     const internByEmailMap = new Map(
-      matchingInterns.map((i) => [i.user.email?.toLowerCase() ?? "", i]),
+      matchingInterns.map((i: any) => [i.user.email?.toLowerCase() ?? "", { id: i.userId, fullName: i.user.fullName }]),
     );
 
     const internMappings = Object.entries(ownerEmailMap)
@@ -495,22 +494,23 @@ export class TaskImportService {
 
     const internsByEmail =
       allEmails.length > 0
-        ? await prisma.intern.findMany({
+        ? await prisma.internshipProfile.findMany({
             where: {
               deletedAt: null,
               user: { email: { in: allEmails, mode: "insensitive" } },
             },
             select: {
-              id: true,
-              fullName: true,
               userId: true,
-              user: { select: { email: true } },
+              user: { select: { id: true, email: true, fullName: true } },
             },
           })
         : [];
 
     const internsByEmailMap = new Map(
-      internsByEmail.map((i) => [i.user.email?.toLowerCase() ?? "", i]),
+      internsByEmail.map((i: any) => [
+        i.user.email?.toLowerCase() ?? "",
+        { id: i.userId, userId: i.userId, fullName: i.user.fullName },
+      ]),
     );
 
     let importedTasks = 0;
@@ -549,11 +549,11 @@ export class TaskImportService {
           resolvedGroupName = tg.name;
         } else {
           // Gắn nhóm công việc vào Department của Leader để Leader nhìn thấy được nhóm
-          const leader = await tx.leader.findFirst({
+          const manager = await tx.departmentManager.findFirst({
             where: { userId: createdBy },
-            select: { departments: { select: { departmentId: true } } },
+            select: { departmentId: true },
           });
-          const departmentId = leader?.departments?.[0]?.departmentId ?? null;
+          const departmentId = manager?.departmentId ?? null;
 
           const name =
             (taskGroupName && taskGroupName.trim()) ||
@@ -578,25 +578,25 @@ export class TaskImportService {
         // Tự động thêm các intern tham gia vào TaskGroupMember để cả Leader và Intern đều có quyền xem
         const internIdsInImport = Array.from(
           new Set(
-            Array.from(internsByEmailMap.values()).map((i) => i.id),
+            Array.from(internsByEmailMap.values()).map((i: any) => i.userId),
           ),
         );
         if (internIdsInImport.length > 0) {
           const existingMembers = await tx.taskGroupMember.findMany({
             where: {
               taskGroupId: resolvedGroupId,
-              internId: { in: internIdsInImport },
+              userId: { in: internIdsInImport },
             },
-            select: { internId: true },
+            select: { userId: true },
           });
           const existingMemberSet = new Set(
-            existingMembers.map((m) => m.internId),
+            existingMembers.map((m: any) => m.userId),
           );
           const newMembers = internIdsInImport
             .filter((id) => !existingMemberSet.has(id))
-            .map((internId) => ({
+            .map((userId) => ({
               taskGroupId: resolvedGroupId,
-              internId,
+              userId,
             }));
           if (newMembers.length > 0) {
             await tx.taskGroupMember.createMany({
@@ -707,7 +707,7 @@ export class TaskImportService {
               await tx.taskAssignment.update({
                 where: { id: existingAssignment.id },
                 data: {
-                  internId: ownerInternId,
+                  assigneeId: ownerInternId,
                   supportId: supportInternId,
                   status: targetStatus,
                 },
@@ -716,7 +716,7 @@ export class TaskImportService {
               await tx.taskAssignment.create({
                 data: {
                   taskId,
-                  internId: ownerInternId,
+                  assigneeId: ownerInternId,
                   supportId: supportInternId,
                   assignedBy: createdBy,
                   status: targetStatus,

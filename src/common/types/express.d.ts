@@ -7,6 +7,7 @@ declare global {
         email: string;
         role: string;
         roleId?: string;
+        portalType?: string;
         permissions?: string[];
       };
       apiKey?: {

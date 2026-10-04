@@ -14,7 +14,11 @@ import {
   createPositionSchema,
   updatePositionSchema,
   positionIdParamSchema,
+  assignDepartmentManagerSchema,
+  updateDepartmentManagerSchema,
+  departmentManagerParamSchema,
 } from "./department.validation";
+
 import { PERMISSIONS } from "../../common/constants/permission.constant";
 
 const router = Router();
@@ -69,7 +73,41 @@ router.delete(
   controller.deletePosition,
 );
 
+// ── Managers Sub-routes ──
+router.get(
+  "/:id/managers",
+  validate(departmentIdParamSchema, "params"),
+  controller.findManagers,
+);
+
+router.post(
+  "/:id/managers",
+  authMiddleware,
+  requirePermission(PERMISSIONS.DEPARTMENT_UPDATE),
+  validate(departmentIdParamSchema, "params"),
+  validate(assignDepartmentManagerSchema),
+  controller.assignManager,
+);
+
+router.put(
+  "/:id/managers/:userId",
+  authMiddleware,
+  requirePermission(PERMISSIONS.DEPARTMENT_UPDATE),
+  validate(departmentManagerParamSchema, "params"),
+  validate(updateDepartmentManagerSchema),
+  controller.updateManager,
+);
+
+router.delete(
+  "/:id/managers/:userId",
+  authMiddleware,
+  requirePermission(PERMISSIONS.DEPARTMENT_UPDATE),
+  validate(departmentManagerParamSchema, "params"),
+  controller.removeManager,
+);
+
 // ── Department Resource Routes ──
+
 router.get(
   "/:id",
   validate(departmentIdParamSchema, "params"),

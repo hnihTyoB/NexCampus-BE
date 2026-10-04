@@ -1,12 +1,14 @@
 export interface CreateRoleDto {
   name: string;
   description?: string;
+  portalType?: "ADMIN" | "LEADER" | "INTERN";
   permissionIds?: string[];
 }
 
 export interface UpdateRoleDto {
   name?: string;
   description?: string;
+  portalType?: "ADMIN" | "LEADER" | "INTERN";
 }
 
 export interface AssignPermissionsDto {

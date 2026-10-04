@@ -8,18 +8,20 @@ import {
 import { activityLogRepository } from "../activity-logs/activity-log.repository";
 
 export interface WeeklyEvaluationScoping {
-  internId?: string;
-  leaderId?: string;
-  leaderDepartmentIds?: string[];
-  directInternIds?: string[];
-  isLeader?: boolean;
+  targetUserId?: string;
+  internId?: string; // backwards compatibility alias for targetUserId
+  evaluatorId?: string;
+  leaderId?: string; // backwards compatibility alias for evaluatorId
+  departmentIds?: string[];
+  directTargetUserIds?: string[];
+  isReviewer?: boolean;
   isAdmin?: boolean;
 }
 
 const defaultEvaluationSelect = {
   id: true,
-  internId: true,
-  leaderId: true,
+  targetUserId: true,
+  evaluatorId: true,
   week: true,
   year: true,
   startDate: true,
@@ -41,36 +43,35 @@ const defaultEvaluationSelect = {
   viewedAt: true,
   createdAt: true,
   updatedAt: true,
-  intern: {
+  targetUser: {
     select: {
       id: true,
+      email: true,
       fullName: true,
-      internCode: true,
-      departmentId: true,
-      startDate: true,
-      department: {
+      avatarUrl: true,
+      internshipProfile: {
         select: {
           id: true,
-          name: true,
-        },
-      },
-      position: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
-      user: {
-        select: {
-          id: true,
-          email: true,
-          fullName: true,
-          avatarUrl: true,
+          internCode: true,
+          departmentId: true,
+          startDate: true,
+          department: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          position: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
       },
     },
   },
-  leader: {
+  evaluator: {
     select: {
       id: true,
       email: true,
@@ -81,44 +82,91 @@ const defaultEvaluationSelect = {
 };
 
 export class WeeklyEvaluationRepository {
+  private mapEvaluationCompat<T extends Record<string, any>>(item: T | null): T | null {
+    if (!item) return null;
+    const targetUser = item.targetUser;
+    const intern = targetUser
+      ? {
+          id: targetUser.internshipProfile?.id || targetUser.id,
+          fullName: targetUser.fullName || "",
+          internCode: targetUser.internshipProfile?.internCode || null,
+          departmentId: targetUser.internshipProfile?.departmentId || null,
+          department: targetUser.internshipProfile?.department || null,
+          position: targetUser.internshipProfile?.position || null,
+          startDate: targetUser.internshipProfile?.startDate || null,
+          user: {
+            id: targetUser.id,
+            email: targetUser.email,
+            fullName: targetUser.fullName,
+            avatarUrl: targetUser.avatarUrl,
+          },
+        }
+      : null;
+
+    const leader = item.evaluator
+      ? {
+          id: item.evaluator.id,
+          email: item.evaluator.email,
+          fullName: item.evaluator.fullName,
+          avatarUrl: item.evaluator.avatarUrl,
+        }
+      : null;
+
+    return {
+      ...item,
+      internId: item.targetUserId,
+      leaderId: item.evaluatorId,
+      intern,
+      leader,
+    };
+  }
+
   async findById(id: string) {
-    return prisma.weeklyEvaluation.findFirst({
+    const item = await prisma.weeklyEvaluation.findFirst({
       where: {
         id,
         deletedAt: null,
       },
       select: defaultEvaluationSelect,
     });
+    return this.mapEvaluationCompat(item);
   }
 
-  async findByInternAndWeek(internId: string, week: number) {
-    return prisma.weeklyEvaluation.findFirst({
+  async findByTargetUserAndWeek(targetUserId: string, week: number) {
+    const item = await prisma.weeklyEvaluation.findFirst({
       where: {
-        internId,
+        targetUserId,
         week,
         deletedAt: null,
       },
       select: defaultEvaluationSelect,
     });
+    return this.mapEvaluationCompat(item);
+  }
+
+  // Alias for backward compatibility
+  async findByInternAndWeek(internId: string, week: number) {
+    return this.findByTargetUserAndWeek(internId, week);
   }
 
   async create(params: {
     dto: CreateWeeklyEvaluationDto;
     score: number;
     grade: EvaluationGrade;
-    leaderId: string;
+    evaluatorId: string;
     isAiAdjusted: boolean;
     startDate: Date;
     endDate: Date;
     year: number;
   }) {
-    const { dto, score, grade, leaderId, isAiAdjusted, startDate, endDate, year } = params;
+    const { dto, score, grade, evaluatorId, isAiAdjusted, startDate, endDate, year } = params;
     const effectiveYear = year || new Date().getFullYear();
+    const targetUserId = dto.targetUserId || dto.internId;
 
-    return prisma.weeklyEvaluation.create({
+    const item = await prisma.weeklyEvaluation.create({
       data: {
-        internId: dto.internId,
-        leaderId,
+        targetUserId: targetUserId!,
+        evaluatorId,
         week: dto.week,
         year: effectiveYear,
         startDate,
@@ -143,6 +191,8 @@ export class WeeklyEvaluationRepository {
       },
       select: defaultEvaluationSelect,
     });
+
+    return this.mapEvaluationCompat(item)!;
   }
 
   async update(params: {
@@ -154,7 +204,7 @@ export class WeeklyEvaluationRepository {
   }) {
     const { id, dto, score, grade, isAiAdjusted } = params;
 
-    return prisma.weeklyEvaluation.update({
+    const item = await prisma.weeklyEvaluation.update({
       where: { id },
       data: {
         ...(dto.ratings && {
@@ -172,7 +222,10 @@ export class WeeklyEvaluationRepository {
       },
       select: defaultEvaluationSelect,
     });
+
+    return this.mapEvaluationCompat(item)!;
   }
+
 
   async softDelete(id: string) {
     return prisma.weeklyEvaluation.update({
@@ -184,13 +237,14 @@ export class WeeklyEvaluationRepository {
   }
 
   async markViewed(id: string) {
-    return prisma.weeklyEvaluation.update({
+    const item = await prisma.weeklyEvaluation.update({
       where: { id },
       data: {
         viewedAt: new Date(),
       },
       select: defaultEvaluationSelect,
     });
+    return this.mapEvaluationCompat(item);
   }
 
   buildWhereClause(
@@ -199,28 +253,34 @@ export class WeeklyEvaluationRepository {
   ): Prisma.WeeklyEvaluationWhereInput {
     const where: Prisma.WeeklyEvaluationWhereInput = {
       deletedAt: null,
-      intern: {
+      targetUser: {
         deletedAt: null,
       },
     };
 
     // Scoping permissions
-    if (scoping.internId) {
-      where.internId = scoping.internId;
-    } else if (scoping.isLeader) {
-      const orConditions: Prisma.InternWhereInput[] = [
-        ...(scoping.directInternIds && scoping.directInternIds.length > 0
-          ? [{ id: { in: scoping.directInternIds } }]
-          : []),
-        ...(scoping.leaderDepartmentIds && scoping.leaderDepartmentIds.length > 0
-          ? [{ departmentId: { in: scoping.leaderDepartmentIds } }]
-          : []),
-      ];
+    const scopedTargetUserId = scoping.targetUserId || scoping.internId;
+    if (scopedTargetUserId) {
+      where.targetUserId = scopedTargetUserId;
+    } else if (scoping.isReviewer && !scoping.isAdmin) {
+      const orConditions: Prisma.UserWhereInput[] = [];
+
+      if (scoping.directTargetUserIds && scoping.directTargetUserIds.length > 0) {
+        orConditions.push({ id: { in: scoping.directTargetUserIds } });
+      }
+
+      if (scoping.departmentIds && scoping.departmentIds.length > 0) {
+        orConditions.push({
+          internshipProfile: {
+            departmentId: { in: scoping.departmentIds },
+          },
+        });
+      }
 
       if (orConditions.length === 0) {
-        where.internId = { in: [] };
+        where.targetUserId = { in: [] };
       } else {
-        where.intern = {
+        where.targetUser = {
           deletedAt: null,
           OR: orConditions,
         };
@@ -228,12 +288,14 @@ export class WeeklyEvaluationRepository {
     }
 
     // Query filters
-    if (query.internId) {
-      where.internId = query.internId;
+    const queryTargetUserId = query.targetUserId || query.internId;
+    if (queryTargetUserId) {
+      where.targetUserId = queryTargetUserId;
     }
 
-    if (query.leaderId) {
-      where.leaderId = query.leaderId;
+    const queryEvaluatorId = query.evaluatorId || query.leaderId;
+    if (queryEvaluatorId) {
+      where.evaluatorId = queryEvaluatorId;
     }
 
     if (query.week) {
@@ -245,9 +307,11 @@ export class WeeklyEvaluationRepository {
     }
 
     if (query.departmentId) {
-      where.intern = {
-        ...(where.intern as Prisma.InternWhereInput),
-        departmentId: query.departmentId,
+      where.targetUser = {
+        ...(where.targetUser as Prisma.UserWhereInput),
+        internshipProfile: {
+          departmentId: query.departmentId,
+        },
       };
     }
 
@@ -285,7 +349,7 @@ export class WeeklyEvaluationRepository {
     ]);
 
     return {
-      items,
+      items: items.map((item) => this.mapEvaluationCompat(item)),
       total,
       page,
       limit,
@@ -293,10 +357,10 @@ export class WeeklyEvaluationRepository {
     };
   }
 
-  async findAllByIntern(internId: string) {
+  async findAllByTargetUser(targetUserId: string) {
     return prisma.weeklyEvaluation.findMany({
       where: {
-        internId,
+        targetUserId,
         deletedAt: null,
       },
       select: {
@@ -315,6 +379,96 @@ export class WeeklyEvaluationRepository {
     });
   }
 
+  // Alias for backward compatibility
+  async findAllByIntern(internId: string) {
+    return this.findAllByTargetUser(internId);
+  }
+
+  async findUserWithProfile(userId: string) {
+    return prisma.user.findFirst({
+      where: { id: userId, deletedAt: null },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        createdAt: true,
+        internshipProfile: {
+          select: {
+            id: true,
+            mentorId: true,
+            departmentId: true,
+            startDate: true,
+            department: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+  }
+
+  async findInternshipProfileByUserId(userId: string) {
+    return prisma.internshipProfile.findUnique({
+      where: { userId },
+      select: {
+        id: true,
+        userId: true,
+        mentorId: true,
+        departmentId: true,
+        startDate: true,
+      },
+    });
+  }
+
+  async isDepartmentManager(departmentId: string, userId: string): Promise<boolean> {
+    const mgr = await prisma.departmentManager.findUnique({
+      where: {
+        departmentId_userId: { departmentId, userId },
+      },
+      select: { userId: true },
+    });
+    return !!mgr;
+  }
+
+  async findManagedDepartmentIds(userId: string): Promise<string[]> {
+    const records = await prisma.departmentManager.findMany({
+      where: { userId },
+      select: { departmentId: true },
+    });
+    return records.map((r) => r.departmentId);
+  }
+
+  async findMenteeUserIds(mentorId: string): Promise<string[]> {
+    const records = await prisma.internshipProfile.findMany({
+      where: { mentorId, deletedAt: null },
+      select: { userId: true },
+    });
+    return records.map((r) => r.userId);
+  }
+
+  async findUserById(userId: string) {
+    return prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+  }
+
+  async findInternshipProfileById(profileId: string) {
+    return prisma.internshipProfile.findUnique({
+      where: { id: profileId },
+      select: { userId: true },
+    });
+  }
+
+  async findMidWeekReassignLog(targetId: string, after: Date, beforeOrEqual: Date) {
+    return prisma.auditLog.findFirst({
+      where: {
+        action: "ASSIGN_LEADER",
+        targetType: "INTERN",
+        targetId,
+        createdAt: { gt: after, lte: beforeOrEqual },
+      },
+    });
+  }
+
   createAuditLog(data: {
     actorId?: string;
     action: string;
@@ -329,5 +483,3 @@ export class WeeklyEvaluationRepository {
 }
 
 export const weeklyEvaluationRepository = new WeeklyEvaluationRepository();
-
-
