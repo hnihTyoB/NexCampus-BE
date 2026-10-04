@@ -227,6 +227,33 @@ export const assignApplicationSchema = z
     }
   });
 
+export const batchAssignApplicationItemSchema = z
+  .object({
+    id: z.string().uuid("Invalid application ID"),
+    departmentId: z.string().uuid("Invalid department ID").nullable(),
+    positionId: z.string().uuid("Invalid position ID").nullable(),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.departmentId && data.positionId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["positionId"],
+        message: "A department is required before assigning a position",
+      });
+    }
+  });
+
+export const batchAssignApplicationsSchema = z.object({
+  items: z
+    .array(batchAssignApplicationItemSchema)
+    .min(1, "Items array must not be empty")
+    .max(100, "Cannot assign more than 100 applications at once")
+    .refine(
+      (items) => new Set(items.map((i) => i.id)).size === items.length,
+      { message: "Duplicate application IDs are not allowed in batch items" },
+    ),
+});
+
 export const approveApplicationSchema = z.object({
   leaderId: z.string().uuid("Invalid leader ID").optional(),
 });

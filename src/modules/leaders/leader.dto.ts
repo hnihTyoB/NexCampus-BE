@@ -11,6 +11,11 @@ export interface LeaderUserDto {
   fullName: string | null;
   avatarUrl: string | null;
   isActive: boolean;
+  role?: {
+    id: string;
+    name: string;
+    portalType: string;
+  } | null;
 }
 
 export interface LeaderInternDto {
@@ -67,4 +72,16 @@ export interface UpdateLeaderDto {
 
 export interface UpdateMeLeaderDto {
   phone?: string | null;
+}
+
+export interface BatchUpdateLeaderItemDto {
+  id: string;
+  departmentIds?: string[];
+  position?: string | null;
+  phone?: string;
+  isActive?: boolean;
+}
+
+export interface BatchUpdateLeadersDto {
+  items: BatchUpdateLeaderItemDto[];
 }

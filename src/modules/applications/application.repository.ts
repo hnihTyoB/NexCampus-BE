@@ -11,7 +11,12 @@ import {
   GetApplicationInvitesQuery,
   CreateApplicationDto,
   AssignApplicationDto,
+  BatchAssignApplicationItemDto,
 } from "./application.dto";
+import {
+  AUDIT_ACTION,
+  AUDIT_TARGET_TYPE,
+} from "../../common/constants/audit-log.constant";
 
 const userSelect = {
   id: true,
@@ -518,6 +523,64 @@ export class ApplicationRepository {
         positionId: assignment.positionId,
       },
       select: applicationSelect,
+    });
+  }
+
+  async batchAssign(
+    items: BatchAssignApplicationItemDto[],
+    actorId?: string,
+    context?: { ipAddress?: string; userAgent?: string },
+  ): Promise<ApplicationDto[]> {
+    return prisma.$transaction(async (tx) => {
+      const results: ApplicationDto[] = [];
+
+      for (const item of items) {
+        const updated = await tx.application.update({
+          where: { id: item.id },
+          data: {
+            departmentId: item.departmentId,
+            positionId: item.positionId,
+          },
+          select: applicationSelect,
+        });
+
+        await tx.auditLog.create({
+          data: {
+            actorId: actorId ?? null,
+            action: AUDIT_ACTION.ASSIGN_APPLICATION,
+            targetType: AUDIT_TARGET_TYPE.APPLICATION,
+            targetId: item.id,
+            details: {
+              batchAssign: true,
+              departmentId: item.departmentId,
+              positionId: item.positionId,
+            },
+            ipAddress: context?.ipAddress ?? null,
+            userAgent: context?.userAgent ?? null,
+          },
+        });
+
+        results.push(updated);
+      }
+
+      if (items.length > 0) {
+        await tx.auditLog.create({
+          data: {
+            actorId: actorId ?? null,
+            action: AUDIT_ACTION.BATCH_ASSIGN_APPLICATIONS,
+            targetType: AUDIT_TARGET_TYPE.APPLICATION,
+            targetId: items[0].id,
+            details: {
+              totalItems: items.length,
+              ids: items.map((i) => i.id),
+            },
+            ipAddress: context?.ipAddress ?? null,
+            userAgent: context?.userAgent ?? null,
+          },
+        });
+      }
+
+      return results;
     });
   }
 

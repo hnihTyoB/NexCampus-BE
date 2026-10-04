@@ -18,6 +18,7 @@ const userSelect = {
       id: true,
       name: true,
       isSystem: true,
+      portalType: true,
     },
   },
   createdAt: true,
@@ -30,6 +31,7 @@ export class UserRepository {
       email,
       fullName,
       roleName,
+      portalType,
       excludeRoles,
       isActive,
       sortBy = "createdAt",
@@ -38,6 +40,21 @@ export class UserRepository {
       limit = 20,
     } = query;
 
+    const roleFilter: Prisma.RoleWhereInput = {};
+    if (portalType) {
+      roleFilter.portalType = portalType;
+    }
+    if (roleName) {
+      roleFilter.name = roleName;
+    } else if (excludeRoles) {
+      roleFilter.name = {
+        notIn: excludeRoles
+          .split(",")
+          .map((r) => r.trim())
+          .filter(Boolean),
+      };
+    }
+
     const where: Prisma.UserWhereInput = {
       deletedAt: null,
       ...(email ? { email: { contains: email, mode: "insensitive" } } : {}),
@@ -45,20 +62,7 @@ export class UserRepository {
         ? { fullName: { contains: fullName, mode: "insensitive" } }
         : {}),
       ...(isActive !== undefined ? { isActive } : {}),
-      ...(roleName
-        ? { role: { name: roleName } }
-        : excludeRoles
-          ? {
-              role: {
-                name: {
-                  notIn: excludeRoles
-                    .split(",")
-                    .map((r) => r.trim())
-                    .filter(Boolean),
-                },
-              },
-            }
-          : {}),
+      ...(Object.keys(roleFilter).length > 0 ? { role: roleFilter } : {}),
     };
 
     const skip = (page - 1) * limit;

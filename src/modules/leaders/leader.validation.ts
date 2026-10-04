@@ -60,3 +60,26 @@ export const updateMeLeaderSchema = z.object({
 export const leaderIdParamSchema = z.object({
   id: z.string().uuid("Invalid leaderId"),
 });
+
+export const batchUpdateLeaderItemSchema = z.object({
+  id: z.string().uuid("Invalid leaderId"),
+  departmentIds: departmentIdsSchema.optional(),
+  position: z.string().max(100).nullable().optional(),
+  phone: z
+    .string()
+    .regex(VIETNAMESE_PHONE_REGEX, "Số điện thoại không đúng định dạng Việt Nam")
+    .optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const batchUpdateLeaderSchema = z.object({
+  items: z
+    .array(batchUpdateLeaderItemSchema)
+    .min(1, "Items array must not be empty")
+    .max(100, "Cannot update more than 100 leaders at once")
+    .refine(
+      (items) => new Set(items.map((i) => i.id)).size === items.length,
+      { message: "Duplicate leader IDs are not allowed in batch items" },
+    ),
+});
+

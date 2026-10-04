@@ -9,6 +9,7 @@ import {
   DirectCreateInternDto,
   UpdateInternDto,
   UpdateMeInternDto,
+  BatchUpdateInternItemDto,
   InternDto,
 } from "./intern.dto";
 import { prisma } from "../../database/prisma.client";
@@ -546,6 +547,174 @@ export class InternService {
     }
 
     return updated;
+  }
+
+  async batchUpdate(
+    items: BatchUpdateInternItemDto[],
+    actorId?: string,
+    context?: { ipAddress?: string; userAgent?: string },
+  ): Promise<InternDto[]> {
+    if (items.length === 0) return [];
+
+    // Verify all interns exist
+    const internIds = items.map((i) => i.id);
+    const existingInterns = await prisma.intern.findMany({
+      where: { id: { in: internIds }, deletedAt: null },
+      select: {
+        id: true,
+        departmentId: true,
+        positionId: true,
+        leaderId: true,
+        userId: true,
+        fullName: true,
+      },
+    });
+
+    if (existingInterns.length !== items.length) {
+      throw new AppError(
+        "Một hoặc nhiều thực tập sinh không tồn tại hoặc đã bị xóa",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
+
+    const existingMap = new Map(existingInterns.map((i) => [i.id, i]));
+
+    // Determine effective items with position reset if department changed
+    const itemsWithEffectivePosition = items.map((item) => {
+      const existing = existingMap.get(item.id)!;
+      let effectivePositionId = item.positionId;
+
+      if (item.departmentId !== undefined && item.positionId === undefined) {
+        if (
+          item.departmentId === null ||
+          item.departmentId !== existing.departmentId
+        ) {
+          effectivePositionId = null;
+        }
+      }
+
+      return {
+        ...item,
+        positionId: effectivePositionId,
+      };
+    });
+
+    // Validate department existence
+    const deptIds = [
+      ...new Set(
+        itemsWithEffectivePosition
+          .map((i) => i.departmentId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    if (deptIds.length > 0) {
+      const depts = await prisma.department.findMany({
+        where: { id: { in: deptIds }, deletedAt: null },
+        select: { id: true },
+      });
+      if (depts.length !== deptIds.length) {
+        throw new AppError(
+          "Một hoặc nhiều phòng ban không tồn tại hoặc đã bị xóa",
+          404,
+          ERROR_CODE.NOT_FOUND,
+        );
+      }
+    }
+
+    // Validate position belongs to department
+    for (const item of itemsWithEffectivePosition) {
+      if (item.positionId) {
+        const existing = existingMap.get(item.id);
+        const deptId =
+          item.departmentId !== undefined
+            ? item.departmentId
+            : existing?.departmentId;
+        if (!deptId) {
+          throw new AppError(
+            `Thực tập sinh ${existing?.fullName || item.id} chưa có phòng ban để gán vị trí`,
+            400,
+            ERROR_CODE.VALIDATION_ERROR,
+          );
+        }
+        const pos = await prisma.position.findFirst({
+          where: {
+            id: item.positionId,
+            departmentId: deptId,
+            deletedAt: null,
+          },
+        });
+        if (!pos) {
+          throw new AppError(
+            `Vị trí không thuộc phòng ban được chọn cho thực tập sinh ${existing?.fullName || item.id}`,
+            400,
+            ERROR_CODE.VALIDATION_ERROR,
+          );
+        }
+      }
+    }
+
+    // Validate leaders
+    const leaderIds = [
+      ...new Set(
+        itemsWithEffectivePosition
+          .map((i) => i.leaderId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    if (leaderIds.length > 0) {
+      const leaders = await prisma.user.findMany({
+        where: { id: { in: leaderIds }, deletedAt: null, isActive: true },
+        select: { id: true },
+      });
+      if (leaders.length !== leaderIds.length) {
+        throw new AppError(
+          "Một hoặc nhiều Leader không tồn tại hoặc không còn hoạt động",
+          404,
+          ERROR_CODE.NOT_FOUND,
+        );
+      }
+    }
+
+    const results = await this.repository.batchUpdate(
+      itemsWithEffectivePosition,
+      actorId,
+      context,
+    );
+
+    // Discord sync in background
+    for (const updated of results) {
+      const currentDiscordId =
+        updated.discordUserId ||
+        (updated.discordUsername && /^\d{17,20}$/.test(updated.discordUsername)
+          ? updated.discordUsername
+          : null);
+      if (currentDiscordId) {
+        const item = items.find((i) => i.id === updated.id);
+        const isCompletedOrDropped =
+          item?.status === INTERN_STATUS.COMPLETED ||
+          item?.status === INTERN_STATUS.DROPPED;
+        if (isCompletedOrDropped) {
+          discordBotService
+            .syncInternMember({
+              internId: updated.id,
+              discordUserId: currentDiscordId,
+              departmentId: null,
+            })
+            .catch(() => {});
+        } else if (item?.departmentId !== undefined) {
+          discordBotService
+            .syncInternMember({
+              internId: updated.id,
+              discordUserId: currentDiscordId,
+              departmentId: updated.departmentId,
+            })
+            .catch(() => {});
+        }
+      }
+    }
+
+    return results;
   }
 
   async assignLeader(

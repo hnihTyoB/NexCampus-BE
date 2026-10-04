@@ -135,3 +135,35 @@ export const updateMeInternSchema = z.object({
 export const internIdParamSchema = z.object({
   id: z.string().uuid("Invalid internId"),
 });
+
+export const batchUpdateInternItemSchema = z.object({
+  id: z.string().uuid("Invalid intern id"),
+  departmentId: z.string().uuid("Invalid departmentId").nullable().optional(),
+  positionId: z.string().uuid("Invalid positionId").nullable().optional(),
+  leaderId: z.string().uuid("Invalid leaderId").nullable().optional(),
+  status: z
+    .enum([
+      INTERN_STATUS.ACTIVE,
+      INTERN_STATUS.COMPLETED,
+      INTERN_STATUS.DROPPED,
+    ])
+    .optional(),
+  startDate: z
+    .string()
+    .refine((v) => !isNaN(Date.parse(v)), { message: "Invalid date" })
+    .optional(),
+  duration: z.coerce.number().int().positive().optional(),
+  discordUsername: z.string().nullable().optional(),
+  discordRoleGranted: z.boolean().optional(),
+});
+
+export const batchUpdateInternSchema = z.object({
+  items: z
+    .array(batchUpdateInternItemSchema)
+    .min(1, "Items array must not be empty")
+    .max(100, "Cannot update more than 100 interns at once")
+    .refine(
+      (items) => new Set(items.map((i) => i.id)).size === items.length,
+      { message: "Duplicate intern IDs are not allowed in batch items" },
+    ),
+});

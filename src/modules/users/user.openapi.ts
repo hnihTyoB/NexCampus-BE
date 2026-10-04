@@ -42,7 +42,8 @@ export function registerUserOpenApi(): void {
                   role: z.object({
                     id: z.string().uuid(),
                     name: z.string(),
-                    description: z.string().nullable(),
+                    description: z.string().nullable().optional(),
+                    portalType: z.string().optional(),
                   }),
                   createdAt: z.string().datetime(),
                 }),

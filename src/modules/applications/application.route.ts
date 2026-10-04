@@ -14,6 +14,7 @@ import {
   findAllApplicationSchema,
   applicationIdParamSchema,
   assignApplicationSchema,
+  batchAssignApplicationsSchema,
   approveApplicationSchema,
   rejectApplicationSchema,
   reviewApplicationSchema,
@@ -104,6 +105,14 @@ router.get(
   requirePermission(PERMISSIONS.APPLICATION_READ),
   validate(findAllApplicationSchema, "query"),
   controller.findAll,
+);
+
+router.post(
+  "/batch-assign",
+  authMiddleware,
+  requirePermission(PERMISSIONS.APPLICATION_ASSIGN),
+  validate(batchAssignApplicationsSchema),
+  controller.batchAssign,
 );
 
 router.get(

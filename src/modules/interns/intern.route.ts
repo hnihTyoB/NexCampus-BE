@@ -15,6 +15,7 @@ import {
   assignLeaderSchema,
   updateMeInternSchema,
   internIdParamSchema,
+  batchUpdateInternSchema,
 } from "./intern.validation";
 import { PERMISSIONS } from "../../common/constants/permission.constant";
 
@@ -52,6 +53,14 @@ router.post(
   authMiddleware,
   requirePermission(PERMISSIONS.INTERN_UPDATE),
   controller.remindAllDiscord,
+);
+
+router.post(
+  "/batch-update",
+  authMiddleware,
+  requirePermission(PERMISSIONS.INTERN_UPDATE),
+  validate(batchUpdateInternSchema),
+  controller.batchUpdate,
 );
 
 // ── Intern Management Resource Routes ──

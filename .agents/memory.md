@@ -302,9 +302,15 @@
   - **Lý do**: Triệt tiêu rủi ro sập ứng dụng do Out-of-Memory (OOM Killer exit code 137) khi deploy trên Render (Free/Starter 512MB RAM), đồng thời loại bỏ ~300MB thư viện nhị phân Chromium và các thư viện đồ họa Linux (`libnss3`, `libatk`).
   - **Frontend (`NexCampus-FE`)**: Đảm nhiệm 100% việc kết xuất tài liệu PDF phiếu đánh giá tuần (`WeeklyEvaluationReportTemplate.tsx`) chuẩn in ấn A4 bằng `jspdf` + `html2canvas`, hiển thị tiếng Việt có dấu sắc nét, đầy đủ 12 tiêu chí, chữ ký và tải trực tiếp trên trình duyệt.
   - **Backend (`NexCampus-v2-BE`)**: Gỡ bỏ hoàn toàn dependency `puppeteer`. Thay thế `PuppeteerManager` bằng lightweight stub và cập nhật `PdfExportService.renderHtmlToPdfBuffer` trả về PDF buffer nhẹ nhàng, bảo đảm các API endpoints `/api/v2/pdf-export/*` vẫn duy trì tương thích ngược 100% mà không tiêu tốn RAM server.
-- **Squad Task Board & Prerequisite Dependency Automation (2026-09-26)**:
-  - **Lọc vai trò nhiệm vụ (`role: 'ALL' | 'OWNER' | 'SUPPORT'`)**: `TaskAssignmentQueryDto`, `findAllAssignmentSchema` và `TaskAssignmentRepository.findAll` hỗ trợ phân tách rõ ràng giữa task cá nhân phụ trách chính (`internId = me`), task hỗ trợ đồng đội (`supportId = me`) hoặc cả hai.
-  - **Ràng buộc tiên quyết khi bắt đầu làm (`startTask`)**: Kiểm tra toàn diện danh sách công việc tiên quyết (`Task.dependsOn`). Nếu còn bất kỳ task tiên quyết nào chưa đạt trạng thái `DONE`, backend từ chối chuyển trạng thái với lỗi `400 INVALID_STATUS_TRANSITION` kèm danh sách mã task cần hoàn thành trước.
-  - **Cơ chế mở khóa tự động (Auto-Unblock Trigger & Notification)**: Trong `TaskSubmissionService.review`, khi bài nộp được phê duyệt (`APPROVED`), hệ thống tự động quét các task phụ thuộc (`Task.dependencies`). Với những task đang mang cờ `BLOCKED`, nếu toàn bộ điều kiện tiên quyết đã hoàn thành, hệ thống tự động chuyển assignment sang `TODO`, xóa lý do chặn và bắn thông báo In-app Notification (kèm SSE real-time) mở khóa cho thực tập sinh phụ trách.
-  - **Tối ưu hóa dữ liệu nhóm (`TaskGroupRepository.findTasks`)**: Populate đầy đủ `dependsOn`, `dependencies` và thông tin tài khoản người dùng (`avatarUrl`, `email`) của cả người phụ trách chính lẫn người hỗ trợ.
+- **Atomic Single-Transaction Batch Update APIs (2026-10-05)**:
+  - **Mục tiêu**: Thay thế toàn bộ việc gửi `Promise.all` nhiều HTTP PUT/PATCH riêng lẻ từ bảng Frontend bằng một API đơn nhất thực thi trọn vẹn trong một giao dịch `prisma.$transaction` nguyên tử an toàn tuyệt đối.
+  - **Các endpoints bổ sung**:
+    1. `POST /api/v2/interns/batch-update`: Cập nhật đồng loạt phòng ban, vị trí, leader, trạng thái (kèm đồng bộ `user.isActive`), ngày bắt đầu, thời hạn, discord cho danh sách TTS (tối đa 100 items).
+    2. `POST /api/v2/leaders/batch-update`: Cập nhật đồng loạt danh sách phòng ban (quan hệ `LeaderDepartment`), chức danh (tự động reset khi đổi phòng ban nếu không truyền chức danh mới), số điện thoại và trạng thái tài khoản `user.isActive`.
+    3. `POST /api/v2/applications/batch-assign`: Phân bổ đồng loạt phòng ban và vị trí cho các đơn ứng tuyển đang ở trạng thái `PENDING`.
+  - **Kiến trúc & Ràng buộc**:
+    - Tuân thủ nghiêm ngặt 5 tầng: `route -> validation -> controller -> service -> repository`.
+    - Tất cả batch endpoints được định tuyến trước các route có param `/:id` để tránh bị Express route handler bắt nhầm.
+    - Validate toàn diện bằng Zod ở tầng biên (mảng min 1, max 100 items, kiểm tra UUID hợp lệ).
+    - Mọi thao tác ghi DB được đóng gói trong một `prisma.$transaction` duy nhất (All or Nothing), tự động ghi Audit Log cho từng bản ghi và ghi Audit Log tổng cho toàn bộ mẻ (`BATCH_UPDATE_INTERNS`, `BATCH_UPDATE_LEADERS`, `BATCH_ASSIGN_APPLICATIONS`).
 

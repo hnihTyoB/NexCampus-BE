@@ -8,6 +8,11 @@ export interface InternUserDto {
   isActive: boolean;
   discordUserId?: string | null;
   discordUsername?: string | null;
+  role?: {
+    id: string;
+    name: string;
+    portalType: string;
+  } | null;
 }
 
 export interface InternDto {
@@ -120,4 +125,20 @@ export interface UpdateMeInternDto {
 
 export interface AssignLeaderDto {
   leaderId: string | null;
+}
+
+export interface BatchUpdateInternItemDto {
+  id: string;
+  departmentId?: string | null;
+  positionId?: string | null;
+  leaderId?: string | null;
+  status?: InternStatus;
+  startDate?: string;
+  duration?: number;
+  discordUsername?: string | null;
+  discordRoleGranted?: boolean;
+}
+
+export interface BatchUpdateInternsDto {
+  items: BatchUpdateInternItemDto[];
 }

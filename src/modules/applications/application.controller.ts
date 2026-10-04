@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { ApplicationService } from "./application.service";
+import { BatchAssignApplicationsDto } from "./application.dto";
 
 export class ApplicationController {
   private readonly service = new ApplicationService();
@@ -180,6 +181,34 @@ export class ApplicationController {
       );
       res.status(200).json({
         success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  batchAssign = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const actorId = req.user!.id;
+      const context = {
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      };
+      const body = req.body as BatchAssignApplicationsDto;
+
+      const result = await this.service.batchAssign(
+        actorId,
+        body.items,
+        context,
+      );
+      res.status(200).json({
+        success: true,
+        message: `Đã phân công ${result.length} đơn ứng tuyển thành công`,
         data: result,
       });
     } catch (error) {
