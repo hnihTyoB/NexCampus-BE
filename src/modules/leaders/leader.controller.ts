@@ -5,6 +5,7 @@ import {
   CreateLeaderDto,
   UpdateLeaderDto,
   UpdateMeLeaderDto,
+  BatchUpdateLeadersDto,
 } from "./leader.dto";
 
 export class LeaderController {
@@ -74,6 +75,33 @@ export class LeaderController {
 
       res.json({
         success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  batchUpdate = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const body = req.body as BatchUpdateLeadersDto;
+      const context = {
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      };
+      const result = await this.service.batchUpdate(
+        body.items,
+        req.user?.id,
+        context,
+      );
+
+      res.json({
+        success: true,
+        message: `Đã cập nhật ${result.length} Leader thành công`,
         data: result,
       });
     } catch (error) {

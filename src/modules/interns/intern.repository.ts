@@ -5,9 +5,14 @@ import {
   CreateInternDto,
   DirectCreateInternDto,
   UpdateInternDto,
+  BatchUpdateInternItemDto,
   InternDto,
 } from "./intern.dto";
 import { INTERN_STATUS } from "../../common/constants/intern.constant";
+import {
+  AUDIT_ACTION,
+  AUDIT_TARGET_TYPE,
+} from "../../common/constants/audit-log.constant";
 
 const userSelect = {
   id: true,
@@ -422,6 +427,91 @@ export class InternRepository {
         ...(data.major !== undefined ? { major: data.major } : {}),
       },
       select: defaultSelect,
+    });
+  }
+
+  async batchUpdate(
+    items: BatchUpdateInternItemDto[],
+    actorId?: string,
+    context?: { ipAddress?: string; userAgent?: string },
+  ): Promise<InternDto[]> {
+    return prisma.$transaction(async (tx) => {
+      const results: InternDto[] = [];
+
+      for (const item of items) {
+        const updateData: Prisma.InternUpdateInput = {
+          ...(item.leaderId !== undefined ? { leaderId: item.leaderId } : {}),
+          ...(item.departmentId !== undefined
+            ? { departmentId: item.departmentId }
+            : {}),
+          ...(item.positionId !== undefined
+            ? { positionId: item.positionId }
+            : {}),
+          ...(item.status !== undefined ? { status: item.status } : {}),
+          ...(item.startDate !== undefined
+            ? { startDate: new Date(item.startDate) }
+            : {}),
+          ...(item.duration !== undefined ? { duration: item.duration } : {}),
+          ...(item.discordUsername !== undefined
+            ? { discordUsername: item.discordUsername }
+            : {}),
+          ...(item.discordRoleGranted !== undefined
+            ? { discordRoleGranted: item.discordRoleGranted }
+            : {}),
+        };
+
+        const updated = await tx.intern.update({
+          where: { id: item.id },
+          data: updateData,
+          select: defaultSelect,
+        });
+
+        if (item.status !== undefined && updated.userId) {
+          await tx.user.update({
+            where: { id: updated.userId },
+            data: { isActive: item.status !== INTERN_STATUS.DROPPED },
+          });
+        }
+
+        await tx.auditLog.create({
+          data: {
+            actorId: actorId ?? null,
+            action: AUDIT_ACTION.UPDATE_INTERN,
+            targetType: AUDIT_TARGET_TYPE.INTERN,
+            targetId: item.id,
+            details: {
+              batchUpdate: true,
+              leaderId: item.leaderId,
+              departmentId: item.departmentId,
+              positionId: item.positionId,
+              status: item.status,
+            },
+            ipAddress: context?.ipAddress ?? null,
+            userAgent: context?.userAgent ?? null,
+          },
+        });
+
+        results.push(updated);
+      }
+
+      if (items.length > 0) {
+        await tx.auditLog.create({
+          data: {
+            actorId: actorId ?? null,
+            action: AUDIT_ACTION.BATCH_UPDATE_INTERNS,
+            targetType: AUDIT_TARGET_TYPE.INTERN,
+            targetId: items[0].id,
+            details: {
+              totalItems: items.length,
+              ids: items.map((i) => i.id),
+            },
+            ipAddress: context?.ipAddress ?? null,
+            userAgent: context?.userAgent ?? null,
+          },
+        });
+      }
+
+      return results;
     });
   }
 

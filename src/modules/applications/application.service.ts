@@ -9,6 +9,7 @@ import {
   CreateInviteDto,
   CreateApplicationDto,
   AssignApplicationDto,
+  BatchAssignApplicationItemDto,
   ApproveApplicationDto,
   RejectApplicationDto,
   ReviewApplicationDto,
@@ -415,6 +416,91 @@ export class ApplicationService {
     });
 
     return updated;
+  }
+
+  async batchAssign(
+    actorId: string,
+    items: BatchAssignApplicationItemDto[],
+    context?: { ipAddress?: string; userAgent?: string },
+  ): Promise<ApplicationDto[]> {
+    if (items.length === 0) return [];
+
+    // Check all applications exist and are PENDING
+    const appIds = items.map((i) => i.id);
+    const existingApps = await prisma.application.findMany({
+      where: { id: { in: appIds }, deletedAt: null },
+      select: { id: true, status: true, fullName: true },
+    });
+
+    if (existingApps.length !== items.length) {
+      throw new AppError(
+        "Một hoặc nhiều đơn ứng tuyển không tồn tại hoặc đã bị xóa",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
+
+    const nonPending = existingApps.find(
+      (app) => app.status !== APPLICATION_STATUS.PENDING,
+    );
+    if (nonPending) {
+      throw new AppError(
+        `Chỉ các đơn ứng tuyển đang ở trạng thái chờ duyệt (PENDING) mới có thể phân phòng ban/vị trí (${nonPending.fullName})`,
+        409,
+        ERROR_CODE.CONFLICT,
+      );
+    }
+
+    // Validate departments
+    const deptIds = [
+      ...new Set(
+        items
+          .map((i) => i.departmentId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    if (deptIds.length > 0) {
+      const depts = await prisma.department.findMany({
+        where: { id: { in: deptIds }, deletedAt: null },
+        select: { id: true },
+      });
+      if (depts.length !== deptIds.length) {
+        throw new AppError(
+          "Một hoặc nhiều phòng ban không tồn tại hoặc đã bị xóa",
+          404,
+          ERROR_CODE.NOT_FOUND,
+        );
+      }
+    }
+
+    // Validate positions belong to respective departments
+    for (const item of items) {
+      if (item.positionId) {
+        if (!item.departmentId) {
+          throw new AppError(
+            "Cần chọn phòng ban trước khi gán vị trí",
+            400,
+            ERROR_CODE.VALIDATION_ERROR,
+          );
+        }
+        const pos = await prisma.position.findFirst({
+          where: {
+            id: item.positionId,
+            departmentId: item.departmentId,
+            deletedAt: null,
+          },
+        });
+        if (!pos) {
+          throw new AppError(
+            "Vị trí không thuộc phòng ban được chọn",
+            400,
+            ERROR_CODE.VALIDATION_ERROR,
+          );
+        }
+      }
+    }
+
+    return this.repository.batchAssign(items, actorId, context);
   }
 
   async approve(

@@ -9,6 +9,7 @@ import {
   updateLeaderSchema,
   updateMeLeaderSchema,
   leaderIdParamSchema,
+  batchUpdateLeaderSchema,
 } from "./leader.validation";
 import { PERMISSIONS } from "../../common/constants/permission.constant";
 
@@ -22,6 +23,14 @@ router.put(
   authMiddleware,
   validate(updateMeLeaderSchema),
   controller.updateMe,
+);
+
+router.post(
+  "/batch-update",
+  authMiddleware,
+  requirePermission(PERMISSIONS.LEADER_UPDATE),
+  validate(batchUpdateLeaderSchema),
+  controller.batchUpdate,
 );
 
 // ── Leader Management Routes ──

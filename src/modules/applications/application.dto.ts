@@ -154,6 +154,16 @@ export interface AssignApplicationDto {
   positionId: string | null;
 }
 
+export interface BatchAssignApplicationItemDto {
+  id: string;
+  departmentId: string | null;
+  positionId: string | null;
+}
+
+export interface BatchAssignApplicationsDto {
+  items: BatchAssignApplicationItemDto[];
+}
+
 export interface ApproveApplicationDto {
   leaderId?: string;
 }

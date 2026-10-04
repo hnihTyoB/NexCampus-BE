@@ -7,6 +7,7 @@ import {
   UpdateInternDto,
   UpdateMeInternDto,
   AssignLeaderDto,
+  BatchUpdateInternsDto,
 } from "./intern.dto";
 
 export class InternController {
@@ -115,6 +116,33 @@ export class InternController {
 
       res.json({
         success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  batchUpdate = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const body = req.body as BatchUpdateInternsDto;
+      const context = {
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      };
+      const result = await this.service.batchUpdate(
+        body.items,
+        req.user?.id,
+        context,
+      );
+
+      res.json({
+        success: true,
+        message: `Đã cập nhật ${result.length} thực tập sinh thành công`,
         data: result,
       });
     } catch (error) {

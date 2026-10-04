@@ -5,8 +5,13 @@ import {
   CreateLeaderDto,
   UpdateLeaderDto,
   UpdateMeLeaderDto,
+  BatchUpdateLeaderItemDto,
   LeaderDto,
 } from "./leader.dto";
+import {
+  AUDIT_ACTION,
+  AUDIT_TARGET_TYPE,
+} from "../../common/constants/audit-log.constant";
 
 const userSelect = {
   id: true,
@@ -280,6 +285,106 @@ export class LeaderRepository {
     });
 
     return serializeLeader(leader, internCount);
+  }
+
+  async batchUpdate(
+    items: Array<
+      BatchUpdateLeaderItemDto & {
+        resetPosition?: boolean;
+      }
+    >,
+    actorId?: string,
+    context?: { ipAddress?: string; userAgent?: string },
+  ): Promise<LeaderDto[]> {
+    return prisma.$transaction(async (tx) => {
+      const results: LeaderDto[] = [];
+
+      for (const item of items) {
+        if (item.departmentIds !== undefined && item.departmentIds.length > 0) {
+          await tx.leaderDepartment.deleteMany({
+            where: {
+              departmentId: { in: item.departmentIds },
+              leaderId: { not: item.id },
+            },
+          });
+        }
+
+        const updateData: Prisma.LeaderUpdateInput = {
+          ...(item.resetPosition
+            ? { position: null }
+            : item.position !== undefined
+              ? { position: item.position }
+              : {}),
+          ...(item.phone !== undefined ? { phone: item.phone } : {}),
+          ...(item.departmentIds !== undefined
+            ? {
+                departments: {
+                  deleteMany: {},
+                  create: item.departmentIds.map((departmentId) => ({
+                    departmentId,
+                  })),
+                },
+              }
+            : {}),
+        };
+
+        const updated = await tx.leader.update({
+          where: { id: item.id },
+          data: updateData,
+          select: defaultSelect,
+        });
+
+        if (item.isActive !== undefined && updated.userId) {
+          await tx.user.update({
+            where: { id: updated.userId },
+            data: { isActive: item.isActive },
+          });
+          updated.user.isActive = item.isActive;
+        }
+
+        const internCount = await tx.intern.count({
+          where: { leaderId: updated.userId, deletedAt: null },
+        });
+
+        await tx.auditLog.create({
+          data: {
+            actorId: actorId ?? null,
+            action: AUDIT_ACTION.UPDATE_LEADER,
+            targetType: AUDIT_TARGET_TYPE.LEADER,
+            targetId: item.id,
+            details: {
+              batchUpdate: true,
+              departmentIds: item.departmentIds,
+              position: item.resetPosition ? null : item.position,
+              isActive: item.isActive,
+            },
+            ipAddress: context?.ipAddress ?? null,
+            userAgent: context?.userAgent ?? null,
+          },
+        });
+
+        results.push(serializeLeader(updated, internCount));
+      }
+
+      if (items.length > 0) {
+        await tx.auditLog.create({
+          data: {
+            actorId: actorId ?? null,
+            action: AUDIT_ACTION.BATCH_UPDATE_LEADERS,
+            targetType: AUDIT_TARGET_TYPE.LEADER,
+            targetId: items[0].id,
+            details: {
+              totalItems: items.length,
+              ids: items.map((i) => i.id),
+            },
+            ipAddress: context?.ipAddress ?? null,
+            userAgent: context?.userAgent ?? null,
+          },
+        });
+      }
+
+      return results;
+    });
   }
 
   async delete(id: string): Promise<LeaderDto> {

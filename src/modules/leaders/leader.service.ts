@@ -6,6 +6,7 @@ import {
   CreateLeaderDto,
   UpdateLeaderDto,
   UpdateMeLeaderDto,
+  BatchUpdateLeaderItemDto,
   LeaderDto,
   MAX_LEADER_DEPARTMENTS,
 } from "./leader.dto";
@@ -222,6 +223,103 @@ export class LeaderService {
     }
 
     return result;
+  }
+
+  async batchUpdate(
+    items: BatchUpdateLeaderItemDto[],
+    actorId?: string,
+    context?: { ipAddress?: string; userAgent?: string },
+  ): Promise<LeaderDto[]> {
+    if (items.length === 0) return [];
+
+    const leaderIds = items.map((i) => i.id);
+    const existingLeaders = await prisma.leader.findMany({
+      where: { id: { in: leaderIds } },
+      include: { departments: true, user: true },
+    });
+
+    if (existingLeaders.length !== items.length) {
+      throw new AppError(
+        "Một hoặc nhiều Leader không tồn tại",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
+
+    const existingMap = new Map(existingLeaders.map((l) => [l.id, l]));
+
+    // Validate no department conflict between items in the same batch
+    const deptUsage = new Map<string, string>();
+    for (const item of items) {
+      if (item.departmentIds) {
+        for (const deptId of item.departmentIds) {
+          if (deptUsage.has(deptId)) {
+            throw new AppError(
+              "Không thể phân công cùng một phòng ban cho nhiều Leader trong cùng một lần cập nhật",
+              400,
+              ERROR_CODE.VALIDATION_ERROR,
+            );
+          }
+          deptUsage.set(deptId, item.id);
+        }
+      }
+    }
+
+    // Validate departments & phone for each item
+    for (const item of items) {
+      if (item.departmentIds !== undefined) {
+        await this.validateDepartments(item.departmentIds);
+      }
+      if (item.phone) {
+        await validatePhoneUniqueness(item.phone, { leaderId: item.id });
+      }
+    }
+
+    // Determine resetPosition per item
+    const itemsWithReset = items.map((item) => {
+      const existing = existingMap.get(item.id)!;
+      let resetPosition = false;
+      if (item.departmentIds !== undefined) {
+        const currentDeptIds = existing.departments
+          .map((d) => d.departmentId)
+          .sort();
+        const newDeptIds = [...item.departmentIds].sort();
+        const hasDeptChanged =
+          currentDeptIds.length !== newDeptIds.length ||
+          currentDeptIds.some((val, idx) => val !== newDeptIds[idx]);
+
+        if (hasDeptChanged && item.position === undefined) {
+          resetPosition = true;
+        }
+      }
+      return {
+        ...item,
+        resetPosition,
+      };
+    });
+
+    const results = await this.repository.batchUpdate(
+      itemsWithReset,
+      actorId,
+      context,
+    );
+
+    // Sync Discord threads for leaders whose departments were changed
+    for (const item of items) {
+      if (item.departmentIds !== undefined) {
+        const existing = existingMap.get(item.id);
+        if (existing) {
+          discordBotService.syncLeaderThreads(existing.userId).catch((err) => {
+            console.warn(
+              `[LeaderService] syncLeaderThreads on batch update warning:`,
+              err?.message,
+            );
+          });
+        }
+      }
+    }
+
+    return results;
   }
 
   async getMe(userId: string): Promise<LeaderDto> {
