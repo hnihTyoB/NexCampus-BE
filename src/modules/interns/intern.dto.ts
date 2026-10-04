@@ -8,6 +8,11 @@ export interface InternUserDto {
   isActive: boolean;
   discordUserId?: string | null;
   discordUsername?: string | null;
+  role?: {
+    id: string;
+    name: string;
+    portalType: string;
+  } | null;
 }
 
 export interface InternDto {

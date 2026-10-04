@@ -2,6 +2,7 @@ export interface UserQueryDto {
   email?: string;
   fullName?: string;
   roleName?: string;
+  portalType?: "ADMIN" | "LEADER" | "INTERN";
   excludeRoles?: string;
   isActive?: boolean;
   sortBy?: "createdAt" | "email" | "fullName";
@@ -31,6 +32,8 @@ export interface UserResponseDto {
   role?: {
     id: string;
     name: string;
+    isSystem?: boolean;
+    portalType?: string;
   };
   isActive: boolean;
   createdAt: Date;

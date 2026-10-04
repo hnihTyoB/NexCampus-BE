@@ -17,6 +17,13 @@ const userSelect = {
   isActive: true,
   discordUserId: true,
   discordUsername: true,
+  role: {
+    select: {
+      id: true,
+      name: true,
+      portalType: true,
+    },
+  },
 };
 
 const defaultSelect = {
@@ -79,7 +86,15 @@ export class InternRepository {
       limit = 20,
     } = query;
 
-    const andConditions: Prisma.InternWhereInput[] = [{ deletedAt: null }];
+    const andConditions: Prisma.InternWhereInput[] = [
+      { deletedAt: null },
+      {
+        user: {
+          deletedAt: null,
+          role: { portalType: "INTERN" },
+        },
+      },
+    ];
 
     // Scoped access for Leader: Only view interns in managed departments OR directly supervised
     if (scope) {

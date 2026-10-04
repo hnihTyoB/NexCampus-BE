@@ -14,6 +14,13 @@ const userSelect = {
   fullName: true,
   avatarUrl: true,
   isActive: true,
+  role: {
+    select: {
+      id: true,
+      name: true,
+      portalType: true,
+    },
+  },
 };
 
 const defaultSelect = {
@@ -79,16 +86,19 @@ export class LeaderRepository {
     } = query;
 
     const where: Prisma.LeaderWhereInput = {
-      ...(fullName
-        ? {
-            user: {
+      user: {
+        deletedAt: null,
+        role: { portalType: "LEADER" },
+        ...(isActive !== undefined ? { isActive } : {}),
+        ...(fullName
+          ? {
               OR: [
                 { fullName: { contains: fullName, mode: "insensitive" } },
                 { email: { contains: fullName, mode: "insensitive" } },
               ],
-            },
-          }
-        : {}),
+            }
+          : {}),
+      },
       ...(departmentId
         ? { departments: { some: { departmentId } } }
         : {}),
@@ -103,7 +113,6 @@ export class LeaderRepository {
             },
           }
         : {}),
-      ...(isActive !== undefined ? { user: { isActive } } : {}),
     };
 
     const skip = (page - 1) * limit;
