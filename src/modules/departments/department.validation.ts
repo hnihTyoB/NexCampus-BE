@@ -33,3 +33,20 @@ export const updatePositionSchema = z.object({
 export const positionIdParamSchema = z.object({
   id: z.string().uuid("Invalid positionId"),
 });
+
+export const assignDepartmentManagerSchema = z.object({
+  userId: z.string().uuid("Invalid userId"),
+  title: z.string().trim().max(100).optional().nullable(),
+  isPrimary: z.boolean().optional(),
+});
+
+export const updateDepartmentManagerSchema = z.object({
+  title: z.string().trim().max(100).optional().nullable(),
+  isPrimary: z.boolean().optional(),
+});
+
+export const departmentManagerParamSchema = z.object({
+  id: z.string().uuid("Invalid departmentId"),
+  userId: z.string().uuid("Invalid userId"),
+});
+

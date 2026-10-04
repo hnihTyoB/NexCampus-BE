@@ -24,6 +24,7 @@ export interface MeDto {
   discordUsername?: string | null;
   role: string;
   roleId: string;
+  portalType?: "ADMIN" | "LEADER" | "INTERN" | string;
   permissions: string[];
   isActive: boolean;
   twoFactorEnabled: boolean;
@@ -39,6 +40,7 @@ export interface LoginResponseDto {
     fullName: string | null;
     role: string;
     roleId: string;
+    portalType?: "ADMIN" | "LEADER" | "INTERN" | string;
     permissions: string[];
   };
   requires2FA?: boolean;

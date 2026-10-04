@@ -216,8 +216,8 @@ export async function seedReports(
 
       const report = await prisma.dailyReport.upsert({
         where: {
-          internId_date: {
-            internId,
+          userId_date: {
+            userId: internId,
             date: reportDateOnly,
           },
         },
@@ -233,7 +233,7 @@ export async function seedReports(
           updatedAt: feedbackAt || createdAt,
         },
         create: {
-          internId,
+          userId: internId,
           date: reportDateOnly,
           content,
           blockers,

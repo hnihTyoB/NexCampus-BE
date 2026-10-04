@@ -5,9 +5,11 @@ import { uuidv7 } from "uuidv7";
 // These models must be skipped during id injection to avoid Prisma validation
 // errors ("Unknown argument `id`").
 const COMPOSITE_PK_MODELS = new Set([
+  "DepartmentManager",
   "LeaderDepartment",
   "TaskGroupMember",
 ]);
+
 
 // ─── UUIDv7 Prisma Extension ──────────────────────────────────────────────────
 // Intercepts create, createMany, and upsert operations to inject UUIDv7 primary

@@ -19,18 +19,24 @@ const defaultSelect = {
   maxActiveTasks: true,
   requireAllMembers: true,
   members: {
-    orderBy: { intern: { fullName: "asc" as const } },
+    orderBy: { user: { fullName: "asc" as const } },
     select: {
-      internId: true,
-      intern: {
+      userId: true,
+      user: {
         select: {
           id: true,
-          leaderId: true,
           fullName: true,
-          status: true,
-          user: { select: { email: true, avatarUrl: true } },
-          department: { select: { id: true, name: true } },
-          position: { select: { id: true, name: true } },
+          email: true,
+          avatarUrl: true,
+          internshipProfile: {
+            select: {
+              id: true,
+              mentorId: true,
+              status: true,
+              department: { select: { id: true, name: true } },
+              position: { select: { id: true, name: true } },
+            },
+          },
         },
       },
     },
@@ -81,7 +87,11 @@ export class TaskGroupRepository {
         leaderOr.push({
           members: {
             some: {
-              intern: { leaderId: scope.leaderScope.leaderUserId },
+              user: {
+                internshipProfile: {
+                  mentorId: scope.leaderScope.leaderUserId,
+                },
+              },
             },
           },
         });
@@ -104,7 +114,12 @@ export class TaskGroupRepository {
     if (scope?.internId) {
       conditions.push({
         members: {
-          some: { internId: scope.internId },
+          some: {
+            OR: [
+              { userId: scope.internId },
+              { user: { internshipProfile: { id: scope.internId } } },
+            ],
+          },
         },
       });
     }
@@ -166,7 +181,7 @@ export class TaskGroupRepository {
         ...(data.memberIds && data.memberIds.length > 0
           ? {
               members: {
-                create: data.memberIds.map((internId) => ({ internId })),
+                create: data.memberIds.map((userId) => ({ userId })),
               },
             }
           : {}),
@@ -181,7 +196,7 @@ export class TaskGroupRepository {
       data: {
         ...(data.name !== undefined ? { name: data.name } : {}),
         ...(data.description !== undefined ? { description: data.description } : {}),
-        ...(data.departmentId !== undefined ? { departmentId: data.departmentId } : {}),
+        ...(data.departmentId !== undefined ? { departmentId: data.departmentId ?? null } : {}),
         ...(data.status !== undefined ? { status: data.status } : {}),
         ...(data.maxWorkloadDays !== undefined
           ? { maxWorkloadDays: data.maxWorkloadDays }
@@ -196,7 +211,7 @@ export class TaskGroupRepository {
           ? {
               members: {
                 deleteMany: {},
-                create: data.memberIds.map((internId) => ({ internId })),
+                create: data.memberIds.map((userId) => ({ userId })),
               },
             }
           : {}),
@@ -209,15 +224,15 @@ export class TaskGroupRepository {
     return prisma.taskGroup.delete({ where: { id } });
   }
 
-  async isMember(taskGroupId: string, internId: string): Promise<boolean> {
+  async isMember(taskGroupId: string, userId: string): Promise<boolean> {
     const membership = await prisma.taskGroupMember.findUnique({
       where: {
-        taskGroupId_internId: {
+        taskGroupId_userId: {
           taskGroupId,
-          internId,
+          userId,
         },
       },
-      select: { internId: true },
+      select: { userId: true },
     });
     return Boolean(membership);
   }
@@ -325,20 +340,22 @@ export class TaskGroupRepository {
           select: {
             id: true,
             status: true,
-            internId: true,
+            assigneeId: true,
             supportId: true,
-            intern: {
+            assignee: {
               select: {
                 id: true,
                 fullName: true,
-                user: { select: { email: true, avatarUrl: true } },
+                email: true,
+                avatarUrl: true,
               },
             },
             support: {
               select: {
                 id: true,
                 fullName: true,
-                user: { select: { email: true, avatarUrl: true } },
+                email: true,
+                avatarUrl: true,
               },
             },
           },

@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, PortalType } from "@prisma/client";
 import { hashPassword } from "./helper";
 
 export interface SeedUsersResult {
@@ -244,19 +244,19 @@ export async function seedUsers(
 
   // 2. Roles
   const roles = [
-    { name: "ADMIN", description: "Quản trị viên toàn quyền hệ thống", isSystem: true },
-    { name: "LEADER", description: "Người hướng dẫn / Trưởng bộ phận chuyên môn", isSystem: true },
-    { name: "INTERN", description: "Thực tập sinh cơ quan", isSystem: true },
-    { name: "MANAGER", description: "Quản lý nhân sự & vận hành", isSystem: true },
-    { name: "USER", description: "Người dùng cơ bản", isSystem: true },
+    { name: "ADMIN", description: "Quản trị viên toàn quyền hệ thống", isSystem: true, portalType: PortalType.ADMIN },
+    { name: "LEADER", description: "Người hướng dẫn / Trưởng bộ phận chuyên môn", isSystem: true, portalType: PortalType.LEADER },
+    { name: "INTERN", description: "Thực tập sinh cơ quan", isSystem: true, portalType: PortalType.INTERN },
+    { name: "MANAGER", description: "Quản lý nhân sự & vận hành", isSystem: true, portalType: PortalType.ADMIN },
+    { name: "USER", description: "Người dùng cơ bản", isSystem: true, portalType: PortalType.ADMIN },
   ];
 
   const roleMap: Record<string, string> = {};
   for (const r of roles) {
     const role = await prisma.role.upsert({
       where: { name: r.name },
-      update: { description: r.description, isSystem: r.isSystem },
-      create: { name: r.name, description: r.description, isSystem: r.isSystem },
+      update: { description: r.description, isSystem: r.isSystem, portalType: r.portalType },
+      create: { name: r.name, description: r.description, isSystem: r.isSystem, portalType: r.portalType },
     });
     roleMap[r.name] = role.id;
   }
@@ -408,35 +408,27 @@ export async function seedUsers(
       },
     });
     leaders[l.email] = user.id;
+    leaderProfiles[l.email] = user.id;
     await ensureNotificationSetting(user.id);
-
-    const leaderProfile = await prisma.leader.upsert({
-      where: { userId: user.id },
-      update: {
-        position: l.position,
-        phone: l.phone,
-      },
-      create: {
-        userId: user.id,
-        position: l.position,
-        phone: l.phone,
-      },
-    });
-    leaderProfiles[l.email] = leaderProfile.id;
 
     if (l.deptName && deptMap[l.deptName]) {
       const deptId = deptMap[l.deptName];
-      await prisma.leaderDepartment.upsert({
+      await prisma.departmentManager.upsert({
         where: {
-          leaderId_departmentId: {
-            leaderId: leaderProfile.id,
+          departmentId_userId: {
             departmentId: deptId,
+            userId: user.id,
           },
         },
-        update: {},
+        update: {
+          title: l.position,
+          isPrimary: true,
+        },
         create: {
-          leaderId: leaderProfile.id,
           departmentId: deptId,
+          userId: user.id,
+          title: l.position,
+          isPrimary: true,
         },
       });
     }

@@ -8,38 +8,26 @@ export const VIETNAMESE_PHONE_REGEX = /^(0|\+84|84)(3|5|7|8|9)[0-9]{8}$/;
 
 export async function validatePhoneUniqueness(
   phone?: string | null,
-  exclude?: { internId?: string; leaderId?: string },
+  exclude?: { userId?: string; internId?: string; leaderId?: string },
 ): Promise<void> {
   if (!phone) return;
 
-  // 1. Check Intern table (excluding soft-deleted ones)
-  const existingIntern = await prisma.intern.findFirst({
-    where: {
-      phone,
-      deletedAt: null,
-      ...(exclude?.internId ? { id: { not: exclude.internId } } : {}),
-    },
-  });
-  if (existingIntern) {
-    throw new AppError(
-      "Số điện thoại này đã được sử dụng bởi một thực tập sinh khác.",
-      409,
-      ERROR_CODE.DUPLICATE_ENTRY,
-    );
-  }
+  const excludeUserId = exclude?.userId || exclude?.internId || exclude?.leaderId;
 
-  // 2. Check Leader table
-  const existingLeader = await prisma.leader.findFirst({
+  const existingUser = await prisma.user.findFirst({
     where: {
-      phone,
-      ...(exclude?.leaderId ? { id: { not: exclude.leaderId } } : {}),
+      phoneNumber: phone,
+      deletedAt: null,
+      ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
     },
   });
-  if (existingLeader) {
+
+  if (existingUser) {
     throw new AppError(
-      "Số điện thoại này đã được sử dụng bởi một leader khác.",
+      "Số điện thoại này đã được sử dụng bởi một tài khoản khác trong hệ thống.",
       409,
       ERROR_CODE.DUPLICATE_ENTRY,
     );
   }
 }
+

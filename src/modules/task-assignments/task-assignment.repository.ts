@@ -11,7 +11,7 @@ import { activityLogRepository } from "../activity-logs/activity-log.repository"
 const extensionRequestSelect = {
   id: true,
   assignmentId: true,
-  internId: true,
+  userId: true,
   currentDeadline: true,
   proposedDeadline: true,
   extensionDays: true,
@@ -23,13 +23,18 @@ const extensionRequestSelect = {
   reviewedAt: true,
   createdAt: true,
   updatedAt: true,
-  intern: {
+  user: {
     select: {
       id: true,
       fullName: true,
-      internCode: true,
-      department: { select: { id: true, name: true } },
-      user: { select: { id: true, email: true } },
+      email: true,
+      internshipProfile: {
+        select: {
+          id: true,
+          internCode: true,
+          department: { select: { id: true, name: true } },
+        },
+      },
     },
   },
   reviewer: {
@@ -59,7 +64,7 @@ const extensionRequestSelect = {
 const defaultSelect = {
   id: true,
   taskId: true,
-  internId: true,
+  assigneeId: true,
   assignedBy: true,
   supportId: true,
   status: true,
@@ -93,7 +98,7 @@ const defaultSelect = {
             select: {
               id: true,
               status: true,
-              intern: { select: { id: true, fullName: true } },
+              assignee: { select: { id: true, fullName: true } },
             },
           },
         },
@@ -108,32 +113,32 @@ const defaultSelect = {
             select: {
               id: true,
               status: true,
-              intern: { select: { id: true, fullName: true } },
+              assignee: { select: { id: true, fullName: true } },
             },
           },
         },
       },
     },
   },
-  intern: {
+  assignee: {
     select: {
       id: true,
-      userId: true,
-      leaderId: true,
+      email: true,
       fullName: true,
-      phone: true,
-      department: { select: { id: true, name: true } },
-      position: { select: { id: true, name: true } },
-      startDate: true,
-      duration: true,
-      status: true,
-      createdAt: true,
-      updatedAt: true,
-      user: {
+      phoneNumber: true,
+      avatarUrl: true,
+      isActive: true,
+      internshipProfile: {
         select: {
           id: true,
-          email: true,
-          fullName: true,
+          internCode: true,
+          departmentId: true,
+          department: { select: { id: true, name: true } },
+          position: { select: { id: true, name: true } },
+          mentorId: true,
+          status: true,
+          startDate: true,
+          duration: true,
         },
       },
     },
@@ -148,17 +153,11 @@ const defaultSelect = {
   support: {
     select: {
       id: true,
-      userId: true,
-      leaderId: true,
+      email: true,
       fullName: true,
-      status: true,
-      user: {
-        select: {
-          id: true,
-          email: true,
-          fullName: true,
-        },
-      },
+      phoneNumber: true,
+      avatarUrl: true,
+      isActive: true,
     },
   },
   extensionRequests: {
@@ -180,16 +179,69 @@ const defaultSelect = {
 };
 
 export class TaskAssignmentRepository {
+  /**
+   * Helper mapping defaultSelect results to provide backward-compatible `intern` and `internId`
+   */
+  private mapAssignmentCompat<T extends Record<string, any>>(assignment: T): T & { internId: string; intern: any; support: any };
+  private mapAssignmentCompat<T extends Record<string, any>>(assignment: null): null;
+  private mapAssignmentCompat<T extends Record<string, any>>(assignment: T | null): (T & { internId: string; intern: any; support: any }) | null;
+  private mapAssignmentCompat<T extends Record<string, any>>(assignment: T | null): (T & { internId: string; intern: any; support: any }) | null {
+    if (!assignment) return null;
+    const assignee = assignment.assignee;
+    const intern = assignee
+      ? {
+          id: assignee.internshipProfile?.id || assignee.id,
+          userId: assignee.id,
+          leaderId: assignee.internshipProfile?.mentorId || null,
+          fullName: assignee.fullName || "",
+          phone: assignee.phoneNumber || "",
+          department: assignee.internshipProfile?.department || null,
+          position: assignee.internshipProfile?.position || null,
+          startDate: assignee.internshipProfile?.startDate || null,
+          duration: assignee.internshipProfile?.duration || null,
+          status: assignee.internshipProfile?.status || "ACTIVE",
+          user: {
+            id: assignee.id,
+            email: assignee.email,
+            fullName: assignee.fullName,
+          },
+        }
+      : null;
+
+    const support = assignment.support
+      ? {
+          id: assignment.support.id,
+          userId: assignment.support.id,
+          fullName: assignment.support.fullName || "",
+          status: assignment.support.isActive ? "ACTIVE" : "INACTIVE",
+          user: {
+            id: assignment.support.id,
+            email: assignment.support.email,
+            fullName: assignment.support.fullName,
+          },
+        }
+      : null;
+
+    return {
+      ...assignment,
+      internId: assignment.assigneeId,
+      intern,
+      support,
+    };
+  }
+
   async findAll(
     query: TaskAssignmentQueryDto,
     scope?: {
-      internId?: string;
+      userId?: string;
+      internId?: string; // backwards compatibility alias for userId
       departmentIds?: string[];
       leaderUserId?: string;
     },
   ) {
     const {
       taskId,
+      assigneeId,
       internId,
       assignedBy,
       leaderId,
@@ -201,26 +253,31 @@ export class TaskAssignmentRepository {
       limit = 20,
     } = query;
 
+    const targetUserId = assigneeId || internId;
+    const scopedUserId = scope?.userId || scope?.internId;
+
     const where: Prisma.TaskAssignmentWhereInput = {
       task: { deletedAt: null },
       ...(taskId ? { taskId } : {}),
-      ...(internId ? { internId } : {}),
+      ...(targetUserId ? { assigneeId: targetUserId } : {}),
       ...(assignedBy ? { assignedBy } : {}),
       ...(status ? { status } : {}),
       ...(leaderId
         ? {
-            intern: { leaderId },
+            assignee: {
+              internshipProfile: { mentorId: leaderId },
+            },
           }
         : {}),
-      ...(scope?.internId !== undefined
+      ...(scopedUserId !== undefined
         ? role === "OWNER"
-          ? { internId: scope.internId }
+          ? { assigneeId: scopedUserId }
           : role === "SUPPORT"
-            ? { supportId: scope.internId }
+            ? { supportId: scopedUserId }
             : {
                 OR: [
-                  { internId: scope.internId },
-                  { supportId: scope.internId },
+                  { assigneeId: scopedUserId },
+                  { supportId: scopedUserId },
                 ],
               }
         : {}),
@@ -228,9 +285,9 @@ export class TaskAssignmentRepository {
         ? {
             OR: [
               { assignedBy: scope.leaderUserId },
-              { intern: { leaderId: scope.leaderUserId } },
+              { assignee: { internshipProfile: { mentorId: scope.leaderUserId } } },
               { task: { taskGroup: { departmentId: { in: scope.departmentIds } } } },
-              { intern: { departmentId: { in: scope.departmentIds } } },
+              { assignee: { internshipProfile: { departmentId: { in: scope.departmentIds } } } },
             ],
           }
         : {}),
@@ -250,49 +307,57 @@ export class TaskAssignmentRepository {
     ]);
 
     return {
-      data,
+      data: data.map((item) => this.mapAssignmentCompat(item)),
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 
-  findById(id: string) {
-    return prisma.taskAssignment.findUnique({
+  async findById(id: string) {
+    const assignment = await prisma.taskAssignment.findUnique({
       where: { id },
       select: defaultSelect,
     });
+    return this.mapAssignmentCompat(assignment);
   }
 
-  findByTaskId(taskId: string) {
-    return prisma.taskAssignment.findUnique({
+  async findByTaskId(taskId: string) {
+    const assignment = await prisma.taskAssignment.findUnique({
       where: { taskId },
       select: defaultSelect,
     });
+    return this.mapAssignmentCompat(assignment);
   }
 
-  create(data: CreateTaskAssignmentDto, assignedBy: string, status: AssignmentStatus) {
-    return prisma.taskAssignment.create({
+  async create(data: CreateTaskAssignmentDto, assignedBy: string, status: AssignmentStatus) {
+    const assigneeId = data.assigneeId || data.internId;
+    const assignment = await prisma.taskAssignment.create({
       data: {
         taskId: data.taskId,
-        internId: data.internId,
+        assigneeId: assigneeId!,
         supportId: data.supportId || null,
         assignedBy,
         status,
       },
       select: defaultSelect,
     });
+    return this.mapAssignmentCompat(assignment);
   }
 
-  update(id: string, data: UpdateTaskAssignmentDto) {
-    return prisma.taskAssignment.update({
+  async update(id: string, data: UpdateTaskAssignmentDto) {
+    const assigneeId = data.assigneeId || data.internId;
+    const assignment = await prisma.taskAssignment.update({
       where: { id },
       data: {
         ...(data.status !== undefined ? { status: data.status } : {}),
         ...(data.blockedReason !== undefined ? { blockedReason: data.blockedReason } : {}),
-        ...(data.internId !== undefined ? { internId: data.internId } : {}),
+        ...(data.startedAt !== undefined ? { startedAt: data.startedAt } : {}),
+        ...(data.completedAt !== undefined ? { completedAt: data.completedAt } : {}),
+        ...(assigneeId !== undefined ? { assigneeId } : {}),
         ...(data.supportId !== undefined ? { supportId: data.supportId } : {}),
       },
       select: defaultSelect,
     });
+    return this.mapAssignmentCompat(assignment);
   }
 
   delete(id: string) {
@@ -303,19 +368,21 @@ export class TaskAssignmentRepository {
 
   // ─── Task Extension Request Methods ──────────────────────────────────────────
 
-  createExtensionRequest(data: {
+  async createExtensionRequest(data: {
     assignmentId: string;
-    internId: string;
+    userId?: string;
+    internId?: string;
     currentDeadline: Date;
     proposedDeadline: Date;
     extensionDays: number;
     reason: string;
     commitmentPlan: string;
   }) {
-    return prisma.taskExtensionRequest.create({
+    const userId = data.userId || data.internId;
+    const request = await prisma.taskExtensionRequest.create({
       data: {
         assignmentId: data.assignmentId,
-        internId: data.internId,
+        userId: userId!,
         currentDeadline: data.currentDeadline,
         proposedDeadline: data.proposedDeadline,
         extensionDays: data.extensionDays,
@@ -325,17 +392,45 @@ export class TaskAssignmentRepository {
       },
       select: extensionRequestSelect,
     });
+
+    return {
+      ...request,
+      internId: request.userId,
+      intern: request.user
+        ? {
+            id: request.user.internshipProfile?.id || request.user.id,
+            fullName: request.user.fullName || "",
+            internCode: request.user.internshipProfile?.internCode || null,
+            user: { id: request.user.id, email: request.user.email },
+            department: request.user.internshipProfile?.department || null,
+          }
+        : undefined,
+    };
   }
 
-  findExtensionRequestById(id: string) {
-    return prisma.taskExtensionRequest.findUnique({
+  async findExtensionRequestById(id: string) {
+    const request = await prisma.taskExtensionRequest.findUnique({
       where: { id },
       select: extensionRequestSelect,
     });
+    if (!request) return null;
+    return {
+      ...request,
+      internId: request.userId,
+      intern: request.user
+        ? {
+            id: request.user.internshipProfile?.id || request.user.id,
+            fullName: request.user.fullName || "",
+            internCode: request.user.internshipProfile?.internCode || null,
+            user: { id: request.user.id, email: request.user.email },
+            department: request.user.internshipProfile?.department || null,
+          }
+        : undefined,
+    };
   }
 
-  findPendingExtensionRequestByAssignmentId(assignmentId: string) {
-    return prisma.taskExtensionRequest.findFirst({
+  async findPendingExtensionRequestByAssignmentId(assignmentId: string) {
+    const request = await prisma.taskExtensionRequest.findFirst({
       where: {
         assignmentId,
         status: ExtensionRequestStatus.PENDING,
@@ -343,32 +438,61 @@ export class TaskAssignmentRepository {
       select: extensionRequestSelect,
       orderBy: { createdAt: "desc" },
     });
+    if (!request) return null;
+    return {
+      ...request,
+      internId: request.userId,
+      intern: request.user
+        ? {
+            id: request.user.internshipProfile?.id || request.user.id,
+            fullName: request.user.fullName || "",
+            internCode: request.user.internshipProfile?.internCode || null,
+            user: { id: request.user.id, email: request.user.email },
+            department: request.user.internshipProfile?.department || null,
+          }
+        : undefined,
+    };
   }
 
   async findExtensionRequests(
     query: QueryExtensionRequestsDto,
     scope?: {
+      userId?: string;
       internId?: string;
+      departmentIds?: string[];
       leaderUserId?: string;
     },
   ) {
-    const { status, internId, assignmentId, taskId, page = 1, limit = 20 } = query;
-    const where: Prisma.TaskExtensionRequestWhereInput = {};
+    const { status, userId, internId, assignmentId, taskId, page = 1, limit = 20 } = query;
+    const targetUserId = userId || internId;
+    const scopedUserId = scope?.userId || scope?.internId;
 
-    if (status) where.status = status;
-    if (internId) where.internId = internId;
-    if (assignmentId) where.assignmentId = assignmentId;
-    if (taskId) where.assignment = { taskId };
-
-    if (scope?.internId) {
-      where.internId = scope.internId;
-    } else if (scope?.leaderUserId) {
-      where.intern = { leaderId: scope.leaderUserId };
-    }
+    const where: Prisma.TaskExtensionRequestWhereInput = {
+      ...(status ? { status } : {}),
+      ...(targetUserId ? { userId: targetUserId } : {}),
+      ...(assignmentId ? { assignmentId } : {}),
+      ...(taskId ? { assignment: { taskId } } : {}),
+      ...(scopedUserId !== undefined ? { userId: scopedUserId } : {}),
+      ...(scope?.departmentIds !== undefined && scope?.leaderUserId !== undefined
+        ? {
+            OR: [
+              { assignment: { assignedBy: scope.leaderUserId } },
+              { user: { internshipProfile: { mentorId: scope.leaderUserId } } },
+              {
+                assignment: {
+                  task: {
+                    taskGroup: { departmentId: { in: scope.departmentIds } },
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
 
     const skip = (page - 1) * limit;
 
-    const [items, total] = await Promise.all([
+    const [data, total] = await prisma.$transaction([
       prisma.taskExtensionRequest.findMany({
         where,
         select: extensionRequestSelect,
@@ -380,61 +504,317 @@ export class TaskAssignmentRepository {
     ]);
 
     return {
-      items,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+      data: data.map((req) => ({
+        ...req,
+        internId: req.userId,
+        intern: req.user
+          ? {
+              id: req.user.internshipProfile?.id || req.user.id,
+              fullName: req.user.fullName || "",
+              internCode: req.user.internshipProfile?.internCode || null,
+              user: { id: req.user.id, email: req.user.email },
+              department: req.user.internshipProfile?.department || null,
+            }
+          : undefined,
+      })),
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 
-  findExtensionRequestsByAssignment(assignmentId: string) {
-    return prisma.taskExtensionRequest.findMany({
-      where: { assignmentId },
-      select: extensionRequestSelect,
-      orderBy: { createdAt: "desc" },
-    });
-  }
-
-  countExtensionRequestsByAssignment(assignmentId: string) {
-    return prisma.taskExtensionRequest.count({
-      where: { assignmentId },
-    });
-  }
-
-  countExtensionRequestsByIntern(internId: string) {
-    return prisma.taskExtensionRequest.count({
-      where: { internId },
-    });
-  }
-
-  updateExtensionRequest(
+  updateExtensionRequestStatus(
     id: string,
     data: {
-      status?: ExtensionRequestStatus;
-      rejectionReason?: string | null;
-      reviewedBy?: string;
-      reviewedAt?: Date;
+      status: ExtensionRequestStatus;
+      rejectionReason?: string;
+      reviewedBy: string;
+      reviewedAt: Date;
     },
   ) {
     return prisma.taskExtensionRequest.update({
       where: { id },
-      data,
+      data: {
+        status: data.status,
+        rejectionReason: data.rejectionReason,
+        reviewedBy: data.reviewedBy,
+        reviewedAt: data.reviewedAt,
+      },
       select: extensionRequestSelect,
     });
+  }
+
+  countExtensionsOnTask(assignmentId: string): Promise<number> {
+    return prisma.taskExtensionRequest.count({
+      where: {
+        assignmentId,
+        status: ExtensionRequestStatus.APPROVED,
+      },
+    });
+  }
+
+  countExtensionsByUserId(userId: string): Promise<number> {
+    return prisma.taskExtensionRequest.count({
+      where: {
+        userId,
+        status: ExtensionRequestStatus.APPROVED,
+      },
+    });
+  }
+
+  countExtensionsByInternId(internId: string): Promise<number> {
+    return this.countExtensionsByUserId(internId);
   }
 
   createAuditLog(data: {
     actorId?: string;
     action: string;
     targetType: string;
-    targetId: string;
-    details?: Prisma.InputJsonValue;
+    targetId?: string;
+    details?: Record<string, unknown>;
     ipAddress?: string;
     userAgent?: string;
   }) {
     return activityLogRepository.create(data);
   }
+
+  async findUserById(userId: string) {
+    return prisma.user.findFirst({
+      where: { id: userId, deletedAt: null },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        isActive: true,
+        discordUsername: true,
+        discordUserId: true,
+        role: {
+          select: {
+            name: true,
+            portalType: true,
+          },
+        },
+        internshipProfile: {
+          include: { department: true, mentor: true },
+        },
+      },
+    });
+  }
+
+  async findInternshipProfileByUserId(userId: string) {
+    return prisma.internshipProfile.findUnique({
+      where: { userId },
+      select: {
+        id: true,
+        userId: true,
+        mentorId: true,
+        departmentId: true,
+        department: { select: { id: true, name: true } },
+      },
+    });
+  }
+
+  async findInternshipProfileById(profileId: string) {
+    return prisma.internshipProfile.findUnique({
+      where: { id: profileId },
+      select: { userId: true },
+    });
+  }
+
+  async isDepartmentManager(departmentId: string, userId: string): Promise<boolean> {
+    const mgr = await prisma.departmentManager.findUnique({
+      where: {
+        departmentId_userId: { departmentId, userId },
+      },
+      select: { userId: true },
+    });
+    return !!mgr;
+  }
+
+  async findManagedDepartmentIds(userId: string): Promise<string[]> {
+    const records = await prisma.departmentManager.findMany({
+      where: { userId },
+      select: { departmentId: true },
+    });
+    return records.map((r) => r.departmentId);
+  }
+
+  async findMenteeUserIds(mentorId: string): Promise<string[]> {
+    const records = await prisma.internshipProfile.findMany({
+      where: { mentorId },
+      select: { userId: true },
+    });
+    return records.map((r) => r.userId);
+  }
+
+  async isTaskGroupMember(taskGroupId: string, userId: string): Promise<boolean> {
+    const member = await prisma.taskGroupMember.findUnique({
+      where: {
+        taskGroupId_userId: { taskGroupId, userId },
+      },
+      select: { userId: true },
+    });
+    return !!member;
+  }
+
+  async findTaskById(taskId: string) {
+    return prisma.task.findFirst({
+      where: { id: taskId, deletedAt: null },
+      select: {
+        id: true,
+        code: true,
+        title: true,
+        deadline: true,
+        phase: true,
+        priority: true,
+        estDays: true,
+        taskGroupId: true,
+        taskGroup: {
+          select: {
+            id: true,
+            name: true,
+            departmentId: true,
+            maxWorkloadDays: true,
+            maxActiveTasks: true,
+          },
+        },
+        dependsOn: {
+          select: { id: true, title: true, code: true },
+        },
+      },
+    });
+  }
+
+  async findActiveAssignmentsForUser(
+    userId: string,
+    statuses: readonly string[],
+    excludeAssignmentId?: string,
+  ) {
+    return prisma.taskAssignment.findMany({
+      where: {
+        ...(excludeAssignmentId ? { id: { not: excludeAssignmentId } } : {}),
+        status: { in: statuses as any },
+        task: { deletedAt: null },
+        OR: [{ assigneeId: userId }, { supportId: userId }],
+      },
+      select: {
+        assigneeId: true,
+        supportId: true,
+        status: true,
+        task: {
+          select: {
+            id: true,
+            title: true,
+            estDays: true,
+          },
+        },
+      },
+    });
+  }
+
+  async findIncompleteDependencyAssignments(dependencyTaskIds: string[]) {
+    return prisma.taskAssignment.findMany({
+      where: {
+        taskId: { in: dependencyTaskIds },
+        status: { not: AssignmentStatus.DONE },
+      },
+      select: {
+        taskId: true,
+        status: true,
+        task: { select: { title: true, code: true } },
+      },
+    });
+  }
+
+  async approveExtensionInTransaction(params: {
+    requestId: string;
+    assignmentId: string;
+    taskId: string;
+    proposedDeadline: Date;
+    actorId: string;
+    oldDeadline?: Date;
+    extensionDays?: number;
+    ipAddress?: string;
+  }) {
+    return prisma.$transaction(async (tx) => {
+      const updatedReq = await tx.taskExtensionRequest.update({
+        where: { id: params.requestId },
+        data: {
+          status: ExtensionRequestStatus.APPROVED,
+          reviewedBy: params.actorId,
+          reviewedAt: new Date(),
+        },
+        select: extensionRequestSelect,
+      });
+
+      await tx.task.update({
+        where: { id: params.taskId },
+        data: { deadline: params.proposedDeadline },
+      });
+
+      await tx.taskAssignment.update({
+        where: { id: params.assignmentId },
+        data: { status: AssignmentStatus.IN_PROGRESS },
+      });
+
+      await activityLogRepository.create({
+        actorId: params.actorId,
+        action: "APPROVE_TASK_EXTENSION",
+        targetType: "TASK_EXTENSION_REQUEST",
+        targetId: params.requestId,
+        details: {
+          assignmentId: params.assignmentId,
+          taskId: params.taskId,
+          oldDeadline: params.oldDeadline,
+          newDeadline: params.proposedDeadline,
+          extensionDays: params.extensionDays,
+        },
+        ipAddress: params.ipAddress,
+      });
+
+      return updatedReq;
+    });
+  }
+
+  async rejectExtensionInTransaction(params: {
+    requestId: string;
+    assignmentId: string;
+    taskId?: string;
+    reason: string;
+    actorId: string;
+    ipAddress?: string;
+  }) {
+    return prisma.$transaction(async (tx) => {
+      const updatedReq = await tx.taskExtensionRequest.update({
+        where: { id: params.requestId },
+        data: {
+          status: ExtensionRequestStatus.REJECTED,
+          rejectionReason: params.reason,
+          reviewedBy: params.actorId,
+          reviewedAt: new Date(),
+        },
+        select: extensionRequestSelect,
+      });
+
+      await tx.taskAssignment.update({
+        where: { id: params.assignmentId },
+        data: { status: AssignmentStatus.IN_PROGRESS },
+      });
+
+      await activityLogRepository.create({
+        actorId: params.actorId,
+        action: "REJECT_TASK_EXTENSION",
+        targetType: "TASK_EXTENSION_REQUEST",
+        targetId: params.requestId,
+        details: {
+          assignmentId: params.assignmentId,
+          taskId: params.taskId,
+          rejectionReason: params.reason,
+        },
+        ipAddress: params.ipAddress,
+      });
+
+      return updatedReq;
+    });
+  }
 }
+
+export const taskAssignmentRepository = new TaskAssignmentRepository();

@@ -770,6 +770,19 @@ export class CronService {
             department: { select: { id: true, name: true } },
           },
         },
+        targetUser: {
+          select: {
+            id: true,
+            fullName: true,
+            discordUsername: true,
+            internshipProfile: {
+              select: {
+                internCode: true,
+                department: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
       },
       orderBy: { score: "desc" },
       take: 3,
@@ -777,12 +790,12 @@ export class CronService {
 
     const topInterns = evaluations.map((ev, idx) => ({
       rank: idx + 1,
-      fullName: ev.intern.fullName,
-      internCode: ev.intern.internCode,
-      departmentName: ev.intern.department?.name,
+      fullName: ev.intern?.fullName || ev.targetUser?.fullName || "Thực tập sinh",
+      internCode: ev.intern?.internCode || ev.targetUser?.internshipProfile?.internCode || null,
+      departmentName: ev.intern?.department?.name || ev.targetUser?.internshipProfile?.department?.name,
       score: ev.score,
       strengths: ev.strengths,
-      discordUsername: ev.intern.discordUsername,
+      discordUsername: ev.intern?.discordUsername || ev.targetUser?.discordUsername || null,
     }));
 
     const sent = await discordWebhookService.notifyWeeklyLeaderboard({

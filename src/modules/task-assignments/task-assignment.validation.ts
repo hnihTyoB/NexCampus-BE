@@ -11,6 +11,7 @@ export const assignTaskIdParamSchema = z.object({
 
 export const findAllAssignmentSchema = z.object({
   taskId: z.string().uuid().optional(),
+  assigneeId: z.string().uuid().optional(),
   internId: z.string().uuid().optional(),
   assignedBy: z.string().uuid().optional(),
   leaderId: z.string().uuid().optional(),
@@ -35,28 +36,50 @@ export const findAllAssignmentSchema = z.object({
 export const createAssignmentSchema = z
   .object({
     taskId: z.string().uuid("Invalid taskId"),
-    internId: z.string().uuid("Invalid internId"),
+    assigneeId: z.string().uuid("Invalid assigneeId").optional(),
+    internId: z.string().uuid("Invalid internId").optional(),
     internEmail: z.string().trim().email("Invalid intern email").max(255).optional(),
     supportId: z.string().uuid("Invalid supportId").nullable().optional(),
   })
   .refine(
-    (data) => !data.supportId || data.supportId !== data.internId,
+    (data) => !!(data.assigneeId || data.internId),
     {
-      message: "Owner and Support must be different interns",
+      message: "assigneeId hoặc internId là bắt buộc",
+      path: ["assigneeId"],
+    },
+  )
+  .refine(
+    (data) => {
+      const targetId = data.assigneeId || data.internId;
+      return !data.supportId || data.supportId !== targetId;
+    },
+    {
+      message: "Owner và Support phải là 2 người dùng khác nhau",
       path: ["supportId"],
     },
   );
 
 export const assignTaskSchema = z
   .object({
-    internId: z.string().uuid("Invalid internId"),
+    assigneeId: z.string().uuid("Invalid assigneeId").optional(),
+    internId: z.string().uuid("Invalid internId").optional(),
     internEmail: z.string().trim().email("Invalid intern email").max(255).optional(),
     supportId: z.string().uuid("Invalid supportId").nullable().optional(),
   })
   .refine(
-    (data) => !data.supportId || data.supportId !== data.internId,
+    (data) => !!(data.assigneeId || data.internId),
     {
-      message: "Owner and Support must be different interns",
+      message: "assigneeId hoặc internId là bắt buộc",
+      path: ["assigneeId"],
+    },
+  )
+  .refine(
+    (data) => {
+      const targetId = data.assigneeId || data.internId;
+      return !data.supportId || data.supportId !== targetId;
+    },
+    {
+      message: "Owner và Support phải là 2 người dùng khác nhau",
       path: ["supportId"],
     },
   );
@@ -74,6 +97,7 @@ export const updateAssignmentSchema = z
       ])
       .optional(),
     blockedReason: z.string().trim().min(1).max(2000).optional(),
+    assigneeId: z.string().uuid().optional(),
     internId: z.string().uuid().optional(),
     internEmail: z.string().trim().email("Invalid intern email").max(255).optional(),
     supportId: z.string().uuid().nullable().optional(),
@@ -81,10 +105,11 @@ export const updateAssignmentSchema = z
   .refine(
     (data) =>
       data.status !== undefined ||
+      data.assigneeId !== undefined ||
       data.internId !== undefined ||
       data.supportId !== undefined,
     {
-      message: "At least one field (status, internId, or supportId) must be provided for update",
+      message: "At least one field (status, assigneeId/internId, or supportId) must be provided for update",
     },
   )
   .refine(
@@ -106,12 +131,12 @@ export const updateAssignmentSchema = z
     },
   )
   .refine(
-    (data) =>
-      !data.supportId ||
-      !data.internId ||
-      data.supportId !== data.internId,
+    (data) => {
+      const targetId = data.assigneeId || data.internId;
+      return !data.supportId || !targetId || data.supportId !== targetId;
+    },
     {
-      message: "Owner and Support must be different interns",
+      message: "Owner và Support phải là 2 người dùng khác nhau",
       path: ["supportId"],
     },
   );
@@ -129,14 +154,14 @@ export const extensionRequestIdParamSchema = z.object({
 });
 
 export const requestTaskExtensionSchema = z.object({
-  proposedDeadline: z.string().trim().min(1, "proposedDeadline is required"),
-  extensionDays: z.coerce.number().int().min(1, "Số ngày gia hạn tối thiểu là 1").max(90, "Số ngày gia hạn không được vượt quá 90 ngày"),
-  reason: z.string().trim().min(5, "Lý do xin gia hạn tối thiểu 5 ký tự").max(2000, "Lý do không được vượt quá 2000 ký tự"),
-  commitmentPlan: z.string().trim().min(5, "Kế hoạch cam kết tối thiểu 5 ký tự").max(2000, "Kế hoạch cam kết không được vượt quá 2000 ký tự"),
+  proposedDeadline: z.string().datetime("proposedDeadline must be an ISO-8601 datetime string"),
+  extensionDays: z.coerce.number().int().positive("extensionDays must be a positive integer"),
+  reason: z.string().trim().min(1, "reason is required").max(2000),
+  commitmentPlan: z.string().trim().min(1, "commitmentPlan is required").max(2000),
 });
 
 export const rejectTaskExtensionSchema = z.object({
-  rejectionReason: z.string().trim().min(1, "Lý do từ chối là bắt buộc").max(2000, "Lý do không được vượt quá 2000 ký tự"),
+  rejectionReason: z.string().trim().min(1, "rejectionReason is required").max(2000),
 });
 
 export const queryExtensionRequestsSchema = z.object({
@@ -145,6 +170,5 @@ export const queryExtensionRequestsSchema = z.object({
   assignmentId: z.string().uuid().optional(),
   taskId: z.string().uuid().optional(),
   page: z.coerce.number().int().positive().optional().default(1),
-  limit: z.coerce.number().int().min(1).max(200).optional().default(20),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
 });
-

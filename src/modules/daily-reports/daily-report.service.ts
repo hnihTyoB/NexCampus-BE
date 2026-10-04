@@ -12,7 +12,6 @@ import {
   UploadReportAttachmentUrlResponseDto,
 } from "./daily-report.dto";
 import { R2Service } from "../../common/services/r2.service";
-import { prisma } from "../../database/prisma.client";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import { PERMISSIONS } from "../../common/constants/permission.constant";
@@ -31,6 +30,7 @@ interface UserPayload {
   id: string;
   email: string;
   role: string;
+  portalType?: string;
 }
 
 export class DailyReportService {
@@ -43,9 +43,49 @@ export class DailyReportService {
     );
     return (
       callerPerms.has(PERMISSIONS.DAILY_REPORT_DELETE) ||
+      callerPerms.has(PERMISSIONS.DAILY_REPORT_UPDATE) ||
       callerPerms.has(PERMISSIONS.ROLE_READ) ||
       callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN)
     );
+  }
+
+  /**
+   * Kiểm tra quyền quản lý/người hướng dẫn đối với một user mục tiêu
+   */
+  private async isManagerOrMentorOfUser(
+    actorId: string,
+    targetUserId: string,
+  ): Promise<boolean> {
+    if (actorId === targetUserId) {
+      return true;
+    }
+
+    const hasGlobal = await this.hasGlobalAccess(actorId);
+    if (hasGlobal) {
+      return true;
+    }
+
+    // Kiểm tra hồ sơ thực tập sinh của target user
+    const profile = await this.repository.findInternshipProfileByUserId(targetUserId);
+
+    if (!profile) {
+      return false;
+    }
+
+    // 1. Kiểm tra trực tiếp mentor
+    if (profile.mentorId === actorId) {
+      return true;
+    }
+
+    // 2. Kiểm tra nếu actor là người quản lý phòng ban của target user
+    if (profile.departmentId) {
+      const isMgr = await this.repository.isDepartmentManager(profile.departmentId, actorId);
+      if (isMgr) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   async submitReport(
@@ -53,60 +93,45 @@ export class DailyReportService {
     actor: UserPayload,
     context?: { ipAddress?: string },
   ) {
-    let internId: string;
+    const targetUserId = dto.userId || dto.internId || actor.id;
 
-    const intern = await prisma.intern.findUnique({
-      where: { userId: actor.id },
-    });
-    if (intern && !dto.internId) {
-      internId = intern.id;
-    } else if (dto.internId) {
-      const targetIntern = await prisma.intern.findUnique({
-        where: { id: dto.internId },
-      });
-      if (!targetIntern) {
+    // Nếu nộp báo cáo cho người khác, kiểm tra quyền
+    if (targetUserId !== actor.id) {
+      const isAllowed = await this.isManagerOrMentorOfUser(actor.id, targetUserId);
+      if (!isAllowed) {
         throw new AppError(
-          "Hồ sơ thực tập sinh không tồn tại",
-          404,
-          ERROR_CODE.NOT_FOUND,
-        );
-      }
-      const hasGlobal = await this.hasGlobalAccess(actor.id);
-      const isDirectLeader = targetIntern.leaderId === actor.id;
-      const isSelf = intern?.id === targetIntern.id;
-      if (!hasGlobal && !isDirectLeader && !isSelf) {
-        throw new AppError(
-          "Bạn không có quyền nộp báo cáo thay thực tập sinh này",
+          "Bạn không có quyền nộp báo cáo thay người dùng này",
           403,
           ERROR_CODE.FORBIDDEN,
         );
       }
-      internId = targetIntern.id;
-    } else if (intern) {
-      internId = intern.id;
-    } else {
+    }
+
+    // Kiểm tra target user có tồn tại và đang hoạt động không
+    const targetUser = await this.repository.findActiveUserById(targetUserId);
+    if (!targetUser) {
       throw new AppError(
-        "Cần truyền internId khi nộp báo cáo hộ",
-        400,
-        ERROR_CODE.BAD_REQUEST,
+        "Người dùng không tồn tại hoặc đã bị vô hiệu hóa",
+        404,
+        ERROR_CODE.NOT_FOUND,
       );
     }
 
-    // Determine calendar date in Asia/Ho_Chi_Minh
+    // Xác định ngày báo cáo theo múi giờ Việt Nam
     const reportDate = dto.date ? toCalendarDate(dto.date) : getVietnamToday();
 
-    // Check if report already exists for this intern and calendar date
-    const existing = await this.repository.findByInternAndDate(internId, reportDate);
+    // Kiểm tra xem báo cáo đã tồn tại trong ngày này chưa
+    const existing = await this.repository.findByUserAndDate(targetUserId, reportDate);
     const isUpdate = !!existing;
 
     const result = await this.repository.upsert(
-      internId,
+      targetUserId,
       reportDate,
       dto,
       actor.id,
     );
 
-    // Audit log
+    // Ghi nhận Audit Log
     await this.repository.createAuditLog({
       actorId: actor.id,
       action: isUpdate
@@ -115,6 +140,7 @@ export class DailyReportService {
       targetType: AUDIT_TARGET_TYPE.DAILY_REPORT,
       targetId: result?.id,
       details: {
+        targetUserId,
         reportDate: reportDate.toISOString().slice(0, 10),
         isUpdate,
       },
@@ -128,9 +154,6 @@ export class DailyReportService {
     input: UploadReportAttachmentUrlInput,
     actor: UserPayload,
   ): Promise<UploadReportAttachmentUrlResponseDto> {
-    const fileExt = input.fileName.includes(".")
-      ? input.fileName.slice(input.fileName.lastIndexOf("."))
-      : "";
     const baseName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
     const uniqueId = crypto.randomUUID();
     const key = `daily-reports/${uniqueId}_${baseName}`;
@@ -161,8 +184,12 @@ export class DailyReportService {
       );
     }
 
-    const hasGlobal = await this.hasGlobalAccess(actor.id);
-    if (!hasGlobal && report.intern?.user?.id !== actor.id) {
+    if (report.userId === actor.id) {
+      return report;
+    }
+
+    const isAllowed = await this.isManagerOrMentorOfUser(actor.id, report.userId);
+    if (!isAllowed) {
       throw new AppError(
         `Không có quyền ${actionDesc}`,
         403,
@@ -199,14 +226,7 @@ export class DailyReportService {
   ) {
     await this.verifyReportAccess(reportId, actor, "cập nhật video cho báo cáo này");
     const videoUrl = this.r2Service.getPublicUrl(filePath);
-    const updated = await prisma.dailyReport.update({
-      where: { id: reportId },
-      data: { videoDemo: videoUrl },
-      include: {
-        attachments: true,
-        intern: { include: { user: true } },
-      },
-    });
+    const updated = await this.repository.updateVideoDemo(reportId, videoUrl);
     return updated;
   }
 
@@ -237,108 +257,44 @@ export class DailyReportService {
   ) {
     await this.verifyReportAccess(reportId, actor, "thêm tệp đính kèm vào báo cáo này");
     const fileUrl = this.r2Service.getPublicUrl(data.filePath);
-    const attachment = await prisma.reportAttachment.create({
-      data: {
-        reportId,
-        fileName: data.fileName,
-        fileUrl,
-        filePath: data.filePath,
-        fileSize: data.fileSize,
-        mimeType: data.mimeType,
-        uploadedBy: actor.id,
-      },
+    const attachment = await this.repository.addAttachment({
+      reportId,
+      fileName: data.fileName,
+      fileUrl,
+      filePath: data.filePath,
+      fileSize: data.fileSize,
+      mimeType: data.mimeType,
+      uploadedBy: actor.id,
     });
     return attachment;
   }
 
   async findAll(query: DailyReportQueryDto, actor: UserPayload) {
     const hasGlobal = await this.hasGlobalAccess(actor.id);
-    if (!hasGlobal) {
-      const intern = await prisma.intern.findUnique({
-        where: { userId: actor.id },
-      });
-      if (intern) {
-        return this.repository.findAll(query, { internId: intern.id });
-      }
-
-      const leaderProfile = await prisma.leader.findUnique({
-        where: { userId: actor.id },
-        include: { departments: true },
-      });
-      if (leaderProfile) {
-        const leaderDepartmentIds =
-          leaderProfile.departments.map((d: { departmentId: string }) => d.departmentId) || [];
-        const directInterns = await prisma.intern.findMany({
-          where: { leaderId: actor.id, deletedAt: null },
-          select: { id: true },
-        });
-        const directInternIds = directInterns.map((i: { id: string }) => i.id);
-
-        return this.repository.findAll(query, {
-          isLeader: true,
-          leaderDepartmentIds,
-          directInternIds,
-        });
-      }
-
-      throw new AppError(
-        "Bạn không có quyền xem danh sách báo cáo ngày",
-        403,
-        ERROR_CODE.FORBIDDEN,
-      );
+    if (hasGlobal) {
+      return this.repository.findAll(query, { isAdmin: true });
     }
 
-    return this.repository.findAll(query, { isAdmin: true });
+    // Lấy các phòng ban mà actor làm quản lý và các user mà actor là mentor
+    const [departmentIds, mentoredUserIds] = await Promise.all([
+      this.repository.findManagedDepartmentIds(actor.id),
+      this.repository.findMenteeUserIds(actor.id),
+    ]);
+
+    if (departmentIds.length > 0 || mentoredUserIds.length > 0) {
+      return this.repository.findAll(query, {
+        isReviewer: true,
+        departmentIds,
+        mentoredUserIds,
+      });
+    }
+
+    // Nếu không quản lý phòng ban hay mentor ai, chỉ xem báo cáo của chính mình
+    return this.repository.findAll(query, { userId: actor.id });
   }
 
   async findById(id: string, actor: UserPayload) {
-    const report = await this.repository.findById(id);
-    if (!report) {
-      throw new AppError(
-        "Báo cáo ngày không tồn tại",
-        404,
-        ERROR_CODE.REPORT_NOT_FOUND,
-      );
-    }
-
-    const hasGlobal = await this.hasGlobalAccess(actor.id);
-    if (!hasGlobal) {
-      const intern = await prisma.intern.findUnique({
-        where: { userId: actor.id },
-      });
-      if (intern) {
-        if (report.internId !== intern.id) {
-          throw new AppError(
-            "Bạn không có quyền xem báo cáo này",
-            403,
-            ERROR_CODE.FORBIDDEN,
-          );
-        }
-      } else {
-        const isDirect = report.intern?.user?.id === actor.id || report.intern?.id === actor.id;
-        const leaderProfile = await prisma.leader.findUnique({
-          where: { userId: actor.id },
-          include: { departments: true },
-        });
-        const inDepartment = leaderProfile?.departments.some(
-          (d: { departmentId: string }) => d.departmentId === report.intern?.departmentId,
-        );
-
-        const directIntern = await prisma.intern.findFirst({
-          where: { id: report.internId, leaderId: actor.id },
-        });
-
-        if (!isDirect && !inDepartment && !directIntern) {
-          throw new AppError(
-            "Bạn không có quyền xem báo cáo của thực tập sinh này",
-            403,
-            ERROR_CODE.FORBIDDEN,
-          );
-        }
-      }
-    }
-
-    return report;
+    return this.verifyReportAccess(id, actor, "xem báo cáo này");
   }
 
   async update(
@@ -350,17 +306,12 @@ export class DailyReportService {
     const report = await this.findById(id, actor);
 
     const hasGlobal = await this.hasGlobalAccess(actor.id);
-    if (!hasGlobal) {
-      const intern = await prisma.intern.findUnique({
-        where: { userId: actor.id },
-      });
-      if (intern && report.internId !== intern.id) {
-        throw new AppError(
-          "Bạn chỉ được chỉnh sửa báo cáo của mình",
-          403,
-          ERROR_CODE.FORBIDDEN,
-        );
-      }
+    if (!hasGlobal && report.userId !== actor.id) {
+      throw new AppError(
+        "Bạn chỉ được chỉnh sửa báo cáo của mình",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
     }
 
     const updated = await this.repository.update(id, dto, actor.id);
@@ -388,17 +339,12 @@ export class DailyReportService {
     const report = await this.findById(id, actor);
 
     const hasGlobal = await this.hasGlobalAccess(actor.id);
-    if (!hasGlobal) {
-      const intern = await prisma.intern.findUnique({
-        where: { userId: actor.id },
-      });
-      if (intern && report.internId !== intern.id) {
-        throw new AppError(
-          "Bạn chỉ được xóa báo cáo của mình",
-          403,
-          ERROR_CODE.FORBIDDEN,
-        );
-      }
+    if (!hasGlobal && report.userId !== actor.id) {
+      throw new AppError(
+        "Bạn chỉ được xóa báo cáo của mình",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
     }
 
     await this.repository.softDelete(id);
@@ -425,6 +371,23 @@ export class DailyReportService {
   ) {
     const report = await this.findById(id, actor);
 
+    if (report.userId === actor.id) {
+      throw new AppError(
+        "Không thể tự nhận xét báo cáo của chính mình",
+        400,
+        ERROR_CODE.BAD_REQUEST,
+      );
+    }
+
+    const isAllowed = await this.isManagerOrMentorOfUser(actor.id, report.userId);
+    if (!isAllowed) {
+      throw new AppError(
+        "Bạn không có quyền đánh giá hoặc nhận xét báo cáo này",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
+    }
+
     const result = await this.repository.addFeedback(id, feedback, actor.id);
 
     await this.repository.createAuditLog({
@@ -434,7 +397,7 @@ export class DailyReportService {
       targetId: id,
       details: {
         reportId: id,
-        internName: report.intern?.fullName,
+        authorId: report.userId,
       },
       ipAddress: context?.ipAddress,
     });
@@ -446,69 +409,24 @@ export class DailyReportService {
     query: DailyReportCalendarQueryDto,
     actor: UserPayload,
   ): Promise<DailyReportCalendarResponseDto> {
-    let internId: string;
+    const targetUserId = query.userId || query.internId || actor.id;
 
-    const intern = await prisma.intern.findUnique({
-      where: { userId: actor.id },
-    });
-    if (intern && !query.internId) {
-      internId = intern.id;
-    } else {
-      if (!query.internId) {
-        if (intern) {
-          internId = intern.id;
-        } else {
-          throw new AppError(
-            "Vui lòng cung cấp internId cần xem lịch",
-            400,
-            ERROR_CODE.BAD_REQUEST,
-          );
-        }
-      } else {
-        internId = query.internId;
-
-        const targetIntern = await prisma.intern.findUnique({
-          where: { id: internId },
-          include: { department: true },
-        });
-        if (!targetIntern) {
-          throw new AppError(
-            "Hồ sơ thực tập sinh không tồn tại",
-            404,
-            ERROR_CODE.NOT_FOUND,
-          );
-        }
-
-        const hasGlobal = await this.hasGlobalAccess(actor.id);
-        if (!hasGlobal) {
-          const isDirect = targetIntern.leaderId === actor.id;
-          const leaderProfile = await prisma.leader.findUnique({
-            where: { userId: actor.id },
-            include: { departments: true },
-          });
-          const inDept = leaderProfile?.departments.some(
-            (d: { departmentId: string }) => d.departmentId === targetIntern.departmentId,
-          );
-
-          if (!isDirect && !inDept) {
-            throw new AppError(
-              "Bạn không có quyền xem lịch của thực tập sinh này",
-              403,
-              ERROR_CODE.FORBIDDEN,
-            );
-          }
-        }
+    if (targetUserId !== actor.id) {
+      const isAllowed = await this.isManagerOrMentorOfUser(actor.id, targetUserId);
+      if (!isAllowed) {
+        throw new AppError(
+          "Bạn không có quyền xem lịch của người dùng này",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
       }
     }
 
-    const internProfile = await prisma.intern.findUnique({
-      where: { id: internId },
-      select: { startDate: true, userId: true },
-    });
+    const targetUser = await this.repository.findUserWithProfile(targetUserId);
 
-    if (!internProfile) {
+    if (!targetUser) {
       throw new AppError(
-        "Hồ sơ thực tập sinh không tồn tại",
+        "Người dùng không tồn tại",
         404,
         ERROR_CODE.NOT_FOUND,
       );
@@ -517,36 +435,25 @@ export class DailyReportService {
     const year = query.year;
     const month = query.month;
 
-    // Date boundaries of the month in UTC representing Vietnam calendar days
+    // Giới hạn ngày trong tháng theo UTC đại diện cho ngày Việt Nam
     const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
     const startOfMonth = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
     const endOfMonth = new Date(Date.UTC(year, month - 1, daysInMonth, 23, 59, 59, 999));
 
     const [reports, approvedLeaves] = await Promise.all([
-      this.repository.findReportsByInternAndMonth(
-        internId,
+      this.repository.findReportsByUserAndMonth(
+        targetUserId,
         startOfMonth,
         endOfMonth,
       ),
-      prisma.absence.findMany({
-        where: {
-          userId: internProfile.userId,
-          status: "APPROVED",
-          startDate: { lte: endOfMonth },
-          endDate: { gte: startOfMonth },
-        },
-        select: {
-          id: true,
-          startDate: true,
-          endDate: true,
-          durationUnit: true,
-          reasonType: true,
-          reason: true,
-        },
-      }),
+      this.repository.findApprovedLeavesForMonth(
+        targetUserId,
+        startOfMonth,
+        endOfMonth,
+      ),
     ]);
 
-    // Map reports by YYYY-MM-DD
+    // Map báo cáo theo định dạng YYYY-MM-DD
     const reportMap = new Map<string, (typeof reports)[0]>();
     for (const r of reports) {
       const dStr = r.date.toISOString().slice(0, 10);
@@ -554,7 +461,9 @@ export class DailyReportService {
     }
 
     const todayVN = getVietnamToday();
-    const internStartVN = toCalendarDate(internProfile.startDate);
+    const userStartVN = targetUser.internshipProfile?.startDate
+      ? toCalendarDate(targetUser.internshipProfile.startDate)
+      : toCalendarDate(targetUser.createdAt);
     const workingDaysPerWeek = await systemSettingService.getWorkingDaysPerWeek();
 
     const days: CalendarDayDto[] = [];
@@ -564,13 +473,12 @@ export class DailyReportService {
 
     for (let d = 1; d <= daysInMonth; d++) {
       const dayDate = new Date(Date.UTC(year, month - 1, d, 0, 0, 0, 0));
-      const dayOfWeek = dayDate.getUTCDay(); // 0 = Sunday, 1 = Monday, ...
-      const isoDay = dayOfWeek === 0 ? 7 : dayOfWeek; // 1 = Monday, ..., 7 = Sunday
+      const dayOfWeek = dayDate.getUTCDay();
+      const isoDay = dayOfWeek === 0 ? 7 : dayOfWeek;
       const isWeekend = isoDay > workingDaysPerWeek;
       const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
       const report = reportMap.get(dateStr);
 
-      // Tìm xem ngày này có đơn nghỉ phép APPROVED không
       const matchingLeave = approvedLeaves.find((leave) => {
         const leaveStart = new Date(leave.startDate);
         leaveStart.setUTCHours(0, 0, 0, 0);
@@ -581,7 +489,7 @@ export class DailyReportService {
 
       let status: CalendarDayStatus;
 
-      if (dayDate.getTime() < internStartVN.getTime()) {
+      if (dayDate.getTime() < userStartVN.getTime()) {
         status = "OUT_OF_RANGE";
       } else if (isWeekend) {
         status = "WEEKEND";
@@ -590,13 +498,11 @@ export class DailyReportService {
         reportedDays++;
         totalWorkingDays++;
       } else if (matchingLeave) {
-        // Có đơn nghỉ phép đã duyệt nhưng không có report
         if (dayDate.getTime() > todayVN.getTime()) {
           status = "FUTURE";
         } else {
           status = "LEAVE_APPROVED";
           approvedLeaveDays++;
-          // Không cộng totalWorkingDays và không tăng missingDays để bảo vệ tỷ lệ chuyên cần
         }
       } else if (dayDate.getTime() > todayVN.getTime()) {
         status = "FUTURE";
@@ -624,7 +530,8 @@ export class DailyReportService {
         : 100;
 
     return {
-      internId,
+      userId: targetUserId,
+      internId: targetUserId,
       month,
       year,
       totalWorkingDays,
@@ -647,26 +554,26 @@ export class DailyReportService {
     }
 
     const hasGlobal = await this.hasGlobalAccess(actor.id);
-    if (!hasGlobal) {
-      if (attachment.report.intern?.userId !== actor.id) {
-        throw new AppError(
-          "Bạn chỉ được xóa tệp đính kèm thuộc báo cáo của mình",
-          403,
-          ERROR_CODE.FORBIDDEN,
-        );
-      }
+    if (!hasGlobal && attachment.report.userId !== actor.id) {
+      throw new AppError(
+        "Bạn chỉ được xóa tệp đính kèm thuộc báo cáo của mình",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
     }
 
-    // Delete from R2 object store
+    // Xóa từ R2 object storage nếu có cấu hình
     try {
       await this.r2Service.deleteFile(attachment.filePath);
     } catch (r2Err: any) {
       console.warn(`[DailyReportService] Could not delete R2 object ${attachment.filePath}:`, r2Err.message);
     }
 
-    // Delete from DB
+    // Xóa từ DB
     await this.repository.deleteAttachment(attachmentId);
 
     return { success: true, message: "Tệp đính kèm đã được xóa thành công" };
   }
 }
+
+export const dailyReportService = new DailyReportService();

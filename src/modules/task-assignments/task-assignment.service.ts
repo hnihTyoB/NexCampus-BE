@@ -7,7 +7,6 @@ import {
   AssignTaskDto,
   UpdateTaskAssignmentDto,
   RequestTaskExtensionDto,
-  RejectTaskExtensionDto,
   QueryExtensionRequestsDto,
 } from "./task-assignment.dto";
 import { PERMISSIONS } from "../../common/constants/permission.constant";
@@ -24,8 +23,7 @@ import {
   AUDIT_ACTION,
   AUDIT_TARGET_TYPE,
 } from "../../common/constants/audit-log.constant";
-import { AssignmentStatus, ExtensionRequestStatus } from "@prisma/client";
-import { prisma } from "../../database/prisma.client";
+import { AssignmentStatus } from "@prisma/client";
 import { notificationDispatcher } from "../../common/services/notification-dispatcher.service";
 import {
   NOTIFICATION_CHANNEL,
@@ -33,7 +31,6 @@ import {
 } from "../../common/constants/notification.constant";
 
 import { TaskRepository } from "../tasks/task.repository";
-import { InternRepository } from "../interns/intern.repository";
 import { discordWebhookService } from "../../common/services/discord-webhook.service";
 
 interface UserPayload {
@@ -45,7 +42,6 @@ interface UserPayload {
 export class TaskAssignmentService {
   private readonly repository = new TaskAssignmentRepository();
   private readonly taskRepository = new TaskRepository();
-  private readonly internRepository = new InternRepository();
 
   private ensureAssignmentEditable(status: AssignmentStatus) {
     if (status === ASSIGNMENT_STATUS.DONE) {
@@ -57,34 +53,75 @@ export class TaskAssignmentService {
     }
   }
 
-  private async ensureInternCapacity(
-    internId: string,
+  /**
+   * Helper phân giải ID thực tập sinh hoặc User ID sang User.id chuẩn
+   */
+  async resolveAssigneeUserId(assigneeOrInternId?: string | null): Promise<string | undefined> {
+    if (!assigneeOrInternId) return undefined;
+    const user = await this.repository.findUserById(assigneeOrInternId);
+    if (user) return user.id;
+
+    const profile = await this.repository.findInternshipProfileById(assigneeOrInternId);
+    if (profile) return profile.userId;
+
+    return assigneeOrInternId;
+  }
+
+  /**
+   * Kiểm tra xem actor có quyền quản lý / mentor đối với một user mục tiêu hoặc task không
+   */
+  private async isManagerOrMentor(
+    actorId: string,
+    targetUserId?: string | null,
+    departmentId?: string | null,
+  ): Promise<boolean> {
+    if (targetUserId && actorId === targetUserId) {
+      return true;
+    }
+
+    const callerPerms = new Set(
+      await permissionCacheService.getUserPermissions(actorId),
+    );
+    if (
+      callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_DELETE) ||
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN) ||
+      callerPerms.has(PERMISSIONS.ROLE_READ)
+    ) {
+      return true;
+    }
+
+    if (targetUserId) {
+      const profile = await this.repository.findInternshipProfileByUserId(targetUserId);
+      if (profile?.mentorId === actorId) {
+        return true;
+      }
+      if (profile?.departmentId) {
+        const isMgr = await this.repository.isDepartmentManager(profile.departmentId, actorId);
+        if (isMgr) return true;
+      }
+    }
+
+    if (departmentId) {
+      const isDeptMgr = await this.repository.isDepartmentManager(departmentId, actorId);
+      if (isDeptMgr) return true;
+    }
+
+    return false;
+  }
+
+  private async ensureAssigneeCapacity(
+    userId: string,
     task: { id: string; title: string; estDays: number | null },
     role: "OWNER" | "SUPPORT" = "OWNER",
     excludeAssignmentId?: string,
   ) {
     const [taskWithLimits, activeAssignments] = await Promise.all([
-      prisma.task.findFirst({
-        where: { id: task.id, deletedAt: null },
-        select: {
-          taskGroup: {
-            select: { maxWorkloadDays: true, maxActiveTasks: true },
-          },
-        },
-      }),
-      prisma.taskAssignment.findMany({
-        where: {
-          ...(excludeAssignmentId ? { id: { not: excludeAssignmentId } } : {}),
-          status: { in: [...ACTIVE_CAPACITY_STATUSES] },
-          task: { deletedAt: null },
-          OR: [{ internId }, { supportId: internId }],
-        },
-        select: {
-          internId: true,
-          supportId: true,
-          task: { select: { estDays: true } },
-        },
-      }),
+      this.repository.findTaskById(task.id),
+      this.repository.findActiveAssignmentsForUser(
+        userId,
+        ACTIVE_CAPACITY_STATUSES,
+        excludeAssignmentId,
+      ),
     ]);
 
     const maxWorkloadDays =
@@ -95,47 +132,43 @@ export class TaskAssignmentService {
       const days = assignment.task.estDays ?? DEFAULT_TASK_DAYS;
       return (
         total +
-        (assignment.internId === internId
+        (assignment.assigneeId === userId
           ? days
           : days * SUPPORT_WORKLOAD_FACTOR)
       );
     }, 0);
 
-    const factor = role === "OWNER" ? 1 : SUPPORT_WORKLOAD_FACTOR;
-    const taskDays = (task.estDays ?? DEFAULT_TASK_DAYS) * factor;
-    const nextWorkloadDays = currentWorkloadDays + taskDays;
-    const nextActiveTaskCount = activeAssignments.length + 1;
+    const taskEstDays = task.estDays ?? DEFAULT_TASK_DAYS;
+    const addedDays =
+      role === "OWNER" ? taskEstDays : taskEstDays * SUPPORT_WORKLOAD_FACTOR;
+    const newWorkloadDays = currentWorkloadDays + addedDays;
 
-    if (nextWorkloadDays > maxWorkloadDays) {
+    if (newWorkloadDays > maxWorkloadDays) {
       throw new AppError(
-        `Không thể giao task "${task.title}": TTS sẽ vượt giới hạn workload (${currentWorkloadDays}/${maxWorkloadDays} ngày hiện tại, task cần ${taskDays} ngày)`,
-        409,
-        ERROR_CODE.CONFLICT,
+        `Vượt quá tải trọng tối đa cho phép (${newWorkloadDays.toFixed(1)} / ${maxWorkloadDays} ngày)`,
+        400,
+        ERROR_CODE.CAPACITY_EXCEEDED,
       );
     }
 
-    if (nextActiveTaskCount > maxActiveTasks) {
+    if (activeAssignments.length >= maxActiveTasks) {
       throw new AppError(
-        `Không thể giao task "${task.title}": TTS đã đạt tối đa ${maxActiveTasks} task active`,
-        409,
-        ERROR_CODE.CONFLICT,
+        `Số lượng nhiệm vụ đang xử lý vượt quá giới hạn (${activeAssignments.length} / ${maxActiveTasks} nhiệm vụ)`,
+        400,
+        ERROR_CODE.CAPACITY_EXCEEDED,
       );
     }
   }
 
-  private async validateTaskGroupMembership(taskGroupId: string, internId: string) {
-    const membership = await prisma.taskGroupMember.findUnique({
-      where: {
-        taskGroupId_internId: {
-          taskGroupId,
-          internId,
-        },
-      },
-    });
+  private async validateTaskGroupMembership(
+    taskGroupId: string,
+    userId: string,
+  ) {
+    const isMember = await this.repository.isTaskGroupMember(taskGroupId, userId);
 
-    if (!membership) {
+    if (!isMember) {
       throw new AppError(
-        "Thực tập sinh được phân công phải thuộc danh sách thành viên của Task Group",
+        "Người dùng không thuộc nhóm nhiệm vụ này",
         400,
         ERROR_CODE.VALIDATION_ERROR,
       );
@@ -149,35 +182,25 @@ export class TaskAssignmentService {
       );
       const hasGlobalAccess =
         callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_DELETE) ||
-        callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+        callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN) ||
+        callerPerms.has(PERMISSIONS.ROLE_READ);
 
       if (!hasGlobalAccess) {
-        const intern = await prisma.intern.findUnique({
-          where: { userId: user.id },
-          select: { id: true },
-        });
-        if (intern) {
-          return this.repository.findAll(query, { internId: intern.id });
-        }
+        // Lấy danh sách phòng ban mà user quản lý và danh sách mentee
+        const [departmentIds, mentees] = await Promise.all([
+          this.repository.findManagedDepartmentIds(user.id),
+          this.repository.findMenteeUserIds(user.id),
+        ]);
 
-        const leader = await prisma.leader.findFirst({
-          where: { userId: user.id },
-          select: { departments: { select: { departmentId: true } } },
-        });
-        if (leader) {
-          const departmentIds =
-            leader.departments.map((d) => d.departmentId) ?? [];
+        if (departmentIds.length > 0 || mentees.length > 0) {
           return this.repository.findAll(query, {
             departmentIds,
             leaderUserId: user.id,
           });
         }
 
-        throw new AppError(
-          "Bạn không có quyền xem danh sách phân công công việc",
-          403,
-          ERROR_CODE.FORBIDDEN,
-        );
+        // Người dùng thông thường chỉ xem task được giao cho mình
+        return this.repository.findAll(query, { userId: user.id });
       }
     }
 
@@ -191,38 +214,22 @@ export class TaskAssignmentService {
     }
 
     if (user) {
-      const callerPerms = new Set(
-        await permissionCacheService.getUserPermissions(user.id),
-      );
-      const hasGlobalAccess =
-        callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_DELETE) ||
-        callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+      const isOwner = assignment.assigneeId === user.id || assignment.internId === user.id;
+      const isSupport = assignment.supportId === user.id;
+      const isAssigner = assignment.assignedBy === user.id;
 
-      if (!hasGlobalAccess) {
-        const intern = await prisma.intern.findUnique({
-          where: { userId: user.id },
-          select: { id: true },
-        });
-        if (intern) {
-          const isOwner = assignment.internId === intern.id;
-          const isSupport = assignment.supportId === intern.id;
-          if (!isOwner && !isSupport) {
-            throw new AppError(
-              "You are not authorized to view this assignment",
-              403,
-              ERROR_CODE.FORBIDDEN,
-            );
-          }
-        } else {
-          const isAssigner = assignment.assignedBy === user.id;
-          const isLeader = assignment.intern?.leaderId === user.id;
-          if (!isAssigner && !isLeader) {
-            throw new AppError(
-              "You are not authorized to view this assignment",
-              403,
-              ERROR_CODE.FORBIDDEN,
-            );
-          }
+      if (!isOwner && !isSupport && !isAssigner) {
+        const isAllowed = await this.isManagerOrMentor(
+          user.id,
+          assignment.assigneeId,
+          assignment.task?.taskGroup?.departmentId,
+        );
+        if (!isAllowed) {
+          throw new AppError(
+            "You are not authorized to view this assignment",
+            403,
+            ERROR_CODE.FORBIDDEN,
+          );
         }
       }
     }
@@ -236,23 +243,22 @@ export class TaskAssignmentService {
     actorRole?: string,
     context?: { ipAddress?: string },
   ) {
-    // 1. Check Task exists and not soft-deleted
-    const task = await prisma.task.findFirst({
-      where: { id: data.taskId, deletedAt: null },
-      include: {
-        taskGroup: { select: { id: true, departmentId: true } },
-      },
-    });
+    const assigneeUserId = await this.resolveAssigneeUserId(data.assigneeId || data.internId);
+    if (!assigneeUserId) {
+      throw new AppError("assigneeId hoặc internId là bắt buộc", 400, ERROR_CODE.VALIDATION_ERROR);
+    }
+    const supportUserId = await this.resolveAssigneeUserId(data.supportId);
+
+    // 1. Check Task
+    const task = await this.repository.findTaskById(data.taskId);
     if (!task) {
       throw new AppError("Task not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
-    // 2. Check Task Deadline
-    const deadlineDay = new Date(task.deadline);
-    deadlineDay.setHours(23, 59, 59, 999);
-    if (deadlineDay.getTime() < Date.now()) {
+    // 2. Deadline validation
+    if (new Date(task.deadline).getTime() < Date.now()) {
       throw new AppError(
-        "Task past deadline cannot be assigned",
+        "Cannot assign a task whose deadline has already passed",
         400,
         ERROR_CODE.VALIDATION_ERROR,
       );
@@ -260,24 +266,21 @@ export class TaskAssignmentService {
 
     // 3. Check Task Group Membership if task belongs to a task group
     if (task.taskGroupId) {
-      await this.validateTaskGroupMembership(task.taskGroupId, data.internId);
-      if (data.supportId) {
-        await this.validateTaskGroupMembership(task.taskGroupId, data.supportId);
+      await this.validateTaskGroupMembership(task.taskGroupId, assigneeUserId);
+      if (supportUserId) {
+        await this.validateTaskGroupMembership(task.taskGroupId, supportUserId);
       }
     }
 
-    // 4. Check Intern profile
-    const intern = await prisma.intern.findUnique({
-      where: { id: data.internId },
-      include: { user: { select: { id: true, email: true, isActive: true } } },
-    });
-    if (!intern || intern.deletedAt) {
-      throw new AppError("Intern profile not found", 404, ERROR_CODE.NOT_FOUND);
+    // 4. Check Assignee user & profile
+    const targetUser = await this.repository.findUserById(assigneeUserId);
+    if (!targetUser) {
+      throw new AppError("User not found", 404, ERROR_CODE.NOT_FOUND);
     }
 
-    if (intern.status !== "ACTIVE" || !intern.user.isActive) {
+    if (!targetUser.isActive) {
       throw new AppError(
-        "Chỉ có thể giao việc cho thực tập sinh đang active",
+        "Chỉ có thể giao việc cho người dùng đang active",
         400,
         ERROR_CODE.VALIDATION_ERROR,
       );
@@ -291,12 +294,13 @@ export class TaskAssignmentService {
       callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_APPROVE) ||
       callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
 
-    const isCrossTeam = intern.leaderId !== assignedBy;
+    const isDirectMentor = targetUser.internshipProfile?.mentorId === assignedBy;
+    const isCrossTeam = !isDirectMentor && assignedBy !== targetUser.id;
     if (!hasApprovePerm && isCrossTeam) {
       const confirmedEmail = data.internEmail?.toLowerCase().trim();
-      if (!confirmedEmail || confirmedEmail !== intern.user.email?.toLowerCase().trim()) {
+      if (!confirmedEmail || confirmedEmail !== targetUser.email?.toLowerCase().trim()) {
         throw new AppError(
-          "Email thực tập sinh là bắt buộc và phải khớp khi giao việc cho team khác",
+          "Email người dùng là bắt buộc và phải khớp khi giao việc cho team khác",
           400,
           ERROR_CODE.VALIDATION_ERROR,
         );
@@ -314,20 +318,17 @@ export class TaskAssignmentService {
     }
 
     // 7. Check Capacity
-    await this.ensureInternCapacity(data.internId, task, "OWNER");
+    await this.ensureAssigneeCapacity(assigneeUserId, task, "OWNER");
 
-    if (data.supportId) {
-      const supportIntern = await prisma.intern.findUnique({
-        where: { id: data.supportId },
-        include: { user: { select: { id: true, isActive: true } } },
-      });
-      if (!supportIntern || supportIntern.deletedAt) {
-        throw new AppError("Support Intern profile not found", 404, ERROR_CODE.NOT_FOUND);
+    if (supportUserId) {
+      const supportUser = await this.repository.findUserById(supportUserId);
+      if (!supportUser) {
+        throw new AppError("Support User not found", 404, ERROR_CODE.NOT_FOUND);
       }
-      if (supportIntern.status !== "ACTIVE" || !supportIntern.user.isActive) {
-        throw new AppError("Support Intern is not active", 400, ERROR_CODE.VALIDATION_ERROR);
+      if (!supportUser.isActive) {
+        throw new AppError("Support User is not active", 400, ERROR_CODE.VALIDATION_ERROR);
       }
-      await this.ensureInternCapacity(data.supportId, task, "SUPPORT");
+      await this.ensureAssigneeCapacity(supportUserId, task, "SUPPORT");
     }
 
     // 8. Determine status
@@ -336,14 +337,21 @@ export class TaskAssignmentService {
       status = ASSIGNMENT_STATUS.PENDING_APPROVAL;
     }
 
-    const result = await this.repository.create(data, assignedBy, status);
+    const assignmentData: CreateTaskAssignmentDto = {
+      taskId: data.taskId,
+      assigneeId: assigneeUserId,
+      internId: assigneeUserId,
+      supportId: supportUserId,
+    };
+
+    const result = await this.repository.create(assignmentData, assignedBy, status);
 
     // 9. Dispatch notification if auto-approved (TODO)
-    if (status === ASSIGNMENT_STATUS.TODO && intern.user.email) {
+    if (status === ASSIGNMENT_STATUS.TODO && targetUser.email) {
       try {
         await notificationDispatcher.send({
           channels: [NOTIFICATION_CHANNEL.WEB],
-          userId: intern.userId,
+          userId: targetUser.id,
           web: {
             type: NOTIFICATION_TYPE.INFO,
             title: "Công việc mới được phân công",
@@ -362,26 +370,26 @@ export class TaskAssignmentService {
       targetId: result.id,
       details: {
         taskId: task.id,
-        internId: intern.id,
+        assigneeId: assigneeUserId,
         status,
         isCrossTeam,
       },
       ipAddress: context?.ipAddress,
     });
 
-    // Bắn thông báo Discord Webhook thời gian thực vào kênh #task-board
+    // Discord Webhook
     try {
       await discordWebhookService.notifyTaskCreated({
         taskGroupId: task.taskGroupId,
-        departmentId: task.taskGroup?.departmentId || intern.departmentId,
+        departmentId: task.taskGroup?.departmentId || targetUser.internshipProfile?.departmentId,
         task: {
           id: task.id,
           code: task.code,
           title: task.title,
           deadline: task.deadline,
           priority: task.priority,
-          assigneeName: intern.fullName,
-          assigneeDiscordId: intern.discordUsername,
+          assigneeName: targetUser.fullName || targetUser.email || "Thực tập sinh",
+          assigneeDiscordId: targetUser.discordUsername,
         },
       });
     } catch (err: any) {
@@ -426,14 +434,6 @@ export class TaskAssignmentService {
   ) {
     const assignment = await this.findById(id);
 
-    if (!assignment.intern) {
-      throw new AppError(
-        "Intern profile associated with this assignment was not found",
-        404,
-        ERROR_CODE.NOT_FOUND,
-      );
-    }
-
     if (assignment.status !== ASSIGNMENT_STATUS.PENDING_APPROVAL) {
       throw new AppError(
         "Yêu cầu giao việc không ở trạng thái chờ duyệt",
@@ -442,7 +442,6 @@ export class TaskAssignmentService {
       );
     }
 
-    // Only Admin or the direct Leader of the intern is allowed to approve
     const callerPerms = new Set(
       await permissionCacheService.getUserPermissions(actorId),
     );
@@ -450,9 +449,14 @@ export class TaskAssignmentService {
       callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN) ||
       callerPerms.has(PERMISSIONS.ROLE_READ);
     const hasApprovePerm = callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_APPROVE);
-    const isDirectLeader = assignment.intern.leaderId === actorId;
 
-    if (!isGlobalAdmin && (!isDirectLeader || !hasApprovePerm)) {
+    const isAuthorized = await this.isManagerOrMentor(
+      actorId,
+      assignment.assigneeId,
+      assignment.task?.taskGroup?.departmentId,
+    );
+
+    if (!isGlobalAdmin && (!isAuthorized || !hasApprovePerm)) {
       throw new AppError(
         "Bạn không có quyền duyệt yêu cầu giao việc này",
         403,
@@ -460,26 +464,28 @@ export class TaskAssignmentService {
       );
     }
 
-    await this.ensureInternCapacity(
-      assignment.intern.id,
-      assignment.task,
-      "OWNER",
-      assignment.id,
-    );
+    if (assignment.assigneeId && assignment.task) {
+      await this.ensureAssigneeCapacity(
+        assignment.assigneeId,
+        assignment.task,
+        "OWNER",
+        assignment.id,
+      );
+    }
 
     const result = await this.repository.update(id, {
       status: ASSIGNMENT_STATUS.TODO,
     });
 
-    if (assignment.intern.user?.email) {
+    if (assignment.assignee?.email) {
       try {
         await notificationDispatcher.send({
           channels: [NOTIFICATION_CHANNEL.WEB],
-          userId: assignment.intern.userId,
+          userId: assignment.assignee.id,
           web: {
             type: NOTIFICATION_TYPE.INFO,
             title: "Yêu cầu giao việc đã được duyệt",
-            content: `Yêu cầu giao việc "${assignment.task.title}" đã được Leader phê duyệt.`,
+            content: `Yêu cầu giao việc "${assignment.task?.title}" đã được phê duyệt.`,
           },
         });
       } catch (e) {
@@ -492,7 +498,7 @@ export class TaskAssignmentService {
       action: AUDIT_ACTION.APPROVE_TASK_ASSIGNMENT,
       targetType: AUDIT_TARGET_TYPE.TASK_ASSIGNMENT,
       targetId: id,
-      details: { taskId: assignment.taskId, internId: assignment.internId },
+      details: { taskId: assignment.taskId, assigneeId: assignment.assigneeId },
       ipAddress: context?.ipAddress,
     });
 
@@ -508,14 +514,6 @@ export class TaskAssignmentService {
   ) {
     const assignment = await this.findById(id);
 
-    if (!assignment.intern) {
-      throw new AppError(
-        "Intern profile associated with this assignment was not found",
-        404,
-        ERROR_CODE.NOT_FOUND,
-      );
-    }
-
     if (assignment.status !== ASSIGNMENT_STATUS.PENDING_APPROVAL) {
       throw new AppError(
         "Yêu cầu giao việc không ở trạng thái chờ duyệt",
@@ -524,7 +522,6 @@ export class TaskAssignmentService {
       );
     }
 
-    // Only Admin or direct Leader can reject
     const callerPerms = new Set(
       await permissionCacheService.getUserPermissions(actorId),
     );
@@ -532,9 +529,14 @@ export class TaskAssignmentService {
       callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN) ||
       callerPerms.has(PERMISSIONS.ROLE_READ);
     const hasApprovePerm = callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_APPROVE);
-    const isDirectLeader = assignment.intern.leaderId === actorId;
 
-    if (!isGlobalAdmin && (!isDirectLeader || !hasApprovePerm)) {
+    const isAuthorized = await this.isManagerOrMentor(
+      actorId,
+      assignment.assigneeId,
+      assignment.task?.taskGroup?.departmentId,
+    );
+
+    if (!isGlobalAdmin && (!isAuthorized || !hasApprovePerm)) {
       throw new AppError(
         "Bạn không có quyền từ chối yêu cầu giao việc này",
         403,
@@ -543,7 +545,7 @@ export class TaskAssignmentService {
     }
 
     const rejectionReason =
-      reason || "Yêu cầu giao việc xuyên team đã bị Leader từ chối.";
+      reason || "Yêu cầu giao việc xuyên team đã bị từ chối.";
 
     const result = await this.repository.update(id, {
       status: ASSIGNMENT_STATUS.BLOCKED,
@@ -557,7 +559,7 @@ export class TaskAssignmentService {
       targetId: id,
       details: {
         taskId: assignment.taskId,
-        internId: assignment.internId,
+        assigneeId: assignment.assigneeId,
         reason: rejectionReason,
       },
       ipAddress: context?.ipAddress,
@@ -575,7 +577,6 @@ export class TaskAssignmentService {
   ) {
     const assignment = await this.findById(id);
 
-    // Lock check: DONE assignments cannot be modified!
     this.ensureAssignmentEditable(assignment.status);
 
     const callerPerms = new Set(
@@ -585,17 +586,19 @@ export class TaskAssignmentService {
       callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_DELETE) ||
       callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
 
-    const isOwnAssignment = assignment.intern?.userId === actorId;
+    const isOwnAssignment = assignment.assigneeId === actorId || assignment.internId === actorId;
     if (isOwnAssignment) {
       const canStartOwn =
         data.status === ASSIGNMENT_STATUS.IN_PROGRESS &&
         assignment.status === ASSIGNMENT_STATUS.TODO &&
+        data.assigneeId === undefined &&
         data.internId === undefined &&
         data.supportId === undefined;
       const canBlockOwn =
         data.status === ASSIGNMENT_STATUS.BLOCKED &&
         assignment.status === ASSIGNMENT_STATUS.IN_PROGRESS &&
         data.blockedReason !== undefined &&
+        data.assigneeId === undefined &&
         data.internId === undefined &&
         data.supportId === undefined;
 
@@ -608,47 +611,52 @@ export class TaskAssignmentService {
       }
     } else if (
       !hasGlobalUpdateAccess &&
-      (assignment.intern
-        ? assignment.intern.leaderId !== actorId && assignment.assignedBy !== actorId
-        : assignment.assignedBy !== actorId)
+      assignment.assignedBy !== actorId
     ) {
-      throw new AppError(
-        "Bạn không có quyền cập nhật phân công này",
-        403,
-        ERROR_CODE.FORBIDDEN,
+      const isAuthorized = await this.isManagerOrMentor(
+        actorId,
+        assignment.assigneeId,
+        assignment.task?.taskGroup?.departmentId,
       );
+      if (!isAuthorized) {
+        throw new AppError(
+          "Bạn không có quyền cập nhật phân công này",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
+      }
     }
 
-    // Reassigning intern check
-    if (data.internId !== undefined && data.internId !== assignment.internId) {
-      const newIntern = await prisma.intern.findUnique({
-        where: { id: data.internId },
-        include: { user: { select: { id: true, email: true, isActive: true } } },
-      });
-      if (!newIntern || newIntern.deletedAt) {
-        throw new AppError("Intern profile not found", 404, ERROR_CODE.NOT_FOUND);
+    const resolvedAssigneeId = await this.resolveAssigneeUserId(data.assigneeId || data.internId);
+    const resolvedSupportId = await this.resolveAssigneeUserId(data.supportId);
+
+    // Reassigning assignee check
+    if (resolvedAssigneeId !== undefined && resolvedAssigneeId !== assignment.assigneeId) {
+      const newAssignee = await this.repository.findUserById(resolvedAssigneeId);
+      if (!newAssignee) {
+        throw new AppError("User not found", 404, ERROR_CODE.NOT_FOUND);
       }
-      if (newIntern.status !== "ACTIVE" || !newIntern.user.isActive) {
+      if (!newAssignee.isActive) {
         throw new AppError(
-          "Chỉ có thể giao việc cho thực tập sinh đang active",
+          "Chỉ có thể giao việc cho người dùng đang active",
           400,
           ERROR_CODE.VALIDATION_ERROR,
         );
       }
 
-      if (assignment.task.taskGroupId) {
-        await this.validateTaskGroupMembership(assignment.task.taskGroupId, data.internId);
+      if (assignment.task?.taskGroupId) {
+        await this.validateTaskGroupMembership(assignment.task.taskGroupId, resolvedAssigneeId);
       }
 
-      const isCrossTeam = newIntern.leaderId !== actorId;
+      const isCrossTeam = newAssignee.internshipProfile?.mentorId !== actorId && actorId !== resolvedAssigneeId;
       const hasApprovePerm =
         callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_APPROVE) ||
         callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
       if (!hasApprovePerm && isCrossTeam) {
         const confirmedEmail = data.internEmail?.toLowerCase().trim();
-        if (!confirmedEmail || confirmedEmail !== newIntern.user.email?.toLowerCase().trim()) {
+        if (!confirmedEmail || confirmedEmail !== newAssignee.email?.toLowerCase().trim()) {
           throw new AppError(
-            "Email thực tập sinh là bắt buộc và phải khớp khi giao việc cho team khác",
+            "Email người dùng là bắt buộc và phải khớp khi giao việc cho team khác",
             400,
             ERROR_CODE.VALIDATION_ERROR,
           );
@@ -658,42 +666,50 @@ export class TaskAssignmentService {
         data.status = ASSIGNMENT_STATUS.TODO;
       }
 
-      await this.ensureInternCapacity(
-        data.internId,
-        assignment.task,
-        "OWNER",
-        assignment.id,
-      );
-    }
-
-    // Support intern check
-    if (data.supportId !== undefined && data.supportId !== assignment.supportId) {
-      if (data.supportId) {
-        const supportIntern = await prisma.intern.findUnique({
-          where: { id: data.supportId },
-          include: { user: { select: { id: true, isActive: true } } },
-        });
-        if (!supportIntern || supportIntern.deletedAt) {
-          throw new AppError("Support Intern profile not found", 404, ERROR_CODE.NOT_FOUND);
-        }
-        if (supportIntern.status !== "ACTIVE" || !supportIntern.user.isActive) {
-          throw new AppError("Support Intern is not active", 400, ERROR_CODE.VALIDATION_ERROR);
-        }
-
-        if (assignment.task.taskGroupId) {
-          await this.validateTaskGroupMembership(assignment.task.taskGroupId, data.supportId);
-        }
-
-        await this.ensureInternCapacity(
-          data.supportId,
+      if (assignment.task) {
+        await this.ensureAssigneeCapacity(
+          resolvedAssigneeId,
           assignment.task,
-          "SUPPORT",
+          "OWNER",
           assignment.id,
         );
       }
     }
 
-    const result = await this.repository.update(id, data);
+    // Support user check
+    if (resolvedSupportId !== undefined && resolvedSupportId !== assignment.supportId) {
+      if (resolvedSupportId) {
+        const supportUser = await this.repository.findUserById(resolvedSupportId);
+        if (!supportUser) {
+          throw new AppError("Support User not found", 404, ERROR_CODE.NOT_FOUND);
+        }
+        if (!supportUser.isActive) {
+          throw new AppError("Support User is not active", 400, ERROR_CODE.VALIDATION_ERROR);
+        }
+
+        if (assignment.task?.taskGroupId) {
+          await this.validateTaskGroupMembership(assignment.task.taskGroupId, resolvedSupportId);
+        }
+
+        if (assignment.task) {
+          await this.ensureAssigneeCapacity(
+            resolvedSupportId,
+            assignment.task,
+            "SUPPORT",
+            assignment.id,
+          );
+        }
+      }
+    }
+
+    const updatePayload: UpdateTaskAssignmentDto = {
+      ...data,
+      assigneeId: resolvedAssigneeId,
+      internId: resolvedAssigneeId,
+      supportId: resolvedSupportId,
+    };
+
+    const result = await this.repository.update(id, updatePayload);
 
     await this.repository.createAuditLog({
       actorId,
@@ -701,33 +717,11 @@ export class TaskAssignmentService {
       targetType: AUDIT_TARGET_TYPE.TASK_ASSIGNMENT,
       targetId: id,
       details: {
-        status: data.status,
-        internId: data.internId,
-        supportId: data.supportId,
+        taskId: assignment.taskId,
+        updatedFields: Object.keys(data),
       },
       ipAddress: context?.ipAddress,
     });
-
-    if (data.status === ASSIGNMENT_STATUS.BLOCKED) {
-      try {
-        const taskDetail = await this.taskRepository.findById(assignment.taskId);
-        const internName = assignment.intern?.fullName || "Thực tập sinh";
-
-        await discordWebhookService.notifyTaskBlocked({
-          taskGroupId: taskDetail?.taskGroupId,
-          departmentId: taskDetail?.taskGroup?.departmentId,
-          task: {
-            id: assignment.taskId,
-            code: taskDetail?.code,
-            title: taskDetail?.title || "Nhiệm vụ",
-            internName,
-            blockedReason: data.blockedReason || "Nhiệm vụ bị cản trở",
-          },
-        });
-      } catch (err: any) {
-        console.warn("[TaskAssignmentService] Failed to dispatch Discord task blocked:", err.message);
-      }
-    }
 
     return result;
   }
@@ -740,42 +734,42 @@ export class TaskAssignmentService {
   ) {
     const assignment = await this.findById(id);
 
+    this.ensureAssignmentEditable(assignment.status);
+
     const callerPerms = new Set(
       await permissionCacheService.getUserPermissions(actorId),
     );
-    const hasDeletePerm =
+    const hasGlobalDeleteAccess =
       callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_DELETE) ||
       callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
 
-    const isDirectLeader = assignment.intern?.leaderId === actorId;
-    const isAssignmentRequester = assignment.assignedBy === actorId;
-    if (
-      !hasDeletePerm &&
-      !isDirectLeader &&
-      !isAssignmentRequester
-    ) {
-      throw new AppError(
-        "Bạn không có quyền hủy phân công này",
-        403,
-        ERROR_CODE.FORBIDDEN,
+    if (!hasGlobalDeleteAccess && assignment.assignedBy !== actorId) {
+      const isAuthorized = await this.isManagerOrMentor(
+        actorId,
+        assignment.assigneeId,
+        assignment.task?.taskGroup?.departmentId,
       );
+      if (!isAuthorized) {
+        throw new AppError(
+          "Bạn không có quyền hủy phân công công việc này",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
+      }
     }
 
-    // Lock check: DONE assignments cannot be deleted / unassigned!
-    this.ensureAssignmentEditable(assignment.status);
-
-    const result = await this.repository.delete(id);
+    await this.repository.delete(id);
 
     await this.repository.createAuditLog({
       actorId,
       action: AUDIT_ACTION.DELETE_TASK_ASSIGNMENT,
       targetType: AUDIT_TARGET_TYPE.TASK_ASSIGNMENT,
       targetId: id,
-      details: { taskId: assignment.taskId, internId: assignment.internId },
+      details: { taskId: assignment.taskId, assigneeId: assignment.assigneeId },
       ipAddress: context?.ipAddress,
     });
 
-    return result;
+    return { message: "Task assignment removed successfully" };
   }
 
   async startTask(
@@ -795,19 +789,21 @@ export class TaskAssignmentService {
       );
     }
 
-    const intern = await prisma.intern.findUnique({
-      where: { userId: actor.id },
-    });
-    if (intern) {
-      const isOwner = assignment.internId === intern.id;
-      const isSupport = assignment.supportId === intern.id;
-      if (!isOwner && !isSupport) {
-        throw new AppError(
-          "Bạn chỉ có thể bắt đầu công việc được phân công cho mình",
-          403,
-          ERROR_CODE.FORBIDDEN,
-        );
-      }
+    const isOwner = assignment.assigneeId === actor.id || assignment.internId === actor.id;
+    const isSupport = assignment.supportId === actor.id;
+    const callerPerms = new Set(
+      await permissionCacheService.getUserPermissions(actor.id),
+    );
+    const hasGlobalAccess =
+      callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_DELETE) ||
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+
+    if (!isOwner && !isSupport && !hasGlobalAccess) {
+      throw new AppError(
+        "Bạn chỉ có thể bắt đầu công việc được phân công cho mình",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
     }
 
     const taskWithPrereqs = await this.taskRepository.findWithPrerequisites(
@@ -858,7 +854,6 @@ export class TaskAssignmentService {
 
     this.ensureAssignmentEditable(assignment.status);
 
-    // Ràng buộc bền vững: Intern chỉ báo blocked khi IN_PROGRESS
     if (assignment.status !== ASSIGNMENT_STATUS.IN_PROGRESS) {
       throw new AppError(
         "Chỉ công việc đang thực hiện (IN_PROGRESS) mới có thể báo bị chặn",
@@ -875,19 +870,21 @@ export class TaskAssignmentService {
       );
     }
 
-    const intern = await prisma.intern.findUnique({
-      where: { userId: actor.id },
-    });
-    if (intern) {
-      const isOwner = assignment.internId === intern.id;
-      const isSupport = assignment.supportId === intern.id;
-      if (!isOwner && !isSupport) {
-        throw new AppError(
-          "Bạn chỉ có thể báo bị chặn cho công việc được phân công cho mình",
-          403,
-          ERROR_CODE.FORBIDDEN,
-        );
-      }
+    const isOwner = assignment.assigneeId === actor.id || assignment.internId === actor.id;
+    const isSupport = assignment.supportId === actor.id;
+    const callerPerms = new Set(
+      await permissionCacheService.getUserPermissions(actor.id),
+    );
+    const hasGlobalAccess =
+      callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_DELETE) ||
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+
+    if (!isOwner && !isSupport && !hasGlobalAccess) {
+      throw new AppError(
+        "Bạn chỉ có thể báo bị chặn cho công việc được phân công cho mình",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
     }
 
     const result = await this.repository.update(id, {
@@ -900,29 +897,12 @@ export class TaskAssignmentService {
       action: AUDIT_ACTION.BLOCK_TASK,
       targetType: AUDIT_TARGET_TYPE.TASK_ASSIGNMENT,
       targetId: id,
-      details: { taskId: assignment.taskId, blockedReason: blockedReason.trim() },
+      details: {
+        taskId: assignment.taskId,
+        blockedReason: blockedReason.trim(),
+      },
       ipAddress: context?.ipAddress,
     });
-
-    // Bắn thông báo Discord Webhook thời gian thực vào kênh #task-board (cảnh báo đỏ Neon)
-    try {
-      const taskDetail = await this.taskRepository.findById(assignment.taskId);
-      const internName = assignment.intern?.fullName || "Thực tập sinh";
-
-      await discordWebhookService.notifyTaskBlocked({
-        taskGroupId: taskDetail?.taskGroupId,
-        departmentId: taskDetail?.taskGroup?.departmentId,
-        task: {
-          id: assignment.taskId,
-          code: taskDetail?.code,
-          title: taskDetail?.title || "Nhiệm vụ",
-          internName,
-          blockedReason: blockedReason.trim(),
-        },
-      });
-    } catch (err: any) {
-      console.warn("[TaskAssignmentService] Failed to dispatch Discord task blocked:", err.message);
-    }
 
     return result;
   }
@@ -938,25 +918,24 @@ export class TaskAssignmentService {
 
     if (assignment.status !== ASSIGNMENT_STATUS.BLOCKED) {
       throw new AppError(
-        "Chỉ công việc đang bị chặn (BLOCKED) mới có thể mở lại",
+        "Chỉ công việc đang bị chặn (BLOCKED) mới có thể bỏ chặn",
         400,
         ERROR_CODE.INVALID_STATUS_TRANSITION,
       );
     }
 
-    // Ràng buộc bền vững: Chỉ Leader trực tiếp hoặc Admin mới có quyền thao tác (Intern không được tự mở)
-    const isDirectLeader = assignment.intern?.leaderId === actor.id;
+    const isOwner = assignment.assigneeId === actor.id || assignment.internId === actor.id;
+    const isSupport = assignment.supportId === actor.id;
     const callerPerms = new Set(
       await permissionCacheService.getUserPermissions(actor.id),
     );
-    const hasAdminPerm =
+    const hasGlobalAccess =
       callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_DELETE) ||
-      callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_APPROVE) ||
       callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
 
-    if (!hasAdminPerm && !isDirectLeader) {
+    if (!isOwner && !isSupport && !hasGlobalAccess) {
       throw new AppError(
-        "Chỉ Leader trực tiếp hoặc Admin mới có quyền mở lại task bị chặn",
+        "Bạn chỉ có thể bỏ chặn cho công việc được phân công cho mình",
         403,
         ERROR_CODE.FORBIDDEN,
       );
@@ -972,14 +951,15 @@ export class TaskAssignmentService {
       action: AUDIT_ACTION.UNBLOCK_TASK,
       targetType: AUDIT_TARGET_TYPE.TASK_ASSIGNMENT,
       targetId: id,
-      details: { taskId: assignment.taskId, status: ASSIGNMENT_STATUS.IN_PROGRESS },
+      details: {
+        taskId: assignment.taskId,
+        previousBlockedReason: assignment.blockedReason,
+      },
       ipAddress: context?.ipAddress,
     });
 
     return result;
   }
-
-  // ─── Task Extension Request Workflows ────────────────────────────────────────
 
   async requestExtension(
     id: string,
@@ -999,24 +979,17 @@ export class TaskAssignmentService {
       );
     }
 
-    const intern = await prisma.intern.findUnique({
-      where: { userId: actor.id },
-    });
-    if (intern) {
-      const isOwner = assignment.internId === intern.id;
-      const isSupport = assignment.supportId === intern.id;
-      if (!isOwner && !isSupport) {
-        throw new AppError(
-          "Bạn chỉ có thể xin gia hạn cho công việc được phân công cho mình",
-          403,
-          ERROR_CODE.FORBIDDEN,
-        );
-      }
+    const isOwner = assignment.assigneeId === actor.id || assignment.internId === actor.id;
+    const isSupport = assignment.supportId === actor.id;
+    if (!isOwner && !isSupport) {
+      throw new AppError(
+        "Bạn chỉ có thể xin gia hạn cho công việc được phân công cho mình",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
     }
 
-    const task = await prisma.task.findUnique({
-      where: { id: assignment.taskId },
-    });
+    const task = await this.repository.findTaskById(assignment.taskId);
     if (!task) {
       throw new AppError("Công việc không tồn tại", 404, ERROR_CODE.NOT_FOUND);
     }
@@ -1049,18 +1022,11 @@ export class TaskAssignmentService {
       );
     }
 
-    const internId = assignment.internId || intern?.id;
-    if (!internId) {
-      throw new AppError(
-        "Công việc chưa được gán cho thực tập sinh nào",
-        400,
-        ERROR_CODE.BAD_REQUEST,
-      );
-    }
+    const targetUserId = assignment.assigneeId || actor.id;
 
     const extensionRequest = await this.repository.createExtensionRequest({
       assignmentId: id,
-      internId,
+      userId: targetUserId,
       currentDeadline,
       proposedDeadline: proposedDate,
       extensionDays: dto.extensionDays,
@@ -1088,12 +1054,10 @@ export class TaskAssignmentService {
       ipAddress: context?.ipAddress,
     });
 
-    // Bắn thông báo Discord Webhook tới Leader kèm Link Button duyệt nhanh
+    // Discord Webhook
     try {
-      const [taskDetail, internDetail] = await Promise.all([
-        this.taskRepository.findById(assignment.taskId),
-        this.internRepository.findById(internId),
-      ]);
+      const taskDetail = await this.taskRepository.findById(assignment.taskId);
+      const userDetail = await this.repository.findUserById(targetUserId);
 
       await discordWebhookService.notifyTaskExtensionRequested({
         departmentId: taskDetail?.taskGroup?.departmentId,
@@ -1103,13 +1067,13 @@ export class TaskAssignmentService {
           id: assignment.taskId,
           code: taskDetail?.code,
           title: taskDetail?.title || "Nhiệm vụ",
-          internName: internDetail?.fullName || internDetail?.user?.fullName || "Thực tập sinh",
+          internName: userDetail?.fullName || userDetail?.email || "Thực tập sinh",
           extensionDays: dto.extensionDays,
           proposedDeadline: proposedDate,
           reason: dto.reason.trim(),
           commitmentPlan: dto.commitmentPlan?.trim(),
-          leaderDiscordId: internDetail?.leader?.discordUserId || internDetail?.leader?.discordUsername,
-          leaderName: internDetail?.leader?.fullName,
+          leaderDiscordId: userDetail?.internshipProfile?.mentor?.discordUserId,
+          leaderName: userDetail?.internshipProfile?.mentor?.fullName || undefined,
         },
       });
     } catch (err: any) {
@@ -1118,8 +1082,8 @@ export class TaskAssignmentService {
 
     const [totalExtensionsOnTask, totalExtensionsInInternship] =
       await Promise.all([
-        this.repository.countExtensionRequestsByAssignment(id),
-        this.repository.countExtensionRequestsByIntern(internId),
+        this.repository.countExtensionsOnTask(id),
+        this.repository.countExtensionsByUserId(targetUserId),
       ]);
 
     return {
@@ -1140,27 +1104,28 @@ export class TaskAssignmentService {
       callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_APPROVE) ||
       callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
 
-    let scope: { internId?: string; leaderUserId?: string } | undefined;
-    const intern = await prisma.intern.findUnique({
-      where: { userId: actor.id },
-    });
+    let scope: { userId?: string; departmentIds?: string[]; leaderUserId?: string } | undefined;
 
-    if (intern) {
-      scope = { internId: intern.id };
-    } else if (!hasAdminPerm) {
-      scope = { leaderUserId: actor.id };
+    if (!hasAdminPerm) {
+      const managedDeptIds = await this.repository.findManagedDepartmentIds(actor.id);
+      if (managedDeptIds.length > 0) {
+        scope = {
+          departmentIds: managedDeptIds,
+          leaderUserId: actor.id,
+        };
+      } else {
+        scope = { userId: actor.id };
+      }
     }
 
     const result = await this.repository.findExtensionRequests(query, scope);
 
     const enrichedItems = await Promise.all(
-      result.items.map(async (item) => {
+      result.data.map(async (item) => {
         const [totalExtensionsOnTask, totalExtensionsInInternship] =
           await Promise.all([
-            this.repository.countExtensionRequestsByAssignment(
-              item.assignmentId,
-            ),
-            this.repository.countExtensionRequestsByIntern(item.internId),
+            this.repository.countExtensionsOnTask(item.assignmentId),
+            this.repository.countExtensionsByUserId(item.userId || item.internId || ""),
           ]);
         return {
           ...item,
@@ -1180,24 +1145,7 @@ export class TaskAssignmentService {
     assignmentId: string,
     actor: UserPayload,
   ) {
-    const assignment = await this.findById(assignmentId);
-    const items =
-      await this.repository.findExtensionRequestsByAssignment(assignmentId);
-
-    const internId = assignment.internId;
-    const totalExtensionsInInternship = internId
-      ? await this.repository.countExtensionRequestsByIntern(internId)
-      : items.length;
-
-    return {
-      items: items.map((item) => ({
-        ...item,
-        totalExtensionsOnTask: items.length,
-        totalExtensionsInInternship,
-      })),
-      totalExtensionsOnTask: items.length,
-      totalExtensionsInInternship,
-    };
+    return this.getExtensionRequests({ assignmentId } as QueryExtensionRequestsDto, actor);
   }
 
   async approveExtension(
@@ -1232,12 +1180,12 @@ export class TaskAssignmentService {
       callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_APPROVE) ||
       callerPerms.has(PERMISSIONS.TASK_UPDATE);
 
-    const internProfile = await prisma.intern.findUnique({
-      where: { id: request.internId },
-    });
-    const isDirectLeader = internProfile?.leaderId === actor.id;
+    const isAuthorized = await this.isManagerOrMentor(
+      actor.id,
+      request.userId,
+    );
 
-    if (!isGlobalAdmin && (!isDirectLeader || !hasApprovePerm)) {
+    if (!isGlobalAdmin && (!isAuthorized || !hasApprovePerm)) {
       throw new AppError(
         "Chỉ Leader trực tiếp hoặc Quản trị viên mới có quyền xét duyệt gia hạn",
         403,
@@ -1245,46 +1193,15 @@ export class TaskAssignmentService {
       );
     }
 
-    return await prisma.$transaction(async (tx) => {
-      const updatedRequest = await tx.taskExtensionRequest.update({
-        where: { id: requestId },
-        data: {
-          status: ExtensionRequestStatus.APPROVED,
-          reviewedBy: actor.id,
-          reviewedAt: new Date(),
-        },
-      });
-
-      await tx.task.update({
-        where: { id: request.assignment.taskId },
-        data: {
-          deadline: request.proposedDeadline,
-        },
-      });
-
-      await tx.taskAssignment.update({
-        where: { id: request.assignmentId },
-        data: {
-          status: ASSIGNMENT_STATUS.IN_PROGRESS,
-        },
-      });
-
-      await this.repository.createAuditLog({
-        actorId: actor.id,
-        action: AUDIT_ACTION.APPROVE_TASK_EXTENSION,
-        targetType: AUDIT_TARGET_TYPE.TASK_EXTENSION_REQUEST,
-        targetId: requestId,
-        details: {
-          assignmentId: request.assignmentId,
-          taskId: request.assignment.taskId,
-          oldDeadline: request.currentDeadline,
-          newDeadline: request.proposedDeadline,
-          extensionDays: request.extensionDays,
-        },
-        ipAddress: context?.ipAddress,
-      });
-
-      return updatedRequest;
+    return this.repository.approveExtensionInTransaction({
+      requestId,
+      assignmentId: request.assignmentId,
+      taskId: request.assignment.taskId,
+      proposedDeadline: request.proposedDeadline,
+      actorId: actor.id,
+      oldDeadline: request.currentDeadline,
+      extensionDays: request.extensionDays,
+      ipAddress: context?.ipAddress,
     });
   }
 
@@ -1321,12 +1238,12 @@ export class TaskAssignmentService {
       callerPerms.has(PERMISSIONS.TASK_ASSIGNMENT_APPROVE) ||
       callerPerms.has(PERMISSIONS.TASK_UPDATE);
 
-    const internProfile = await prisma.intern.findUnique({
-      where: { id: request.internId },
-    });
-    const isDirectLeader = internProfile?.leaderId === actor.id;
+    const isAuthorized = await this.isManagerOrMentor(
+      actor.id,
+      request.userId,
+    );
 
-    if (!isGlobalAdmin && (!isDirectLeader || !hasApprovePerm)) {
+    if (!isGlobalAdmin && (!isAuthorized || !hasApprovePerm)) {
       throw new AppError(
         "Chỉ Leader trực tiếp hoặc Quản trị viên mới có quyền từ chối gia hạn",
         403,
@@ -1334,38 +1251,15 @@ export class TaskAssignmentService {
       );
     }
 
-    return await prisma.$transaction(async (tx) => {
-      const updatedRequest = await tx.taskExtensionRequest.update({
-        where: { id: requestId },
-        data: {
-          status: ExtensionRequestStatus.REJECTED,
-          rejectionReason: rejectionReason.trim(),
-          reviewedBy: actor.id,
-          reviewedAt: new Date(),
-        },
-      });
-
-      await tx.taskAssignment.update({
-        where: { id: request.assignmentId },
-        data: {
-          status: ASSIGNMENT_STATUS.IN_PROGRESS,
-        },
-      });
-
-      await this.repository.createAuditLog({
-        actorId: actor.id,
-        action: AUDIT_ACTION.REJECT_TASK_EXTENSION,
-        targetType: AUDIT_TARGET_TYPE.TASK_EXTENSION_REQUEST,
-        targetId: requestId,
-        details: {
-          assignmentId: request.assignmentId,
-          taskId: request.assignment.taskId,
-          rejectionReason: rejectionReason.trim(),
-        },
-        ipAddress: context?.ipAddress,
-      });
-
-      return updatedRequest;
+    return this.repository.rejectExtensionInTransaction({
+      requestId,
+      assignmentId: request.assignmentId,
+      taskId: request.assignment.taskId,
+      reason: rejectionReason.trim(),
+      actorId: actor.id,
+      ipAddress: context?.ipAddress,
     });
   }
 }
+
+export const taskAssignmentService = new TaskAssignmentService();

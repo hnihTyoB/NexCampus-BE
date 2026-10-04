@@ -61,26 +61,27 @@ export class TaskSubmissionService {
 
     const hasGlobal = await this.hasGlobalAccess(actor.id);
     if (!hasGlobal) {
-      const intern = await prisma.intern.findUnique({
-        where: { userId: actor.id },
-        select: { id: true },
-      });
-      if (intern) {
-        scope = { internId: intern.id };
-      } else {
-        const leader = await prisma.leader.findFirst({
+      const [profile, managedDepts] = await Promise.all([
+        prisma.internshipProfile.findUnique({
           where: { userId: actor.id },
           select: { id: true },
-        });
-        if (leader) {
-          scope = { leaderUserId: actor.id };
-        } else {
-          throw new AppError(
-            "Bạn không có quyền xem danh sách bài nộp",
-            403,
-            ERROR_CODE.FORBIDDEN,
-          );
-        }
+        }),
+        prisma.departmentManager.findFirst({
+          where: { userId: actor.id },
+          select: { departmentId: true },
+        }),
+      ]);
+
+      if (profile) {
+        scope = { internId: actor.id };
+      } else if (managedDepts) {
+        scope = { leaderUserId: actor.id };
+      } else {
+        throw new AppError(
+          "Bạn không có quyền xem danh sách bài nộp",
+          403,
+          ERROR_CODE.FORBIDDEN,
+        );
       }
     }
 
@@ -99,22 +100,13 @@ export class TaskSubmissionService {
 
     const hasGlobal = await this.hasGlobalAccess(actor.id);
     if (!hasGlobal) {
-      const intern = await prisma.intern.findUnique({
-        where: { userId: actor.id },
-        select: { id: true },
-      });
-      if (intern) {
-        const isOwner = submission.assignment.internId === intern.id;
-        const isSupport = submission.assignment.supportId === intern.id;
-        if (!isOwner && !isSupport) {
-          throw new AppError("Forbidden", 403, ERROR_CODE.FORBIDDEN);
-        }
-      } else {
-        const isLeaderOfOwner = submission.assignment.intern?.leaderId === actor.id;
-        const isLeaderOfSupport = submission.assignment.support?.leaderId === actor.id;
-        if (!isLeaderOfOwner && !isLeaderOfSupport) {
-          throw new AppError("Forbidden", 403, ERROR_CODE.FORBIDDEN);
-        }
+      const isOwner = (submission.assignment as any)?.assigneeId === actor.id || (submission.assignment as any)?.internId === actor.id;
+      const isSupport = (submission.assignment as any)?.supportId === actor.id;
+      const isLeaderOfOwner = (submission.assignment.intern as any)?.leaderId === actor.id;
+      const isLeaderOfSupport = (submission.assignment.support as any)?.leaderId === actor.id;
+
+      if (!isOwner && !isSupport && !isLeaderOfOwner && !isLeaderOfSupport) {
+        throw new AppError("Forbidden", 403, ERROR_CODE.FORBIDDEN);
       }
     }
 
@@ -129,8 +121,8 @@ export class TaskSubmissionService {
     const assignment = await prisma.taskAssignment.findUnique({
       where: { id: dto.assignmentId },
       include: {
-        intern: true,
-        support: true,
+        assignee: { include: { internshipProfile: true } },
+        support: { include: { internshipProfile: true } },
         task: true,
       },
     });
@@ -155,11 +147,8 @@ export class TaskSubmissionService {
     // Permission check: only assigned intern (or admin/manager) can submit
     const hasGlobal = await this.hasGlobalAccess(actor.id);
     if (!hasGlobal) {
-      const intern = await prisma.intern.findUnique({
-        where: { userId: actor.id },
-      });
-      const isOwner = intern && assignment.internId === intern.id;
-      const isSupport = intern && assignment.supportId === intern.id;
+      const isOwner = assignment.assigneeId === actor.id;
+      const isSupport = assignment.supportId === actor.id;
       if (!isOwner && !isSupport) {
         throw new AppError(
           "Bạn chỉ được nộp bài cho công việc được phân công cho mình",
@@ -211,17 +200,17 @@ export class TaskSubmissionService {
     try {
       const taskDetail = await this.taskRepository.findById(assignment.taskId);
 
-      const leaderUser = assignment.intern?.leaderId
-        ? await this.userRepository.findById(assignment.intern.leaderId)
+      const leaderUser = assignment.assignee?.internshipProfile?.mentorId
+        ? await this.userRepository.findById(assignment.assignee.internshipProfile.mentorId)
         : null;
 
       await discordWebhookService.notifyTaskNeedsReview({
         taskGroupId: taskDetail?.taskGroupId,
-        departmentId: taskDetail?.taskGroup?.departmentId || assignment.intern?.departmentId,
+        departmentId: taskDetail?.taskGroup?.departmentId || assignment.assignee?.internshipProfile?.departmentId,
         task: {
           code: taskDetail?.code,
           title: taskDetail?.title || "Nhiệm vụ",
-          internName: assignment.intern?.fullName || "Thực tập sinh",
+          internName: assignment.assignee?.fullName || "Thực tập sinh",
           attempt: submission.attempt,
           prLink: dto.prLink,
           videoDemo: dto.videoDemo,
@@ -260,8 +249,8 @@ export class TaskSubmissionService {
 
     // Phân quyền: Quyền Leader trực tiếp hoặc Quản trị viên đánh giá
     const isDirectLeader =
-      submission.assignment?.intern?.leaderId === actor.id ||
-      submission.assignment?.support?.leaderId === actor.id;
+      (submission.assignment?.intern as any)?.leaderId === actor.id ||
+      (submission.assignment?.support as any)?.leaderId === actor.id;
 
     const hasGlobalReviewAccess = await this.hasGlobalAccess(actor.id);
     if (!hasGlobalReviewAccess && !isDirectLeader) {
@@ -333,7 +322,7 @@ export class TaskSubmissionService {
 
         if (isBlocked || isTodo) {
           const allPrereqsDone = depTask.dependsOn.every(
-            (prereq) =>
+            (prereq: any) =>
               prereq.id === completedTaskId ||
               prereq.assignment?.status === ASSIGNMENT_STATUS.DONE,
           );
@@ -407,12 +396,8 @@ export class TaskSubmissionService {
 
     const hasGlobal = await this.hasGlobalAccess(actor.id);
     if (!hasGlobal) {
-      const intern = await prisma.intern.findUnique({
-        where: { userId: actor.id },
-        select: { id: true },
-      });
-      const isOwner = intern && submission.assignment.internId === intern.id;
-      const isSupport = intern && submission.assignment.supportId === intern.id;
+      const isOwner = (submission.assignment as any)?.assigneeId === actor.id || (submission.assignment as any)?.internId === actor.id;
+      const isSupport = (submission.assignment as any)?.supportId === actor.id;
       if (!isOwner && !isSupport) {
         throw new AppError(
           `Không có quyền ${actionDesc}`,
@@ -469,7 +454,7 @@ export class TaskSubmissionService {
         assignment: {
           include: {
             task: true,
-            intern: { include: { user: true } },
+            assignee: { include: { internshipProfile: true } },
           },
         },
       },
@@ -538,12 +523,8 @@ export class TaskSubmissionService {
     // bài nộp mà mình là support. Không được đính kèm vào bài của intern khác.
     const hasGlobal = await this.hasGlobalAccess(actor.id);
     if (!hasGlobal) {
-      const intern = await prisma.intern.findUnique({
-        where: { userId: actor.id },
-        select: { id: true },
-      });
-      const isOwner = intern && submission.assignment.internId === intern.id;
-      const isSupport = intern && submission.assignment.supportId === intern.id;
+      const isOwner = (submission.assignment as any)?.assigneeId === actor.id || (submission.assignment as any)?.internId === actor.id;
+      const isSupport = (submission.assignment as any)?.supportId === actor.id;
       if (!isOwner && !isSupport) {
         throw new AppError(
           "Không có quyền đính kèm tệp vào bài nộp này",

@@ -9,6 +9,7 @@ const attachmentInputSchema = z.object({
 });
 
 export const createDailyReportSchema = z.object({
+  userId: z.string().uuid("User ID không hợp lệ").optional(),
   internId: z.string().uuid("Intern ID không hợp lệ").optional(),
   date: z
     .string()
@@ -56,6 +57,7 @@ export const queryDailyReportSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Định dạng ngày kết thúc: YYYY-MM-DD")
     .optional(),
+  userId: z.string().uuid("User ID không hợp lệ").optional(),
   internId: z.string().uuid("Intern ID không hợp lệ").optional(),
   departmentId: z.string().uuid("Department ID không hợp lệ").optional(),
   sortBy: z.enum(["date", "createdAt", "hoursWorked"]).default("date"),
@@ -65,6 +67,7 @@ export const queryDailyReportSchema = z.object({
 export const calendarDailyReportSchema = z.object({
   month: z.coerce.number().int().min(1, "Tháng từ 1 đến 12").max(12, "Tháng từ 1 đến 12"),
   year: z.coerce.number().int().min(2000, "Năm từ 2000 trở lên").max(2100),
+  userId: z.string().uuid("User ID không hợp lệ").optional(),
   internId: z.string().uuid("Intern ID không hợp lệ").optional(),
 });
 

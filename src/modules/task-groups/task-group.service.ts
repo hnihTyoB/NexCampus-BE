@@ -42,12 +42,12 @@ export class TaskGroupService {
       const hasGlobal = await this.hasGlobalAccess(user.id, user.permissions);
       if (!hasGlobal) {
         if (user.role !== "LEADER") {
-          const intern = await prisma.intern.findUnique({
+          const profile = await prisma.internshipProfile.findUnique({
             where: { userId: user.id },
-            select: { id: true },
+            select: { id: true, userId: true },
           });
-          if (intern) {
-            return this.repository.findAll(query, { internId: intern.id });
+          if (profile) {
+            return this.repository.findAll(query, { internId: profile.userId });
           }
           if (user.role === "INTERN") {
             return {
@@ -63,16 +63,12 @@ export class TaskGroupService {
         }
 
         if (user.role !== "INTERN") {
-          const leader = await prisma.leader.findFirst({
+          const managedDepts = await prisma.departmentManager.findMany({
             where: { userId: user.id },
-            select: {
-              id: true,
-              departments: { select: { departmentId: true } },
-            },
+            select: { departmentId: true },
           });
-          if (leader) {
-            const departmentIds =
-              leader.departments.map((d) => d.departmentId) ?? [];
+          if (managedDepts.length > 0) {
+            const departmentIds = managedDepts.map((d: { departmentId: string }) => d.departmentId);
             return this.repository.findAll(query, {
               leaderScope: {
                 departmentIds,
@@ -117,55 +113,34 @@ export class TaskGroupService {
     if (user) {
       const hasGlobal = await this.hasGlobalAccess(user.id);
       if (!hasGlobal) {
-        const intern = await prisma.intern.findUnique({
+        const isMember = (group as any).members?.some((m: any) => m.userId === user.id || m.internId === user.id);
+        if (isMember) {
+          return group as unknown as TaskGroupDto;
+        }
+
+        const managedDepts = await prisma.departmentManager.findMany({
           where: { userId: user.id },
-          select: { id: true },
+          select: { departmentId: true },
         });
-        if (intern) {
-          const isMember = group.members?.some((m) => m.internId === intern.id);
-          if (!isMember) {
-            throw new AppError(
-              "You are not a member of this task group",
-              403,
-              ERROR_CODE.FORBIDDEN,
-            );
-          }
-        } else {
-          const leader = await prisma.leader.findFirst({
-            where: { userId: user.id },
-            select: {
-              id: true,
-              departments: { select: { departmentId: true } },
-            },
-          });
-          if (leader) {
-            const deptIds =
-              leader.departments.map((d) => d.departmentId) ?? [];
-            const isDeptGroup = Boolean(
-              group.departmentId && deptIds.includes(group.departmentId),
-            );
-            const hasOwnMember = Boolean(
-              group.members?.some((m) => m.intern?.leaderId === user.id),
-            );
-            if (!isDeptGroup && !hasOwnMember) {
-              throw new AppError(
-                "You do not have access to this task group",
-                403,
-                ERROR_CODE.FORBIDDEN,
-              );
-            }
-          } else {
-            throw new AppError(
-              "You do not have access to this task group",
-              403,
-              ERROR_CODE.FORBIDDEN,
-            );
-          }
+        const deptIds = managedDepts.map((d: { departmentId: string }) => d.departmentId);
+        const isDeptGroup = Boolean(
+          group.departmentId && deptIds.includes(group.departmentId),
+        );
+        const hasOwnMember = Boolean(
+          (group as any).members?.some((m: any) => m.intern?.leaderId === user.id || m.user?.internshipProfile?.mentorId === user.id),
+        );
+        if (!isDeptGroup && !hasOwnMember) {
+          throw new AppError(
+            "You do not have access to this task group",
+            403,
+            ERROR_CODE.FORBIDDEN,
+          );
         }
       }
     }
 
     return group as unknown as TaskGroupDto;
+
   }
 
   private async validateMembers(
@@ -188,19 +163,19 @@ export class TaskGroupService {
     if (user) {
       const hasGlobal = await this.hasGlobalAccess(user.id);
       if (!hasGlobal) {
-        const leader = await prisma.leader.findFirst({
+        const managedDepts = await prisma.departmentManager.findMany({
           where: { userId: user.id },
-          select: { departments: { select: { departmentId: true } } },
+          select: { departmentId: true },
         });
-        if (leader) {
-          allowedDepartmentIds = leader.departments.map((d) => d.departmentId) ?? [];
+        if (managedDepts.length > 0) {
+          allowedDepartmentIds = managedDepts.map((d: { departmentId: string }) => d.departmentId);
         }
       }
     }
 
-    const validMembers = await prisma.intern.findMany({
+    const validMembers = await prisma.internshipProfile.findMany({
       where: {
-        id: { in: uniqueMemberIds },
+        userId: { in: uniqueMemberIds },
         status: "ACTIVE",
         deletedAt: null,
         user: { isActive: true, deletedAt: null },
@@ -208,13 +183,13 @@ export class TaskGroupService {
         ...(allowedDepartmentIds !== undefined
           ? {
               OR: [
-                { leaderId: user?.id },
+                { mentorId: user?.id },
                 { departmentId: { in: allowedDepartmentIds } },
               ],
             }
           : {}),
       },
-      select: { id: true },
+      select: { userId: true },
     });
 
     if (validMembers.length !== uniqueMemberIds.length) {
@@ -235,19 +210,17 @@ export class TaskGroupService {
     if (user && data.departmentId) {
       const hasGlobal = await this.hasGlobalAccess(user.id);
       if (!hasGlobal) {
-        const leader = await prisma.leader.findFirst({
+        const managedDepts = await prisma.departmentManager.findMany({
           where: { userId: user.id },
-          select: { departments: { select: { departmentId: true } } },
+          select: { departmentId: true },
         });
-        if (leader) {
-          const deptIds = leader.departments.map((d) => d.departmentId) ?? [];
-          if (!deptIds.includes(data.departmentId)) {
-            throw new AppError(
-              "Leader chỉ được tạo nhóm trong phòng ban mình quản lý",
-              403,
-              ERROR_CODE.FORBIDDEN,
-            );
-          }
+        const deptIds = managedDepts.map((d: { departmentId: string }) => d.departmentId);
+        if (deptIds.length > 0 && !deptIds.includes(data.departmentId)) {
+          throw new AppError(
+            "Leader chỉ được tạo nhóm trong phòng ban mình quản lý",
+            403,
+            ERROR_CODE.FORBIDDEN,
+          );
         }
       }
     }

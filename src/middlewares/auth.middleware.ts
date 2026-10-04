@@ -76,6 +76,7 @@ export async function authMiddleware(
         email: ticketUser.email,
         role: userState.roleName || ticketUser.role,
         roleId: userState.roleId || ticketUser.roleId,
+        portalType: userState.portalType || undefined,
       };
 
       next();
@@ -101,6 +102,7 @@ export async function authMiddleware(
       email: string;
       role: string;
       roleId?: string;
+      portalType?: string;
       purpose?: string;
       type?: string;
     };
@@ -139,6 +141,7 @@ export async function authMiddleware(
       email: payload.email,
       role: userState.roleName || payload.role,
       roleId: userState.roleId || payload.roleId,
+      portalType: userState.portalType || payload.portalType,
     };
 
     next();
@@ -178,6 +181,7 @@ export async function optionalAuthMiddleware(
       email: string;
       role: string;
       roleId?: string;
+      portalType?: string;
       purpose?: string;
       type?: string;
     };
@@ -198,6 +202,7 @@ export async function optionalAuthMiddleware(
         email: payload.email,
         role: userState.roleName || payload.role,
         roleId: userState.roleId || payload.roleId,
+        portalType: userState.portalType || payload.portalType,
       };
     }
   } catch {

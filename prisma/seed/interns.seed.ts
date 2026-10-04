@@ -220,14 +220,12 @@ export async function seedInterns(
     const posId = (item.deptName && item.posName) ? posMap[`${item.deptName}:${item.posName}`] : null;
     const startDate = getVnDate(item.startOffsetDays, 8, 0);
 
-    const intern = await prisma.intern.upsert({
+    const intern = await prisma.internshipProfile.upsert({
       where: { userId },
       update: {
-        fullName: item.fullName,
-        phone: item.phone,
         departmentId: deptId,
         positionId: posId,
-        leaderId: leaderUserId,
+        mentorId: leaderUserId,
         status: item.status,
         startDate,
         duration: item.duration,
@@ -237,11 +235,9 @@ export async function seedInterns(
       },
       create: {
         userId,
-        fullName: item.fullName,
-        phone: item.phone,
         departmentId: deptId,
         positionId: posId,
-        leaderId: leaderUserId,
+        mentorId: leaderUserId,
         status: item.status,
         startDate,
         duration: item.duration,
@@ -251,7 +247,7 @@ export async function seedInterns(
       },
     });
 
-    interns[item.email] = intern.id;
+    interns[item.email] = userId;
   }
 
   console.log(`   ✓ Đã tạo ${Object.keys(interns).length} hồ sơ thực tập sinh đầy đủ.`);

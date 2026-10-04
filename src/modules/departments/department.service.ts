@@ -9,6 +9,9 @@ import {
   DepartmentQueryDto,
   DepartmentDto,
   PositionDto,
+  DepartmentManagerDto,
+  AssignDepartmentManagerDto,
+  UpdateDepartmentManagerDto,
 } from "./department.dto";
 import {
   AUDIT_ACTION,
@@ -250,4 +253,126 @@ export class DepartmentService {
 
     return result;
   }
+
+  // ─── Department Managers ──────────────────────────────────────────
+
+  async findManagers(departmentId: string): Promise<DepartmentManagerDto[]> {
+    await this.findById(departmentId);
+    return this.repository.findManagersByDepartmentId(departmentId);
+  }
+
+  async assignManager(
+    departmentId: string,
+    data: AssignDepartmentManagerDto,
+    actorId?: string,
+  ): Promise<DepartmentManagerDto> {
+    const dept = await this.findById(departmentId);
+
+    const user = await this.repository.findActiveUserById(data.userId);
+    if (!user) {
+      throw new AppError(
+        "Người dùng không tồn tại hoặc không ở trạng thái hoạt động",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
+
+    const portalType = user.role?.portalType;
+    if (portalType && portalType !== "LEADER" && portalType !== "ADMIN") {
+      throw new AppError(
+        "Chỉ người dùng có quyền Leader hoặc Admin mới có thể làm người phụ trách phòng ban",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    const existingInDept = await this.repository.findManager(departmentId, data.userId);
+    if (!existingInDept) {
+      const managedCount = await this.repository.countDepartmentsManagedByUser(data.userId);
+      if (managedCount >= 3) {
+        throw new AppError(
+          "Một người phụ trách chỉ được quản lý tối đa 3 phòng ban cùng lúc",
+          400,
+          ERROR_CODE.CAPACITY_EXCEEDED,
+        );
+      }
+    }
+
+    const result = await this.repository.assignManager(departmentId, data);
+
+    await this.repository.createAuditLog({
+      actorId,
+      action: AUDIT_ACTION.ASSIGN_DEPARTMENT_MANAGER,
+      targetType: AUDIT_TARGET_TYPE.DEPARTMENT,
+      targetId: departmentId,
+      details: {
+        userId: data.userId,
+        departmentName: dept.name,
+        isPrimary: data.isPrimary,
+        title: data.title,
+      },
+    });
+
+    return result;
+  }
+
+  async updateManager(
+    departmentId: string,
+    userId: string,
+    data: UpdateDepartmentManagerDto,
+    actorId?: string,
+  ): Promise<DepartmentManagerDto> {
+    await this.findById(departmentId);
+    const existing = await this.repository.findManager(departmentId, userId);
+    if (!existing) {
+      throw new AppError(
+        "Người phụ trách không thuộc phòng ban này",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
+
+    const result = await this.repository.updateManager(departmentId, userId, data);
+
+    await this.repository.createAuditLog({
+      actorId,
+      action: AUDIT_ACTION.UPDATE_DEPARTMENT_MANAGER,
+      targetType: AUDIT_TARGET_TYPE.DEPARTMENT,
+      targetId: departmentId,
+      details: {
+        userId,
+        isPrimary: data.isPrimary,
+        title: data.title,
+      },
+    });
+
+    return result;
+  }
+
+  async removeManager(
+    departmentId: string,
+    userId: string,
+    actorId?: string,
+  ): Promise<void> {
+    await this.findById(departmentId);
+    const existing = await this.repository.findManager(departmentId, userId);
+    if (!existing) {
+      throw new AppError(
+        "Người phụ trách không thuộc phòng ban này",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
+
+    await this.repository.removeManager(departmentId, userId);
+
+    await this.repository.createAuditLog({
+      actorId,
+      action: AUDIT_ACTION.REMOVE_DEPARTMENT_MANAGER,
+      targetType: AUDIT_TARGET_TYPE.DEPARTMENT,
+      targetId: departmentId,
+      details: { userId },
+    });
+  }
 }
+

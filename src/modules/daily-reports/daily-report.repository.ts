@@ -3,23 +3,23 @@ import { prisma } from "../../database/prisma.client";
 import { getVietnamDayRange } from "../../common/helpers/date.helper";
 import {
   CreateDailyReportDto,
-  CreateReportAttachmentInput,
   DailyReportQueryDto,
   UpdateDailyReportDto,
 } from "./daily-report.dto";
 import { activityLogRepository } from "../activity-logs/activity-log.repository";
 
 export interface DailyReportScoping {
-  internId?: string;
-  leaderDepartmentIds?: string[];
-  directInternIds?: string[];
-  isLeader?: boolean;
+  userId?: string;
+  internId?: string; // backwards compatibility alias for userId
+  departmentIds?: string[];
+  mentoredUserIds?: string[];
+  isReviewer?: boolean;
   isAdmin?: boolean;
 }
 
 const defaultReportSelect = {
   id: true,
-  internId: true,
+  userId: true,
   date: true,
   content: true,
   blockers: true,
@@ -32,31 +32,30 @@ const defaultReportSelect = {
   feedbackAt: true,
   createdAt: true,
   updatedAt: true,
-  intern: {
+  user: {
     select: {
       id: true,
+      email: true,
       fullName: true,
-      phone: true,
-      internCode: true,
-      departmentId: true,
-      department: {
+      avatarUrl: true,
+      phoneNumber: true,
+      internshipProfile: {
         select: {
           id: true,
-          name: true,
-        },
-      },
-      position: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
-      user: {
-        select: {
-          id: true,
-          email: true,
-          fullName: true,
-          avatarUrl: true,
+          internCode: true,
+          departmentId: true,
+          department: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          position: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
       },
     },
@@ -97,10 +96,10 @@ export class DailyReportRepository {
     });
   }
 
-  async findByInternAndDate(internId: string, date: Date) {
+  async findByUserAndDate(userId: string, date: Date) {
     return prisma.dailyReport.findFirst({
       where: {
-        internId,
+        userId,
         date,
         deletedAt: null,
       },
@@ -108,13 +107,18 @@ export class DailyReportRepository {
     });
   }
 
+  // Alias for backward compatibility
+  async findByInternAndDate(internId: string, date: Date) {
+    return this.findByUserAndDate(internId, date);
+  }
+
   async upsert(
-    internId: string,
+    userId: string,
     date: Date,
     data: CreateDailyReportDto,
     uploaderUserId: string,
   ) {
-    const existing = await this.findByInternAndDate(internId, date);
+    const existing = await this.findByUserAndDate(userId, date);
 
     if (existing) {
       // Update existing report
@@ -156,7 +160,7 @@ export class DailyReportRepository {
     return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const created = await tx.dailyReport.create({
         data: {
-          internId,
+          userId,
           date,
           content: data.content,
           blockers: data.blockers || null,
@@ -247,28 +251,34 @@ export class DailyReportRepository {
   ): Prisma.DailyReportWhereInput {
     const where: Prisma.DailyReportWhereInput = {
       deletedAt: null,
-      intern: {
+      user: {
         deletedAt: null,
       },
     };
 
     // Scoping permissions
-    if (scoping.internId) {
-      where.internId = scoping.internId;
-    } else if (scoping.isLeader) {
-      const orConditions: Prisma.InternWhereInput[] = [
-        ...(scoping.directInternIds && scoping.directInternIds.length > 0
-          ? [{ id: { in: scoping.directInternIds } }]
-          : []),
-        ...(scoping.leaderDepartmentIds && scoping.leaderDepartmentIds.length > 0
-          ? [{ departmentId: { in: scoping.leaderDepartmentIds } }]
-          : []),
-      ];
+    const scopedUserId = scoping.userId || scoping.internId;
+    if (scopedUserId) {
+      where.userId = scopedUserId;
+    } else if (scoping.isReviewer && !scoping.isAdmin) {
+      const orConditions: Prisma.UserWhereInput[] = [];
+
+      if (scoping.mentoredUserIds && scoping.mentoredUserIds.length > 0) {
+        orConditions.push({ id: { in: scoping.mentoredUserIds } });
+      }
+
+      if (scoping.departmentIds && scoping.departmentIds.length > 0) {
+        orConditions.push({
+          internshipProfile: {
+            departmentId: { in: scoping.departmentIds },
+          },
+        });
+      }
 
       if (orConditions.length === 0) {
-        where.internId = { in: [] };
+        where.userId = { in: [] };
       } else {
-        where.intern = {
+        where.user = {
           deletedAt: null,
           OR: orConditions,
         };
@@ -276,14 +286,17 @@ export class DailyReportRepository {
     }
 
     // Query filters
-    if (query.internId) {
-      where.internId = query.internId;
+    const queryUserId = query.userId || query.internId;
+    if (queryUserId) {
+      where.userId = queryUserId;
     }
 
     if (query.departmentId) {
-      where.intern = {
-        ...(where.intern as Prisma.InternWhereInput),
-        departmentId: query.departmentId,
+      where.user = {
+        ...(where.user as Prisma.UserWhereInput),
+        internshipProfile: {
+          departmentId: query.departmentId,
+        },
       };
     }
 
@@ -345,14 +358,14 @@ export class DailyReportRepository {
     };
   }
 
-  async findReportsByInternAndMonth(
-    internId: string,
+  async findReportsByUserAndMonth(
+    userId: string,
     startDate: Date,
     endDate: Date,
   ) {
     return prisma.dailyReport.findMany({
       where: {
-        internId,
+        userId,
         date: {
           gte: startDate,
           lte: endDate,
@@ -372,6 +385,15 @@ export class DailyReportRepository {
     });
   }
 
+  // Alias for backward compatibility
+  async findReportsByInternAndMonth(
+    internId: string,
+    startDate: Date,
+    endDate: Date,
+  ) {
+    return this.findReportsByUserAndMonth(internId, startDate, endDate);
+  }
+
   async findAttachmentById(id: string) {
     return prisma.reportAttachment.findUnique({
       where: { id },
@@ -379,12 +401,7 @@ export class DailyReportRepository {
         report: {
           select: {
             id: true,
-            internId: true,
-            intern: {
-              select: {
-                userId: true,
-              },
-            },
+            userId: true,
           },
         },
       },
@@ -394,6 +411,114 @@ export class DailyReportRepository {
   async deleteAttachment(id: string) {
     return prisma.reportAttachment.delete({
       where: { id },
+    });
+  }
+
+  async findInternshipProfileByUserId(userId: string) {
+    return prisma.internshipProfile.findUnique({
+      where: { userId },
+      select: {
+        id: true,
+        userId: true,
+        mentorId: true,
+        departmentId: true,
+        startDate: true,
+      },
+    });
+  }
+
+  async isDepartmentManager(departmentId: string, userId: string): Promise<boolean> {
+    const mgr = await prisma.departmentManager.findUnique({
+      where: {
+        departmentId_userId: { departmentId, userId },
+      },
+      select: { userId: true },
+    });
+    return !!mgr;
+  }
+
+  async findActiveUserById(userId: string) {
+    return prisma.user.findFirst({
+      where: { id: userId, deletedAt: null, isActive: true },
+      select: { id: true, fullName: true, email: true, isActive: true },
+    });
+  }
+
+  async updateVideoDemo(reportId: string, videoUrl: string) {
+    return prisma.dailyReport.update({
+      where: { id: reportId },
+      data: { videoDemo: videoUrl },
+      include: {
+        attachments: true,
+        user: true,
+      },
+    });
+  }
+
+  async addAttachment(data: {
+    reportId: string;
+    fileName: string;
+    fileUrl: string;
+    filePath: string;
+    fileSize: number;
+    mimeType: string;
+    uploadedBy: string;
+  }) {
+    return prisma.reportAttachment.create({
+      data,
+    });
+  }
+
+  async findManagedDepartmentIds(userId: string): Promise<string[]> {
+    const records = await prisma.departmentManager.findMany({
+      where: { userId },
+      select: { departmentId: true },
+    });
+    return records.map((r) => r.departmentId);
+  }
+
+  async findMenteeUserIds(mentorId: string): Promise<string[]> {
+    const records = await prisma.internshipProfile.findMany({
+      where: { mentorId, deletedAt: null },
+      select: { userId: true },
+    });
+    return records.map((r) => r.userId);
+  }
+
+  async findUserWithProfile(userId: string) {
+    return prisma.user.findFirst({
+      where: { id: userId, deletedAt: null },
+      select: {
+        id: true,
+        createdAt: true,
+        internshipProfile: {
+          select: {
+            id: true,
+            startDate: true,
+            departmentId: true,
+            mentorId: true,
+          },
+        },
+      },
+    });
+  }
+
+  async findApprovedLeavesForMonth(userId: string, startDate: Date, endDate: Date) {
+    return prisma.absence.findMany({
+      where: {
+        userId,
+        status: "APPROVED",
+        startDate: { lte: endDate },
+        endDate: { gte: startDate },
+      },
+      select: {
+        id: true,
+        startDate: true,
+        endDate: true,
+        durationUnit: true,
+        reasonType: true,
+        reason: true,
+      },
     });
   }
 

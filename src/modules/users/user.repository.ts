@@ -102,7 +102,7 @@ export class UserRepository {
         isActive: true,
         deletedAt: true,
         roleId: true,
-        role: { select: { name: true } },
+        role: { select: { name: true, portalType: true } },
       },
     });
   }

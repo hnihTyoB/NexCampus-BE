@@ -3,7 +3,8 @@ import { AssignmentStatus, ExtensionRequestStatus } from "@prisma/client";
 export interface TaskAssignmentDto {
   id: string;
   taskId: string;
-  internId: string | null;
+  assigneeId?: string | null;
+  internId?: string | null; // backwards compatibility alias for assigneeId
   supportId: string | null;
   assignedBy: string;
   status: AssignmentStatus;
@@ -23,12 +24,31 @@ export interface TaskAssignmentDto {
     taskGroupId: string | null;
     taskGroup?: { id: string; name: string; departmentId: string | null } | null;
   };
+  assignee?: {
+    id: string;
+    email: string | null;
+    fullName: string | null;
+    phoneNumber?: string | null;
+    avatarUrl?: string | null;
+    isActive: boolean;
+    internshipProfile?: {
+      id: string;
+      internCode: string | null;
+      departmentId: string | null;
+      department?: { id: string; name: string } | null;
+      position?: { id: string; name: string } | null;
+      mentorId?: string | null;
+      status: string;
+      startDate: Date | string;
+      duration: number;
+    } | null;
+  } | null;
   intern?: {
     id: string;
     userId: string;
-    leaderId: string | null;
+    leaderId?: string | null;
     fullName: string;
-    phone: string;
+    phone?: string;
     status: string;
     department?: { id: string; name: string } | null;
     position?: { id: string; name: string } | null;
@@ -36,11 +56,13 @@ export interface TaskAssignmentDto {
   } | null;
   support?: {
     id: string;
-    userId: string;
-    leaderId: string | null;
-    fullName: string;
-    status: string;
-    user: { id: string; email: string | null; fullName: string | null };
+    userId?: string;
+    email?: string | null;
+    fullName: string | null;
+    phoneNumber?: string | null;
+    avatarUrl?: string | null;
+    isActive?: boolean;
+    user?: { id: string; email: string | null; fullName: string | null };
   } | null;
   assigner?: {
     id: string;
@@ -52,7 +74,8 @@ export interface TaskAssignmentDto {
 
 export interface CreateTaskAssignmentDto {
   taskId: string;
-  internId: string;
+  assigneeId?: string;
+  internId?: string; // backwards compatibility alias for assigneeId
   internEmail?: string;
   supportId?: string | null;
 }
@@ -64,7 +87,8 @@ export interface UpdateTaskAssignmentDto {
   blockedReason?: string | null;
   startedAt?: Date | null;
   completedAt?: Date | null;
-  internId?: string;
+  assigneeId?: string;
+  internId?: string; // backwards compatibility alias
   internEmail?: string;
   supportId?: string | null;
 }
@@ -75,7 +99,8 @@ export interface BlockTaskDto {
 
 export interface TaskAssignmentQueryDto {
   taskId?: string;
-  internId?: string;
+  assigneeId?: string;
+  internId?: string; // backwards compatibility alias
   assignedBy?: string;
   status?: AssignmentStatus;
   leaderId?: string;
@@ -95,6 +120,8 @@ export interface RequestTaskExtensionDto {
   extensionDays: number;
   reason: string;
   commitmentPlan: string;
+  userId?: string;
+  internId?: string;
 }
 
 export interface RejectTaskExtensionDto {
@@ -104,7 +131,8 @@ export interface RejectTaskExtensionDto {
 export interface TaskExtensionRequestDto {
   id: string;
   assignmentId: string;
-  internId: string;
+  userId?: string;
+  internId?: string;
   currentDeadline: Date | string;
   proposedDeadline: Date | string;
   extensionDays: number;
@@ -116,6 +144,16 @@ export interface TaskExtensionRequestDto {
   reviewedAt: Date | string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
+  user?: {
+    id: string;
+    fullName: string | null;
+    email: string | null;
+    internshipProfile?: {
+      id: string;
+      internCode: string | null;
+      department?: { id: string; name: string } | null;
+    } | null;
+  };
   intern?: {
     id: string;
     fullName: string;
@@ -145,10 +183,10 @@ export interface TaskExtensionRequestDto {
 
 export interface QueryExtensionRequestsDto {
   status?: ExtensionRequestStatus;
+  userId?: string;
   internId?: string;
   assignmentId?: string;
   taskId?: string;
   page?: number;
   limit?: number;
 }
-

@@ -26,24 +26,33 @@ export const ratingsSchema = z.object({
   progressRequirement: ratingLevelSchema,
 });
 
-export const createWeeklyEvaluationSchema = z.object({
-  internId: z.string().uuid("Intern ID không hợp lệ"),
-  week: z.coerce.number().int().min(1, "Tuần đánh giá phải từ 1 trở lên"),
-  year: z.coerce.number().int().min(2000).max(2100).optional(),
-  ratings: ratingsSchema,
-  comment: z.string().trim().max(2000, "Nhận xét tối đa 2000 ký tự").optional().nullable(),
-  strengths: z.array(z.string().trim()).optional(),
-  weaknesses: z.array(z.string().trim()).optional(),
-  recommendations: z.array(z.string().trim()).optional(),
+export const createWeeklyEvaluationSchema = z
+  .object({
+    targetUserId: z.string().uuid("Target User ID không hợp lệ").optional(),
+    internId: z.string().uuid("Intern ID không hợp lệ").optional(),
+    week: z.coerce.number().int().min(1, "Tuần đánh giá phải từ 1 trở lên"),
+    year: z.coerce.number().int().min(2000).max(2100).optional(),
+    ratings: ratingsSchema,
+    comment: z.string().trim().max(2000, "Nhận xét tối đa 2000 ký tự").optional().nullable(),
+    strengths: z.array(z.string().trim()).optional(),
+    weaknesses: z.array(z.string().trim()).optional(),
+    recommendations: z.array(z.string().trim()).optional(),
 
-  // AI suggestion metadata
-  aiRatings: ratingsSchema.optional(),
-  aiScore: z.number().min(0).max(10).optional(),
-  aiComment: z.string().trim().optional().nullable(),
-  aiStrengths: z.array(z.string().trim()).optional(),
-  aiWeaknesses: z.array(z.string().trim()).optional(),
-  aiRecommendations: z.array(z.string().trim()).optional(),
-});
+    // AI suggestion metadata
+    aiRatings: ratingsSchema.optional(),
+    aiScore: z.number().min(0).max(10).optional(),
+    aiComment: z.string().trim().optional().nullable(),
+    aiStrengths: z.array(z.string().trim()).optional(),
+    aiWeaknesses: z.array(z.string().trim()).optional(),
+    aiRecommendations: z.array(z.string().trim()).optional(),
+  })
+  .refine(
+    (data) => !!(data.targetUserId || data.internId),
+    {
+      message: "targetUserId hoặc internId là bắt buộc",
+      path: ["targetUserId"],
+    },
+  );
 
 export const updateWeeklyEvaluationSchema = z.object({
   ratings: ratingsSchema.optional(),
@@ -53,16 +62,27 @@ export const updateWeeklyEvaluationSchema = z.object({
   recommendations: z.array(z.string().trim()).optional(),
 });
 
-export const aiSuggestSchema = z.object({
-  internId: z.string().uuid("Intern ID không hợp lệ"),
-  week: z.coerce.number().int().min(1, "Tuần đánh giá phải từ 1 trở lên"),
-});
+export const aiSuggestSchema = z
+  .object({
+    targetUserId: z.string().uuid("Target User ID không hợp lệ").optional(),
+    internId: z.string().uuid("Intern ID không hợp lệ").optional(),
+    week: z.coerce.number().int().min(1, "Tuần đánh giá phải từ 1 trở lên"),
+  })
+  .refine(
+    (data) => !!(data.targetUserId || data.internId),
+    {
+      message: "targetUserId hoặc internId là bắt buộc",
+      path: ["targetUserId"],
+    },
+  );
 
 export const queryWeeklyEvaluationSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
   week: z.coerce.number().int().min(1).optional(),
   year: z.coerce.number().int().min(2000).max(2100).optional(),
+  targetUserId: z.string().uuid("Target User ID không hợp lệ").optional(),
+  evaluatorId: z.string().uuid("Evaluator ID không hợp lệ").optional(),
   internId: z.string().uuid("Intern ID không hợp lệ").optional(),
   leaderId: z.string().uuid("Leader ID không hợp lệ").optional(),
   departmentId: z.string().uuid("Department ID không hợp lệ").optional(),

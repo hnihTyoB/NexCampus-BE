@@ -39,17 +39,24 @@ model User {
   apiKeys             ApiKey[]
   webhookEndpoints    WebhookEndpoint[]
   webhookDeliveries   WebhookDelivery[]
-  intern              Intern?              @relation("InternUser")
-  leadedInterns       Intern[]             @relation("LeaderInterns")
-  leader              Leader?
-  approvedApplications Application[]        @relation("ApprovedApplications")
-  rejectedApplications Application[]        @relation("RejectedApplications")
-  createdInvites       ApplicationInvite[]
+  intern                        Intern?                @relation("InternUser")
+  leadedInterns                 Intern[]               @relation("LeaderInterns")
+  leader                        Leader?
+  internshipProfile             InternshipProfile?     @relation("UserInternshipProfile")
+  mentoredInternships           InternshipProfile[]    @relation("MentorInterns")
+  departmentManagers            DepartmentManager[]
+  leaderEvaluations             WeeklyEvaluation[]     @relation("LeaderEvaluations")
+  approvedApplications          Application[]          @relation("ApprovedApplications")
+  rejectedApplications          Application[]          @relation("RejectedApplications")
+  createdInvites                ApplicationInvite[]
   createdTasks                  Task[]                 @relation("CreatedTasks")
   uploadedAttachments           TaskAttachment[]       @relation("TaskAttachmentUploader")
   assignedTasks                 TaskAssignment[]       @relation("AssignedTasks")
+  receivedTasks                 TaskAssignment[]       @relation("TaskAssignee")
+  supportedTasks                TaskAssignment[]       @relation("TaskSupport")
   reviewedSubmissions           TaskSubmission[]       @relation("ReviewedSubmissions")
   reviewedExtensionRequests    TaskExtensionRequest[] @relation("ReviewedExtensionRequests")
+  extensionRequests             TaskExtensionRequest[] @relation("UserExtensionRequests")
   uploadedSubmissionAttachments SubmissionAttachment[] @relation("SubmissionAttachmentUploader")
   createdMeetings               Meeting[]              @relation("CreatedMeetings")
   hostedMeetings                Meeting[]              @relation("HostedMeetings")
@@ -57,9 +64,13 @@ model User {
   reviewedMeetingAbsences       AbsenceRequest[]       @relation("ReviewedAbsences")
   absences                      Absence[]              @relation("InternAbsences")
   reviewedAbsences              Absence[]              @relation("ReviewedGeneralAbsences")
+  dailyReports                  DailyReport[]          @relation("UserDailyReports")
   feedbackDailyReports          DailyReport[]          @relation("FeedbackDailyReports")
   uploadedReportAttachments     ReportAttachment[]     @relation("ReportAttachmentUploader")
-  leaderEvaluations             WeeklyEvaluation[]     @relation("LeaderEvaluations")
+  evaluationsReceived           WeeklyEvaluation[]     @relation("UserWeeklyEvaluations")
+  evaluationsGiven              WeeklyEvaluation[]     @relation("EvaluatorWeeklyEvaluations")
+  taskGroupMemberships          TaskGroupMember[]
+  regulationAcknowledgments     RegulationAcknowledgment[]
   notificationSetting           NotificationSetting?
   auditLogs                     AuditLog[]             @relation("UserAuditLogs")
   exports                       ExportHistory[]        @relation("UserExports")
@@ -70,11 +81,18 @@ model User {
   @@map("users")
 }
 
+enum PortalType {
+  ADMIN
+  LEADER
+  INTERN
+}
+
 model Role {
   id          String           @id @default(uuid()) @db.Uuid
   name        String           @unique
   description String?
   isSystem    Boolean          @default(false) @map("is_system")
+  portalType  PortalType       @default(ADMIN) @map("portal_type")
   users       User[]
   permissions RolePermission[]
   createdAt   DateTime         @default(now()) @map("created_at")
@@ -454,13 +472,15 @@ model Department {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  positions         Position[]
-  interns           Intern[]
-  leaderAssignments LeaderDepartment[]
-  applications      Application[]
-  taskGroups        TaskGroup[]
-  meetings          Meeting[]
-  discordWebhooks   DiscordWebhookConfig[]
+  positions          Position[]
+  interns            Intern[]
+  internshipProfiles InternshipProfile[]
+  leaderAssignments  LeaderDepartment[]
+  managers           DepartmentManager[]
+  applications       Application[]
+  taskGroups         TaskGroup[]
+  meetings           Meeting[]
+  discordWebhooks    DiscordWebhookConfig[]
 
   @@index([deletedAt])
   @@map("departments")
@@ -474,9 +494,10 @@ model Position {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-  interns      Intern[]
-  applications Application[]
+  department         Department          @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  interns            Intern[]
+  internshipProfiles InternshipProfile[]
+  applications       Application[]
 
   @@index([departmentId])
   @@index([deletedAt])
@@ -484,12 +505,12 @@ model Position {
 }
 
 model Leader {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @unique @map("user_id") @db.Uuid
+  id        String             @id @default(uuid()) @db.Uuid
+  userId    String             @unique @map("user_id") @db.Uuid
   position  String?
-  phone     String?  @unique
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  phone     String?
+  createdAt DateTime           @default(now()) @map("created_at")
+  updatedAt DateTime           @updatedAt @map("updated_at")
 
   user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   departments LeaderDepartment[]
@@ -498,24 +519,77 @@ model Leader {
 }
 
 model LeaderDepartment {
-  leaderId     String   @map("leader_id") @db.Uuid
-  departmentId String   @unique @map("department_id") @db.Uuid
-  createdAt    DateTime @default(now()) @map("created_at")
+  leaderId     String     @map("leader_id") @db.Uuid
+  departmentId String     @map("department_id") @db.Uuid
+  createdAt    DateTime   @default(now()) @map("created_at")
 
   leader     Leader     @relation(fields: [leaderId], references: [id], onDelete: Cascade)
   department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
 
   @@id([leaderId, departmentId])
-  @@index([departmentId])
   @@map("leader_departments")
+}
+
+model DepartmentManager {
+  departmentId String   @map("department_id") @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  title        String?
+  isPrimary    Boolean  @default(false) @map("is_primary")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([departmentId, userId])
+  @@index([userId])
+  @@index([departmentId])
+  @@map("department_managers")
 }
 
 model Intern {
   id                 String       @id @default(uuid()) @db.Uuid
   userId             String       @unique @map("user_id") @db.Uuid
+  fullName           String       @default("") @map("full_name")
+  phone              String       @default("")
+  departmentId       String?      @map("department_id") @db.Uuid
+  positionId         String?      @map("position_id") @db.Uuid
   leaderId           String?      @map("leader_id") @db.Uuid
-  fullName           String       @map("full_name")
-  phone              String       @unique
+  startDate          DateTime     @map("start_date")
+  duration           Int
+  status             InternStatus @default(ACTIVE)
+  internCode         String?      @unique @map("intern_code")
+  university         String?
+  major              String?
+  discordUserId      String?      @map("discord_user_id")
+  discordUsername    String?      @map("discord_username")
+  discordRoleGranted Boolean      @default(false) @map("discord_role_granted")
+  deletedAt          DateTime?    @map("deleted_at")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+
+  user                      User                     @relation("InternUser", fields: [userId], references: [id], onDelete: Cascade)
+  leader                    User?                    @relation("LeaderInterns", fields: [leaderId], references: [id], onDelete: SetNull)
+  department                Department?              @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  position                  Position?                @relation(fields: [positionId], references: [id], onDelete: Restrict)
+  taskGroupMembers          TaskGroupMember[]
+  assignedTasks             TaskAssignment[]         @relation("TaskAssignmentOwner")
+  dailyReports              DailyReport[]
+  weeklyEvaluations         WeeklyEvaluation[]
+  regulationAcknowledgments RegulationAcknowledgment[]
+  extensionRequests         TaskExtensionRequest[]
+
+  @@index([leaderId])
+  @@index([departmentId])
+  @@index([positionId])
+  @@index([status])
+  @@index([deletedAt])
+  @@map("interns")
+}
+
+model InternshipProfile {
+  id                 String       @id @default(uuid()) @db.Uuid
+  userId             String       @unique @map("user_id") @db.Uuid
+  mentorId           String?      @map("mentor_id") @db.Uuid
   departmentId       String?      @map("department_id") @db.Uuid
   positionId         String?      @map("position_id") @db.Uuid
   startDate          DateTime     @map("start_date")
@@ -531,24 +605,17 @@ model Intern {
   createdAt          DateTime     @default(now()) @map("created_at")
   updatedAt          DateTime     @updatedAt @map("updated_at")
 
-  user                      User                     @relation("InternUser", fields: [userId], references: [id], onDelete: Cascade)
-  leader                    User?                    @relation("LeaderInterns", fields: [leaderId], references: [id], onDelete: SetNull)
-  department                Department?              @relation(fields: [departmentId], references: [id], onDelete: Restrict)
-  position                  Position?                @relation(fields: [positionId], references: [id], onDelete: Restrict)
-  taskGroupMembers          TaskGroupMember[]
-  assignedTasks             TaskAssignment[]         @relation("TaskAssignmentOwner")
-  supportTasks              TaskAssignment[]         @relation("TaskAssignmentSupport")
-  dailyReports              DailyReport[]
-  weeklyEvaluations         WeeklyEvaluation[]
-  regulationAcknowledgments RegulationAcknowledgment[]
-  extensionRequests         TaskExtensionRequest[]
+  user       User        @relation("UserInternshipProfile", fields: [userId], references: [id], onDelete: Cascade)
+  mentor     User?       @relation("MentorInterns", fields: [mentorId], references: [id], onDelete: SetNull)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  position   Position?   @relation(fields: [positionId], references: [id], onDelete: Restrict)
 
-  @@index([leaderId])
+  @@index([mentorId])
   @@index([departmentId])
   @@index([positionId])
   @@index([status])
   @@index([deletedAt])
-  @@map("interns")
+  @@map("internship_profiles")
 }
 
 enum ApplicationStatus {
@@ -726,13 +793,16 @@ model TaskGroup {
 
 model TaskGroupMember {
   taskGroupId String   @map("task_group_id") @db.Uuid
-  internId    String   @map("intern_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  internId    String?  @map("intern_id") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at")
 
   taskGroup TaskGroup @relation(fields: [taskGroupId], references: [id], onDelete: Cascade)
-  intern    Intern    @relation(fields: [internId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  intern    Intern?   @relation(fields: [internId], references: [id], onDelete: Cascade)
 
-  @@id([taskGroupId, internId])
+  @@id([taskGroupId, userId])
+  @@index([userId])
   @@index([internId])
   @@map("task_group_members")
 }
@@ -801,6 +871,7 @@ model TaskAttachment {
 model TaskAssignment {
   id            String           @id @default(uuid()) @db.Uuid
   taskId        String           @unique @map("task_id") @db.Uuid
+  assigneeId    String?          @map("assignee_id") @db.Uuid
   internId      String?          @map("intern_id") @db.Uuid
   supportId     String?          @map("support_id") @db.Uuid
   assignedBy    String           @map("assigned_by") @db.Uuid
@@ -811,13 +882,16 @@ model TaskAssignment {
   assignedAt    DateTime         @default(now()) @map("assigned_at")
   updatedAt     DateTime         @updatedAt @map("updated_at")
 
-  task        Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  intern      Intern?          @relation("TaskAssignmentOwner", fields: [internId], references: [id], onDelete: Cascade)
-  support     Intern?          @relation("TaskAssignmentSupport", fields: [supportId], references: [id], onDelete: SetNull)
+  task              Task                   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  assignee          User?                  @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: Cascade)
+  intern            Intern?                @relation("TaskAssignmentOwner", fields: [internId], references: [id], onDelete: Cascade)
+  support           User?                  @relation("TaskSupport", fields: [supportId], references: [id], onDelete: SetNull)
   assigner          User                   @relation("AssignedTasks", fields: [assignedBy], references: [id], onDelete: Cascade)
   submissions       TaskSubmission[]
   extensionRequests TaskExtensionRequest[]
 
+  @@index([assigneeId])
+  @@index([assigneeId, status])
   @@index([internId])
   @@index([internId, status])
   @@index([supportId])
@@ -881,12 +955,13 @@ model SubmissionAttachment {
 model TaskExtensionRequest {
   id               String                 @id @default(uuid()) @db.Uuid
   assignmentId     String                 @map("assignment_id") @db.Uuid
-  internId         String                 @map("intern_id") @db.Uuid
+  userId           String                 @map("user_id") @db.Uuid
+  internId         String?                @map("intern_id") @db.Uuid
   currentDeadline  DateTime               @map("current_deadline")
   proposedDeadline DateTime               @map("proposed_deadline")
   extensionDays    Int                    @map("extension_days")
   reason           String                 @db.Text
-  commitmentPlan   String                 @map("commitment_plan") @db.Text
+  commitmentPlan   String?                @map("commitment_plan") @db.Text
   status           ExtensionRequestStatus @default(PENDING)
   rejectionReason  String?                @map("rejection_reason") @db.Text
   reviewedBy       String?                @map("reviewed_by") @db.Uuid
@@ -895,10 +970,12 @@ model TaskExtensionRequest {
   updatedAt        DateTime               @updatedAt @map("updated_at")
 
   assignment TaskAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  intern     Intern         @relation(fields: [internId], references: [id], onDelete: Cascade)
+  user       User           @relation("UserExtensionRequests", fields: [userId], references: [id], onDelete: Cascade)
+  intern     Intern?        @relation(fields: [internId], references: [id], onDelete: Cascade)
   reviewer   User?          @relation("ReviewedExtensionRequests", fields: [reviewedBy], references: [id], onDelete: SetNull)
 
   @@index([assignmentId])
+  @@index([userId])
   @@index([internId])
   @@index([status])
   @@index([reviewedBy])
@@ -1086,7 +1163,8 @@ enum EvaluationGrade {
 
 model DailyReport {
   id          String   @id @default(uuid()) @db.Uuid
-  internId    String   @map("intern_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  internId    String?  @map("intern_id") @db.Uuid
   date        DateTime @map("date") @db.Date
   content     String   @db.Text
   blockers    String?  @db.Text
@@ -1103,11 +1181,13 @@ model DailyReport {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  intern       Intern             @relation(fields: [internId], references: [id], onDelete: Cascade)
+  user         User               @relation("UserDailyReports", fields: [userId], references: [id], onDelete: Cascade)
+  intern       Intern?            @relation(fields: [internId], references: [id], onDelete: Cascade)
   feedbackUser User?              @relation("FeedbackDailyReports", fields: [feedbackBy], references: [id], onDelete: SetNull)
   attachments  ReportAttachment[]
 
-  @@unique([internId, date])
+  @@unique([userId, date])
+  @@index([userId])
   @@index([internId])
   @@index([date])
   @@index([feedbackBy])
@@ -1136,8 +1216,10 @@ model ReportAttachment {
 
 model WeeklyEvaluation {
   id              String           @id @default(uuid()) @db.Uuid
-  internId        String           @map("intern_id") @db.Uuid
-  leaderId        String           @map("leader_id") @db.Uuid
+  targetUserId    String           @map("target_user_id") @db.Uuid
+  evaluatorId     String           @map("evaluator_id") @db.Uuid
+  internId        String?          @map("intern_id") @db.Uuid
+  leaderId        String?          @map("leader_id") @db.Uuid
   week            Int
   year            Int
   startDate       DateTime?        @map("start_date")
@@ -1167,10 +1249,14 @@ model WeeklyEvaluation {
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
-  intern Intern @relation(fields: [internId], references: [id], onDelete: Cascade)
-  leader User   @relation("LeaderEvaluations", fields: [leaderId], references: [id], onDelete: Cascade)
+  targetUser User    @relation("UserWeeklyEvaluations", fields: [targetUserId], references: [id], onDelete: Cascade)
+  evaluator  User    @relation("EvaluatorWeeklyEvaluations", fields: [evaluatorId], references: [id], onDelete: Cascade)
+  intern     Intern? @relation(fields: [internId], references: [id], onDelete: Cascade)
+  leader     User?   @relation("LeaderEvaluations", fields: [leaderId], references: [id], onDelete: Cascade)
 
-  @@unique([internId, week])
+  @@unique([targetUserId, week])
+  @@index([targetUserId])
+  @@index([evaluatorId])
   @@index([internId])
   @@index([leaderId])
   @@index([week])
@@ -1206,16 +1292,20 @@ model ExportHistory {
 model RegulationAcknowledgment {
   id             String   @id @default(uuid()) @db.Uuid
   regulationId   String   @map("regulation_id") @db.Uuid
-  internId       String   @map("intern_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  internId       String?  @map("intern_id") @db.Uuid
   acknowledgedAt DateTime @default(now()) @map("acknowledged_at")
   ipAddress      String?  @map("ip_address")
   userAgent      String?  @map("user_agent")
 
   regulation Regulation @relation(fields: [regulationId], references: [id], onDelete: Cascade)
-  intern     Intern     @relation(fields: [internId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  intern     Intern?    @relation(fields: [internId], references: [id], onDelete: Cascade)
 
+  @@unique([regulationId, userId])
   @@unique([regulationId, internId])
   @@index([regulationId])
+  @@index([userId])
   @@index([internId])
   @@map("regulation_acknowledgments")
 }

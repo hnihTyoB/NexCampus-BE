@@ -27,7 +27,7 @@ const defaultSelect = {
     select: {
       id: true,
       taskId: true,
-      internId: true,
+      assigneeId: true,
       supportId: true,
       status: true,
       task: {
@@ -38,31 +38,23 @@ const defaultSelect = {
           deadline: true,
         },
       },
-      intern: {
+      assignee: {
         select: {
           id: true,
-          leaderId: true,
           fullName: true,
-          user: {
-            select: {
-              id: true,
-              email: true,
-              fullName: true,
-            },
+          email: true,
+          internshipProfile: {
+            select: { mentorId: true, departmentId: true },
           },
         },
       },
       support: {
         select: {
           id: true,
-          leaderId: true,
           fullName: true,
-          user: {
-            select: {
-              id: true,
-              email: true,
-              fullName: true,
-            },
+          email: true,
+          internshipProfile: {
+            select: { mentorId: true, departmentId: true },
           },
         },
       },
@@ -89,7 +81,50 @@ const defaultSelect = {
     },
     orderBy: { createdAt: "asc" as const },
   },
-};
+} satisfies Prisma.TaskSubmissionSelect;
+
+function serializeSubmission(sub: any) {
+  if (!sub) return null;
+  const assignment = sub.assignment
+    ? {
+        ...sub.assignment,
+        assigneeId: sub.assignment.assigneeId,
+        internId: sub.assignment.assigneeId,
+        intern: sub.assignment.assignee
+          ? {
+              id: sub.assignment.assignee.id,
+              fullName: sub.assignment.assignee.fullName,
+              leaderId: sub.assignment.assignee.internshipProfile?.mentorId ?? null,
+              departmentId: sub.assignment.assignee.internshipProfile?.departmentId ?? null,
+              user: {
+                id: sub.assignment.assignee.id,
+                email: sub.assignment.assignee.email,
+                fullName: sub.assignment.assignee.fullName,
+              },
+            }
+          : null,
+        support: sub.assignment.support
+          ? {
+              id: sub.assignment.support.id,
+              fullName: sub.assignment.support.fullName,
+              leaderId: sub.assignment.support.internshipProfile?.mentorId ?? null,
+              departmentId: sub.assignment.support.internshipProfile?.departmentId ?? null,
+              user: {
+                id: sub.assignment.support.id,
+                email: sub.assignment.support.email,
+                fullName: sub.assignment.support.fullName,
+              },
+            }
+          : null,
+      }
+    : null;
+
+  return {
+    ...sub,
+    assignment,
+  };
+}
+
 
 export class TaskSubmissionRepository {
   async findAll(
@@ -114,16 +149,16 @@ export class TaskSubmissionRepository {
       ...(reviewStatus ? { reviewStatus } : {}),
       assignment: {
         ...(internId
-          ? { OR: [{ internId }, { supportId: internId }] }
+          ? { OR: [{ assigneeId: internId }, { supportId: internId }] }
           : {}),
         ...(scope?.internId
-          ? { OR: [{ internId: scope.internId }, { supportId: scope.internId }] }
+          ? { OR: [{ assigneeId: scope.internId }, { supportId: scope.internId }] }
           : {}),
         ...(scope?.leaderUserId
           ? {
               OR: [
-                { intern: { leaderId: scope.leaderUserId } },
-                { support: { leaderId: scope.leaderUserId } },
+                { assignee: { internshipProfile: { mentorId: scope.leaderUserId } } },
+                { support: { internshipProfile: { mentorId: scope.leaderUserId } } },
               ],
             }
           : {}),
@@ -143,7 +178,7 @@ export class TaskSubmissionRepository {
     ]);
 
     return {
-      data,
+      data: data.map(serializeSubmission),
       meta: {
         total,
         page,
@@ -154,11 +189,13 @@ export class TaskSubmissionRepository {
   }
 
   async findById(id: string) {
-    return prisma.taskSubmission.findUnique({
+    const sub = await prisma.taskSubmission.findUnique({
       where: { id },
       select: defaultSelect,
     });
+    return serializeSubmission(sub);
   }
+
 
   async countAttempts(assignmentId: string): Promise<number> {
     return prisma.taskSubmission.count({
@@ -279,9 +316,10 @@ export class TaskSubmissionRepository {
             assignmentId: true,
             assignment: {
               select: {
-                internId: true,
+                assigneeId: true,
                 supportId: true,
               },
+
             },
           },
         },

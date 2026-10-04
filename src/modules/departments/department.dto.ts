@@ -16,6 +16,31 @@ export interface DepartmentLeaderDto {
   };
 }
 
+export interface DepartmentManagerDto {
+  departmentId: string;
+  userId: string;
+  title?: string | null;
+  isPrimary: boolean;
+  createdAt?: Date;
+  user: {
+    id: string;
+    fullName: string | null;
+    email: string | null;
+    avatarUrl?: string | null;
+  };
+}
+
+export interface AssignDepartmentManagerDto {
+  userId: string;
+  title?: string | null;
+  isPrimary?: boolean;
+}
+
+export interface UpdateDepartmentManagerDto {
+  title?: string | null;
+  isPrimary?: boolean;
+}
+
 export interface DepartmentDto {
   id: string;
   name: string;
@@ -25,8 +50,11 @@ export interface DepartmentDto {
   internsCount?: number;
   _count?: {
     positions: number;
-    interns: number;
+    internshipProfiles?: number;
+    interns?: number;
+    managers?: number;
   };
+  managers?: DepartmentManagerDto[];
   leaders?: DepartmentLeaderDto[];
   createdAt?: Date;
   updatedAt?: Date;
@@ -57,3 +85,4 @@ export interface UpdatePositionDto {
   departmentId?: string;
   name?: string;
 }
+
