@@ -18,6 +18,7 @@ const userSelect = {
       id: true,
       name: true,
       isSystem: true,
+      portalType: true,
     },
   },
   createdAt: true,
