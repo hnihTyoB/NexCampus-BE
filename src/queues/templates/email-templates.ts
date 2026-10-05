@@ -6,6 +6,7 @@ export type EmailTemplateType =
   | "DISCORD_LINK_REMINDER"
   | "RESET_PASSWORD"
   | "DAILY_REPORT_REMINDER"
+  | "USER_ACCOUNT_CREATED"
   | "CUSTOM";
 
 export interface RenderedEmail {
@@ -164,6 +165,23 @@ const dailyReportReminderTemplate = Handlebars.compile(`
   <p style="font-size: 13px; color: #6b7280;">Nộp báo cáo đầy đủ và đúng hạn giúp Leader theo dõi sát tiến độ và hỗ trợ bạn kịp thời.</p>
 `);
 
+const userAccountCreatedTemplate = Handlebars.compile(`
+  <h2 style="color: #111827; margin-top: 0; font-size: 18px;">Tài khoản NexCampus của bạn đã được khởi tạo</h2>
+  <p>Xin chào <strong>{{fullName}}</strong>,</p>
+  <p>Tài khoản hệ thống NexCampus của bạn đã được khởi tạo với thông tin chi tiết như sau:</p>
+  <div class="info-box">
+    <div class="info-item"><span class="info-label">Tài khoản (Email):</span> <span class="info-value">{{email}}</span></div>
+    <div class="info-item"><span class="info-label">Mật khẩu tạm thời:</span> <span class="info-value" style="font-family: monospace; background: #e0e7ff; padding: 2px 6px; border-radius: 4px; color: #3730a3;">{{temporaryPassword}}</span></div>
+    {{#if roleName}}
+    <div class="info-item"><span class="info-label">Vai trò:</span> <span class="info-value">{{roleName}}</span></div>
+    {{/if}}
+  </div>
+  <div style="text-align: center; margin: 20px 0;">
+    <a href="{{{loginUrl}}}" class="btn" style="background-color: #4f46e5;">Đăng nhập hệ thống ngay</a>
+  </div>
+  <p style="font-size: 13px; color: #ef4444; margin-bottom: 24px;"><strong>Quan trọng:</strong> Vì lý do bảo mật, vui lòng tiến hành đổi mật khẩu ngay sau lần đăng nhập đầu tiên.</p>
+`);
+
 const customTemplate = Handlebars.compile(`
   <h2 style="color: #111827; margin-top: 0; font-size: 18px;">{{title}}</h2>
   <div>{{{content}}}</div>
@@ -177,6 +195,13 @@ export function renderEmailTemplate(
   let bodyHtml = "";
 
   switch (type) {
+    case "USER_ACCOUNT_CREATED": {
+      subject =
+        (data.subject as string) ||
+        "[NexCampus] Thông tin tài khoản đăng nhập hệ thống";
+      bodyHtml = userAccountCreatedTemplate(data);
+      break;
+    }
     case "INVITE_APPLICATION": {
       subject =
         (data.subject as string) ||

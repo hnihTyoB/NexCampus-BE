@@ -1,6 +1,8 @@
+import crypto from "crypto";
 import bcrypt from "bcryptjs";
-import { prisma } from "../../database/prisma.client";
 import { UserRepository } from "./user.repository";
+import { rbacRepository } from "../rbac/rbac.repository";
+import { NotificationSettingRepository } from "../notification-settings/notification-setting.repository";
 import { AppError } from "../../common/errors/app-error";
 import { ERROR_CODE } from "../../common/errors/error-code";
 import {
@@ -17,20 +19,27 @@ import {
   GetAvatarUploadUrlDto,
   ConfirmAvatarUploadDto,
 } from "../auth/auth.dto";
+import { dispatchEmailJob } from "../../queues";
+import { envConfig } from "../../config/env.config";
 
 export class UserService {
   private readonly repository = new UserRepository();
+  private readonly notificationSettingRepository =
+    new NotificationSettingRepository();
 
   /**
    * Kiểm tra người dùng có giữ vai trò hoặc đặc quyền quản trị hệ thống hay không:
-   * 1. Có vai trò hệ thống ADMIN (isSystem = true)
+   * 1. Có vai trò hệ thống ADMIN hoặc tên vai trò là ADMIN
    * 2. Hoặc vai trò sở hữu các quyền quản trị then chốt (USER_ROLE_ASSIGN, ROLE_PERMISSION_ASSIGN)
    */
   async isAdministrativeUser(user: {
     roleId?: string | null;
     role?: { name: string; isSystem?: boolean } | null;
   }): Promise<boolean> {
-    if (user.role?.isSystem && user.role.name === ROLES.ADMIN) {
+    if (
+      user.role?.name === ROLES.ADMIN ||
+      (user.role?.isSystem && user.role.name === ROLES.ADMIN)
+    ) {
       return true;
     }
     if (user.roleId) {
@@ -60,28 +69,42 @@ export class UserService {
   }
 
   async create(data: CreateUserDto, actorId?: string) {
-    const existing = await this.repository.findByEmail(data.email);
+    const normalizedEmail = data.email.trim().toLowerCase();
+    const existing = await this.repository.findByEmail(normalizedEmail);
 
     if (existing) {
       throw new AppError(
-        "Email already in use",
+        "Email đã tồn tại trên hệ thống",
         409,
         ERROR_CODE.DUPLICATE_ENTRY,
       );
     }
 
-    const role = await prisma.role.findUnique({
-      where: { id: data.roleId },
-    });
-    if (!role) {
-      throw new AppError("Role not found", 404, ERROR_CODE.NOT_FOUND);
+    let role = null;
+    if (data.roleId) {
+      role = await rbacRepository.findRoleById(data.roleId);
+    } else if (data.roleName) {
+      role = await rbacRepository.findRoleByName(
+        data.roleName.trim().toUpperCase(),
+      );
     }
+
+    if (!role) {
+      throw new AppError(
+        "Không tìm thấy vai trò (Role not found)",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
+
+    const targetRoleId = role.id;
 
     // SEC-P0: Chống leo thang đặc quyền khi tạo người dùng và gán roleId
     if (actorId) {
       const actor = await this.repository.findById(actorId);
       const isSuperAdmin =
-        actor?.role?.isSystem && actor?.role?.name === ROLES.ADMIN;
+        (actor?.role?.name === ROLES.ADMIN) ||
+        (actor?.role?.isSystem && actor?.role?.name === ROLES.ADMIN);
       if (!isSuperAdmin) {
         const actorPerms = new Set(
           await permissionCacheService.getUserPermissions(actorId),
@@ -94,7 +117,7 @@ export class UserService {
           );
         }
         const targetPermissions =
-          await permissionCacheService.getRolePermissions(data.roleId);
+          await permissionCacheService.getRolePermissions(targetRoleId);
         for (const perm of targetPermissions) {
           if (!actorPerms.has(perm)) {
             throw new AppError(
@@ -107,16 +130,50 @@ export class UserService {
       }
     }
 
-    const passwordHash = await bcrypt.hash(data.password, 10);
+    const rawPassword =
+      data.password ||
+      ("Nx@" + crypto.randomBytes(6).toString("hex") + "!");
+    const passwordHash = await bcrypt.hash(rawPassword, 10);
 
-    return this.repository.create({
-      email: data.email,
+    const newUser = await this.repository.create({
+      email: normalizedEmail,
       passwordHash,
-      roleId: data.roleId,
+      roleId: targetRoleId,
       fullName: data.fullName,
-      phoneNumber: data.phoneNumber,
+      phoneNumber: data.phoneNumber ? data.phoneNumber.trim() : undefined,
       isActive: true, // Admin-created users are active by default
     });
+
+    // Tạo NotificationSetting cho người dùng mới qua Repository
+    await this.notificationSettingRepository
+      .findOrCreateDefault(newUser.id)
+      .catch((err) => {
+        console.warn(
+          `[UserService] Failed to create notificationSetting for user ${newUser.id}:`,
+          err?.message,
+        );
+      });
+
+    // Enqueue welcome email kèm mật khẩu khởi tạo cho user
+    const loginUrl = `${(envConfig.clientUrl || envConfig.cors.allowedOrigins[0] || "http://localhost:3000").replace(/\/$/, "")}/login`;
+    await dispatchEmailJob({
+      type: "USER_ACCOUNT_CREATED",
+      to: normalizedEmail,
+      data: {
+        fullName: data.fullName || normalizedEmail,
+        email: normalizedEmail,
+        temporaryPassword: rawPassword,
+        roleName: role.name,
+        loginUrl,
+      },
+    }).catch((err) => {
+      console.warn(
+        `[UserService] Failed to dispatch welcome email to ${normalizedEmail}:`,
+        err?.message,
+      );
+    });
+
+    return newUser;
   }
 
   async update(id: string, data: UpdateUserDto) {
