@@ -7,6 +7,7 @@ import {
   cronJobNameParamSchema,
   triggerCronJobSchema,
   listCronJobsQuerySchema,
+  toggleCronJobSchema,
 } from "./cron.validation";
 import { PERMISSIONS } from "../../common/constants/permission.constant";
 
@@ -33,6 +34,7 @@ router.patch(
   "/jobs/:jobName/toggle",
   requirePermission(PERMISSIONS.CRON_JOB_MANAGE),
   validate(cronJobNameParamSchema, "params"),
+  validate(toggleCronJobSchema, "body"),
   cronController.toggleJob,
 );
 

@@ -5,6 +5,7 @@ import {
   UpdateDiscordWebhookDto,
 } from "./discord-webhook.dto";
 import { AUDIT_ACTION, AUDIT_TARGET_TYPE } from "../../common/constants/audit-log.constant";
+import { ROLES } from "../../common/constants/role.constant";
 
 export class DiscordWebhookRepository {
   async findMany(filter: DiscordWebhookFilterQuery = {}) {
@@ -240,6 +241,106 @@ export class DiscordWebhookRepository {
         userAgent: params.userAgent || null,
       },
     });
+  }
+
+  /**
+   * Lấy toàn bộ danh sách cấu hình webhook của 1 phòng ban
+   */
+  async findByDepartmentId(departmentId: string) {
+    return prisma.discordWebhookConfig.findMany({
+      where: { departmentId },
+    });
+  }
+
+  /**
+   * Lấy danh sách discordUserId của Admin và Leader thuộc phòng ban để thêm vào thread
+   */
+  async findThreadMemberDiscordIds(departmentId: string): Promise<string[]> {
+    const memberIds = new Set<string>();
+
+    try {
+      const adminUsers = await prisma.user.findMany({
+        where: {
+          role: { name: ROLES.ADMIN },
+          isActive: true,
+        },
+        select: { discordUserId: true },
+      });
+      for (const a of adminUsers) {
+        if (a.discordUserId) memberIds.add(a.discordUserId);
+      }
+    } catch (err: any) {
+      console.warn(`[DiscordWebhookRepo] Fetch admins for thread failed:`, err?.message);
+    }
+
+    try {
+      const leaderAssignments = await prisma.departmentManager.findMany({
+        where: { departmentId },
+        include: {
+          user: {
+            select: { discordUserId: true },
+          },
+        },
+      });
+      for (const la of leaderAssignments) {
+        if (la.user?.discordUserId) {
+          memberIds.add(la.user.discordUserId);
+        }
+      }
+    } catch (err: any) {
+      console.warn(`[DiscordWebhookRepo] Fetch leaders for thread failed:`, err?.message);
+    }
+
+    return Array.from(memberIds);
+  }
+
+  /**
+   * Cập nhật hoặc tạo mới cấu hình Webhook phòng ban với Deduplication an toàn
+   */
+  async upsertDepartmentConfigWithDeduplication(params: {
+    departmentId: string;
+    purpose: any;
+    defaultWebhookUrl: string;
+    discordRoleId?: string | null;
+    threadId?: string | null;
+  }) {
+    const { departmentId, purpose, defaultWebhookUrl, discordRoleId, threadId } = params;
+
+    const records = await prisma.discordWebhookConfig.findMany({
+      where: { departmentId, purpose },
+      orderBy: { createdAt: "asc" },
+    });
+
+    if (records.length > 0) {
+      const primary = records[0];
+      await prisma.discordWebhookConfig.update({
+        where: { id: primary.id },
+        data: {
+          ...(discordRoleId ? { discordRoleId } : {}),
+          ...(threadId ? { threadId } : {}),
+          isEnabled: true,
+        },
+      });
+
+      if (records.length > 1) {
+        const duplicateIds = records.slice(1).map((r) => r.id);
+        await prisma.discordWebhookConfig.deleteMany({
+          where: { id: { in: duplicateIds } },
+        });
+      }
+    } else {
+      await prisma.discordWebhookConfig.create({
+        data: {
+          scope: "DEPARTMENT",
+          departmentId,
+          purpose,
+          webhookUrl: defaultWebhookUrl,
+          discordRoleId: discordRoleId || null,
+          threadId: threadId || null,
+          isEnabled: true,
+        },
+      });
+    }
   }
 }
 
