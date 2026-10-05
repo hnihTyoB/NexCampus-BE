@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../database/prisma.client";
 import { ROLES } from "../../common/constants/role.constant";
 import { PERMISSIONS } from "../../common/constants/permission.constant";
+import { CRON_SYSTEM_CONFIG_KEYS } from "../../common/constants/cron.constant";
 import { ActivitySummaryStatsDto } from "./cron.dto";
 
 export class CronRepository {
@@ -354,6 +355,38 @@ export class CronRepository {
       deptWebhookConfigs,
     };
   }
+
+  /**
+   * Lấy danh sách tên các cron job đang bị vô hiệu hóa từ SystemConfig
+   */
+  async getDisabledJobs(): Promise<string[]> {
+    const config = await prisma.systemConfig.findUnique({
+      where: { key: CRON_SYSTEM_CONFIG_KEYS.DISABLED_JOBS },
+    });
+    if (config && Array.isArray(config.value)) {
+      return config.value as string[];
+    }
+    return [];
+  }
+
+  /**
+   * Cập nhật danh sách tên các cron job đang bị vô hiệu hóa vào SystemConfig
+   */
+  async setDisabledJobs(jobs: string[]): Promise<void> {
+    await prisma.systemConfig.upsert({
+      where: { key: CRON_SYSTEM_CONFIG_KEYS.DISABLED_JOBS },
+      update: {
+        value: jobs,
+        description: "Danh sách tác vụ nền bị vô hiệu hóa lịch chạy tự động",
+      },
+      create: {
+        key: CRON_SYSTEM_CONFIG_KEYS.DISABLED_JOBS,
+        value: jobs,
+        description: "Danh sách tác vụ nền bị vô hiệu hóa lịch chạy tự động",
+      },
+    });
+  }
 }
 
 export const cronRepository = new CronRepository();
+

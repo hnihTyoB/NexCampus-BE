@@ -22,25 +22,33 @@ export const userIdParamSchema = z.object({
   id: z.string().uuid("Invalid user ID format"),
 });
 
-export const createUserSchema = z.object({
-  email: z.string().min(1, "Email is required").email("Invalid email format"),
-  password: z
-    .string()
-    .min(8, "Password must be at least 8 characters")
-    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-    .regex(/[0-9]/, "Password must contain at least one number")
-    .regex(
-      /[^a-zA-Z0-9]/,
-      "Password must contain at least one special character",
-    ),
-  roleId: z.string().uuid("Invalid roleId format"),
-  fullName: z.string().trim().min(1).max(100).optional(),
-  phoneNumber: z
-    .string()
-    .regex(/^[0-9]{10,11}$/, "Invalid phone number format")
-    .optional(),
-});
+export const createUserSchema = z
+  .object({
+    email: z.string().min(1, "Email is required").email("Invalid email format"),
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+      .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+      .regex(/[0-9]/, "Password must contain at least one number")
+      .regex(
+        /[^a-zA-Z0-9]/,
+        "Password must contain at least one special character",
+      )
+      .optional(),
+    roleId: z.string().uuid("Invalid roleId format").optional(),
+    roleName: z.string().trim().min(1).max(50).optional(),
+    fullName: z.string().trim().min(1).max(100).optional(),
+    phoneNumber: z
+      .string()
+      .regex(/^[0-9]{10,11}$/, "Invalid phone number format")
+      .optional()
+      .or(z.literal("")),
+  })
+  .refine((data) => Boolean(data.roleId || data.roleName), {
+    message: "roleId hoặc roleName là bắt buộc",
+    path: ["roleId"],
+  });
 
 export const updateUserSchema = z
   .object({
@@ -49,7 +57,8 @@ export const updateUserSchema = z
     phoneNumber: z
       .string()
       .regex(/^[0-9]{10,11}$/, "Invalid phone number format")
-      .optional(),
+      .optional()
+      .or(z.literal("")),
   })
   .refine(
     (data) => Object.keys(data).length > 0,

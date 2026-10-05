@@ -7,6 +7,7 @@ import {
 } from "../constants/discord.constant";
 import { ROLES } from "../constants/role.constant";
 import { AUDIT_ACTION } from "../constants/audit-log.constant";
+import { discordWebhookRepository } from "../../modules/integration/discord-webhook.repository";
 
 export interface BatchSyncRoleDetail {
   internId: string;
@@ -71,6 +72,7 @@ export class DiscordBotService {
   private runtimeToken?: string;
   private runtimeGuildId?: string;
   private runtimeEnabled?: boolean;
+  private activeProvisions = new Map<string, Promise<ProvisionDepartmentResult>>();
 
   setRuntimeConfig(config: { token?: string; guildId?: string; enabled?: boolean }): void {
     if (config.token !== undefined) this.runtimeToken = config.token.trim();
@@ -212,6 +214,68 @@ export class DiscordBotService {
       return (await res.json()) as any;
     } catch (err: any) {
       console.warn(`[DiscordBot] getGuildChannels failed:`, err.message);
+      return [];
+    }
+  }
+
+  /**
+   * Lấy danh sách Roles trên Server Discord
+   */
+  async getGuildRoles(): Promise<
+    Array<{ id: string; name: string; color: number }>
+  > {
+    if (!this.token || !this.guildId) return [];
+
+    try {
+      const res = await fetch(`${this.baseUrl}/guilds/${this.guildId}/roles`, {
+        headers: this.getHeaders(),
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (!res.ok) {
+        console.warn(`[DiscordBot] getGuildRoles error HTTP ${res.status}`);
+        return [];
+      }
+
+      return (await res.json()) as any;
+    } catch (err: any) {
+      console.warn(`[DiscordBot] getGuildRoles failed:`, err?.message);
+      return [];
+    }
+  }
+
+  /**
+   * Lấy danh sách tất cả các Active Threads trên Server Discord
+   */
+  async getGuildActiveThreads(): Promise<
+    Array<{ id: string; name: string; parentId: string; type: number }>
+  > {
+    if (!this.token || !this.guildId) return [];
+
+    try {
+      const res = await fetch(
+        `${this.baseUrl}/guilds/${this.guildId}/threads/active`,
+        {
+          headers: this.getHeaders(),
+          signal: AbortSignal.timeout(6000),
+        },
+      );
+
+      if (!res.ok) {
+        console.warn(`[DiscordBot] getGuildActiveThreads error HTTP ${res.status}`);
+        return [];
+      }
+
+      const data = (await res.json()) as any;
+      const list = Array.isArray(data?.threads) ? data.threads : [];
+      return list.map((t: any) => ({
+        id: t.id,
+        name: t.name,
+        parentId: t.parent_id,
+        type: t.type,
+      }));
+    } catch (err: any) {
+      console.warn(`[DiscordBot] getGuildActiveThreads failed:`, err?.message);
       return [];
     }
   }
@@ -396,7 +460,7 @@ export class DiscordBotService {
   }
 
   /**
-   * Xóa hoặc Lưu trữ (Archive) Private Thread
+   * Xóa Private Thread
    */
   async deleteThread(threadId: string): Promise<boolean> {
     if (!this.token || !threadId) return false;
@@ -412,6 +476,29 @@ export class DiscordBotService {
     } catch (err: any) {
       console.warn(
         `[DiscordBot] deleteThread ${threadId} failed: ${err?.message}`,
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Lưu trữ (Archive) Private Thread để bảo toàn lịch sử chat thay vì xóa vĩnh viễn
+   */
+  async archiveThread(threadId: string): Promise<boolean> {
+    if (!this.token || !threadId) return false;
+
+    try {
+      const res = await fetch(`${this.baseUrl}/channels/${threadId}`, {
+        method: "PATCH",
+        headers: this.getHeaders(),
+        body: JSON.stringify({ archived: true, locked: true }),
+        signal: AbortSignal.timeout(6000),
+      });
+
+      return res.ok || res.status === 404;
+    } catch (err: any) {
+      console.warn(
+        `[DiscordBot] archiveThread ${threadId} failed: ${err?.message}`,
       );
       return false;
     }
@@ -553,43 +640,75 @@ export class DiscordBotService {
 
   /**
    * Tự động khởi tạo Role & Private Thread cho Phòng ban (Zero-touch Provisioning)
+   * Sử dụng mutex in-memory để chống gọi đồng thời/trùng lặp khi nhấn nhiều lần
    */
   async provisionDepartment(params: {
     departmentId: string;
     departmentName: string;
     parentChannelId?: string;
   }): Promise<ProvisionDepartmentResult> {
+    const existing = this.activeProvisions.get(params.departmentId);
+    if (existing) {
+      return existing;
+    }
+
+    const promise = this.executeProvisionDepartment(params).finally(() => {
+      this.activeProvisions.delete(params.departmentId);
+    });
+
+    this.activeProvisions.set(params.departmentId, promise);
+    return promise;
+  }
+
+  private async executeProvisionDepartment(params: {
+    departmentId: string;
+    departmentName: string;
+    parentChannelId?: string;
+  }): Promise<ProvisionDepartmentResult> {
     const { departmentId, departmentName } = params;
 
-    // 1. Kiểm tra cấu hình hiện có trong DB
-    const existingConfigs = await prisma.discordWebhookConfig.findMany({
-      where: { departmentId },
-    });
+    // 1. Kiểm tra cấu hình hiện có trong DB qua Repository
+    const existingConfigs = await discordWebhookRepository.findByDepartmentId(departmentId);
 
     let discordRoleId = existingConfigs.find((c) => c.discordRoleId)?.discordRoleId || null;
     let standupThreadId = existingConfigs.find((c) => c.purpose === DISCORD_WEBHOOK_PURPOSE.DAILY_STANDUP)?.threadId || null;
     let taskThreadId = existingConfigs.find((c) => c.purpose === DISCORD_WEBHOOK_PURPOSE.TASK_BOARD)?.threadId || null;
     let meetingThreadId = existingConfigs.find((c) => c.purpose === DISCORD_WEBHOOK_PURPOSE.MEETING_ROOM)?.threadId || null;
 
-    const deptShortName = departmentName.split("(")[0].trim();
+    const deptShortName = departmentName.split("(")[0].trim().replace(/^Ban\s+/i, "");
     let roleName = `Ban ${deptShortName}`;
     let isNewlyCreated = false;
 
-    // 2. Tạo Role mới nếu chưa có
+    // 2. Kiểm tra Role: nếu DB chưa có discordRoleId, kiểm tra xem trên Discord đã có Role này chưa trước khi tạo mới
     if (!discordRoleId) {
-      try {
-        const newRole = await this.createRole({
-          name: roleName,
-          mentionable: true,
-        });
-        discordRoleId = newRole.id;
-        roleName = newRole.name;
-        isNewlyCreated = true;
-      } catch (err: any) {
-        console.warn(
-          `[DiscordBot] provisionDepartment createRole warning:`,
-          err.message,
+      const guildRoles = await this.getGuildRoles();
+      const existingRole = guildRoles.find((r) => {
+        const rName = r.name.trim().toLowerCase();
+        return (
+          rName === roleName.trim().toLowerCase() ||
+          rName === `ban ${deptShortName.toLowerCase()}` ||
+          rName === deptShortName.toLowerCase()
         );
+      });
+
+      if (existingRole) {
+        discordRoleId = existingRole.id;
+        roleName = existingRole.name;
+      } else {
+        try {
+          const newRole = await this.createRole({
+            name: roleName,
+            mentionable: true,
+          });
+          discordRoleId = newRole.id;
+          roleName = newRole.name;
+          isNewlyCreated = true;
+        } catch (err: any) {
+          console.warn(
+            `[DiscordBot] provisionDepartment createRole warning:`,
+            err.message,
+          );
+        }
       }
     }
 
@@ -609,53 +728,83 @@ export class DiscordBotService {
       }
     }
 
-    // 4. Lấy danh sách channels trên Guild
-    const channels = await this.getGuildChannels();
+    // 4. Lấy danh sách channels & active threads trên Guild
+    const [channels, activeThreads] = await Promise.all([
+      this.getGuildChannels(),
+      this.getGuildActiveThreads(),
+    ]);
+
     const standupCh = channels.find((c) => c.name.includes("standup") || c.name.includes("daily"));
     const taskCh = channels.find((c) => c.name.includes("task"));
     const meetingCh = channels.find((c) => c.name.includes("meeting"));
 
-    // A. Tạo Private Thread cho Standup
-    if (!standupThreadId && standupCh) {
-      try {
-        const st = await this.createPrivateThread({
-          channelId: standupCh.id,
-          name: `🔒 [${deptShortName}] Standup`,
-        });
-        standupThreadId = st.id;
-        isNewlyCreated = true;
-      } catch (err: any) {
-        console.warn(`[DiscordBot] create Standup thread warning:`, err.message);
-      }
-    }
+    const resolveThread = async (
+      threadType: "Standup" | "Task Board" | "Meeting Room",
+      currentDbThreadId: string | null,
+      parentCh: { id: string; name: string } | undefined,
+    ): Promise<string | null> => {
+      const expectedName = `🔒 [${deptShortName}] ${threadType}`;
 
-    // B. Tạo Private Thread cho Task Board
-    if (!taskThreadId && taskCh) {
-      try {
-        const tt = await this.createPrivateThread({
-          channelId: taskCh.id,
-          name: `🔒 [${deptShortName}] Task Board`,
-        });
-        taskThreadId = tt.id;
-        isNewlyCreated = true;
-      } catch (err: any) {
-        console.warn(`[DiscordBot] create Task Board thread warning:`, err.message);
+      // Nếu DB đã có threadId và thread này còn tồn tại trên server -> giữ nguyên
+      if (currentDbThreadId) {
+        const existsOnDiscord = activeThreads.some((t) => t.id === currentDbThreadId);
+        if (existsOnDiscord) {
+          // Lưu trữ (Archive) các threads trùng lặp rác nếu có trên cùng parentCh để bảo toàn lịch sử chat
+          const duplicates = activeThreads.filter(
+            (t) =>
+              t.id !== currentDbThreadId &&
+              t.name.trim().toLowerCase() === expectedName.toLowerCase() &&
+              (!parentCh || t.parentId === parentCh.id),
+          );
+          for (const dup of duplicates) {
+            await this.archiveThread(dup.id).catch(() => {});
+          }
+          return currentDbThreadId;
+        }
       }
-    }
 
-    // C. Tạo Private Thread cho Meeting Room
-    if (!meetingThreadId && meetingCh) {
-      try {
-        const mt = await this.createPrivateThread({
-          channelId: meetingCh.id,
-          name: `🔒 [${deptShortName}] Meeting Room`,
-        });
-        meetingThreadId = mt.id;
-        isNewlyCreated = true;
-      } catch (err: any) {
-        console.warn(`[DiscordBot] create Meeting Room thread warning:`, err.message);
+      // Nếu DB chưa có (hoặc thread cũ đã bị xóa), kiểm tra xem trên Discord đã có thread cùng tên chưa
+      const matchingThreads = activeThreads.filter((t) => {
+        const tName = t.name.trim().toLowerCase();
+        const expName = expectedName.toLowerCase();
+        const altName = `🔒 [ban ${deptShortName.toLowerCase()}] ${threadType.toLowerCase()}`;
+        const isMatch = tName === expName || tName === altName;
+        if (!isMatch) return false;
+        if (parentCh && t.parentId !== parentCh.id) return false;
+        return true;
+      });
+
+      if (matchingThreads.length > 0) {
+        const primary = matchingThreads[0];
+        // Lưu trữ (Archive) các thread trùng lặp dư thừa
+        if (matchingThreads.length > 1) {
+          for (let i = 1; i < matchingThreads.length; i++) {
+            await this.archiveThread(matchingThreads[i].id).catch(() => {});
+          }
+        }
+        return primary.id;
       }
-    }
+
+      // Chỉ tạo mới khi trên Discord hoàn toàn chưa có thread này
+      if (parentCh) {
+        try {
+          const newThread = await this.createPrivateThread({
+            channelId: parentCh.id,
+            name: expectedName,
+          });
+          isNewlyCreated = true;
+          return newThread.id;
+        } catch (err: any) {
+          console.warn(`[DiscordBot] create ${threadType} thread warning:`, err.message);
+        }
+      }
+
+      return null;
+    };
+
+    standupThreadId = await resolveThread("Standup", standupThreadId, standupCh);
+    taskThreadId = await resolveThread("Task Board", taskThreadId, taskCh);
+    meetingThreadId = await resolveThread("Meeting Room", meetingThreadId, meetingCh);
 
     // Tự động thêm thành viên vào 3 Threads:
     // 1. Server Owner
@@ -665,54 +814,27 @@ export class DiscordBotService {
     if (ownerId) membersToAdd.add(ownerId);
 
     try {
-      const adminUsers = await prisma.user.findMany({
-        where: {
-          role: { name: ROLES.ADMIN },
-          discordUserId: { not: null },
-          deletedAt: null,
-          isActive: true,
-        },
-        select: { discordUserId: true },
-      });
-      for (const a of adminUsers) {
-        if (a.discordUserId) membersToAdd.add(a.discordUserId);
-      }
-    } catch (err: any) {
-      console.warn(`[DiscordBot] Fetch admins for thread failed:`, err?.message);
-    }
-
-    try {
-      const leaderAssignments = await prisma.departmentManager.findMany({
-        where: { departmentId },
-        include: {
-          user: {
-            select: { discordUserId: true },
-          },
-        },
-      });
-      for (const la of leaderAssignments) {
-        const leaderDiscordId = la.user?.discordUserId;
-        if (leaderDiscordId) {
-          membersToAdd.add(leaderDiscordId);
-          if (discordRoleId) {
-            await this.addMemberToRole({ userId: leaderDiscordId, roleId: discordRoleId }).catch(() => {});
-          }
+      const threadMemberDiscordIds =
+        await discordWebhookRepository.findThreadMemberDiscordIds(departmentId);
+      for (const id of threadMemberDiscordIds) {
+        membersToAdd.add(id);
+        if (discordRoleId) {
+          await this.addMemberToRole({ userId: id, roleId: discordRoleId }).catch(() => {});
         }
       }
-
     } catch (err: any) {
-      console.warn(`[DiscordBot] Fetch leaders for thread failed:`, err?.message);
+      console.warn(`[DiscordBot] Fetch thread members failed:`, err?.message);
     }
 
     const createdThreadIds = [standupThreadId, taskThreadId, meetingThreadId].filter(Boolean) as string[];
     for (const threadId of createdThreadIds) {
       for (const userId of membersToAdd) {
         await this.addMemberToThread({ threadId, userId }).catch(() => {});
-        await new Promise((r) => setTimeout(r, 200));
+        await new Promise((r) => setTimeout(r, 150));
       }
     }
 
-    // 5. Cập nhật vào DB cho 3 records
+    // 5. Cập nhật vào DB cho 3 records với xử lý Deduplication an toàn
     const defaultWebhookUrl =
       process.env.DISCORD_STANDUP_WEBHOOK ||
       process.env.DISCORD_WEBHOOK_URL ||
@@ -722,29 +844,13 @@ export class DiscordBotService {
       purpose: (typeof DISCORD_WEBHOOK_PURPOSE)[keyof typeof DISCORD_WEBHOOK_PURPOSE],
       threadId: string | null,
     ) => {
-      const existing = existingConfigs.find((c) => c.purpose === purpose);
-      if (existing) {
-        await prisma.discordWebhookConfig.update({
-          where: { id: existing.id },
-          data: {
-            ...(discordRoleId ? { discordRoleId } : {}),
-            ...(threadId ? { threadId } : {}),
-            isEnabled: true,
-          },
-        });
-      } else {
-        await prisma.discordWebhookConfig.create({
-          data: {
-            scope: DISCORD_WEBHOOK_SCOPE.DEPARTMENT,
-            departmentId,
-            purpose,
-            webhookUrl: defaultWebhookUrl,
-            discordRoleId,
-            threadId,
-            isEnabled: true,
-          },
-        });
-      }
+      await discordWebhookRepository.upsertDepartmentConfigWithDeduplication({
+        departmentId,
+        purpose,
+        defaultWebhookUrl,
+        discordRoleId,
+        threadId,
+      });
     };
 
     await updateOrCreateConfig(DISCORD_WEBHOOK_PURPOSE.DAILY_STANDUP, standupThreadId);

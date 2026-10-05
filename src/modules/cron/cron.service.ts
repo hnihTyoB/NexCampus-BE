@@ -31,10 +31,10 @@ import { DISCORD_WEBHOOK_PURPOSE } from "../../common/constants/discord.constant
 
 export class CronService {
   /**
-   * Tập hợp các job đang bị vô hiệu hóa (lưu in-memory, reset khi restart server)
-   * Nếu muốn bền vững hơn, có thể đưa vào Redis hoặc DB sau.
+   * Tập hợp các job đang bị vô hiệu hóa (lưu trữ bền vững trong SystemConfig)
    */
   private readonly disabledJobs = new Set<CronJobName>();
+  private isInitialized = false;
 
   constructor(
     private readonly repository: CronRepository = cronRepository,
@@ -42,9 +42,28 @@ export class CronService {
   ) {}
 
   /**
+   * Tải danh sách các job bị tắt từ SystemConfig khi khởi chạy
+   */
+  private async ensureInitialized(): Promise<void> {
+    if (this.isInitialized) return;
+    try {
+      const persistedDisabled = await this.repository.getDisabledJobs();
+      for (const job of persistedDisabled) {
+        this.disabledJobs.add(job as CronJobName);
+      }
+      this.isInitialized = true;
+    } catch (error) {
+      console.warn("[CronService] Failed to load disabled cron jobs from DB:", error);
+      this.isInitialized = true;
+    }
+  }
+
+  /**
    * Danh sách toàn bộ các tác vụ định kỳ đã đăng ký trong hệ thống
    */
   async listJobs(search?: string): Promise<CronJobItemDto[]> {
+    await this.ensureInitialized();
+
     const jobs: CronJobItemDto[] = Object.entries(DEFAULT_CRON_SCHEDULES).map(
       ([name, config]) => ({
         name: name as CronJobName,
@@ -72,19 +91,23 @@ export class CronService {
    */
   async toggleJob(
     jobName: CronJobName,
+    desiredState?: boolean,
     actorContext?: { actorId?: string; ipAddress?: string; userAgent?: string },
   ): Promise<ToggleCronJobResponseDto> {
-    const wasDisabled = this.disabledJobs.has(jobName);
+    await this.ensureInitialized();
 
-    if (wasDisabled) {
-      // Đang tắt → Bật lên
+    const currentlyDisabled = this.disabledJobs.has(jobName);
+    const shouldEnable = desiredState !== undefined ? desiredState : currentlyDisabled;
+
+    if (shouldEnable) {
       this.disabledJobs.delete(jobName);
       await cronQueue.enableJobScheduler(jobName);
     } else {
-      // Đang bật → Tắt đi
       this.disabledJobs.add(jobName);
       await cronQueue.disableJobScheduler(jobName);
     }
+
+    await this.repository.setDisabledJobs(Array.from(this.disabledJobs));
 
     const isEnabled = !this.disabledJobs.has(jobName);
 

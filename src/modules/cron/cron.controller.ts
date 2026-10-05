@@ -57,8 +57,9 @@ export class CronController {
   ): Promise<void> => {
     try {
       const jobName = req.params.jobName as CronJobName;
+      const isEnabled = req.body?.isEnabled as boolean | undefined;
 
-      const result = await this.service.toggleJob(jobName, {
+      const result = await this.service.toggleJob(jobName, isEnabled, {
         actorId: req.user?.id,
         ipAddress:
           req.ip ||

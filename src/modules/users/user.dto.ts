@@ -13,8 +13,9 @@ export interface UserQueryDto {
 
 export interface CreateUserDto {
   email: string;
-  password: string;
-  roleId: string;
+  password?: string;
+  roleId?: string;
+  roleName?: string;
   fullName?: string;
   phoneNumber?: string;
 }

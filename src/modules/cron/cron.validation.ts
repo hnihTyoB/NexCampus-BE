@@ -18,3 +18,12 @@ export const triggerCronJobSchema = z.object({
 export const listCronJobsQuerySchema = z.object({
   search: z.string().optional(),
 });
+
+export const toggleCronJobSchema = z
+  .object({
+    isEnabled: z.boolean().optional(),
+  })
+  .optional()
+  .default({});
+
+
