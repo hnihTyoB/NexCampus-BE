@@ -22,6 +22,7 @@ const defaultSelect = {
     orderBy: { user: { fullName: "asc" as const } },
     select: {
       userId: true,
+      internId: true,
       user: {
         select: {
           id: true,
@@ -45,6 +46,38 @@ const defaultSelect = {
   createdAt: true,
   updatedAt: true,
 };
+
+export function formatTaskGroup<T extends { members?: any[] }>(group: T | null): T | null {
+  if (!group) return null;
+  if (!group.members || !Array.isArray(group.members)) return group;
+
+  const formattedMembers = group.members.map((m: any) => {
+    const profile = m.user?.internshipProfile;
+    const internId = m.internId ?? profile?.id ?? m.userId;
+    return {
+      ...m,
+      userId: m.userId,
+      internId,
+      intern: m.intern ?? {
+        id: internId,
+        leaderId: profile?.mentorId ?? null,
+        fullName: m.user?.fullName ?? "",
+        status: profile?.status ?? "ACTIVE",
+        user: {
+          email: m.user?.email ?? null,
+          avatarUrl: m.user?.avatarUrl ?? null,
+        },
+        department: profile?.department ?? null,
+        position: profile?.position ?? null,
+      },
+    };
+  });
+
+  return {
+    ...group,
+    members: formattedMembers,
+  };
+}
 
 export class TaskGroupRepository {
   async findAll(
@@ -141,7 +174,7 @@ export class TaskGroupRepository {
     ]);
 
     return {
-      data,
+      data: data.map((item) => formatTaskGroup(item)!),
       meta: {
         total,
         page,
@@ -151,11 +184,12 @@ export class TaskGroupRepository {
     };
   }
 
-  findById(id: string) {
-    return prisma.taskGroup.findUnique({
+  async findById(id: string) {
+    const group = await prisma.taskGroup.findUnique({
       where: { id },
       select: defaultSelect,
     });
+    return formatTaskGroup(group);
   }
 
   findByNameAndDepartment(name: string, departmentId: string | null = null) {
@@ -168,8 +202,8 @@ export class TaskGroupRepository {
     });
   }
 
-  create(data: CreateTaskGroupDto) {
-    return prisma.taskGroup.create({
+  async create(data: CreateTaskGroupDto) {
+    const group = await prisma.taskGroup.create({
       data: {
         name: data.name,
         description: data.description,
@@ -188,10 +222,11 @@ export class TaskGroupRepository {
       },
       select: defaultSelect,
     });
+    return formatTaskGroup(group)!;
   }
 
-  update(id: string, data: UpdateTaskGroupDto) {
-    return prisma.taskGroup.update({
+  async update(id: string, data: UpdateTaskGroupDto) {
+    const group = await prisma.taskGroup.update({
       where: { id },
       data: {
         ...(data.name !== undefined ? { name: data.name } : {}),
@@ -218,6 +253,7 @@ export class TaskGroupRepository {
       },
       select: defaultSelect,
     });
+    return formatTaskGroup(group)!;
   }
 
   delete(id: string) {
@@ -381,6 +417,150 @@ export class TaskGroupRepository {
       },
       orderBy: { createdAt: "desc" },
     });
+  }
+
+  findInternshipProfileByUserId(userId: string) {
+    return prisma.internshipProfile.findUnique({
+      where: { userId },
+      select: { id: true, userId: true },
+    });
+  }
+
+  async getLeaderDepartmentIds(userId: string): Promise<string[]> {
+    const [managedDepts, leaderDepts] = await Promise.all([
+      prisma.departmentManager.findMany({
+        where: { userId },
+        select: { departmentId: true },
+      }),
+      prisma.leaderDepartment.findMany({
+        where: { leader: { userId } },
+        select: { departmentId: true },
+      }),
+    ]);
+    const deptIds = [
+      ...managedDepts.map((d) => d.departmentId),
+      ...leaderDepts.map((d) => d.departmentId),
+    ];
+    return [...new Set(deptIds)];
+  }
+
+  async findActiveInternshipProfiles(
+    uniqueMemberIds: string[],
+    departmentId?: string | null,
+    allowedDepartmentIds?: string[],
+    mentorId?: string,
+  ): Promise<Array<{ id: string; userId: string }>> {
+    const andConditions: Prisma.InternshipProfileWhereInput[] = [
+      {
+        OR: [
+          { userId: { in: uniqueMemberIds } },
+          { id: { in: uniqueMemberIds } },
+        ],
+      },
+    ];
+
+    if (departmentId) {
+      andConditions.push({ departmentId });
+    }
+
+    if (allowedDepartmentIds !== undefined) {
+      andConditions.push({
+        OR: [
+          ...(mentorId ? [{ mentorId }] : []),
+          ...(allowedDepartmentIds.length > 0
+            ? [{ departmentId: { in: allowedDepartmentIds } }]
+            : []),
+        ],
+      });
+    }
+
+    return prisma.internshipProfile.findMany({
+      where: {
+        AND: andConditions,
+        status: "ACTIVE",
+        deletedAt: null,
+        user: { isActive: true, deletedAt: null },
+      },
+      select: { id: true, userId: true },
+    });
+  }
+
+  async findUnassignedTasks(taskGroupId: string) {
+    return prisma.task.findMany({
+      where: {
+        taskGroupId,
+        deletedAt: null,
+        assignment: null,
+      },
+      select: {
+        id: true,
+        code: true,
+        title: true,
+        description: true,
+        priority: true,
+        estDays: true,
+        deadline: true,
+        module: true,
+        taskGroupId: true,
+      },
+      orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
+    });
+  }
+
+  async findGroupMemberCandidates(taskGroupId: string) {
+    return prisma.taskGroupMember.findMany({
+      where: { taskGroupId },
+      include: {
+        user: {
+          include: {
+            internshipProfile: {
+              include: {
+                position: true,
+              },
+            },
+            assignedTasks: {
+              where: {
+                status: { in: ["TODO", "IN_PROGRESS", "REVIEW"] },
+                task: { deletedAt: null },
+              },
+              include: {
+                task: { select: { estDays: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  async createAssignmentsBulk(
+    assignments: Array<{
+      taskId: string;
+      assigneeId: string;
+      supportId?: string | null;
+      assignedBy: string;
+    }>,
+  ) {
+    return prisma.$transaction(
+      assignments.map((a) =>
+        prisma.taskAssignment.upsert({
+          where: { taskId: a.taskId },
+          update: {
+            assigneeId: a.assigneeId,
+            supportId: a.supportId ?? null,
+            assignedBy: a.assignedBy,
+            status: "TODO",
+          },
+          create: {
+            taskId: a.taskId,
+            assigneeId: a.assigneeId,
+            supportId: a.supportId ?? null,
+            assignedBy: a.assignedBy,
+            status: "TODO",
+          },
+        }),
+      ),
+    );
   }
 
   createAuditLog(data: {

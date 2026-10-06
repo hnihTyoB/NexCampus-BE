@@ -17,7 +17,10 @@ export const createTaskGroupSchema = z.object({
     ])
     .optional()
     .default(TASK_GROUP_STATUS.ACTIVE),
-  memberIds: z.array(z.string().uuid("Invalid internId")).max(100).optional(),
+  memberIds: z
+    .array(z.string().uuid("Invalid member ID (must be a valid UUID)"))
+    .max(100)
+    .optional(),
   maxWorkloadDays: z.number().positive().max(365).optional().default(10),
   maxActiveTasks: z.number().int().positive().max(100).optional().nullable(),
   requireAllMembers: z.boolean().optional().default(false),
@@ -34,7 +37,10 @@ export const updateTaskGroupSchema = z.object({
       TASK_GROUP_STATUS.ARCHIVED,
     ])
     .optional(),
-  memberIds: z.array(z.string().uuid("Invalid internId")).max(100).optional(),
+  memberIds: z
+    .array(z.string().uuid("Invalid member ID (must be a valid UUID)"))
+    .max(100)
+    .optional(),
   maxWorkloadDays: z.number().positive().max(365).optional(),
   maxActiveTasks: z.number().int().positive().max(100).optional().nullable(),
   requireAllMembers: z.boolean().optional(),
@@ -52,4 +58,17 @@ export const queryTaskGroupSchema = z.object({
   search: z.string().trim().optional(),
   page: z.coerce.number().int().positive().optional().default(1),
   limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+});
+
+export const confirmGroupAiAllocationSchema = z.object({
+  assignments: z
+    .array(
+      z.object({
+        taskId: z.string().uuid("Invalid taskId"),
+        internId: z.string().uuid("Invalid internId"),
+        supportId: z.string().uuid("Invalid supportId").nullable().optional(),
+      }),
+    )
+    .min(1, "At least one assignment is required")
+    .max(200),
 });

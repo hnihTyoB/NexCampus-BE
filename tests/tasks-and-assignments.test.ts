@@ -39,6 +39,7 @@ import { ERROR_CODE } from "../src/common/errors/error-code";
 import { AppError } from "../src/common/errors/app-error";
 import { TaskService } from "../src/modules/tasks/task.service";
 import { TaskAssignmentService } from "../src/modules/task-assignments/task-assignment.service";
+import { TaskGroupService } from "../src/modules/task-groups/task-group.service";
 
 describe("Task Management & Assignment Suite (task-groups, tasks, task-assignments)", () => {
   // ─── 1. Constants & Error Codes ───────────────────────────────────────────
@@ -536,6 +537,90 @@ describe("Task Management & Assignment Suite (task-groups, tasks, task-assignmen
         taskGroupId: "invalid-uuid",
       });
       assert.equal(parsed.success, false);
+    });
+  });
+
+  // ─── 10. Task Group Membership & Scope Validation ─────────────────────────
+
+  describe("10. Task Group Membership & Scope Validation", () => {
+    it("should reject duplicated member IDs with AppError 400", async () => {
+      const service = new TaskGroupService();
+      await assert.rejects(
+        async () => {
+          await (service as any).validateMembers(
+            ["11111111-1111-1111-1111-111111111111", "11111111-1111-1111-1111-111111111111"],
+            null,
+          );
+        },
+        (err: any) => {
+          assert.equal(err.statusCode, 400);
+          assert.equal(err.code, ERROR_CODE.VALIDATION_ERROR);
+          assert.match(err.message, /trùng/);
+          return true;
+        },
+      );
+    });
+
+    it("should return empty array when memberIds is empty", async () => {
+      const service = new TaskGroupService();
+      const res = await (service as any).validateMembers([], null);
+      assert.deepEqual(res, []);
+    });
+
+    it("should reject leader creating group in department they do not manage (deptIds is empty)", async () => {
+      const service = new TaskGroupService();
+      (service as any).repository.getLeaderDepartmentIds = async () => [];
+      (service as any).hasGlobalAccess = async () => false;
+
+      await assert.rejects(
+        async () => {
+          await service.create(
+            {
+              name: "Unauthorized Dept Group",
+              departmentId: "22222222-2222-2222-2222-222222222222",
+            },
+            "leader-user-id",
+            { id: "leader-user-id", role: "LEADER" },
+          );
+        },
+        (err: any) => {
+          assert.equal(err.statusCode, 403);
+          assert.equal(err.code, ERROR_CODE.FORBIDDEN);
+          assert.match(err.message, /phòng ban/);
+          return true;
+        },
+      );
+    });
+
+    it("should reject leader updating group to department they do not manage", async () => {
+      const service = new TaskGroupService();
+      (service as any).repository.getLeaderDepartmentIds = async () => ["11111111-1111-1111-1111-111111111111"];
+      (service as any).hasGlobalAccess = async () => false;
+      (service as any).findById = async () => ({
+        id: "tg-1",
+        name: "Test Group",
+        departmentId: "11111111-1111-1111-1111-111111111111",
+        members: [],
+      });
+
+      await assert.rejects(
+        async () => {
+          await service.update(
+            "tg-1",
+            {
+              departmentId: "99999999-9999-9999-9999-999999999999",
+            },
+            "leader-user-id",
+            { id: "leader-user-id", role: "LEADER" },
+          );
+        },
+        (err: any) => {
+          assert.equal(err.statusCode, 403);
+          assert.equal(err.code, ERROR_CODE.FORBIDDEN);
+          assert.match(err.message, /phòng ban/);
+          return true;
+        },
+      );
     });
   });
 });
