@@ -22,6 +22,8 @@ export interface CreateMeetingDto {
   location?: string;
   meetingType: MeetingType;
   meetingLink?: string;
+  discordChannelId?: string;
+  discordVoiceLink?: string;
   startTime: Date | string;
   endTime: Date | string;
   status?: MeetingStatus;
@@ -38,6 +40,8 @@ export interface UpdateMeetingDto {
   location?: string;
   meetingType?: MeetingType;
   meetingLink?: string;
+  discordChannelId?: string;
+  discordVoiceLink?: string;
   startTime?: Date | string;
   endTime?: Date | string;
   status?: MeetingStatus;

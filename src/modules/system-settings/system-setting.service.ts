@@ -31,6 +31,7 @@ const DEFAULT_SETTINGS: SystemSettingsResponseDto = {
   DISCORD_BOT_TOKEN: "",
   DISCORD_GUILD_ID: envConfig.discord.guildId || "",
   DISCORD_INVITE_URL: envConfig.discord.inviteUrl || "https://discord.gg/nexcampus",
+  DISCORD_MEETING_EMPTY_BUFFER_MINUTES: 5,
 };
 
 export class SystemSettingService {
@@ -337,6 +338,17 @@ export class SystemSettingService {
       }
     }
 
+    if (key === "DISCORD_MEETING_EMPTY_BUFFER_MINUTES") {
+      const minutes = Number(value);
+      if (isNaN(minutes) || !Number.isInteger(minutes) || minutes < 0 || minutes > 120) {
+        throw new AppError(
+          "Thời gian chờ phòng trống phải là số nguyên từ 0 đến 120 phút",
+          400,
+          ERROR_CODE.VALIDATION_ERROR
+        );
+      }
+    }
+
     const stringValue = String(value);
     const updated = await this.repository.upsert(
       key,
@@ -436,6 +448,10 @@ export class SystemSettingService {
 
   async getEvaluationMaxPastWeeks(): Promise<number> {
     return this.getSetting<number>("EVALUATION_MAX_PAST_WEEKS", 4);
+  }
+
+  async getMeetingEmptyBufferMinutes(): Promise<number> {
+    return this.getSetting<number>("DISCORD_MEETING_EMPTY_BUFFER_MINUTES", 5);
   }
 }
 

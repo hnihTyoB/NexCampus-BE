@@ -218,4 +218,39 @@ export class MeetingController {
       next(error);
     }
   };
+
+  getDiscordVoiceRooms = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await this.service.getDiscordVoiceRooms();
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  grantDiscordPermissions = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await this.service.grantDiscordRoomPermissions(
+        req.params.id,
+        req.user!,
+        { ipAddress: req.ip },
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  resetDiscordPermissions = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await this.service.resetDiscordRoomPermissions(
+        req.params.id,
+        req.user!,
+        { ipAddress: req.ip },
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  };
 }

@@ -43,6 +43,13 @@ export const createMeetingSchema = z
     location: z.string().trim().max(255).optional(),
     meetingType: z.nativeEnum(MeetingType).default(MeetingType.ONLINE),
     meetingLink: z.string().trim().url("meetingLink must be a valid URL").optional().or(z.literal("")),
+    discordChannelId: z
+      .string()
+      .trim()
+      .regex(/^\d{17,20}$/, "discordChannelId must be a valid Discord Snowflake ID (17-20 digits)")
+      .optional()
+      .or(z.literal("")),
+    discordVoiceLink: z.string().trim().url("discordVoiceLink must be a valid URL").optional().or(z.literal("")),
     startTime: z.coerce.date(),
     endTime: z.coerce.date(),
     status: z.nativeEnum(MeetingStatus).optional().default(MeetingStatus.SCHEDULED),
@@ -75,6 +82,13 @@ export const updateMeetingSchema = z
     location: z.string().trim().max(255).optional(),
     meetingType: z.nativeEnum(MeetingType).optional(),
     meetingLink: z.string().trim().url().optional().or(z.literal("")),
+    discordChannelId: z
+      .string()
+      .trim()
+      .regex(/^\d{17,20}$/, "discordChannelId must be a valid Discord Snowflake ID (17-20 digits)")
+      .optional()
+      .or(z.literal("")),
+    discordVoiceLink: z.string().trim().url("discordVoiceLink must be a valid URL").optional().or(z.literal("")),
     startTime: z.coerce.date().optional(),
     endTime: z.coerce.date().optional(),
     status: z.nativeEnum(MeetingStatus).optional(),

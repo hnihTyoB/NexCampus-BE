@@ -11,6 +11,7 @@ export const CRON_JOB_NAMES = {
   REMIND_DAILY_REPORT_CLOSING: "remind-daily-report-closing",
   DAILY_STANDUP_EXECUTIVE_SUMMARY: "daily-standup-executive-summary",
   REMIND_UPCOMING_MEETINGS: "remind-upcoming-meetings",
+  CLEANUP_EMPTY_MEETING_ROOMS: "cleanup-empty-meeting-rooms",
   WEEKLY_LEADERBOARD_DISCORD: "weekly-leaderboard-discord",
 } as const;
 
@@ -68,6 +69,11 @@ export const DEFAULT_CRON_SCHEDULES: Record<
     cron: "*/5 * * * *", // Quét mỗi 5 phút
     description:
       "Quét và nhắc nhở cuộc họp trước 15 phút qua Discord Webhook phòng họp",
+  },
+  "cleanup-empty-meeting-rooms": {
+    cron: "*/2 * * * *", // Quét mỗi 2 phút
+    description:
+      "Quét và thu hồi quyền phòng thoại Discord cố định sau khi phòng trống X phút kể từ giờ kết thúc",
   },
   "weekly-leaderboard-discord": {
     cron: "0 9 * * 1", // Thứ 2 lúc 09:00 sáng Asia/Ho_Chi_Minh

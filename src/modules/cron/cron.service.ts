@@ -28,6 +28,8 @@ import { prisma } from "../../database/prisma.client";
 import { AbsenceStatus, MeetingStatus } from "@prisma/client";
 import { discordWebhookService } from "../../common/services/discord-webhook.service";
 import { DISCORD_WEBHOOK_PURPOSE } from "../../common/constants/discord.constant";
+import { discordBotService } from "../../common/services/discord-bot.service";
+import { systemSettingService } from "../system-settings/system-setting.service";
 
 export class CronService {
   /**
@@ -704,7 +706,12 @@ export class CronService {
       },
       include: {
         department: { select: { id: true, name: true } },
-        host: { select: { fullName: true } },
+        host: { select: { id: true, fullName: true, discordUserId: true } },
+        participants: {
+          include: {
+            user: { select: { id: true, fullName: true, discordUserId: true } },
+          },
+        },
       },
     });
 
@@ -712,7 +719,55 @@ export class CronService {
     const meetings: string[] = [];
 
     for (const meeting of upcomingMeetings) {
-      // Kiểm tra tránh gửi trùng lặp nếu cron chạy lặp lại mỗi 5 phút
+      // 1. Tự động cấp quyền phòng thoại Discord cố định trước 15 phút (Hướng B)
+      if (meeting.discordChannelId && !meeting.discordPermissionsGranted) {
+        const discordIds: string[] = [];
+        if (meeting.host?.discordUserId) {
+          discordIds.push(meeting.host.discordUserId);
+        }
+        for (const p of meeting.participants) {
+          if (p.user?.discordUserId) {
+            discordIds.push(p.user.discordUserId);
+          }
+        }
+
+        if (discordIds.length > 0) {
+          try {
+            const grantRes = await discordBotService.grantMeetingRoomPermissions({
+              channelId: meeting.discordChannelId,
+              userIds: discordIds,
+            });
+
+            if (grantRes.success) {
+              await prisma.meeting.update({
+                where: { id: meeting.id },
+                data: { discordPermissionsGranted: true },
+              });
+
+              await prisma.auditLog.create({
+                data: {
+                  action: AUDIT_ACTION.GRANT_DISCORD_ROOM_PERMISSIONS,
+                  targetType: AUDIT_TARGET_TYPE.MEETING,
+                  targetId: meeting.id,
+                  details: {
+                    meetingTitle: meeting.title,
+                    discordChannelId: meeting.discordChannelId,
+                    grantedCount: grantRes.grantedCount,
+                    totalUsers: grantRes.totalUsers,
+                  },
+                },
+              });
+            }
+          } catch (err: any) {
+            console.warn(
+              `[CronService] Failed to grant meeting room permissions for ${meeting.id}:`,
+              err.message,
+            );
+          }
+        }
+      }
+
+      // 2. Kiểm tra tránh gửi trùng lặp nếu cron chạy lặp lại mỗi 5 phút
       const alreadyNotified = await prisma.auditLog.findFirst({
         where: {
           targetType: AUDIT_TARGET_TYPE.MEETING,
@@ -734,6 +789,7 @@ export class CronService {
           startTime: meeting.startTime,
           endTime: meeting.endTime,
           meetingLink: meeting.meetingLink,
+          discordVoiceLink: meeting.discordVoiceLink,
           location: meeting.location,
           hostName: meeting.host?.fullName,
         },
@@ -755,6 +811,101 @@ export class CronService {
     }
 
     return { remindedMeetingsCount, meetings };
+  }
+
+  /**
+   * 6b. Hướng B: Quét và thu hồi quyền phòng thoại Discord cố định
+   * Chỉ reset quyền sau khi phòng trống X phút kể từ giờ kết thúc cuộc họp
+   */
+  async executeMeetingRoomCleanupJob(): Promise<{
+    scannedCount: number;
+    resetRoomsCount: number;
+    resetMeetings: string[];
+    waitingOvertimeCount: number;
+  }> {
+    const now = new Date();
+    const meetingsToEvaluate = await prisma.meeting.findMany({
+      where: {
+        discordChannelId: { not: null },
+        discordPermissionsGranted: true,
+        discordPermissionsResetAt: null,
+        deletedAt: null,
+        endTime: { lte: now }, // Chỉ xét kể từ giờ kết thúc cuộc họp
+      },
+      select: {
+        id: true,
+        title: true,
+        discordChannelId: true,
+        startTime: true,
+        endTime: true,
+        status: true,
+      },
+    });
+
+    let resetRoomsCount = 0;
+    let waitingOvertimeCount = 0;
+    const resetMeetings: string[] = [];
+    const bufferMinutes = await systemSettingService.getMeetingEmptyBufferMinutes();
+
+    for (const meeting of meetingsToEvaluate) {
+      if (!meeting.discordChannelId) continue;
+
+      const isEligible = discordBotService.isMeetingRoomEmptyForDuration(
+        meeting.discordChannelId,
+        bufferMinutes,
+        meeting.endTime,
+      );
+
+      if (!isEligible) {
+        // Phòng vẫn còn người hoặc chưa đủ X phút phòng trống kể từ endTime
+        waitingOvertimeCount++;
+        continue;
+      }
+
+      // Đã đủ điều kiện: phòng trống X phút kể từ giờ kết thúc -> Reset quyền phòng thoại
+      const resetRes = await discordBotService.resetMeetingRoomPermissions(meeting.discordChannelId);
+
+      if (resetRes.success) {
+        resetRoomsCount++;
+        resetMeetings.push(meeting.title);
+
+        const newStatus =
+          meeting.status === MeetingStatus.CANCELLED
+            ? MeetingStatus.CANCELLED
+            : MeetingStatus.COMPLETED;
+
+        await prisma.meeting.update({
+          where: { id: meeting.id },
+          data: {
+            discordPermissionsResetAt: now,
+            discordPermissionsGranted: false,
+            status: newStatus,
+          },
+        });
+
+        await prisma.auditLog.create({
+          data: {
+            action: AUDIT_ACTION.RESET_DISCORD_ROOM_PERMISSIONS,
+            targetType: AUDIT_TARGET_TYPE.MEETING,
+            targetId: meeting.id,
+            details: {
+              meetingTitle: meeting.title,
+              discordChannelId: meeting.discordChannelId,
+              endTime: meeting.endTime,
+              bufferMinutes,
+              resetCount: resetRes.resetCount,
+            },
+          },
+        });
+      }
+    }
+
+    return {
+      scannedCount: meetingsToEvaluate.length,
+      resetRoomsCount,
+      resetMeetings,
+      waitingOvertimeCount,
+    };
   }
 
   /**
@@ -901,6 +1052,10 @@ export class CronService {
       }
       case CRON_JOB_NAMES.REMIND_UPCOMING_MEETINGS: {
         executionData = await this.executeMeetingReminderJob();
+        break;
+      }
+      case CRON_JOB_NAMES.CLEANUP_EMPTY_MEETING_ROOMS: {
+        executionData = await this.executeMeetingRoomCleanupJob();
         break;
       }
       case CRON_JOB_NAMES.WEEKLY_LEADERBOARD_DISCORD: {

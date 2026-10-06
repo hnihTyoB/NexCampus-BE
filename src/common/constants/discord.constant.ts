@@ -66,3 +66,37 @@ export const DISCORD_NEON_ROLE_COLORS = [
   0x3b82f6, // Bright Blue
 ] as const;
 
+/**
+ * Discord Channel Types
+ */
+export const DISCORD_CHANNEL_TYPE = {
+  GUILD_TEXT: 0,
+  DM: 1,
+  GUILD_VOICE: 2,
+  GROUP_DM: 3,
+  GUILD_CATEGORY: 4,
+  GUILD_ANNOUNCEMENT: 5,
+  ANNOUNCEMENT_THREAD: 10,
+  PUBLIC_THREAD: 11,
+  PRIVATE_THREAD: 12,
+  GUILD_STAGE_VOICE: 13,
+} as const;
+
+/**
+ * Discord Permission Flags for Voice Channel Overwrites
+ * VIEW_CHANNEL (1 << 10) = 1024
+ * CONNECT (1 << 20)      = 1048576
+ * SPEAK (1 << 21)        = 2097152
+ * Total Allow Bitfield   = 3146752
+ */
+export const DISCORD_VOICE_PERMISSIONS = {
+  VIEW_CHANNEL: "1024",
+  CONNECT: "1048576",
+  SPEAK: "2097152",
+  DEFAULT_ALLOW_VOICE: "3146752",
+  DEFAULT_DENY_EVERYONE: "1049600", // VIEW_CHANNEL (1024) | CONNECT (1048576)
+} as const;
+
+export const DEFAULT_MEETING_EMPTY_BUFFER_MINUTES = 5;
+
+

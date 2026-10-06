@@ -12,12 +12,12 @@ import {
 } from "./meeting.dto";
 import { PERMISSIONS } from "../../common/constants/permission.constant";
 import { permissionCacheService } from "../../common/services/permission-cache.service";
-import { prisma } from "../../database/prisma.client";
 import {
   AUDIT_ACTION,
   AUDIT_TARGET_TYPE,
 } from "../../common/constants/audit-log.constant";
 import { MeetingStatus } from "@prisma/client";
+import { discordBotService } from "../../common/services/discord-bot.service";
 
 interface UserPayload {
   id: string;
@@ -81,6 +81,10 @@ export class MeetingService {
     actor: UserPayload,
     context?: { ipAddress?: string },
   ) {
+    if (data.discordChannelId && !data.discordVoiceLink) {
+      data.discordVoiceLink = discordBotService.getChannelVoiceUrl(data.discordChannelId);
+    }
+
     const meeting = await this.repository.create(data, actor.id);
 
     await this.repository.createAuditLog({
@@ -91,6 +95,7 @@ export class MeetingService {
       details: {
         title: data.title,
         meetingType: data.meetingType,
+        discordChannelId: data.discordChannelId,
         startTime: data.startTime,
         endTime: data.endTime,
       },
@@ -133,6 +138,10 @@ export class MeetingService {
       );
     }
 
+    if (data.discordChannelId && !data.discordVoiceLink) {
+      data.discordVoiceLink = discordBotService.getChannelVoiceUrl(data.discordChannelId);
+    }
+
     const updated = await this.repository.update(id, data);
 
     await this.repository.createAuditLog({
@@ -140,7 +149,7 @@ export class MeetingService {
       action: AUDIT_ACTION.UPDATE_MEETING,
       targetType: AUDIT_TARGET_TYPE.MEETING,
       targetId: id,
-      details: { title: data.title, status: data.status },
+      details: { title: data.title, status: data.status, discordChannelId: data.discordChannelId },
       ipAddress: context?.ipAddress,
     });
 
@@ -418,10 +427,7 @@ export class MeetingService {
     const hasGlobal = await this.hasGlobalAccess(actor.id);
     let scope: { leaderUserId?: string } | undefined;
     if (!hasGlobal) {
-      const leader = await prisma.leader.findFirst({
-        where: { userId: actor.id },
-        select: { id: true },
-      });
+      const leader = await this.repository.findLeaderByUserId(actor.id);
       if (leader) {
         scope = { leaderUserId: actor.id };
       } else {
@@ -540,5 +546,161 @@ export class MeetingService {
     });
 
     return updated;
+  }
+
+  /**
+   * Lấy danh sách Kênh thoại Discord cố định có thể sử dụng làm phòng họp
+   */
+  async getDiscordVoiceRooms() {
+    return discordBotService.getGuildVoiceChannels();
+  }
+
+  /**
+   * Cấp quyền truy cập phòng thoại Discord cố định cho người tham dự cuộc họp
+   */
+  async grantDiscordRoomPermissions(
+    meetingId: string,
+    actor: UserPayload,
+    context?: { ipAddress?: string },
+  ) {
+    const meeting = await this.repository.findById(meetingId);
+    if (!meeting) {
+      throw new AppError("Cuộc họp không tồn tại", 404, ERROR_CODE.MEETING_NOT_FOUND);
+    }
+
+    if (meeting.status === MeetingStatus.CANCELLED) {
+      throw new AppError(
+        "Không thể cấp quyền cho cuộc họp đã bị hủy",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    if (meeting.status === MeetingStatus.COMPLETED) {
+      throw new AppError(
+        "Không thể cấp quyền cho cuộc họp đã kết thúc",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    const isHostOrCreator = actor.id === meeting.createdBy || actor.id === meeting.hostId;
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal && !isHostOrCreator) {
+      throw new AppError(
+        "Bạn không có quyền quản lý phòng họp này",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
+    }
+
+    if (!meeting.discordChannelId) {
+      throw new AppError(
+        "Cuộc họp chưa được gắn phòng thoại Discord",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    // Lấy danh sách discordUserId của host và participants qua repository (tránh N+1 query)
+    const discordIds = await this.repository.findDiscordUserIdsForMeeting(meetingId);
+
+    if (discordIds.length === 0) {
+      throw new AppError(
+        "Không có thành viên nào trong cuộc họp liên kết tài khoản Discord",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    const result = await discordBotService.grantMeetingRoomPermissions({
+      channelId: meeting.discordChannelId,
+      userIds: discordIds,
+    });
+
+    if (!result.success) {
+      throw new AppError(
+        `Không thể cấp quyền phòng Discord: ${result.errors.join("; ") || "Lỗi không xác định"}`,
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    await this.repository.updateDiscordPermissionStatus(meetingId, {
+      discordPermissionsGranted: true,
+      discordPermissionsResetAt: null,
+    });
+
+    await this.repository.createAuditLog({
+      actorId: actor.id,
+      action: AUDIT_ACTION.GRANT_DISCORD_ROOM_PERMISSIONS,
+      targetType: AUDIT_TARGET_TYPE.MEETING,
+      targetId: meetingId,
+      details: {
+        meetingTitle: meeting.title,
+        discordChannelId: meeting.discordChannelId,
+        grantedCount: result.grantedCount,
+        totalUsers: result.totalUsers,
+      },
+      ipAddress: context?.ipAddress,
+    });
+
+    return result;
+  }
+
+  /**
+   * Thu hồi quyền truy cập phòng thoại Discord (reset về mặc định)
+   */
+  async resetDiscordRoomPermissions(
+    meetingId: string,
+    actor: UserPayload,
+    context?: { ipAddress?: string },
+  ) {
+    const meeting = await this.repository.findById(meetingId);
+    if (!meeting) {
+      throw new AppError("Cuộc họp không tồn tại", 404, ERROR_CODE.MEETING_NOT_FOUND);
+    }
+
+    const isHostOrCreator = actor.id === meeting.createdBy || actor.id === meeting.hostId;
+    const hasGlobal = await this.hasGlobalAccess(actor.id);
+    if (!hasGlobal && !isHostOrCreator) {
+      throw new AppError(
+        "Bạn không có quyền quản lý phòng họp này",
+        403,
+        ERROR_CODE.FORBIDDEN,
+      );
+    }
+
+    if (!meeting.discordChannelId) {
+      throw new AppError(
+        "Cuộc họp chưa được gắn phòng thoại Discord",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    const result = await discordBotService.resetMeetingRoomPermissions(meeting.discordChannelId);
+
+    if (result.success) {
+      await this.repository.updateDiscordPermissionStatus(meetingId, {
+        discordPermissionsGranted: false,
+        discordPermissionsResetAt: new Date(),
+      });
+
+      await this.repository.createAuditLog({
+        actorId: actor.id,
+        action: AUDIT_ACTION.RESET_DISCORD_ROOM_PERMISSIONS,
+        targetType: AUDIT_TARGET_TYPE.MEETING,
+        targetId: meetingId,
+        details: {
+          meetingTitle: meeting.title,
+          discordChannelId: meeting.discordChannelId,
+          resetCount: result.resetCount,
+        },
+        ipAddress: context?.ipAddress,
+      });
+    }
+
+    return result;
   }
 }
