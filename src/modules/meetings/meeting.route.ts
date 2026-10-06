@@ -54,6 +54,13 @@ router.put(
   controller.reviewAbsence,
 );
 
+router.get(
+  "/discord-rooms",
+  authMiddleware,
+  requirePermission(PERMISSIONS.MEETING_READ),
+  controller.getDiscordVoiceRooms,
+);
+
 // ── Collection Routes ───────────────────────────────────────────────────────
 
 router.get(
@@ -134,6 +141,22 @@ router.put(
   validate(meetingIdParamSchema, "params"),
   validate(updateMeetingAttendanceSchema),
   controller.updateAttendance,
+);
+
+router.post(
+  "/:id/discord-permissions/grant",
+  authMiddleware,
+  requirePermission(PERMISSIONS.MEETING_UPDATE),
+  validate(meetingIdParamSchema, "params"),
+  controller.grantDiscordPermissions,
+);
+
+router.post(
+  "/:id/discord-permissions/reset",
+  authMiddleware,
+  requirePermission(PERMISSIONS.MEETING_UPDATE),
+  validate(meetingIdParamSchema, "params"),
+  controller.resetDiscordPermissions,
 );
 
 // ── Meeting Absences ────────────────────────────────────────────────────────

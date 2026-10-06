@@ -1019,6 +1019,7 @@ export class DiscordWebhookService {
       startTime: Date | string;
       endTime?: Date | string;
       meetingLink?: string | null;
+      discordVoiceLink?: string | null;
       location?: string | null;
       hostName?: string | null;
     };
@@ -1036,24 +1037,55 @@ export class DiscordWebhookService {
       minute: "2-digit",
     });
 
-    const link = params.meeting.meetingLink || params.meeting.location || "Kênh Discord Voice";
+    const primaryLink = params.meeting.meetingLink;
+    const discordVoice = params.meeting.discordVoiceLink;
+    const location = params.meeting.location;
+
+    const fields: DiscordEmbedField[] = [
+      { name: "📋 Chủ đề cuộc họp", value: params.meeting.title, inline: false },
+      { name: "🏢 Phòng ban", value: params.meeting.departmentName || "Nội bộ", inline: true },
+      { name: "🕒 Giờ bắt đầu", value: `\`${startStr}\``, inline: true },
+      { name: "🎙️ Người chủ trì", value: params.meeting.hostName || "Host", inline: true },
+    ];
+
+    if (primaryLink && primaryLink.startsWith("http")) {
+      fields.push({
+        name: "🌐 Link họp chính (Google Meet)",
+        value: `[👉 Nhấn vào đây để vào Google Meet](${primaryLink})`,
+        inline: false,
+      });
+    }
+
+    if (discordVoice) {
+      fields.push({
+        name: "🔊 Phòng thoại Discord (Dự phòng / Kênh riêng)",
+        value: `[👉 Bấm vào đây để vào Kênh Thoại Discord](${discordVoice})\n*(Hệ thống đã tự động cấp quyền truy cập phòng thoại riêng cho các thành viên được mời)*`,
+        inline: false,
+      });
+    }
+
+    if (location) {
+      fields.push({
+        name: "📍 Địa điểm",
+        value: location.startsWith("http") ? `[👉 Nhấn vào đây](${location})` : `\`${location}\``,
+        inline: false,
+      });
+    }
+
+    if (primaryLink && discordVoice) {
+      fields.push({
+        name: "💡 Lưu ý kết nối",
+        value: "Nếu link Google Meet gặp sự cố hoặc không truy cập được, toàn bộ thành viên chuyển sang phòng thoại Discord phía trên.",
+        inline: false,
+      });
+    }
 
     const embed: DiscordEmbed = {
       title: `⏰ Nhắc nhở: Cuộc họp sẽ bắt đầu sau 15 phút!`,
       description: `Cuộc họp **${params.meeting.title}** sắp diễn ra vào lúc **${startStr}**. Vui lòng kiểm tra micro, camera và chuẩn bị tham dự.`,
       color: DISCORD_EMBED_COLORS.MEETING_REMINDER,
-      fields: [
-        { name: "📋 Chủ đề cuộc họp", value: params.meeting.title, inline: false },
-        { name: "🏢 Phòng ban", value: params.meeting.departmentName || "Nội bộ", inline: true },
-        { name: "🕒 Giờ bắt đầu", value: `\`${startStr}\``, inline: true },
-        { name: "🎙️ Người chủ trì", value: params.meeting.hostName || "Host", inline: true },
-        {
-          name: "🔗 Đường dẫn tham gia",
-          value: link.startsWith("http") ? `[👉 Nhấn vào đây để vào họp](${link})` : `\`${link}\``,
-          inline: false,
-        },
-      ],
-      footer: { text: "NexCampus Meeting Room • Nhắc họp tự động" },
+      fields,
+      footer: { text: "NexCampus Meeting Room • Tự động thu hồi quyền sau khi phòng trống X phút" },
       timestamp: new Date().toISOString(),
     };
 

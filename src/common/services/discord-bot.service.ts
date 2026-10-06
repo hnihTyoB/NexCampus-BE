@@ -4,10 +4,26 @@ import {
   DISCORD_NEON_ROLE_COLORS,
   DISCORD_WEBHOOK_PURPOSE,
   DISCORD_WEBHOOK_SCOPE,
+  DISCORD_CHANNEL_TYPE,
+  DISCORD_VOICE_PERMISSIONS,
+  DEFAULT_MEETING_EMPTY_BUFFER_MINUTES,
 } from "../constants/discord.constant";
 import { ROLES } from "../constants/role.constant";
 import { AUDIT_ACTION } from "../constants/audit-log.constant";
 import { discordWebhookRepository } from "../../modules/integration/discord-webhook.repository";
+
+export interface DiscordVoiceChannelInfo {
+  id: string;
+  name: string;
+  type: number;
+  parentId?: string;
+  position: number;
+  userLimit?: number;
+  bitrate?: number;
+  currentMembersCount: number;
+  voiceUrl: string;
+  isPrivate?: boolean;
+}
 
 export interface BatchSyncRoleDetail {
   internId: string;
@@ -74,10 +90,35 @@ export class DiscordBotService {
   private runtimeEnabled?: boolean;
   private activeProvisions = new Map<string, Promise<ProvisionDepartmentResult>>();
 
+  // Real-time Voice State Tracking via Discord Gateway
+  private voiceChannelMembers = new Map<string, Set<string>>(); // channelId -> Set<userId>
+  private userToVoiceChannel = new Map<string, string>(); // userId -> channelId
+  private channelEmptySince = new Map<string, number>(); // channelId -> timestamp (ms)
+  private gatewayWs: any = null;
+  private heartbeatTimer: any = null;
+  private gatewayReconnectTimeout: any = null;
+  private isGatewayConnecting = false;
+
+  constructor() {
+    if (typeof globalThis.WebSocket !== "undefined") {
+      setTimeout(() => {
+        if (this.token && this.isEnabled) {
+          this.startGateway();
+        }
+      }, 3000);
+    }
+  }
+
   setRuntimeConfig(config: { token?: string; guildId?: string; enabled?: boolean }): void {
     if (config.token !== undefined) this.runtimeToken = config.token.trim();
     if (config.guildId !== undefined) this.runtimeGuildId = config.guildId.trim();
     if (config.enabled !== undefined) this.runtimeEnabled = config.enabled;
+
+    if (this.token && this.isEnabled) {
+      this.startGateway();
+    } else {
+      this.cleanupGateway();
+    }
   }
 
   get isEnabled(): boolean {
@@ -216,6 +257,450 @@ export class DiscordBotService {
       console.warn(`[DiscordBot] getGuildChannels failed:`, err.message);
       return [];
     }
+  }
+
+  /**
+   * Khởi chạy kết nối Discord Gateway WebSocket để theo dõi voice states trong thời gian thực
+   */
+  startGateway(): void {
+    if (typeof globalThis.WebSocket === "undefined") {
+      return;
+    }
+    if (!this.token || !this.isEnabled) return;
+    if (this.isGatewayConnecting || (this.gatewayWs && this.gatewayWs.readyState === 1)) return;
+
+    this.isGatewayConnecting = true;
+    try {
+      const ws = new (globalThis as any).WebSocket("wss://gateway.discord.gg/?v=10&encoding=json");
+      this.gatewayWs = ws;
+
+      ws.onopen = () => {
+        this.isGatewayConnecting = false;
+      };
+
+      ws.onmessage = (event: any) => {
+        try {
+          const raw = typeof event.data === "string" ? event.data : event.data?.toString();
+          const payload = JSON.parse(raw);
+          const { op, d, t } = payload;
+
+          if (op === 10) {
+            // Hello: Thiết lập Heartbeat và gửi Identify
+            const heartbeatInterval = d?.heartbeat_interval || 41250;
+            if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+            this.heartbeatTimer = setInterval(() => {
+              if (this.gatewayWs && this.gatewayWs.readyState === 1) {
+                this.gatewayWs.send(JSON.stringify({ op: 1, d: null }));
+              }
+            }, heartbeatInterval);
+
+            // Gửi Identify với Intents: GUILDS (1) | GUILD_VOICE_STATES (128) = 129
+            ws.send(
+              JSON.stringify({
+                op: 2,
+                d: {
+                  token: this.token,
+                  intents: 129,
+                  properties: {
+                    os: "windows",
+                    browser: "nexcampus",
+                    device: "nexcampus",
+                  },
+                },
+              }),
+            );
+          } else if (op === 0) {
+            // Dispatch Events
+            if (t === "VOICE_STATE_UPDATE" && d) {
+              this.handleVoiceStateUpdate(d);
+            }
+          }
+        } catch {
+          // ignore parsing error
+        }
+      };
+
+      ws.onclose = () => {
+        this.cleanupGateway();
+        this.scheduleGatewayReconnect();
+      };
+
+      ws.onerror = () => {
+        this.cleanupGateway();
+        this.scheduleGatewayReconnect();
+      };
+    } catch {
+      this.cleanupGateway();
+      this.scheduleGatewayReconnect();
+    }
+  }
+
+  private cleanupGateway(): void {
+    this.isGatewayConnecting = false;
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+    this.gatewayWs = null;
+  }
+
+  private scheduleGatewayReconnect(): void {
+    if (this.gatewayReconnectTimeout) clearTimeout(this.gatewayReconnectTimeout);
+    this.gatewayReconnectTimeout = setTimeout(() => {
+      if (this.token && this.isEnabled) {
+        this.startGateway();
+      }
+    }, 15000);
+  }
+
+  private handleVoiceStateUpdate(data: any): void {
+    const userId = data.user_id;
+    const newChannelId = data.channel_id; // null nếu user rời kênh
+    const oldChannelId = this.userToVoiceChannel.get(userId);
+
+    // 1. Rời kênh cũ
+    if (oldChannelId && oldChannelId !== newChannelId) {
+      const oldMembers = this.voiceChannelMembers.get(oldChannelId);
+      if (oldMembers) {
+        oldMembers.delete(userId);
+        if (oldMembers.size === 0) {
+          this.channelEmptySince.set(oldChannelId, Date.now());
+        }
+      }
+      this.userToVoiceChannel.delete(userId);
+    }
+
+    // 2. Vào kênh mới
+    if (newChannelId) {
+      this.userToVoiceChannel.set(userId, newChannelId);
+      let newMembers = this.voiceChannelMembers.get(newChannelId);
+      if (!newMembers) {
+        newMembers = new Set<string>();
+        this.voiceChannelMembers.set(newChannelId, newMembers);
+      }
+      newMembers.add(userId);
+      this.channelEmptySince.delete(newChannelId); // Phòng có người -> xóa cờ empty
+    }
+  }
+
+  /**
+   * Lấy số lượng người dùng đang ở trong Kênh Voice
+   */
+  getVoiceChannelMemberCount(channelId: string): number {
+    return this.voiceChannelMembers.get(channelId)?.size || 0;
+  }
+
+  /**
+   * Tạo đường dẫn trực tiếp tới Voice Channel trên Discord
+   */
+  getChannelVoiceUrl(channelId: string): string {
+    const gid = this.guildId;
+    return gid
+      ? `https://discord.com/channels/${gid}/${channelId}`
+      : `https://discord.com/channels/@me/${channelId}`;
+  }
+
+  /**
+   * Lấy danh sách tất cả các Voice Channels trên Server Discord
+   */
+  async getGuildVoiceChannels(): Promise<DiscordVoiceChannelInfo[]> {
+    if (!this.token || !this.guildId) return [];
+
+    try {
+      const channels = await this.getGuildChannels();
+      const voiceTypes = [
+        DISCORD_CHANNEL_TYPE.GUILD_VOICE,
+        DISCORD_CHANNEL_TYPE.GUILD_STAGE_VOICE,
+      ];
+
+      const voiceChannels: DiscordVoiceChannelInfo[] = channels
+        .filter((c: any) => voiceTypes.includes(c.type))
+        .map((c: any) => {
+          const everyoneOverwrite = (c as any).permission_overwrites?.find(
+            (po: any) => po.id === this.guildId,
+          );
+          const denyBigInt = everyoneOverwrite ? BigInt(everyoneOverwrite.deny || "0") : BigInt(0);
+          const isPrivate =
+            (denyBigInt & BigInt(DISCORD_VOICE_PERMISSIONS.VIEW_CHANNEL)) !== BigInt(0) ||
+            (denyBigInt & BigInt(DISCORD_VOICE_PERMISSIONS.CONNECT)) !== BigInt(0);
+
+          return {
+            id: c.id,
+            name: c.name,
+            type: c.type,
+            parentId: c.parent_id || c.parentId,
+            position: c.position || 0,
+            userLimit: c.user_limit,
+            bitrate: c.bitrate,
+            currentMembersCount: this.getVoiceChannelMemberCount(c.id),
+            voiceUrl: this.getChannelVoiceUrl(c.id),
+            isPrivate,
+          };
+        });
+
+      // Sắp xếp theo thứ tự hiển thị trên server Discord
+      voiceChannels.sort((a, b) => a.position - b.position);
+      return voiceChannels;
+    } catch (err: any) {
+      console.warn("[DiscordBot] getGuildVoiceChannels failed:", err?.message);
+      return [];
+    }
+  }
+
+  /**
+   * Cấp quyền truy cập (Permission Overwrite) vào Voice Channel cho danh sách Discord User ID
+   * 1. Khóa phòng đối với @everyone (Role ID = guildId): Deny VIEW_CHANNEL (1024) + CONNECT (1048576) -> Biến phòng thành Private
+   * 2. Cấp quyền cho từng người tham gia: Allow VIEW_CHANNEL + CONNECT + SPEAK -> Chỉ người được mời mới thấy và vào được phòng
+   */
+  async grantMeetingRoomPermissions(params: {
+    channelId: string;
+    userIds: string[];
+    lockEveryone?: boolean;
+  }): Promise<{ success: boolean; grantedCount: number; totalUsers: number; errors: string[] }> {
+    const { channelId, userIds, lockEveryone = true } = params;
+    if (!this.token || !channelId || !userIds.length) {
+      return { success: false, grantedCount: 0, totalUsers: userIds.length, errors: ["Missing token, channelId or userIds"] };
+    }
+
+    let grantedCount = 0;
+    const errors: string[] = [];
+
+    // 1. Tự động Deny @everyone để đảm bảo phòng voice là Private (kể cả khi phòng trên Discord ban đầu là Public)
+    if (lockEveryone && this.guildId) {
+      try {
+        const lockRes = await fetch(
+          `${this.baseUrl}/channels/${channelId}/permissions/${this.guildId}`,
+          {
+            method: "PUT",
+            headers: this.getHeaders(),
+            body: JSON.stringify({
+              id: this.guildId,
+              type: 0, // 0 = Role Overwrite (@everyone)
+              allow: "0",
+              deny: DISCORD_VOICE_PERMISSIONS.DEFAULT_DENY_EVERYONE,
+            }),
+            signal: AbortSignal.timeout(6000),
+          },
+        );
+
+        if (!lockRes.ok && lockRes.status !== 204) {
+          const errText = await lockRes.text().catch(() => "");
+          errors.push(`Lock @everyone (${this.guildId}): HTTP ${lockRes.status} ${errText}`);
+        }
+      } catch (err: any) {
+        errors.push(`Lock @everyone: ${err?.message}`);
+      }
+    }
+
+    // 2. Cấp quyền Allow cho danh sách người tham gia
+    const validUserIds = Array.from(new Set(userIds.filter((id) => /^\d{17,20}$/.test(id.trim()))));
+
+    for (const userId of validUserIds) {
+      try {
+        const body = {
+          id: userId,
+          type: 1, // 1 = Member Overwrite
+          allow: DISCORD_VOICE_PERMISSIONS.DEFAULT_ALLOW_VOICE,
+          deny: "0",
+        };
+
+        const res = await fetch(`${this.baseUrl}/channels/${channelId}/permissions/${userId}`, {
+          method: "PUT",
+          headers: this.getHeaders(),
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(6000),
+        });
+
+        if (res.status === 204 || res.ok) {
+          grantedCount++;
+        } else {
+          const errText = await res.text().catch(() => "");
+          errors.push(`User ${userId}: HTTP ${res.status} ${errText}`);
+        }
+
+        // Rate-limit safety: 120ms gap
+        await new Promise((r) => setTimeout(r, 120));
+      } catch (err: any) {
+        errors.push(`User ${userId}: ${err?.message}`);
+      }
+    }
+
+    return {
+      success: grantedCount > 0,
+      grantedCount,
+      totalUsers: validUserIds.length,
+      errors,
+    };
+  }
+
+  /**
+   * Thu hồi toàn bộ quyền thành viên (Reset Member Overwrites) khỏi Voice Channel
+   * Trả phòng thoại về trạng thái riêng tư/mặc định ban đầu
+   * Nếu unlockEveryone = true: Gỡ bỏ deny của @everyone để mở lại public
+   */
+  async resetMeetingRoomPermissions(
+    channelId: string,
+    options?: { unlockEveryone?: boolean },
+  ): Promise<{
+    success: boolean;
+    resetCount: number;
+    errors: string[];
+  }> {
+    if (!this.token || !channelId) {
+      return { success: false, resetCount: 0, errors: ["Missing token or channelId"] };
+    }
+
+    try {
+      // 1. Đọc chi tiết Channel để lấy danh sách permission_overwrites hiện có
+      const chRes = await fetch(`${this.baseUrl}/channels/${channelId}`, {
+        headers: this.getHeaders(),
+        signal: AbortSignal.timeout(6000),
+      });
+
+      if (!chRes.ok) {
+        const errText = await chRes.text().catch(() => "");
+        return { success: false, resetCount: 0, errors: [`Fetch channel failed: ${chRes.status} ${errText}`] };
+      }
+
+      const channelData = (await chRes.json()) as any;
+      const overwrites: Array<{ id: string; type: number }> = channelData?.permission_overwrites || [];
+
+      // 2. Lọc các overwrite dành riêng cho Member (type === 1)
+      const memberOverwrites = overwrites.filter((o) => o.type === 1);
+      let resetCount = 0;
+      const errors: string[] = [];
+
+      for (const overwrite of memberOverwrites) {
+        try {
+          const delRes = await fetch(
+            `${this.baseUrl}/channels/${channelId}/permissions/${overwrite.id}`,
+            {
+              method: "DELETE",
+              headers: this.getHeaders(),
+              signal: AbortSignal.timeout(6000),
+            },
+          );
+
+          if (delRes.status === 204 || delRes.ok || delRes.status === 404) {
+            resetCount++;
+          } else {
+            const errText = await delRes.text().catch(() => "");
+            errors.push(`Overwrite ${overwrite.id}: HTTP ${delRes.status} ${errText}`);
+          }
+
+          await new Promise((r) => setTimeout(r, 120));
+        } catch (err: any) {
+          errors.push(`Overwrite ${overwrite.id}: ${err?.message}`);
+        }
+      }
+
+      // 3. Nếu được yêu cầu mở lại phòng thành public
+      if (options?.unlockEveryone && this.guildId) {
+        try {
+          await fetch(
+            `${this.baseUrl}/channels/${channelId}/permissions/${this.guildId}`,
+            {
+              method: "DELETE",
+              headers: this.getHeaders(),
+              signal: AbortSignal.timeout(6000),
+            },
+          );
+        } catch (err: any) {
+          errors.push(`Unlock @everyone: ${err?.message}`);
+        }
+      }
+
+      // Xóa mốc thời gian empty sau khi reset xong
+      this.channelEmptySince.delete(channelId);
+
+      return {
+        success: true,
+        resetCount,
+        errors,
+      };
+    } catch (err: any) {
+      return { success: false, resetCount: 0, errors: [err?.message || "Unknown error"] };
+    }
+  }
+
+  /**
+   * Khóa phòng thoại đối với @everyone (chủ động biến thành phòng riêng tư)
+   */
+  async lockVoiceChannel(channelId: string): Promise<boolean> {
+    if (!this.token || !this.guildId || !channelId) return false;
+    try {
+      const res = await fetch(
+        `${this.baseUrl}/channels/${channelId}/permissions/${this.guildId}`,
+        {
+          method: "PUT",
+          headers: this.getHeaders(),
+          body: JSON.stringify({
+            id: this.guildId,
+            type: 0,
+            allow: "0",
+            deny: DISCORD_VOICE_PERMISSIONS.DEFAULT_DENY_EVERYONE,
+          }),
+          signal: AbortSignal.timeout(6000),
+        },
+      );
+      return res.ok || res.status === 204;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Mở khóa phòng thoại đối với @everyone (trả về public)
+   */
+  async unlockVoiceChannel(channelId: string): Promise<boolean> {
+    if (!this.token || !this.guildId || !channelId) return false;
+    try {
+      const res = await fetch(
+        `${this.baseUrl}/channels/${channelId}/permissions/${this.guildId}`,
+        {
+          method: "DELETE",
+          headers: this.getHeaders(),
+          signal: AbortSignal.timeout(6000),
+        },
+      );
+      return res.ok || res.status === 204 || res.status === 404;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Kiểm tra điều kiện Hướng B:
+   * Phòng họp có đang trống (0 thành viên) trong ít nhất `bufferMinutes` phút kể từ `meetingEndTime` hay không.
+   */
+  isMeetingRoomEmptyForDuration(
+    channelId: string,
+    bufferMinutes: number,
+    meetingEndTime: Date | string,
+  ): boolean {
+    const endMs = new Date(meetingEndTime).getTime();
+    const now = Date.now();
+
+    // 1. Nếu chưa đến giờ kết thúc, tuyệt đối KHÔNG reset
+    if (now < endMs) {
+      return false;
+    }
+
+    // 2. Nếu phòng hiện tại vẫn còn người (memberCount > 0), cuộc họp đang overtime -> KHÔNG reset
+    const memberCount = this.getVoiceChannelMemberCount(channelId);
+    if (memberCount > 0) {
+      return false;
+    }
+
+    // 3. Nếu phòng trống, xác định thời điểm bắt đầu tính trạng thái trống
+    // Mốc bắt đầu không được sớm hơn meetingEndTime
+    const recordedEmptySince = this.channelEmptySince.get(channelId) ?? endMs;
+    const effectiveEmptyStart = Math.max(recordedEmptySince, endMs);
+
+    const requiredDurationMs = bufferMinutes * 60 * 1000;
+    const elapsedSinceEmpty = now - effectiveEmptyStart;
+
+    return elapsedSinceEmpty >= requiredDurationMs;
   }
 
   /**
@@ -834,20 +1319,33 @@ export class DiscordBotService {
       }
     }
 
-    // 5. Cập nhật vào DB cho 3 records với xử lý Deduplication an toàn
-    const defaultWebhookUrl =
-      process.env.DISCORD_STANDUP_WEBHOOK ||
-      process.env.DISCORD_WEBHOOK_URL ||
-      "https://discord.com/api/webhooks/000000000000000000/placeholder-token";
+    const resolveWebhookUrlForPurpose = (purpose: string): string => {
+      // 1. Kiểm tra cấu hình hiện có của chính phòng ban này
+      const currentConfig = existingConfigs.find(
+        (c) =>
+          c.purpose === purpose &&
+          c.webhookUrl &&
+          !c.webhookUrl.includes("placeholder-token"),
+      );
+      if (currentConfig?.webhookUrl) return currentConfig.webhookUrl;
+
+      // 2. Fallback cấu hình hệ thống hoặc placeholder (tuyệt đối không mượn webhook của phòng ban khác)
+      return (
+        process.env.DISCORD_STANDUP_WEBHOOK ||
+        process.env.DISCORD_WEBHOOK_URL ||
+        "https://discord.com/api/webhooks/000000000000000000/placeholder-token"
+      );
+    };
 
     const updateOrCreateConfig = async (
       purpose: (typeof DISCORD_WEBHOOK_PURPOSE)[keyof typeof DISCORD_WEBHOOK_PURPOSE],
       threadId: string | null,
     ) => {
+      const webhookUrl = resolveWebhookUrlForPurpose(purpose);
       await discordWebhookRepository.upsertDepartmentConfigWithDeduplication({
         departmentId,
         purpose,
-        defaultWebhookUrl,
+        defaultWebhookUrl: webhookUrl,
         discordRoleId,
         threadId,
       });

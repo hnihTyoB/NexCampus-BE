@@ -36,5 +36,6 @@ export interface SystemSettingsResponseDto {
   DISCORD_BOT_TOKEN?: string;
   DISCORD_GUILD_ID?: string;
   DISCORD_INVITE_URL?: string;
+  DISCORD_MEETING_EMPTY_BUFFER_MINUTES?: number;
   [key: string]: string | number | boolean | undefined;
 }

@@ -25,18 +25,18 @@ describe("Discord Webhook Notifications & Isolation Test Suite", () => {
 
   let createdWebhookId: string;
   let testDeptId: string;
+  let createdTestDepartment = false;
 
   before(async () => {
-    // Tìm hoặc tạo một phòng ban thử nghiệm
-    let dept = await prisma.department.findFirst({
-      where: { deletedAt: null },
+    // Luôn tạo phòng ban thử nghiệm biệt lập để tuyệt đối không ảnh hưởng hay xóa nhầm dữ liệu phòng ban thật
+    const testDept = await prisma.department.create({
+      data: {
+        name: `__Test_Dept_Discord_Isolation_${Date.now()}`,
+        description: "Phòng ban tạm thời cho unit test discord webhook",
+      },
     });
-    if (!dept) {
-      dept = await prisma.department.create({
-        data: { name: "Test Department for Discord" },
-      });
-    }
-    testDeptId = dept.id;
+    testDeptId = testDept.id;
+    createdTestDepartment = true;
   });
 
   after(async () => {
@@ -44,6 +44,15 @@ describe("Discord Webhook Notifications & Isolation Test Suite", () => {
     if (createdWebhookId) {
       await prisma.discordWebhookConfig.deleteMany({
         where: { id: createdWebhookId },
+      });
+    }
+    // Dọn dẹp phòng ban thử nghiệm và các webhook liên quan
+    if (testDeptId && createdTestDepartment) {
+      await prisma.discordWebhookConfig.deleteMany({
+        where: { departmentId: testDeptId },
+      });
+      await prisma.department.deleteMany({
+        where: { id: testDeptId },
       });
     }
   });

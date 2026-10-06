@@ -18,6 +18,10 @@ const defaultMeetingSelect = {
   location: true,
   meetingType: true,
   meetingLink: true,
+  discordChannelId: true,
+  discordVoiceLink: true,
+  discordPermissionsGranted: true,
+  discordPermissionsResetAt: true,
   startTime: true,
   endTime: true,
   status: true,
@@ -44,6 +48,7 @@ const defaultMeetingSelect = {
       id: true,
       email: true,
       fullName: true,
+      discordUserId: true,
     },
   },
   participants: {
@@ -62,6 +67,7 @@ const defaultMeetingSelect = {
           email: true,
           fullName: true,
           avatarUrl: true,
+          discordUserId: true,
         },
       },
     },
@@ -235,6 +241,8 @@ export class MeetingRepository {
           location: data.location || null,
           meetingType: data.meetingType,
           meetingLink: data.meetingLink || null,
+          discordChannelId: data.discordChannelId || null,
+          discordVoiceLink: data.discordVoiceLink || null,
           startTime: new Date(data.startTime),
           endTime: new Date(data.endTime),
           status: data.status || MeetingStatus.SCHEDULED,
@@ -296,6 +304,10 @@ export class MeetingRepository {
         location: data.location,
         meetingType: data.meetingType,
         meetingLink: data.meetingLink,
+        discordChannelId:
+          data.discordChannelId !== undefined ? (data.discordChannelId || null) : undefined,
+        discordVoiceLink:
+          data.discordVoiceLink !== undefined ? (data.discordVoiceLink || null) : undefined,
         startTime: data.startTime ? new Date(data.startTime) : undefined,
         endTime: data.endTime ? new Date(data.endTime) : undefined,
         status: data.status,
@@ -637,6 +649,60 @@ export class MeetingRepository {
         details: data.details as Prisma.InputJsonValue,
         ipAddress: data.ipAddress,
       },
+    });
+  }
+
+  async updateDiscordPermissionStatus(
+    id: string,
+    data: {
+      discordPermissionsGranted: boolean;
+      discordPermissionsResetAt?: Date | null;
+      status?: MeetingStatus;
+    },
+  ) {
+    return prisma.meeting.update({
+      where: { id },
+      data: {
+        discordPermissionsGranted: data.discordPermissionsGranted,
+        discordPermissionsResetAt: data.discordPermissionsResetAt,
+        ...(data.status ? { status: data.status } : {}),
+      },
+      select: defaultMeetingSelect,
+    });
+  }
+
+  async findDiscordUserIdsForMeeting(meetingId: string): Promise<string[]> {
+    const meeting = await prisma.meeting.findUnique({
+      where: { id: meetingId },
+      select: {
+        host: { select: { discordUserId: true } },
+        participants: {
+          select: {
+            user: { select: { discordUserId: true } },
+          },
+        },
+      },
+    });
+
+    if (!meeting) return [];
+
+    const ids: string[] = [];
+    if (meeting.host?.discordUserId) {
+      ids.push(meeting.host.discordUserId);
+    }
+    for (const p of meeting.participants) {
+      if (p.user?.discordUserId) {
+        ids.push(p.user.discordUserId);
+      }
+    }
+
+    return Array.from(new Set(ids));
+  }
+
+  async findLeaderByUserId(userId: string) {
+    return prisma.leader.findFirst({
+      where: { userId },
+      select: { id: true },
     });
   }
 }

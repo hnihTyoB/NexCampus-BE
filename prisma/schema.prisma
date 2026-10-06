@@ -1055,6 +1055,10 @@ model Meeting {
   location    String?
   meetingType MeetingType       @default(ONLINE) @map("meeting_type")
   meetingLink String?           @map("meeting_link")
+  discordChannelId String?      @map("discord_channel_id")
+  discordVoiceLink String?      @map("discord_voice_link")
+  discordPermissionsGranted Boolean @default(false) @map("discord_permissions_granted")
+  discordPermissionsResetAt DateTime? @map("discord_permissions_reset_at")
   startTime   DateTime          @map("start_time")
   endTime     DateTime          @map("end_time")
   departmentId String?          @map("department_id") @db.Uuid
@@ -1076,6 +1080,7 @@ model Meeting {
   @@index([status])
   @@index([startTime])
   @@index([startTime, endTime])
+  @@index([discordChannelId])
   @@index([deletedAt])
   @@map("meetings")
 }
