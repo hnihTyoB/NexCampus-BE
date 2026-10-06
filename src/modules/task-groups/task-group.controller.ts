@@ -87,4 +87,31 @@ export class TaskGroupController {
       next(error);
     }
   };
+
+  getAiRecommendation = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await this.service.getGroupAiRecommendation(
+        req.params.id,
+        req.user,
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  confirmAiAllocation = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.service.confirmGroupAiAllocation(
+        req.params.id,
+        req.body,
+        req.user?.id,
+        req.user,
+        { ipAddress: req.ip },
+      );
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  };
 }

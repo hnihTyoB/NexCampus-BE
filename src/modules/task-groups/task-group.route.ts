@@ -9,6 +9,7 @@ import {
   updateTaskGroupSchema,
   queryTaskGroupSchema,
   taskGroupIdParamSchema,
+  confirmGroupAiAllocationSchema,
 } from "./task-group.validation";
 
 const router = Router();
@@ -36,6 +37,23 @@ router.get(
   requirePermission(PERMISSIONS.TASK_GROUP_READ),
   validate(taskGroupIdParamSchema, "params"),
   controller.findTasks,
+);
+
+router.post(
+  "/:id/ai-recommendation",
+  authMiddleware,
+  requirePermission(PERMISSIONS.TASK_ASSIGNMENT_CREATE),
+  validate(taskGroupIdParamSchema, "params"),
+  controller.getAiRecommendation,
+);
+
+router.post(
+  "/:id/ai-allocation/confirm",
+  authMiddleware,
+  requirePermission(PERMISSIONS.TASK_ASSIGNMENT_CREATE),
+  validate(taskGroupIdParamSchema, "params"),
+  validate(confirmGroupAiAllocationSchema),
+  controller.confirmAiAllocation,
 );
 
 router.get(
