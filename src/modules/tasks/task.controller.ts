@@ -1,5 +1,4 @@
 import fs from "fs";
-import path from "path";
 import { Request, Response, NextFunction } from "express";
 import { TaskService } from "./task.service";
 import { TaskAnalyticsService } from "./task.analytics.service";
@@ -231,18 +230,7 @@ export class TaskController {
     next: NextFunction,
   ) => {
     try {
-      const templatePath = path.join(
-        process.cwd(),
-        "templates",
-        "task-import-template.xlsx",
-      );
-      if (!fs.existsSync(templatePath)) {
-        throw new AppError(
-          "File mẫu không tồn tại trên hệ thống",
-          404,
-          ERROR_CODE.NOT_FOUND,
-        );
-      }
+      const templatePath = this.service.getImportTemplatePath();
       res.setHeader(
         "Content-Type",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

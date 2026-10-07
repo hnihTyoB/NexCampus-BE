@@ -97,22 +97,6 @@ const defaultSelect = {
     },
     orderBy: { createdAt: "desc" as const },
   },
-} satisfies Prisma.TaskSelect;
-
-const detailSelect = {
-  ...defaultSelect,
-  recreatedTask: {
-    select: {
-      id: true,
-      code: true,
-      title: true,
-      assignment: {
-        select: {
-          assignee: { select: { fullName: true } },
-        },
-      },
-    },
-  },
   dependsOn: {
     where: { deletedAt: null },
     select: {
@@ -130,6 +114,24 @@ const detailSelect = {
   },
   dependencies: {
     where: { deletedAt: null },
+    select: {
+      id: true,
+      code: true,
+      title: true,
+      assignment: {
+        select: {
+          id: true,
+          status: true,
+          assignee: { select: { id: true, fullName: true } },
+        },
+      },
+    },
+  },
+} satisfies Prisma.TaskSelect;
+
+const detailSelect = {
+  ...defaultSelect,
+  recreatedTask: {
     select: {
       id: true,
       code: true,

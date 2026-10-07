@@ -31,6 +31,26 @@ export interface TaskDto {
     support?: { id: string; fullName: string } | null;
   } | null;
   attachments?: TaskAttachmentDto[];
+  dependsOn?: Array<{
+    id: string;
+    code: string | null;
+    title: string;
+    assignment?: {
+      id: string;
+      status: AssignmentStatus;
+      assignee?: { id: string; fullName: string } | null;
+    } | null;
+  }>;
+  dependencies?: Array<{
+    id: string;
+    code: string | null;
+    title: string;
+    assignment?: {
+      id: string;
+      status: AssignmentStatus;
+      assignee?: { id: string; fullName: string } | null;
+    } | null;
+  }>;
   createdAt: Date | string;
   updatedAt: Date | string;
 }

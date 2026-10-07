@@ -20,6 +20,8 @@ import { prisma } from "../../database/prisma.client";
 import { taskAllocationAiService } from "./task-allocation.ai.service";
 import { TaskGroupRepository } from "../task-groups/task-group.repository";
 import crypto from "crypto";
+import fs from "fs";
+import path from "path";
 
 interface UserPayload {
   id: string;
@@ -654,5 +656,23 @@ export class TaskService {
         generatedAt: new Date().toISOString(),
       },
     };
+  }
+
+  getImportTemplatePath(): string {
+    const templatePath = fs.existsSync(
+      path.join(process.cwd(), "templates", "template_tasks.xlsx"),
+    )
+      ? path.join(process.cwd(), "templates", "template_tasks.xlsx")
+      : path.join(__dirname, "../../../templates", "template_tasks.xlsx");
+
+    if (!fs.existsSync(templatePath)) {
+      throw new AppError(
+        "File mẫu không tồn tại trên hệ thống",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
+
+    return templatePath;
   }
 }
