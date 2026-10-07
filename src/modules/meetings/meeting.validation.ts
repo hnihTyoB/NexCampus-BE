@@ -22,6 +22,8 @@ export const findAllMeetingSchema = z.object({
   departmentId: z.string().uuid("Invalid department ID").optional(),
   startDate: z.string().datetime({ offset: true }).optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()),
   endDate: z.string().datetime({ offset: true }).optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()),
+  startTimeFrom: z.string().datetime({ offset: true }).optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()),
+  startTimeTo: z.string().datetime({ offset: true }).optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()),
   sortBy: z.enum(["startTime", "createdAt", "title"]).optional().default("startTime"),
   order: z.enum(["asc", "desc"]).optional().default("asc"),
   page: z.coerce.number().int().positive().optional().default(1),
