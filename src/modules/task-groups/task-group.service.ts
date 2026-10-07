@@ -192,11 +192,20 @@ export class TaskGroupService {
     user?: UserContext,
     context?: { ipAddress?: string },
   ) {
-    if (user && data.departmentId) {
+    if (user) {
       const hasGlobal = await this.hasGlobalAccess(user.id);
       if (!hasGlobal) {
         const deptIds = await this.repository.getLeaderDepartmentIds(user.id);
-        if (!deptIds.includes(data.departmentId)) {
+        if (deptIds.length === 0) {
+          throw new AppError(
+            "Leader chưa được phân công quản lý phòng ban nào",
+            403,
+            ERROR_CODE.FORBIDDEN,
+          );
+        }
+        if (!data.departmentId) {
+          data.departmentId = deptIds[0];
+        } else if (!deptIds.includes(data.departmentId)) {
           throw new AppError(
             "Leader chỉ được tạo nhóm trong phòng ban mình quản lý",
             403,
