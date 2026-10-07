@@ -83,6 +83,8 @@ export interface MeetingQueryDto {
   departmentId?: string;
   startDate?: string;
   endDate?: string;
+  startTimeFrom?: string;
+  startTimeTo?: string;
   page?: number;
   limit?: number;
   sortBy?: "startTime" | "createdAt" | "title";
