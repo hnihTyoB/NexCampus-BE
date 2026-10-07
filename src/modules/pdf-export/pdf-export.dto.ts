@@ -204,11 +204,31 @@ export class WeeklyEvaluationPdfDTO {
     const aiRatingsRaw = raw.aiRatings || null;
     this.hasRatings = !!ratingsRaw && typeof ratingsRaw === "object" && Object.keys(ratingsRaw).length > 0;
 
+const RATING_ALIASES_BE: Record<string, string> = {
+  resilience: "pressureTolerance",
+  pressureTolerance: "resilience",
+  practicalSkills: "practicalSkill",
+  practicalSkill: "practicalSkills",
+  foreignLanguage: "languageProficiency",
+  languageProficiency: "foreignLanguage",
+  contentQuality: "contentRequirement",
+  contentRequirement: "contentQuality",
+  progressDelivery: "progressRequirement",
+  progressRequirement: "progressDelivery",
+};
+
+function resolveRatingCodeBE(ratings: Record<string, any>, key: string): string | null {
+  if (ratings[key]) return ratings[key];
+  const alias = RATING_ALIASES_BE[key];
+  if (alias && ratings[alias]) return ratings[alias];
+  return null;
+}
+
     if (this.hasRatings) {
       this.criteriaSections = CRITERIA_SECTIONS_META.map((section) => {
         const rows: CriteriaRow[] = section.criteria.map((c, idx) => {
-          const ratingCode: string = ratingsRaw[c.key] || "TB";
-          const aiCode: string | null = aiRatingsRaw ? aiRatingsRaw[c.key] || null : null;
+          const ratingCode: string = resolveRatingCodeBE(ratingsRaw, c.key) || "TB";
+          const aiCode: string | null = aiRatingsRaw ? (resolveRatingCodeBE(aiRatingsRaw, c.key) || null) : null;
           return {
             index: idx + 1,
             label: c.label,
@@ -231,10 +251,15 @@ export class WeeklyEvaluationPdfDTO {
 
     // Điểm tổng & 4 nhóm rút gọn
     this.totalScore = raw.score ?? raw.totalScore ?? 8.0;
-    this.communication = ratingsRaw.communication ? RATING_SCORES[ratingsRaw.communication] || 8 : (raw.communication || 8);
-    this.attitude = ratingsRaw.workAttitude ? RATING_SCORES[ratingsRaw.workAttitude] || 8 : (raw.attitude || 8);
-    this.learning = ratingsRaw.learningCapacity ? RATING_SCORES[ratingsRaw.learningCapacity] || 8 : (raw.learning || 8);
-    this.coding = ratingsRaw.practicalSkills ? RATING_SCORES[ratingsRaw.practicalSkills] || 8 : (raw.coding || 8);
+    const commCode = resolveRatingCodeBE(ratingsRaw, "communication");
+    const attCode = resolveRatingCodeBE(ratingsRaw, "workAttitude");
+    const learnCode = resolveRatingCodeBE(ratingsRaw, "learningCapacity");
+    const codeCode = resolveRatingCodeBE(ratingsRaw, "practicalSkills");
+
+    this.communication = commCode ? RATING_SCORES[commCode] || 8 : (raw.communication || 8);
+    this.attitude = attCode ? RATING_SCORES[attCode] || 8 : (raw.attitude || 8);
+    this.learning = learnCode ? RATING_SCORES[learnCode] || 8 : (raw.learning || 8);
+    this.coding = codeCode ? RATING_SCORES[codeCode] || 8 : (raw.coding || 8);
     this.comment = raw.comment || "Thực tập sinh thể hiện thái độ học hỏi và hoàn thành nhiệm vụ.";
 
     // AI Evaluation
