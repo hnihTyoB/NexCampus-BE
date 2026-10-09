@@ -491,7 +491,7 @@ export class DiscordWebhookService {
       id: string;
       code?: string | null;
       title: string;
-      deadline: Date | string;
+      deadline?: Date | string | null;
       priority?: string;
       assigneeName?: string | null;
       assigneeDiscordId?: string | null;
@@ -506,14 +506,16 @@ export class DiscordWebhookService {
 
     if (!webhook) return false;
 
-    const deadlineStr = new Date(params.task.deadline).toLocaleDateString("vi-VN", {
-      timeZone: "Asia/Ho_Chi_Minh",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const deadlineStr = params.task.deadline
+      ? new Date(params.task.deadline).toLocaleDateString("vi-VN", {
+          timeZone: "Asia/Ho_Chi_Minh",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "Chưa thiết lập";
 
     const assigneeTag = params.task.assigneeDiscordId
       ? `<@${params.task.assigneeDiscordId}>`

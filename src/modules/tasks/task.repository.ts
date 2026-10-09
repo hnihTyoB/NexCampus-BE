@@ -382,15 +382,14 @@ export class TaskRepository {
   }
 
   create(data: CreateTaskDto, createdBy: string) {
-
     return prisma.task.create({
       data: {
         title: data.title,
         description: data.description,
-        deadline: new Date(data.deadline),
+        deadline: data.deadline ? new Date(data.deadline) : null,
         priority: data.priority,
         code: data.code,
-        startDate: data.startDate ? new Date(data.startDate) : undefined,
+        startDate: data.startDate ? new Date(data.startDate) : null,
         estDays: data.estDays,
         phase: data.phase,
         module: data.module,
@@ -409,7 +408,9 @@ export class TaskRepository {
       data: {
         ...(data.title !== undefined ? { title: data.title } : {}),
         ...(data.description !== undefined ? { description: data.description } : {}),
-        ...(data.deadline !== undefined ? { deadline: new Date(data.deadline) } : {}),
+        ...(data.deadline !== undefined
+          ? { deadline: data.deadline ? new Date(data.deadline) : null }
+          : {}),
         ...(data.priority !== undefined ? { priority: data.priority } : {}),
         ...(data.code !== undefined ? { code: data.code } : {}),
         ...(data.startDate !== undefined
@@ -429,6 +430,86 @@ export class TaskRepository {
       },
       select: defaultSelect,
     });
+  }
+
+  async findTasksForScheduleAdjustment(filter: {
+    taskGroupId?: string;
+    taskIds?: string[];
+  }) {
+    return prisma.task.findMany({
+      where: {
+        deletedAt: null,
+        ...(filter.taskGroupId ? { taskGroupId: filter.taskGroupId } : {}),
+        ...(filter.taskIds && filter.taskIds.length > 0
+          ? { id: { in: filter.taskIds } }
+          : {}),
+      },
+      select: {
+        id: true,
+        code: true,
+        title: true,
+        startDate: true,
+        deadline: true,
+        estDays: true,
+        createdBy: true,
+        taskGroupId: true,
+        taskGroup: {
+          select: {
+            id: true,
+            departmentId: true,
+          },
+        },
+        assignment: {
+          select: {
+            id: true,
+            status: true,
+            assigneeId: true,
+            assignee: {
+              select: {
+                id: true,
+                internshipProfile: {
+                  select: { mentorId: true, departmentId: true },
+                },
+              },
+            },
+            supportId: true,
+            support: {
+              select: {
+                id: true,
+                internshipProfile: {
+                  select: { mentorId: true, departmentId: true },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ startDate: "asc" }, { createdAt: "asc" }],
+    });
+  }
+
+  async updateTaskScheduleBatch(
+    updates: Array<{ id: string; startDate: Date; deadline: Date }>,
+  ) {
+    return prisma.$transaction(
+      updates.map((u) =>
+        prisma.task.update({
+          where: { id: u.id },
+          data: {
+            startDate: u.startDate,
+            deadline: u.deadline,
+          },
+          select: {
+            id: true,
+            code: true,
+            title: true,
+            startDate: true,
+            deadline: true,
+            estDays: true,
+          },
+        }),
+      ),
+    );
   }
 
   softDelete(id: string) {

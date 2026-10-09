@@ -304,7 +304,7 @@ export class AbsenceRepository {
         select: { id: true, deadline: true, taskNotes: true },
       });
 
-      if (task) {
+      if (task && task.deadline) {
         const newDeadline = new Date(
           task.deadline.getTime() + daysToAdd * 24 * 60 * 60 * 1000,
         );

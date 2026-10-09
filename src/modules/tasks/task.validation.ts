@@ -80,14 +80,19 @@ export const findAllTaskSchema = z.object({
 export const createTaskSchema = z.object({
   title: z.string().trim().min(1, "Title is required").max(200),
   description: z.string().trim().optional(),
-  deadline: z.string().refine((v) => !isNaN(Date.parse(v)), {
-    message: "Invalid deadline",
-  }),
+  deadline: z
+    .string()
+    .refine((v) => !isNaN(Date.parse(v)), {
+      message: "Invalid deadline",
+    })
+    .nullable()
+    .optional(),
   priority: prioritySchema.optional().default(TASK_PRIORITY.MEDIUM),
   code: z.string().trim().max(50).optional(),
   startDate: z
     .string()
     .refine((v) => !isNaN(Date.parse(v)), { message: "Invalid startDate" })
+    .nullable()
     .optional(),
   estDays: z.coerce.number().positive().max(365),
   phase: z.string().trim().max(100).optional(),
@@ -196,4 +201,37 @@ export const importTaskBodySchema = z.object({
   taskGroupId: z.string().uuid("Invalid taskGroupId").optional(),
   taskGroupName: z.string().trim().max(100).optional(),
 });
+
+export const adjustTaskScheduleSchema = z
+  .object({
+    taskGroupId: z.string().uuid("Invalid taskGroupId").optional(),
+    taskIds: z.array(z.string().uuid("Invalid taskId")).optional(),
+    anchorStartDate: z
+      .string()
+      .trim()
+      .regex(
+        /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?)?$/,
+        "anchorStartDate phải có định dạng YYYY-MM-DD hoặc ISO-8601",
+      )
+      .refine((v) => !isNaN(Date.parse(v)), { message: "Invalid anchorStartDate" })
+      .optional(),
+    shiftDays: z.coerce.number().int().optional(),
+  })
+  .refine((data) => !!data.taskGroupId || (Array.isArray(data.taskIds) && data.taskIds.length > 0), {
+    message: "Phải cung cấp taskGroupId hoặc danh sách taskIds",
+  })
+  .refine(
+    (data) =>
+      (data.anchorStartDate !== undefined && data.shiftDays === undefined) ||
+      (data.shiftDays !== undefined && data.anchorStartDate === undefined),
+    {
+      message: "Chỉ được chọn 1 trong 2 phương thức điều chỉnh: anchorStartDate hoặc shiftDays",
+    },
+  )
+  .refine(
+    (data) => data.shiftDays === undefined || data.shiftDays !== 0,
+    {
+      message: "Số ngày tịnh tiến shiftDays phải khác 0",
+    },
+  );
 

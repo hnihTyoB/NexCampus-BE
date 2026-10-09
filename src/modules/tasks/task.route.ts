@@ -17,10 +17,21 @@ import {
   createLinkAttachmentSchema,
   aiSuggestTaskAllocationSchema,
   importTaskBodySchema,
+  adjustTaskScheduleSchema,
 } from "./task.validation";
 
 const router = Router();
 const controller = new TaskController();
+
+// ─── Task Schedule Adjustment ────────────────────────────────────────────────
+
+router.post(
+  "/adjust-schedule",
+  authMiddleware,
+  requirePermission(PERMISSIONS.TASK_UPDATE),
+  validate(adjustTaskScheduleSchema),
+  controller.adjustSchedule,
+);
 
 // ─── Task Import ────────────────────────────────────────────────────────────
 

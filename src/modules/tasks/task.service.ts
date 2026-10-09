@@ -7,6 +7,7 @@ import {
   UpdateTaskDto,
   ConfirmAttachmentUploadDto,
   CreateLinkAttachmentDto,
+  AdjustTaskScheduleDto,
 } from "./task.dto";
 import { ASSIGNMENT_STATUS } from "../../common/constants/task.constant";
 import { PERMISSIONS } from "../../common/constants/permission.constant";
@@ -19,6 +20,11 @@ import { R2Service } from "../../common/services/r2.service";
 import { prisma } from "../../database/prisma.client";
 import { taskAllocationAiService } from "./task-allocation.ai.service";
 import { TaskGroupRepository } from "../task-groups/task-group.repository";
+import {
+  calculateDeadlineFromStartDate,
+  getTodayStart,
+} from "./task.import.service";
+import { getVietnamDayRange } from "../../common/helpers/date.helper";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
@@ -96,9 +102,9 @@ export class TaskService {
 
   private validateSchedule(
     startDate: string | Date | null | undefined,
-    deadline: string | Date,
+    deadline: string | Date | null | undefined,
   ) {
-    if (!startDate) return;
+    if (!startDate || !deadline) return;
 
     if (new Date(startDate).getTime() > new Date(deadline).getTime()) {
       throw new AppError(
@@ -674,5 +680,156 @@ export class TaskService {
     }
 
     return templatePath;
+  }
+
+  async adjustSchedule(
+    dto: AdjustTaskScheduleDto,
+    actor: string | UserPayload,
+    context?: { ipAddress?: string },
+  ) {
+    const actorUser: UserPayload =
+      typeof actor === "string" ? ({ id: actor } as UserPayload) : actor;
+    const actorId = actorUser.id;
+
+    const tasks = await this.repository.findTasksForScheduleAdjustment({
+      taskGroupId: dto.taskGroupId,
+      taskIds: dto.taskIds,
+    });
+
+    if (tasks.length === 0) {
+      throw new AppError(
+        "Không tìm thấy công việc nào phù hợp để điều chỉnh lịch trình",
+        404,
+        ERROR_CODE.NOT_FOUND,
+      );
+    }
+
+    // 1. Phân quyền theo phạm vi đối tượng (Scope Authorization / anti-IDOR)
+    const callerPerms = new Set(
+      actorUser.permissions ?? (await permissionCacheService.getUserPermissions(actorUser.id)),
+    );
+    const hasGlobalAccess =
+      callerPerms.has(PERMISSIONS.ROLE_READ) ||
+      callerPerms.has(PERMISSIONS.USER_ROLE_ASSIGN);
+
+    if (!hasGlobalAccess) {
+      const scope = await this.resolveUserScope(actorUser);
+      for (const t of tasks) {
+        const isCreator = t.createdBy === actorId;
+        const isDeptTask = Boolean(
+          t.taskGroup?.departmentId &&
+          scope.departmentIds?.includes(t.taskGroup.departmentId),
+        );
+        const isMentorOfAssignee = Boolean(
+          t.assignment?.assignee?.internshipProfile?.mentorId === actorId,
+        );
+        const isMentorOfSupport = Boolean(
+          t.assignment?.support?.internshipProfile?.mentorId === actorId,
+        );
+        const isDeptOfAssignee = Boolean(
+          t.assignment?.assignee?.internshipProfile?.departmentId &&
+          scope.departmentIds?.includes(t.assignment.assignee.internshipProfile.departmentId),
+        );
+
+        if (!isCreator && !isDeptTask && !isMentorOfAssignee && !isMentorOfSupport && !isDeptOfAssignee) {
+          throw new AppError(
+            "Bạn không có quyền điều chỉnh lịch trình của những công việc này",
+            403,
+            ERROR_CODE.FORBIDDEN,
+          );
+        }
+      }
+    }
+
+    // 2. Kiểm tra quy tắc bất biến: KHÓA TASK ĐÃ HOÀN THÀNH (DONE)
+    const activeTasks = tasks.filter(
+      (t) => t.assignment?.status !== ASSIGNMENT_STATUS.DONE,
+    );
+
+    if (activeTasks.length === 0) {
+      throw new AppError(
+        "Tất cả công việc đã chọn đều đã hoàn thành (DONE) và không thể điều chỉnh lịch trình",
+        409,
+        ERROR_CODE.TASK_ALREADY_COMPLETED,
+      );
+    }
+
+    const updates: Array<{ id: string; startDate: Date; deadline: Date }> = [];
+
+    if (dto.shiftDays !== undefined && dto.shiftDays !== 0) {
+      const shift = dto.shiftDays;
+      for (const t of activeTasks) {
+        const baseStart = t.startDate ? new Date(t.startDate) : getTodayStart();
+        const { startOfDay } = getVietnamDayRange(baseStart);
+        const newStart = new Date(startOfDay.getTime() + shift * 24 * 60 * 60 * 1000);
+
+        const newDeadline = calculateDeadlineFromStartDate(newStart, t.estDays ?? 1);
+        updates.push({
+          id: t.id,
+          startDate: newStart,
+          deadline: newDeadline,
+        });
+      }
+    } else if (dto.anchorStartDate) {
+      const { startOfDay: anchor } = getVietnamDayRange(dto.anchorStartDate);
+
+      const tasksWithStart = activeTasks.filter((t) => t.startDate !== null);
+      if (tasksWithStart.length > 0) {
+        const earliestTime = Math.min(
+          ...tasksWithStart.map((t) => getVietnamDayRange(t.startDate!).startOfDay.getTime()),
+        );
+        const deltaDays = Math.round(
+          (anchor.getTime() - earliestTime) / (24 * 60 * 60 * 1000),
+        );
+
+        for (const t of activeTasks) {
+          const baseStart = t.startDate ? new Date(t.startDate) : anchor;
+          const { startOfDay: baseDay } = getVietnamDayRange(baseStart);
+          const newStart = t.startDate
+            ? new Date(baseDay.getTime() + deltaDays * 24 * 60 * 60 * 1000)
+            : anchor;
+
+          const newDeadline = calculateDeadlineFromStartDate(newStart, t.estDays ?? 1);
+          updates.push({
+            id: t.id,
+            startDate: newStart,
+            deadline: newDeadline,
+          });
+        }
+      } else {
+        for (const t of activeTasks) {
+          const newStart = anchor;
+          const newDeadline = calculateDeadlineFromStartDate(newStart, t.estDays ?? 1);
+          updates.push({
+            id: t.id,
+            startDate: newStart,
+            deadline: newDeadline,
+          });
+        }
+      }
+    }
+
+    const updatedTasks = await this.repository.updateTaskScheduleBatch(updates);
+
+    await this.repository.createAuditLog({
+      actorId,
+      action: AUDIT_ACTION.UPDATE_TASK,
+      targetType: AUDIT_TARGET_TYPE.TASK,
+      targetId: dto.taskGroupId || tasks[0].id,
+      details: {
+        message: `Điều chỉnh lịch trình cho ${updatedTasks.length} công việc`,
+        shiftDays: dto.shiftDays,
+        anchorStartDate: dto.anchorStartDate,
+        count: updatedTasks.length,
+        skippedDoneCount: tasks.length - activeTasks.length,
+      },
+      ipAddress: context?.ipAddress,
+    });
+
+    return {
+      adjustedTasksCount: updatedTasks.length,
+      skippedDoneCount: tasks.length - activeTasks.length,
+      tasks: updatedTasks,
+    };
   }
 }
