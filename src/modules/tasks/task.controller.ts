@@ -298,5 +298,26 @@ export class TaskController {
       next(error);
     }
   };
+
+  adjustSchedule = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      const data = await this.service.adjustSchedule(
+        req.body,
+        req.user!,
+        { ipAddress: req.ip },
+      );
+      res.json({
+        success: true,
+        message: `Đã điều chỉnh lịch trình thành công cho ${data.adjustedTasksCount} công việc.`,
+        data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
 

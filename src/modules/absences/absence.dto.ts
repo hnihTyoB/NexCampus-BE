@@ -20,7 +20,7 @@ export interface TaskConflictDto {
   taskId: string;
   code: string | null;
   title: string;
-  deadline: Date | string;
+  deadline: Date | string | null;
   status: string;
   priority: string;
 }

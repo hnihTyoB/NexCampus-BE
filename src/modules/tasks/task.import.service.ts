@@ -33,6 +33,23 @@ const PRIORITY_MAP: Record<string, TaskPriority> = {
   LOW: TASK_PRIORITY.LOW as TaskPriority,
 };
 
+import { getVietnamDayRange } from "../../common/helpers/date.helper";
+
+export function getTodayStart(): Date {
+  return getVietnamDayRange().startOfDay;
+}
+
+export function calculateDeadlineFromStartDate(
+  startDate: Date | string,
+  estDays?: number | null,
+): Date {
+  const { startOfDay } = getVietnamDayRange(startDate);
+  const est = estDays && estDays > 0 ? Number(estDays) : 1;
+  const daysToAdd = Math.max(0, Math.ceil(est) - 1);
+  const targetDay = new Date(startOfDay.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+  return getVietnamDayRange(targetDay).endOfDay;
+}
+
 function parseAssignmentStatus(value: unknown): string {
   if (!value) return ASSIGNMENT_STATUS.TODO;
   const s = String(value)
@@ -222,26 +239,12 @@ function parseTaskSheet(
     const rawTask = row["Task"];
     if (!rawTask) errors.push("Thiếu tên Task");
 
-    const rawDue = row["Due"];
-    const deadline = parseExcelDate(rawDue);
-    if (!deadline) errors.push(`Không parse được ngày Due: "${rawDue}"`);
-
     const rawPriority = row["Priority"] ? String(row["Priority"]).trim() : null;
     const priority = rawPriority ? PRIORITY_MAP[rawPriority.toUpperCase()] : null;
     if (!priority)
       errors.push(
         `Priority không hợp lệ: "${rawPriority}" (cho phép: P0, P1, P2 hoặc HIGH, MEDIUM, LOW)`,
       );
-
-    const rawStart =
-      row["Start"] && String(row["Start"]).trim()
-        ? String(row["Start"]).trim()
-        : null;
-    let startDate: string | undefined;
-    if (rawStart) {
-      startDate = parseExcelDate(rawStart);
-      if (!startDate) errors.push(`Không parse được ngày Start: "${rawStart}"`);
-    }
 
     const rawOwner =
       row["Owner"] && String(row["Owner"]).trim()
@@ -277,6 +280,27 @@ function parseTaskSheet(
       );
     }
 
+    const rawEstDays = row["Est Days"];
+    let estDays: number | undefined;
+    if (rawEstDays != null) {
+      estDays = Number(rawEstDays);
+      if (isNaN(estDays)) {
+        errors.push(`Est Days phải là số hợp lệ: "${rawEstDays}"`);
+      }
+    }
+
+    // Quy tắc nghiệp vụ:
+    // Dù ngày bắt đầu trong Excel là bao nhiêu cũng để trống.
+    // Nếu có email gán cho intern -> ngày bắt đầu lấy hôm nay (today) & tính deadline = startDate + (ceil(estDays) - 1) lúc 23:59:59.
+    // Nếu chưa có startDate -> deadline = null.
+    let startDate: string | undefined = undefined;
+    let deadline: string | null = null;
+    if (ownerEmail) {
+      const today = getTodayStart();
+      startDate = today.toISOString();
+      deadline = calculateDeadlineFromStartDate(today, estDays).toISOString();
+    }
+
     const rawStatus =
       row["Status"] ??
       row["status"] ??
@@ -291,20 +315,11 @@ function parseTaskSheet(
       continue;
     }
 
-    const rawEstDays = row["Est Days"];
-    let estDays: number | undefined;
-    if (rawEstDays != null) {
-      estDays = Number(rawEstDays);
-      if (isNaN(estDays)) {
-        errors.push(`Est Days phải là số hợp lệ: "${rawEstDays}"`);
-      }
-    }
-
     validRows.push({
       excelCode: excelCode!,
       title: String(rawTask).trim(),
       description: row["Mô tả"] ? String(row["Mô tả"]).trim() : "",
-      deadline: deadline!,
+      deadline,
       startDate,
       priority: priority!,
       ownerEmail,
@@ -440,6 +455,19 @@ export class TaskImportService {
           internFullName: intern?.fullName ?? null,
         };
       });
+
+    const today = getTodayStart();
+    for (const row of validRows) {
+      const hasMatchedIntern =
+        row.ownerEmail && internByEmailMap.has(row.ownerEmail.toLowerCase());
+      if (hasMatchedIntern) {
+        row.startDate = today.toISOString();
+        row.deadline = calculateDeadlineFromStartDate(today, row.estDays).toISOString();
+      } else {
+        row.startDate = undefined;
+        row.deadline = null;
+      }
+    }
 
     return {
       totalRows: validRows.length + errorRows.length,
@@ -628,57 +656,6 @@ export class TaskImportService {
 
         for (const row of validRows) {
           try {
-            const existingTask =
-              existingByCode.get(row.excelCode.trim().toUpperCase()) ||
-              existingByTitle.get(row.title.trim().toLowerCase());
-
-            let taskId: string;
-
-            if (existingTask) {
-              const updated = await tx.task.update({
-                where: { id: existingTask.id },
-                data: {
-                  title: row.title,
-                  description: row.description || null,
-                  deadline: new Date(row.deadline),
-                  startDate: row.startDate ? new Date(row.startDate) : null,
-                  estDays: row.estDays ?? null,
-                  phase: row.phase ?? null,
-                  module: row.module ?? null,
-                  acceptanceCriteria: row.acceptanceCriteria ?? null,
-                  taskNotes: row.taskNotes ?? null,
-                  priority: row.priority,
-                },
-                select: { id: true },
-              });
-              taskId = updated.id;
-              skippedCodes.push(row.excelCode);
-            } else {
-              const created = await tx.task.create({
-                data: {
-                  code: row.excelCode,
-                  title: row.title,
-                  description: row.description || null,
-                  deadline: new Date(row.deadline),
-                  startDate: row.startDate ? new Date(row.startDate) : null,
-                  estDays: row.estDays ?? 1,
-                  phase: row.phase ?? null,
-                  module: row.module ?? null,
-                  acceptanceCriteria: row.acceptanceCriteria ?? null,
-                  taskNotes: row.taskNotes ?? null,
-                  priority: row.priority,
-                  taskGroupId: resolvedGroupId,
-                  createdBy,
-                },
-                select: { id: true },
-              });
-              taskId = created.id;
-              importedTasks++;
-            }
-
-            codeToDbId.set(row.excelCode, taskId);
-            titleToDbId.set(row.title.toLowerCase().trim(), taskId);
-
             let ownerInternId: string | null = null;
             if (row.ownerEmail) {
               const ownerIntern = internsByEmailMap.get(
@@ -698,6 +675,77 @@ export class TaskImportService {
                 supportInternId = supportIntern.id;
               }
             }
+
+            // Quy tắc nghiệp vụ:
+            // Nếu có intern -> startDate = hôm nay, deadline = startDate + (ceil(estDays) - 1) lúc 23:59:59.
+            // Nếu chưa có startDate -> deadline = null.
+            let resolvedStartDate: Date | null = null;
+            let resolvedDeadline: Date | null = null;
+
+            if (ownerInternId) {
+              const today = getTodayStart();
+              resolvedStartDate = today;
+              resolvedDeadline = calculateDeadlineFromStartDate(today, row.estDays ?? 1);
+            }
+
+            const existingTask =
+              existingByCode.get(row.excelCode.trim().toUpperCase()) ||
+              existingByTitle.get(row.title.trim().toLowerCase());
+
+            let taskId: string;
+
+            if (existingTask) {
+              if (existingTask.assignment?.status === ASSIGNMENT_STATUS.DONE) {
+                // Công việc đã hoàn thành: KHÔNG ĐƯỢC PHÉP CHỈNH SỬA THEO QUY CHUẨN KIẾN TRÚC
+                skippedCodes.push(`${row.excelCode} (Đã hoàn thành - bỏ qua)`);
+                codeToDbId.set(row.excelCode, existingTask.id);
+                titleToDbId.set(row.title.toLowerCase().trim(), existingTask.id);
+                continue;
+              }
+
+              const updated = await tx.task.update({
+                where: { id: existingTask.id },
+                data: {
+                  title: row.title,
+                  description: row.description || null,
+                  deadline: resolvedDeadline,
+                  startDate: resolvedStartDate,
+                  estDays: row.estDays ?? null,
+                  phase: row.phase ?? null,
+                  module: row.module ?? null,
+                  acceptanceCriteria: row.acceptanceCriteria ?? null,
+                  taskNotes: row.taskNotes ?? null,
+                  priority: row.priority,
+                },
+                select: { id: true },
+              });
+              taskId = updated.id;
+              skippedCodes.push(row.excelCode);
+            } else {
+              const created = await tx.task.create({
+                data: {
+                  code: row.excelCode,
+                  title: row.title,
+                  description: row.description || null,
+                  deadline: resolvedDeadline,
+                  startDate: resolvedStartDate,
+                  estDays: row.estDays ?? 1,
+                  phase: row.phase ?? null,
+                  module: row.module ?? null,
+                  acceptanceCriteria: row.acceptanceCriteria ?? null,
+                  taskNotes: row.taskNotes ?? null,
+                  priority: row.priority,
+                  taskGroupId: resolvedGroupId,
+                  createdBy,
+                },
+                select: { id: true },
+              });
+              taskId = created.id;
+              importedTasks++;
+            }
+
+            codeToDbId.set(row.excelCode, taskId);
+            titleToDbId.set(row.title.toLowerCase().trim(), taskId);
 
             const existingAssignment = existingTask?.assignment;
             const rowWithStatus = row as ImportTaskRowDto & { _status?: string };
@@ -736,7 +784,9 @@ export class TaskImportService {
                   notificationsToDispatch.push({
                     userId: ownerIntern.userId,
                     taskTitle: row.title,
-                    deadline: new Date(row.deadline).toLocaleDateString("vi-VN"),
+                    deadline: resolvedDeadline
+                      ? resolvedDeadline.toLocaleDateString("vi-VN")
+                      : "Chưa thiết lập",
                   });
                 }
               }

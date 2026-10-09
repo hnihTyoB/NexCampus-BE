@@ -813,7 +813,7 @@ model Task {
   code               String?
   title              String
   description        String?
-  deadline           DateTime
+  deadline           DateTime?
   startDate          DateTime?    @map("start_date")
   estDays            Float?       @map("est_days")
   phase              String?

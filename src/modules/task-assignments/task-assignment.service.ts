@@ -256,7 +256,7 @@ export class TaskAssignmentService {
     }
 
     // 2. Deadline validation
-    if (new Date(task.deadline).getTime() < Date.now()) {
+    if (task.deadline && new Date(task.deadline).getTime() < Date.now()) {
       throw new AppError(
         "Cannot assign a task whose deadline has already passed",
         400,
@@ -355,7 +355,7 @@ export class TaskAssignmentService {
           web: {
             type: NOTIFICATION_TYPE.INFO,
             title: "Công việc mới được phân công",
-            content: `Bạn đã được phân công công việc "${task.title}". Hạn chót: ${new Date(task.deadline).toLocaleDateString("vi-VN")}`,
+            content: `Bạn đã được phân công công việc "${task.title}". Hạn chót: ${task.deadline ? new Date(task.deadline).toLocaleDateString("vi-VN") : "Chưa thiết lập"}`,
           },
         });
       } catch (e) {
@@ -1008,6 +1008,14 @@ export class TaskAssignmentService {
     if (isNaN(proposedDate.getTime())) {
       throw new AppError(
         "Ngày deadline mới không hợp lệ",
+        400,
+        ERROR_CODE.VALIDATION_ERROR,
+      );
+    }
+
+    if (!task.deadline) {
+      throw new AppError(
+        "Công việc chưa có hạn chót, không thể tạo yêu cầu gia hạn",
         400,
         ERROR_CODE.VALIDATION_ERROR,
       );

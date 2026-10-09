@@ -5,7 +5,7 @@ export interface TaskDto {
   code: string | null;
   title: string;
   description: string | null;
-  deadline: Date | string;
+  deadline: Date | string | null;
   startDate: Date | string | null;
   estDays: number | null;
   phase: string | null;
@@ -58,11 +58,11 @@ export interface TaskDto {
 export interface CreateTaskDto {
   title: string;
   description?: string;
-  deadline: string;
-  estDays: number;
+  deadline?: string | null;
+  estDays?: number;
   priority?: TaskPriority;
   code?: string;
-  startDate?: string;
+  startDate?: string | null;
   phase?: string;
   module?: string;
   acceptanceCriteria?: string;
@@ -226,8 +226,8 @@ export interface ImportTaskRowDto {
   excelCode: string;
   title: string;
   description: string;
-  deadline: string;
-  startDate?: string;
+  deadline?: string | null;
+  startDate?: string | null;
   priority: TaskPriority;
   ownerEmail?: string;
   supportEmail?: string;
@@ -269,5 +269,25 @@ export interface ImportResultDto {
 export interface ImportTaskBodyDto {
   taskGroupId?: string;
   taskGroupName?: string;
+}
+
+export interface AdjustTaskScheduleDto {
+  taskGroupId?: string;
+  taskIds?: string[];
+  anchorStartDate?: string;
+  shiftDays?: number;
+}
+
+export interface AdjustTaskScheduleResultDto {
+  adjustedTasksCount: number;
+  skippedDoneCount?: number;
+  tasks: Array<{
+    id: string;
+    code: string | null;
+    title: string;
+    startDate: Date | string | null;
+    deadline: Date | string | null;
+    estDays: number | null;
+  }>;
 }
 
